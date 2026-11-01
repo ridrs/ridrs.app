@@ -20,7 +20,7 @@ import {
 } from '@ridrs/contracts';
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
-import type { BleSimulator, SimulatedPeripheral } from '@ridrs/testing';
+import type { BleSimulator, SimulatedPeripheral, SimulatedTauriBridge } from '@ridrs/testing';
 import type FakeTimers from '@sinonjs/fake-timers';
 import type { ResultPromise } from 'execa';
 import { z } from 'zod';
@@ -76,6 +76,7 @@ export class RidrsWorld extends World {
   // Phase 2 state
   realPluginIds: string[] = [];
   bleSimulator?: BleSimulator;
+  tauriBridge?: SimulatedTauriBridge;
   trainer?: SimulatedPeripheral;
   readonly observed: EventEnvelope[] = [];
   packetMark = 0;
@@ -138,6 +139,8 @@ export class RidrsWorld extends World {
       await this.host.dispose();
       this.host = undefined;
     }
+    this.tauriBridge?.uninstall();
+    this.tauriBridge = undefined;
     if (this.tempPluginDir) {
       await rm(this.tempPluginDir, { recursive: true, force: true });
       this.tempPluginDir = '';

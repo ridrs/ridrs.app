@@ -5,3 +5,4 @@ export {
   SimulatedPeripheral,
   type SimulatedPeripheralOptions,
 } from './ble-simulator.ts';
+export { SimulatedTauriBridge } from './tauri-bridge.ts';

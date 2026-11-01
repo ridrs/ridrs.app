@@ -1,0 +1,9 @@
+{
+  "id": "transport-ble-tauri",
+  "name": "BLE Transport (Tauri)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["ble.central"],
+  "requires": [],
+  "entry": "index.ts"
+}

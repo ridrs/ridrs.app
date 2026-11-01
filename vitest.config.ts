@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/**/*.test.ts', 'tests/**/*.test.ts'],
+    include: ['packages/**/*.test.ts', 'plugins/**/*.test.ts', 'tests/**/*.test.ts'],
     environment: 'node',
   },
 });
