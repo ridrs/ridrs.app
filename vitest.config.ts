@@ -9,6 +9,8 @@ export default defineConfig({
       '@ridrs/contracts': resolve(import.meta.dirname, 'packages/contracts/src/index.ts'),
       '@ridrs/core/node': resolve(import.meta.dirname, 'packages/core/src/node/index.ts'),
       '@ridrs/core': resolve(import.meta.dirname, 'packages/core/src/index.ts'),
+      '@ridrs/ui-sdk': resolve(import.meta.dirname, 'packages/ui-sdk/src/index.ts'),
+      '@ridrs/ui-shell': resolve(import.meta.dirname, 'packages/ui-shell/src/index.ts'),
     },
   },
   test: {

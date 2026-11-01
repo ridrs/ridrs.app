@@ -1,0 +1,29 @@
+{
+  "id": "ui-widget-cadence",
+  "name": "Cadence Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui",
+    "metric-widget"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "cadence",
+        "extensionPoint": "hud/widget",
+        "export": "CadenceWidget",
+        "order": 1
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "metric.cadence"
+      ],
+      "publish": []
+    }
+  }
+}

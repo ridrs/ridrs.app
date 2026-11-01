@@ -30,6 +30,7 @@ import {
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
 import type { BleSimulator, SimulatedPeripheral, SimulatedTauriBridge } from '@ridrs/testing';
+import { createInProcessUiBridge, type InProcessUiBridge } from '@ridrs/ui-bridge';
 import type FakeTimers from '@sinonjs/fake-timers';
 import type { ResultPromise } from 'execa';
 import { z } from 'zod';
@@ -110,6 +111,12 @@ export class RidrsWorld extends World {
   /** Events recorded by the World's own host-level subscriptions (see HOST_OBSERVED_EVENTS). */
   readonly hostObserved: EventEnvelope[] = [];
   readonly pendingUi = new Map<string, Record<string, unknown>>();
+  extraPluginDirs: string[] = [];
+
+  // UI state (@ui scenarios): the in-process bridge is created with the host, like in apps/native.
+  uiEnabled = false;
+  uiBridge?: InProcessUiBridge;
+  readonly uiViews: Array<{ readonly root: HTMLElement; dispose: () => void }> = [];
   packetMark = 0;
   readonly stopMarks = new Map<
     string,
@@ -172,10 +179,7 @@ export class RidrsWorld extends World {
     if (this.headlessProcess && !this.headlessExited) {
       this.headlessProcess.kill('SIGKILL');
     }
-    if (this.host) {
-      await this.host.dispose();
-      this.host = undefined;
-    }
+    await this.disposeHost();
     this.tauriBridge?.uninstall();
     this.tauriBridge = undefined;
     if (this.tempPluginDir) {
@@ -186,12 +190,28 @@ export class RidrsWorld extends World {
     this.fakeClock = undefined;
   }
 
+  /** Unmounts every UI view, then disposes the bridge and the host. */
+  async disposeHost(): Promise<void> {
+    for (const view of this.uiViews.splice(0)) {
+      view.dispose();
+      view.root.remove();
+    }
+    this.uiBridge?.dispose();
+    this.uiBridge = undefined;
+    if (this.host) {
+      await this.host.dispose();
+      this.host = undefined;
+    }
+  }
+
   ensureHost(): PluginHost {
     if (!this.host) {
-      const dirs =
-        this.realPluginIds.length > 0
+      const dirs = [
+        ...(this.realPluginIds.length > 0
           ? [this.tempPluginDir, REAL_PLUGINS_DIR]
-          : [this.tempPluginDir];
+          : [this.tempPluginDir]),
+        ...this.extraPluginDirs,
+      ];
       this.host = new PluginHost({
         sources: this.bundled
           ? [createBundledPluginSource(this.bundled satisfies BundledPluginSet)]
@@ -201,6 +221,9 @@ export class RidrsWorld extends World {
         capabilities: this.capabilityContracts.values(),
         events: this.eventDefinitions.values(),
       });
+      if (this.uiEnabled) {
+        this.uiBridge = createInProcessUiBridge(this.host, PHASE_3_EVENTS);
+      }
       for (const event of HOST_OBSERVED_EVENTS) {
         this.host.subscribeEvent('test-world', event, (envelope) => {
           this.hostObserved.push(envelope);

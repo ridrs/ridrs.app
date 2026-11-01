@@ -65,6 +65,71 @@ module.exports = {
       },
     },
     {
+      name: 'ui-sdk-only-imports-contracts',
+      comment:
+        'packages/ui-sdk is the browser-safe client contract: it imports packages/contracts only.',
+      severity: 'error',
+      from: { path: '^packages/ui-sdk/' },
+      to: { path: '^(packages/(?!contracts/|ui-sdk/)|plugins/|apps/|tests/)' },
+    },
+    {
+      name: 'browser-code-stays-browser-safe',
+      comment:
+        'Client modules, the shell and the client contract run in a WebView: no node builtins, no packages/core, no apps or tests.',
+      severity: 'error',
+      from: {
+        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/|packages/contracts/)',
+        pathNot: '\\.test\\.ts$',
+      },
+      to: { path: '^(node:|packages/core/|packages/testing/|apps/|tests/)' },
+    },
+    {
+      name: 'browser-code-no-node-builtins',
+      comment: 'Node builtins (dependency type "core") are not available to browser code.',
+      severity: 'error',
+      from: {
+        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/)',
+        pathNot: '\\.test\\.ts$',
+      },
+      to: { dependencyTypes: ['core'] },
+    },
+    {
+      name: 'ui-shell-imports-sdk-and-contracts-only',
+      comment: 'The shell talks to the host only through the UiBridge port of packages/ui-sdk.',
+      severity: 'error',
+      from: { path: '^packages/ui-shell/' },
+      to: { path: '^(packages/(?!contracts/|ui-sdk/|ui-shell/)|plugins/|apps/|tests/)' },
+    },
+    {
+      name: 'tauri-only-in-transport-native-and-testing',
+      comment:
+        '@tauri-apps/* may only be imported by plugins/transport-ble-tauri, apps/native and the simulated bridge in packages/testing.',
+      severity: 'error',
+      from: { pathNot: '^(plugins/transport-ble-tauri/|apps/native/|packages/testing/)' },
+      to: { path: '@tauri-apps' },
+    },
+    {
+      name: 'domain-plugins-know-no-ui',
+      comment: 'Activity, device, metric, transport and output plugins never import UI code.',
+      severity: 'error',
+      from: { path: '^plugins/(activity-|device-|metric-|transport-|output-)' },
+      to: { path: '(^packages/ui-|react)' },
+    },
+    {
+      name: 'core-knows-no-ui-packages',
+      comment: 'The core indexes UI manifests but never imports UI packages.',
+      severity: 'error',
+      from: { path: '^packages/(core|contracts)/' },
+      to: { path: '(^packages/ui-|react)' },
+    },
+    {
+      name: 'react-only-in-ui-code',
+      comment: 'React is an implementation detail of UI plugin clients and the native app entry.',
+      severity: 'error',
+      from: { pathNot: '^(plugins/ui-[^/]+/client/|apps/native/src/|tests/)' },
+      to: { path: '(^|/)node_modules/.*/(react|react-dom)/' },
+    },
+    {
       name: 'testing-only-in-tests',
       comment:
         'packages/testing may be imported by tests/** and tests/fixtures/** only - never by plugins/**, packages/core, packages/contracts, or apps/**.',

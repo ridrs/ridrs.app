@@ -145,7 +145,7 @@ export class PluginHost {
   async loadClientModule(pluginId: string): Promise<unknown> {
     const managed = this.plugins.get(pluginId);
     const client = managed?.discovered.manifest.ui?.client;
-    if (!managed || managed.state !== 'started' || client === undefined) {
+    if (managed?.state !== 'started' || client === undefined) {
       throw new Error(`Plugin "${pluginId}" has no client module in the UI registry`);
     }
     return managed.discovered.candidate.loadModule(client);

@@ -1,0 +1,21 @@
+{
+  "id": "ui-landscape-flat",
+  "name": "Flat Landscape",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "landscape",
+        "extensionPoint": "activity/landscape",
+        "export": "FlatLandscape"
+      }
+    ]
+  }
+}
