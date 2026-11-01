@@ -14,3 +14,4 @@ export { EventBus } from './event-bus.ts';
 export { createConsoleLogger, createSilentLogger } from './logger.ts';
 export { PluginHost, type PluginHostOptions } from './plugin-host.ts';
 export { type ResolutionResult, resolveCapabilities } from './resolution.ts';
+export { computeUiRegistry, type UiRegistryInput, type UiRegistryResult } from './ui-registry.ts';

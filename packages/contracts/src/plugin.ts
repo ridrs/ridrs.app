@@ -5,6 +5,7 @@ import type { Clock } from './clock.ts';
 import type { DiagnosticCode } from './diagnostics.ts';
 import type { PluginEventsContext } from './events.ts';
 import type { PluginManifest } from './manifest.ts';
+import type { UiRegistry } from './ui.ts';
 
 export type PluginState =
   | 'discovered'
@@ -39,6 +40,8 @@ export interface PluginContext {
   readonly events: PluginEventsContext;
   readonly capabilities: PluginCapabilitiesContext;
   readonly signal: AbortSignal;
+  /** Read-only view of the UI registry; `core.ui-registry.changed` announces new revisions. */
+  readonly ui: { registry(): UiRegistry };
   reportDiagnostic(
     code: DiagnosticCode,
     message: string,

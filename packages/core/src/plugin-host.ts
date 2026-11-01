@@ -5,6 +5,9 @@ import {
   type Clock,
   type Diagnostic,
   type DiagnosticCode,
+  type EventDefinition,
+  type EventHandler,
+  type EventSubscription,
   hostStartedEvent,
   type PluginContext,
   type PluginDefinition,
@@ -12,6 +15,8 @@ import {
   type PluginManifest,
   type PluginState,
   RidrsError,
+  type UiRegistry,
+  uiRegistryChangedEvent,
 } from '@ridrs/contracts';
 import type { DepGraph } from 'dependency-graph';
 import { CapabilityRegistry } from './capability-registry.ts';
@@ -21,6 +26,7 @@ import { type DiscoveredPlugin, discoverPlugins, type PluginSource } from './dis
 import { EventBus } from './event-bus.ts';
 import { createSilentLogger } from './logger.ts';
 import { resolveCapabilities } from './resolution.ts';
+import { computeUiRegistry } from './ui-registry.ts';
 
 export interface PluginHostOptions {
   /** Where plugins come from: a file-system source in Node hosts, a bundled source in apps. */
@@ -29,6 +35,8 @@ export interface PluginHostOptions {
   readonly clock?: Clock;
   readonly logger?: PluginLogger;
   readonly capabilities?: Iterable<CapabilityContract>;
+  /** Event definitions the host can resolve by id (for bridges that only know ids). */
+  readonly events?: Iterable<EventDefinition>;
 }
 
 interface ManagedPlugin {
@@ -38,7 +46,17 @@ interface ManagedPlugin {
   definition?: PluginDefinition;
   abortController?: AbortController;
   publishingAllowed: boolean;
+  /** Whether the plugin source can deliver `ui.client`; checked whenever the plugin starts. */
+  clientAvailable: boolean;
 }
+
+const EMPTY_UI_REGISTRY: UiRegistry = Object.freeze({
+  revision: 0,
+  screens: [],
+  contributions: [],
+  events: { subscribe: [], publish: [] },
+  plugins: [],
+});
 
 export class PluginHost {
   private readonly sources: readonly PluginSource[];
@@ -54,6 +72,9 @@ export class PluginHost {
   private initializedOrder: string[] = [];
   private discoveredOnce = false;
   private running = false;
+  private readonly eventDefinitions = new Map<string, EventDefinition>();
+  private uiRegistry: UiRegistry = EMPTY_UI_REGISTRY;
+  private readonly reportedUiProblems = new Set<string>();
 
   constructor(options: PluginHostOptions) {
     this.sources = options.sources;
@@ -65,6 +86,7 @@ export class PluginHost {
     if (options.capabilities) {
       this.capabilityRegistry.registerContracts(options.capabilities);
     }
+    this.registerEvents(options.events ?? []);
     this.eventBus = new EventBus({
       clock: this.clock,
       diagnostics: this.diagnostics,
@@ -83,6 +105,52 @@ export class PluginHost {
     this.capabilityRegistry.registerContracts(contracts);
   }
 
+  registerEvents(definitions: Iterable<EventDefinition>): void {
+    for (const definition of definitions) {
+      this.eventDefinitions.set(definition.id, definition);
+    }
+  }
+
+  getEventDefinition(eventId: string): EventDefinition | undefined {
+    return this.eventDefinitions.get(eventId);
+  }
+
+  /** Publishes on the bus with an arbitrary source, e.g. a UI bridge acting for client code. */
+  publishEvent<TPayload, TType extends string>(
+    source: string,
+    event: EventDefinition<TPayload, TType>,
+    payload: TPayload,
+  ): void {
+    this.eventBus.publishSystemEvent(source, event, payload);
+  }
+
+  /** Bus subscription owned by the composition root; it outlives plugin stops. */
+  subscribeEvent<TPayload, TType extends string>(
+    owner: string,
+    event: EventDefinition<TPayload, TType>,
+    handler: EventHandler<TPayload, TType>,
+  ): EventSubscription {
+    return this.eventBus.subscribeSystem(owner, event, handler);
+  }
+
+  reportDiagnostic(diagnostic: Diagnostic): void {
+    this.diagnostics.report(diagnostic);
+  }
+
+  getUiRegistry(): UiRegistry {
+    return this.uiRegistry;
+  }
+
+  /** Loads the client module of a plugin that is currently in the UI registry. */
+  async loadClientModule(pluginId: string): Promise<unknown> {
+    const managed = this.plugins.get(pluginId);
+    const client = managed?.discovered.manifest.ui?.client;
+    if (!managed || managed.state !== 'started' || client === undefined) {
+      throw new Error(`Plugin "${pluginId}" has no client module in the UI registry`);
+    }
+    return managed.discovered.candidate.loadModule(client);
+  }
+
   async discover(): Promise<readonly PluginManifest[]> {
     const discoveredList = await discoverPlugins(this.sources, this.diagnostics);
     this.plugins.clear();
@@ -91,6 +159,7 @@ export class PluginHost {
         discovered: item,
         state: 'discovered',
         publishingAllowed: false,
+        clientAvailable: false,
       });
     }
     this.discoveredOnce = true;
@@ -205,6 +274,7 @@ export class PluginHost {
 
       managed.state = 'started';
       managed.publishingAllowed = true;
+      managed.clientAvailable = await this.checkClient(managed);
 
       try {
         await managed.definition?.start?.(managed.context);
@@ -225,6 +295,8 @@ export class PluginHost {
     }
 
     this.running = true;
+    // Once for the whole start, so transient states (a contribution started before its screen) never surface.
+    this.refreshUiRegistry();
     this.eventBus.publishSystemEvent('core.host', hostStartedEvent, {
       startedPlugins,
     });
@@ -244,6 +316,37 @@ export class PluginHost {
     for (const id of toStopOrder) {
       await this.stopSinglePlugin(id);
     }
+    this.refreshUiRegistry();
+  }
+
+  /** Starts a plugin again after `stopPlugin`, with a fresh context and abort signal. */
+  async startPlugin(pluginId: string): Promise<void> {
+    const managed = this.plugins.get(pluginId);
+    if (managed?.state !== 'stopped' || !managed.definition) {
+      return;
+    }
+    const abortController = new AbortController();
+    managed.abortController = abortController;
+    managed.context = this.createPluginContext(managed.discovered.manifest, abortController.signal);
+    managed.state = 'started';
+    managed.publishingAllowed = true;
+    managed.clientAvailable = await this.checkClient(managed);
+    try {
+      await managed.definition.start?.(managed.context);
+    } catch (error) {
+      abortController.abort();
+      managed.publishingAllowed = false;
+      const reason = error instanceof Error ? error.message : String(error);
+      this.diagnostics.report({
+        code: 'lifecycle-failure',
+        pluginId,
+        message: `Plugin "${pluginId}" failed in "start" hook: ${reason}`,
+        details: { hook: 'start' },
+      });
+      this.eventBus.removeSubscriptionsForPlugin(pluginId);
+      this.failPluginAndBlockDependents(pluginId);
+    }
+    this.refreshUiRegistry();
   }
 
   async stop(): Promise<void> {
@@ -251,6 +354,7 @@ export class PluginHost {
     for (const pluginId of reverseOrder) {
       await this.stopSinglePlugin(pluginId);
     }
+    this.refreshUiRegistry();
     this.eventBus.removeAllSubscriptions();
     this.running = false;
   }
@@ -352,6 +456,7 @@ export class PluginHost {
       events: this.eventBus.createPluginEventsContext(manifest.id),
       capabilities: this.capabilityRegistry.createPluginCapabilitiesContext(manifest),
       signal,
+      ui: Object.freeze({ registry: () => this.uiRegistry }),
       reportDiagnostic: (
         code: DiagnosticCode,
         message: string,
@@ -391,6 +496,48 @@ export class PluginHost {
       });
       return undefined;
     }
+  }
+
+  private async checkClient(managed: ManagedPlugin): Promise<boolean> {
+    const client = managed.discovered.manifest.ui?.client;
+    if (client === undefined) {
+      return false;
+    }
+    return managed.discovered.candidate.hasModule(client).catch(() => false);
+  }
+
+  /** Recomputes the UI registry from the started plugins and announces it if it changed. */
+  private refreshUiRegistry(): void {
+    const inputs = [...this.plugins.values()].flatMap((managed) => {
+      const ui = managed.discovered.manifest.ui;
+      return managed.state === 'started' && ui
+        ? [
+            {
+              pluginId: managed.discovered.manifest.id,
+              ui,
+              clientAvailable: managed.clientAvailable,
+            },
+          ]
+        : [];
+    });
+    const { registry, problems } = computeUiRegistry(inputs);
+
+    for (const problem of problems) {
+      const key = `${problem.code}|${problem.pluginId}|${problem.message}`;
+      if (!this.reportedUiProblems.has(key)) {
+        this.reportedUiProblems.add(key);
+        this.diagnostics.report(problem);
+      }
+    }
+
+    const { revision: _previous, ...previous } = this.uiRegistry;
+    if (JSON.stringify(previous) === JSON.stringify(registry)) {
+      return;
+    }
+    this.uiRegistry = Object.freeze({ revision: this.uiRegistry.revision + 1, ...registry });
+    this.eventBus.publishSystemEvent('core.host', uiRegistryChangedEvent, {
+      revision: this.uiRegistry.revision,
+    });
   }
 
   private failPluginAndBlockDependents(pluginId: string): void {

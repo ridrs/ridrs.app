@@ -85,6 +85,7 @@ When('the plugin {string} is stopped', async function (this: RidrsWorld, pluginI
   const host = this.ensureHost();
   this.stopMarks.set(pluginId, {
     observed: this.observed.length,
+    hostObserved: this.hostObserved.length,
     connectAttempts: this.bleSimulator?.connectAttemptCount() ?? 0,
   });
   await host.stopPlugin(pluginId);

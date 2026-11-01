@@ -63,6 +63,35 @@ export class EventBus {
     this.publishFromSource(source, event, payload);
   }
 
+  /**
+   * Subscription owned by the host or its composition root rather than a plugin; it is not released
+   * when plugins stop, only through the returned handle.
+   */
+  subscribeSystem<TPayload, TType extends string>(
+    owner: string,
+    event: EventDefinition<TPayload, TType>,
+    handler: EventHandler<TPayload, TType>,
+  ): EventSubscription {
+    let subject = this.subjects.get(event.id);
+    if (!subject) {
+      subject = new Subject<EventEnvelope>();
+      this.subjects.set(event.id, subject);
+    }
+    const rxSubscription = subject.subscribe((envelope) => {
+      try {
+        handler(envelope as EventEnvelope<TPayload, TType>);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.diagnostics.report({
+          code: 'event-handler-failure',
+          message: `Subscriber "${owner}" failed while handling event "${event.id}": ${reason}`,
+          details: { eventType: event.id, owner },
+        });
+      }
+    });
+    return { unsubscribe: () => rxSubscription.unsubscribe() };
+  }
+
   private publishFromSource<TPayload, TType extends string>(
     source: string,
     event: EventDefinition<TPayload, TType>,
