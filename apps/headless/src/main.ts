@@ -13,6 +13,12 @@ import { createFileSystemPluginSource } from '@ridrs/core/node';
 import pino from 'pino';
 import pretty from 'pino-pretty';
 
+/**
+ * Plugins that need a runtime this host does not have (the Tauri WebView). Excluded like `--disable`,
+ * mirroring how `apps/native` leaves Node-only plugins out of its bundle.
+ */
+const PLUGINS_FOR_OTHER_RUNTIMES = ['transport-ble-tauri'];
+
 function resolvePluginDir(requestedDir: string): string {
   const baseDir = process.env.INIT_CWD ?? process.cwd();
   const resolvedFromBase = resolve(baseDir, requestedDir);
@@ -40,7 +46,7 @@ async function main(): Promise<void> {
 
   const requestedDirs = values.plugins && values.plugins.length > 0 ? values.plugins : ['plugins'];
   const pluginsDirs = requestedDirs.map(resolvePluginDir);
-  const disabledPlugins = values.disable ?? [];
+  const disabledPlugins = [...PLUGINS_FOR_OTHER_RUNTIMES, ...(values.disable ?? [])];
 
   const stream = process.stdout.isTTY ? pretty({ sync: true }) : pino.destination({ sync: true });
   const logger = pino({ name: 'ridrs-headless' }, stream);

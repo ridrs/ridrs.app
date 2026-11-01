@@ -119,6 +119,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
 
   plugins/device-ftms-trainer:
     dependencies:
@@ -165,6 +168,15 @@ importers:
       '@abandonware/noble':
         specifier: 1.9.2-26
         version: 1.9.2-26(encoding@0.1.14)
+
+  plugins/transport-ble-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
 
 packages:
 
@@ -619,6 +631,9 @@ packages:
 
   '@sinonjs/fake-timers@15.4.0':
     resolution: {integrity: sha512-DsG+8/LscQIQg68J6Ef3dv10u6nVyetYn923s3/sus5eaGfTo1of5WMZSLf0UJc9KDuKPilPH0UDJCjvNbDNCA==}
+
+  '@tauri-apps/api@2.12.4':
+    resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
 
   '@teppeis/multimaps@3.0.0':
     resolution: {integrity: sha512-ID7fosbc50TbT0MK0EG12O+gAP3W3Aa/Pz4DaTtQtEvlc9Odaqi0de+xuZ7Li2GtK4HzEX7IuRWS/JmZLksR3Q==}
@@ -2269,6 +2284,8 @@ snapshots:
   '@sinonjs/fake-timers@15.4.0':
     dependencies:
       '@sinonjs/commons': 3.0.1
+
+  '@tauri-apps/api@2.12.4': {}
 
   '@teppeis/multimaps@3.0.0': {}
 

@@ -14,7 +14,7 @@ import {
   metricCadenceCapability,
   metricPowerCapability,
 } from '@ridrs/contracts';
-import { BleSimulator, type SimulatedPeripheral } from '@ridrs/testing';
+import { BleSimulator, type SimulatedPeripheral, SimulatedTauriBridge } from '@ridrs/testing';
 import type { RidrsWorld } from '../support/world.ts';
 
 const METRIC_PLUGIN_CAPABILITIES: Record<string, string> = {
@@ -136,6 +136,16 @@ Given(
 );
 
 Given(
+  'a simulated Tauri bridge with an FTMS trainer {string}',
+  function (this: RidrsWorld, name: string) {
+    this.bleSimulator = new BleSimulator({ clock: this.clock });
+    this.trainer = this.bleSimulator.addFtmsTrainer(name);
+    this.tauriBridge = new SimulatedTauriBridge(this.bleSimulator, this.clock);
+    this.tauriBridge.install();
+  },
+);
+
+Given(
   'the simulated BLE environment also contains a peripheral {string} without FTMS',
   function (this: RidrsWorld, name: string) {
     simulator(this).addPeripheral({ name, serviceUuids: ['180d'] });
@@ -151,6 +161,12 @@ Given(
     await this.settle();
   },
 );
+
+Given('the ridrs plugins {string} running', async function (this: RidrsWorld, pluginsCsv: string) {
+  await useRealPlugins(this, splitCsv(pluginsCsv));
+  await this.ensureHost().start();
+  await this.settle();
+});
 
 Given(
   'the ridrs plugins {string} with the simulated BLE central',
@@ -254,6 +270,20 @@ Then('the plugin connected to {string}', function (this: RidrsWorld, name: strin
 
 Then('the plugin never connected to {string}', function (this: RidrsWorld, name: string) {
   assert.equal(peripheral(this, name).wasEverConnected(), false);
+});
+
+Then('the simulated Tauri bridge received no new scan request', function (this: RidrsWorld) {
+  assert.ok(this.tauriBridge, 'Expected a simulated Tauri bridge');
+  assert.equal(this.tauriBridge.scanRequestCount(), 1);
+});
+
+Then('the simulated Tauri bridge holds no subscriptions', function (this: RidrsWorld) {
+  assert.ok(this.tauriBridge, 'Expected a simulated Tauri bridge');
+  assert.equal(this.tauriBridge.subscriptionCount(), 0);
+});
+
+Then('the trainer {string} is no longer connected', function (this: RidrsWorld, name: string) {
+  assert.equal(peripheral(this, name).isConnected(), false);
 });
 
 Then('the trainer {string} is still connected', function (this: RidrsWorld, name: string) {
