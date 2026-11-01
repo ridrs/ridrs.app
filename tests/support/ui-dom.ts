@@ -2,6 +2,7 @@
 
 import { After, AfterAll, Before } from '@cucumber/cucumber';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
+import { configure } from '@testing-library/dom';
 import type { RidrsWorld } from './world.ts';
 
 // @ui scenarios render the real shell and UI plugins into a headless DOM (happy-dom), in the same
@@ -11,6 +12,8 @@ import type { RidrsWorld } from './world.ts';
 Before({ tags: '@ui' }, function (this: RidrsWorld) {
   if (!GlobalRegistrator.isRegistered) {
     GlobalRegistrator.register({ url: 'http://localhost/' });
+    // The simulated trainer plays in real time; its steady state arrives after about two seconds.
+    configure({ asyncUtilTimeout: 5000 });
   }
   this.uiEnabled = true;
 });

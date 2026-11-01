@@ -10,7 +10,9 @@
       "*.cjs",
       "*.json",
       "!node_modules",
-      "!dist",
+      "!**/dist",
+      "!**/src-tauri/target",
+      "!**/src-tauri/gen",
       "!web",
       "!experiments"
     ]

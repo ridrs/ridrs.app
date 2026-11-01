@@ -7,14 +7,14 @@ Phase 1 establishes the headless foundation of **ridrs**: a contract-driven plug
 ## Packages and Boundaries
 
 - **`@ridrs/contracts` (`packages/contracts`)**: Public developer contracts licensed under `Apache-2.0`. Defines `manifestSchema`, `definePlugin`, `defineEvent`, `defineCapability`, `Clock`, `PluginContext`, `Diagnostic`, and `RidrsError`. Imports no internal packages.
-- **`@ridrs/core` (`packages/core`)**: Platform runtime licensed under `AGPL-3.0-or-later`. Implements `discoverPlugins`, `resolveCapabilities`, `CapabilityRegistry`, `EventBus`, `DiagnosticCollector`, and `PluginHost`. Imports only `@ridrs/contracts`.
+- **`@ridrs/core` (`packages/core`)**: Platform runtime licensed under `AGPL-3.0-or-later`, runtime-neutral (Node and WebView). Implements `discoverPlugins`, `resolveCapabilities`, `CapabilityRegistry`, `EventBus`, `DiagnosticCollector`, and `PluginHost`. Imports only `@ridrs/contracts`.
 - **`@ridrs/headless` (`apps/headless`)**: Headless CLI composition root licensed under `AGPL-3.0-or-later`. Discovers plugins from a target directory, starts the `PluginHost`, and handles graceful shutdown on `SIGINT`/`SIGTERM`.
 
 Architectural boundaries are enforced in CI via `dependency-cruiser` (`.dependency-cruiser.cjs`). Plugins may only import `@ridrs/contracts` (and shared contract definitions) and never import `@ridrs/core`, `apps/*`, or another plugin's folder.
 
 ## Plugin Discovery & Manifest Validation
 
-Discovery scans immediate subdirectories of a plugin root using `tinyglobby`. Every folder must contain a `manifest.json` validated against `manifestSchema` (Zod v4 `.strict()` plus `semver`):
+Discovery goes through the `PluginSource` port, so the core stays runtime-neutral (see [ui-and-activity.md](ui-and-activity.md#runtime-neutral-core)). `createFileSystemPluginSource(dir)` (Node-only entry `@ridrs/core/node`, `tinyglobby`) lists the immediate subdirectories of a plugin root; `createBundledPluginSource(set)` takes a plugin set bundled at build time. Every candidate's `manifest.json` is validated against `manifestSchema` (Zod v4 `.strict()` plus `semver`):
 
 - Missing `manifest.json` reports `missing-manifest`.
 - Invalid JSON or schema violations report `invalid-manifest` with field-level details.
