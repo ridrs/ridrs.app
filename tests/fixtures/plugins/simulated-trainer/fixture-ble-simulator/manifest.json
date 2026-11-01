@@ -1,0 +1,9 @@
+{
+  "id": "fixture-ble-simulator",
+  "name": "Simulated BLE Trainer (fixture)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["ble.central"],
+  "requires": [],
+  "entry": "index.ts"
+}

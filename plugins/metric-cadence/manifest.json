@@ -1,0 +1,9 @@
+{
+  "id": "metric-cadence",
+  "name": "Cadence Metric",
+  "version": "0.1.0",
+  "types": ["metric"],
+  "provides": ["metric.cadence"],
+  "requires": [],
+  "entry": "index.ts"
+}

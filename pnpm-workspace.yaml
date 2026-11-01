@@ -1,9 +1,16 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "plugins/*"
 
 savePrefix: ""
 onlyBuiltDependencies:
+  - "@abandonware/bluetooth-hci-socket"
+  - "@abandonware/noble"
   - esbuild
+  - napi-thread-safe-callback
 allowBuilds:
+  "@abandonware/bluetooth-hci-socket": true
+  "@abandonware/noble": true
   esbuild: true
+  napi-thread-safe-callback: true

@@ -3,9 +3,16 @@
   "compilerOptions": {
     "paths": {
       "@ridrs/contracts": ["./packages/contracts/src/index.ts"],
-      "@ridrs/core": ["./packages/core/src/index.ts"]
+      "@ridrs/core": ["./packages/core/src/index.ts"],
+      "@ridrs/testing": ["./packages/testing/src/index.ts"]
     }
   },
-  "include": ["apps/**/*.ts", "packages/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+  "include": [
+    "apps/**/*.ts",
+    "packages/**/*.ts",
+    "plugins/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ],
   "exclude": ["node_modules", "dist", "web", "experiments"]
 }

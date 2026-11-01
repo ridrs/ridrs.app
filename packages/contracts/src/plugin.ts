@@ -3,6 +3,7 @@
 import type { Logger } from 'pino';
 import type { PluginCapabilitiesContext } from './capabilities.ts';
 import type { Clock } from './clock.ts';
+import type { DiagnosticCode } from './diagnostics.ts';
 import type { PluginEventsContext } from './events.ts';
 import type { PluginManifest } from './manifest.ts';
 
@@ -23,6 +24,12 @@ export interface PluginContext {
   readonly clock: Clock;
   readonly events: PluginEventsContext;
   readonly capabilities: PluginCapabilitiesContext;
+  readonly signal: AbortSignal;
+  reportDiagnostic(
+    code: DiagnosticCode,
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): void;
 }
 
 export interface PluginDefinition {

@@ -14,76 +14,79 @@ export interface DiscoveredPlugin {
 }
 
 export async function discoverPlugins(
-  pluginsDir: string,
+  pluginsDir: string | readonly string[],
   diagnostics: DiagnosticCollector,
 ): Promise<DiscoveredPlugin[]> {
-  const rootDir = resolve(pluginsDir);
-
-  const [rawFolders, manifestMatches] = await Promise.all([
-    glob('*', { cwd: rootDir, onlyDirectories: true }),
-    glob('*/manifest.json', { cwd: rootDir }),
-  ]);
-
-  const folders = rawFolders
-    .map((f) => f.replace(/\/+$/, ''))
-    .filter((f) => f.length > 0 && !f.includes('/'))
-    .sort((a, b) => a.localeCompare(b));
-
-  const foldersWithManifest = new Set(
-    manifestMatches.map((m) => m.split('/')[0]).filter((f): f is string => Boolean(f)),
-  );
-
+  const dirs = typeof pluginsDir === 'string' ? [pluginsDir] : pluginsDir;
   const candidates: DiscoveredPlugin[] = [];
 
-  for (const folder of folders) {
-    if (!foldersWithManifest.has(folder)) {
-      diagnostics.report({
-        code: 'missing-manifest',
-        folder,
-        message: `Plugin folder "${folder}" is missing a manifest.json file`,
+  for (const dir of dirs) {
+    const rootDir = resolve(dir);
+
+    const [rawFolders, manifestMatches] = await Promise.all([
+      glob('*', { cwd: rootDir, onlyDirectories: true }),
+      glob('*/manifest.json', { cwd: rootDir }),
+    ]);
+
+    const folders = rawFolders
+      .map((f) => f.replace(/\/+$/, ''))
+      .filter((f) => f.length > 0 && !f.includes('/'))
+      .sort((a, b) => a.localeCompare(b));
+
+    const foldersWithManifest = new Set(
+      manifestMatches.map((m) => m.split('/')[0]).filter((f): f is string => Boolean(f)),
+    );
+
+    for (const folder of folders) {
+      if (!foldersWithManifest.has(folder)) {
+        diagnostics.report({
+          code: 'missing-manifest',
+          folder,
+          message: `Plugin folder "${folder}" is missing a manifest.json file`,
+        });
+        continue;
+      }
+
+      const folderPath = join(rootDir, folder);
+      const manifestPath = join(folderPath, 'manifest.json');
+
+      let rawJson: string;
+      try {
+        rawJson = await readFile(manifestPath, 'utf8');
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        diagnostics.report({
+          code: 'missing-manifest',
+          folder,
+          message: `Could not read manifest.json in folder "${folder}": ${reason}`,
+        });
+        continue;
+      }
+
+      const validation = parseManifestJson(rawJson);
+      if (!validation.success) {
+        diagnostics.report({
+          code: 'invalid-manifest',
+          folder,
+          message: `Invalid manifest in folder "${folder}": ${validation.message}`,
+        });
+        continue;
+      }
+
+      const manifest = Object.freeze({
+        ...validation.data,
+        types: [...validation.data.types],
+        provides: [...validation.data.provides],
+        requires: [...validation.data.requires],
       });
-      continue;
-    }
 
-    const folderPath = join(rootDir, folder);
-    const manifestPath = join(folderPath, 'manifest.json');
-
-    let rawJson: string;
-    try {
-      rawJson = await readFile(manifestPath, 'utf8');
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      diagnostics.report({
-        code: 'missing-manifest',
+      candidates.push({
         folder,
-        message: `Could not read manifest.json in folder "${folder}": ${reason}`,
+        folderPath,
+        entryPath: resolve(folderPath, manifest.entry),
+        manifest,
       });
-      continue;
     }
-
-    const validation = parseManifestJson(rawJson);
-    if (!validation.success) {
-      diagnostics.report({
-        code: 'invalid-manifest',
-        folder,
-        message: `Invalid manifest in folder "${folder}": ${validation.message}`,
-      });
-      continue;
-    }
-
-    const manifest = Object.freeze({
-      ...validation.data,
-      types: [...validation.data.types],
-      provides: [...validation.data.provides],
-      requires: [...validation.data.requires],
-    });
-
-    candidates.push({
-      folder,
-      folderPath,
-      entryPath: resolve(folderPath, manifest.entry),
-      manifest,
-    });
   }
 
   const byId = new Map<string, DiscoveredPlugin[]>();

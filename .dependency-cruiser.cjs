@@ -17,13 +17,25 @@ module.exports = {
     {
       name: 'core-only-imports-contracts',
       comment:
-        'packages/core may import contracts; it must never import plugins/, apps/, or tests/.',
+        'packages/core may import contracts; it must never import testing, plugins/, apps/, or tests/.',
       severity: 'error',
       from: {
         path: '^packages/core/',
       },
       to: {
-        path: '^(plugins/|apps/|tests/)',
+        path: '^(packages/(?!contracts/|core/)|plugins/|apps/|tests/)',
+      },
+    },
+    {
+      name: 'testing-only-in-tests',
+      comment:
+        'packages/testing may be imported by tests/** and tests/fixtures/** only - never by plugins/**, packages/core, packages/contracts, or apps/**.',
+      severity: 'error',
+      from: {
+        path: '^(packages/(?!testing/)|plugins/|apps/)',
+      },
+      to: {
+        path: '^packages/testing/',
       },
     },
     {
@@ -71,6 +83,28 @@ module.exports = {
       },
       to: {
         path: '^(plugins/|tests/fixtures/plugins/)',
+      },
+    },
+    {
+      name: 'noble-only-in-transport-ble-noble',
+      comment: '@abandonware/noble may only be imported inside plugins/transport-ble-noble.',
+      severity: 'error',
+      from: {
+        pathNot: '^plugins/transport-ble-noble/',
+      },
+      to: {
+        path: '@abandonware/noble',
+      },
+    },
+    {
+      name: 'metric-and-output-no-ble-or-ftms',
+      comment: 'metric-* and output-* must not import anything BLE- or FTMS-related.',
+      severity: 'error',
+      from: {
+        path: '^plugins/(metric-|output-)',
+      },
+      to: {
+        path: '(^packages/contracts/src/ble\\.ts$|^plugins/(transport-|device-)|@abandonware/noble|ftms)',
       },
     },
   ],

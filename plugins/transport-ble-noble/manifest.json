@@ -1,0 +1,9 @@
+{
+  "id": "transport-ble-noble",
+  "name": "BLE Transport (noble)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["ble.central"],
+  "requires": [],
+  "entry": "index.ts"
+}

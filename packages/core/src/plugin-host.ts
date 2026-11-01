@@ -5,6 +5,7 @@ import {
   type CapabilityContract,
   type Clock,
   type Diagnostic,
+  type DiagnosticCode,
   hostStartedEvent,
   type PluginContext,
   type PluginDefinition,
@@ -22,7 +23,8 @@ import { EventBus } from './event-bus.ts';
 import { resolveCapabilities } from './resolution.ts';
 
 export interface PluginHostOptions {
-  readonly pluginsDir: string;
+  readonly pluginsDir: string | readonly string[];
+  readonly disabledPlugins?: Iterable<string>;
   readonly clock?: Clock;
   readonly logger?: Logger;
   readonly capabilities?: Iterable<CapabilityContract>;
@@ -33,11 +35,13 @@ interface ManagedPlugin {
   state: PluginState;
   context?: PluginContext;
   definition?: PluginDefinition;
+  abortController?: AbortController;
   publishingAllowed: boolean;
 }
 
 export class PluginHost {
-  private readonly pluginsDir: string;
+  private readonly pluginsDir: string | readonly string[];
+  private readonly disabledPlugins: Set<string>;
   private readonly clock: Clock;
   private readonly logger: Logger;
   private readonly diagnostics: DiagnosticCollector;
@@ -52,6 +56,7 @@ export class PluginHost {
 
   constructor(options: PluginHostOptions) {
     this.pluginsDir = options.pluginsDir;
+    this.disabledPlugins = new Set(options.disabledPlugins ?? []);
     this.clock = options.clock ?? createSystemClock();
     this.logger = options.logger ?? pino({ level: 'silent' });
     this.diagnostics = new DiagnosticCollector(this.logger);
@@ -96,9 +101,12 @@ export class PluginHost {
       await this.discover();
     }
 
-    const discoveredList = [...this.plugins.values()].map((p) => p.discovered);
+    const enabledDiscoveredList = [...this.plugins.values()]
+      .filter((p) => !this.disabledPlugins.has(p.discovered.manifest.id))
+      .map((p) => p.discovered);
+
     const resolution = resolveCapabilities(
-      discoveredList,
+      enabledDiscoveredList,
       this.capabilityRegistry.getContracts(),
       this.diagnostics,
     );
@@ -111,6 +119,10 @@ export class PluginHost {
       const managed = this.plugins.get(blockedId);
       if (managed) {
         managed.state = 'blocked';
+        this.logger.warn(
+          { pluginId: blockedId, state: 'blocked' },
+          `Plugin "${blockedId}" is blocked`,
+        );
       }
     }
 
@@ -127,12 +139,18 @@ export class PluginHost {
         continue;
       }
 
+      const abortController = new AbortController();
+      managed.abortController = abortController;
       managed.definition = definition;
-      managed.context = this.createPluginContext(managed.discovered.manifest);
+      managed.context = this.createPluginContext(
+        managed.discovered.manifest,
+        abortController.signal,
+      );
 
       try {
         await definition.initialize?.(managed.context);
       } catch (error) {
+        abortController.abort();
         if (error instanceof RidrsError && error.code === 'undeclared-capability') {
           this.diagnostics.report({
             code: 'undeclared-capability',
@@ -159,6 +177,7 @@ export class PluginHost {
         (capId) => !this.capabilityRegistry.hasProvided(pluginId, capId),
       );
       if (missingProvided) {
+        abortController.abort();
         this.diagnostics.report({
           code: 'capability-not-provided',
           pluginId,
@@ -190,6 +209,7 @@ export class PluginHost {
         await managed.definition?.start?.(managed.context);
         startedPlugins.push(pluginId);
       } catch (error) {
+        managed.abortController?.abort();
         managed.publishingAllowed = false;
         const reason = error instanceof Error ? error.message : String(error);
         this.diagnostics.report({
@@ -301,7 +321,7 @@ export class PluginHost {
       return;
     }
 
-    managed.publishingAllowed = false;
+    managed.abortController?.abort();
     try {
       await managed.definition?.stop?.(managed.context);
       managed.state = 'stopped';
@@ -315,17 +335,34 @@ export class PluginHost {
       });
       managed.state = 'failed';
     } finally {
+      managed.publishingAllowed = false;
       this.eventBus.removeSubscriptionsForPlugin(pluginId);
     }
   }
 
-  private createPluginContext(manifest: Readonly<PluginManifest>): PluginContext {
+  private createPluginContext(
+    manifest: Readonly<PluginManifest>,
+    signal: AbortSignal,
+  ): PluginContext {
     return Object.freeze({
       manifest,
       logger: this.logger.child({ pluginId: manifest.id }),
       clock: this.clock,
       events: this.eventBus.createPluginEventsContext(manifest.id),
       capabilities: this.capabilityRegistry.createPluginCapabilitiesContext(manifest),
+      signal,
+      reportDiagnostic: (
+        code: DiagnosticCode,
+        message: string,
+        details?: Readonly<Record<string, unknown>>,
+      ): void => {
+        this.diagnostics.report({
+          code,
+          pluginId: manifest.id,
+          message,
+          details,
+        });
+      },
     });
   }
 
@@ -368,6 +405,7 @@ export class PluginHost {
         depManaged.state = 'blocked';
         depManaged.publishingAllowed = false;
         this.eventBus.removeSubscriptionsForPlugin(depId);
+        this.logger.warn({ pluginId: depId, state: 'blocked' }, `Plugin "${depId}" is blocked`);
       }
     }
   }

@@ -5,7 +5,7 @@ import type { Clock } from '@ridrs/contracts';
 export function createSystemClock(): Clock {
   return {
     now(): number {
-      return Math.trunc(performance.timeOrigin + performance.now());
+      return Date.now();
     },
   };
 }

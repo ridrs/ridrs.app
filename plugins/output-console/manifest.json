@@ -1,0 +1,9 @@
+{
+  "id": "output-console",
+  "name": "Console Output",
+  "version": "0.1.0",
+  "types": ["output"],
+  "provides": [],
+  "requires": ["metric.power", "metric.cadence"],
+  "entry": "index.ts"
+}

@@ -3,8 +3,20 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import {
+  bleCentralCapability,
+  metricCadenceCapability,
+  metricPowerCapability,
+} from '@ridrs/contracts';
 import { createSystemClock, PluginHost } from '@ridrs/core';
 import pino from 'pino';
+import pretty from 'pino-pretty';
+
+function resolvePluginDir(requestedDir: string): string {
+  const baseDir = process.env.INIT_CWD ?? process.cwd();
+  const resolvedFromBase = resolve(baseDir, requestedDir);
+  return existsSync(resolvedFromBase) ? resolvedFromBase : resolve(process.cwd(), requestedDir);
+}
 
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2).filter((arg) => arg !== '--');
@@ -14,23 +26,30 @@ async function main(): Promise<void> {
       plugins: {
         type: 'string',
         short: 'p',
+        multiple: true,
+      },
+      disable: {
+        type: 'string',
+        short: 'd',
+        multiple: true,
       },
     },
     strict: true,
   });
 
-  const requestedDir = values.plugins ?? 'plugins';
-  const baseDir = process.env.INIT_CWD ?? process.cwd();
-  const resolvedFromBase = resolve(baseDir, requestedDir);
-  const pluginsDir = existsSync(resolvedFromBase)
-    ? resolvedFromBase
-    : resolve(process.cwd(), requestedDir);
+  const requestedDirs = values.plugins && values.plugins.length > 0 ? values.plugins : ['plugins'];
+  const pluginsDirs = requestedDirs.map(resolvePluginDir);
+  const disabledPlugins = values.disable ?? [];
 
-  const logger = pino({ name: 'ridrs-headless' }, pino.destination({ sync: true }));
+  const stream = process.stdout.isTTY ? pretty({ sync: true }) : pino.destination({ sync: true });
+  const logger = pino({ name: 'ridrs-headless' }, stream);
+
   const host = new PluginHost({
-    pluginsDir,
+    pluginsDir: pluginsDirs,
+    disabledPlugins,
     clock: createSystemClock(),
     logger,
+    capabilities: [bleCentralCapability, metricPowerCapability, metricCadenceCapability],
   });
 
   const keepAlive = setInterval(() => {}, 60_000);

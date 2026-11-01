@@ -12,7 +12,9 @@ export type DiagnosticCode =
   | 'lifecycle-failure'
   | 'capability-not-provided'
   | 'undeclared-capability'
-  | 'event-handler-failure';
+  | 'event-handler-failure'
+  | 'malformed-packet'
+  | 'multiple-sources';
 
 export type RidrsErrorCode = DiagnosticCode | 'invalid-event-payload' | 'plugin-not-active';
 

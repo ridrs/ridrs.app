@@ -62,11 +62,13 @@ Given(
 Given('the host has started', async function (this: RidrsWorld) {
   const host = this.ensureHost();
   await host.start();
+  await this.settle();
 });
 
 When('the host starts', async function (this: RidrsWorld) {
   const host = this.ensureHost();
   await host.start();
+  await this.settle();
 });
 
 When('the host stops', async function (this: RidrsWorld) {
@@ -81,7 +83,12 @@ When('the host is disposed', async function (this: RidrsWorld) {
 
 When('the plugin {string} is stopped', async function (this: RidrsWorld, pluginId: string) {
   const host = this.ensureHost();
+  this.stopMarks.set(pluginId, {
+    observed: this.observed.length,
+    connectAttempts: this.bleSimulator?.connectAttemptCount() ?? 0,
+  });
   await host.stopPlugin(pluginId);
+  await this.settle();
 });
 
 Then('the host is running', function (this: RidrsWorld) {

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setWorldConstructor, World } from '@cucumber/cucumber';
 import {
+  bleCentralCapability,
   type CapabilityCardinality,
   type CapabilityContract,
   type Clock,
@@ -13,10 +15,16 @@ import {
   type EventDefinition,
   type EventEnvelope,
   type EventSubscription,
+  metricCadenceCapability,
+  metricPowerCapability,
 } from '@ridrs/contracts';
 import { PluginHost } from '@ridrs/core';
+import type { BleSimulator, SimulatedPeripheral } from '@ridrs/testing';
+import type FakeTimers from '@sinonjs/fake-timers';
 import type { ResultPromise } from 'execa';
 import { z } from 'zod';
+
+const REAL_PLUGINS_DIR = resolve(import.meta.dirname, '../../plugins');
 
 export type LifecycleHookName = 'initialize' | 'start' | 'stop' | 'dispose';
 
@@ -59,9 +67,18 @@ export function getActiveWorld(): RidrsWorld {
 export class RidrsWorld extends World {
   tempPluginDir = '';
   fixedTime = 1_700_000_000_000;
+  fakeClock?: ReturnType<typeof FakeTimers.install>;
   readonly clock: Clock = {
-    now: () => this.fixedTime,
+    now: () => (this.fakeClock ? Date.now() : this.fixedTime),
   };
+
+  // Phase 2 state
+  realPluginIds: string[] = [];
+  bleSimulator?: BleSimulator;
+  trainer?: SimulatedPeripheral;
+  readonly observed: EventEnvelope[] = [];
+  packetMark = 0;
+  readonly stopMarks = new Map<string, { observed: number; connectAttempts: number }>();
 
   host?: PluginHost;
   readonly capabilityContracts = new Map<string, CapabilityContract>();
@@ -85,9 +102,30 @@ export class RidrsWorld extends World {
   headlessOutput = '';
   headlessExitCode: number | null = null;
   headlessExited = false;
+  headlessPluginDirs: string[] = [];
+  headlessDisabled: string[] = [];
+  headlessEnv: Record<string, string> = {};
+  headlessCursor = 0;
 
   async initTempDir(): Promise<void> {
     this.tempPluginDir = await mkdtemp(join(tmpdir(), 'ridrs-phase1-'));
+    for (const contract of [bleCentralCapability, metricPowerCapability, metricCadenceCapability]) {
+      this.capabilityContracts.set(contract.id, contract);
+    }
+  }
+
+  /** Real plugin folders under plugins/ that this scenario did not ask for. */
+  unusedRealPlugins(): string[] {
+    return readdirSync(REAL_PLUGINS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !this.realPluginIds.includes(entry.name))
+      .map((entry) => entry.name);
+  }
+
+  /** Lets pending promise chains settle; with fake timers this runs zero-delay timers too. */
+  async settle(): Promise<void> {
+    if (this.fakeClock) {
+      await this.fakeClock.tickAsync(0);
+    }
   }
 
   async cleanup(): Promise<void> {
@@ -102,12 +140,18 @@ export class RidrsWorld extends World {
       await rm(this.tempPluginDir, { recursive: true, force: true });
       this.tempPluginDir = '';
     }
+    this.fakeClock?.uninstall();
+    this.fakeClock = undefined;
   }
 
   ensureHost(): PluginHost {
     if (!this.host) {
       this.host = new PluginHost({
-        pluginsDir: this.tempPluginDir,
+        pluginsDir:
+          this.realPluginIds.length > 0
+            ? [this.tempPluginDir, REAL_PLUGINS_DIR]
+            : this.tempPluginDir,
+        disabledPlugins: this.realPluginIds.length > 0 ? this.unusedRealPlugins() : [],
         clock: this.clock,
         capabilities: this.capabilityContracts.values(),
       });
@@ -178,6 +222,7 @@ export class RidrsWorld extends World {
     provides?: string[];
     requires?: string[];
     createEntry?: boolean;
+    module?: string;
   }): Promise<void> {
     const folderPath = join(this.tempPluginDir, options.folder);
     await mkdir(folderPath, { recursive: true });
@@ -195,7 +240,7 @@ export class RidrsWorld extends World {
     await writeFile(join(folderPath, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
 
     if (options.createEntry !== false) {
-      const probeModulePath = resolve(import.meta.dirname, 'probe-plugin.ts');
+      const probeModulePath = resolve(import.meta.dirname, options.module ?? 'probe-plugin.ts');
       const entrySource = [
         '// SPDX-License-Identifier: AGPL-3.0-or-later',
         `export { default } from ${JSON.stringify(probeModulePath)};`,

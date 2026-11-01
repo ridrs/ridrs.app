@@ -1,0 +1,9 @@
+{
+  "id": "device-ftms-trainer",
+  "name": "FTMS Smart Trainer",
+  "version": "0.1.0",
+  "types": ["device"],
+  "provides": [],
+  "requires": ["ble.central"],
+  "entry": "index.ts"
+}

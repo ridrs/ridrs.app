@@ -54,3 +54,43 @@ export const hostStartedEvent = defineEvent(
 );
 
 export type HostStartedPayload = z.infer<typeof hostStartedEvent.schema>;
+
+export const deviceConnectionStateSchema = z.enum([
+  'searching',
+  'connecting',
+  'connected',
+  'reconnecting',
+  'disconnected',
+]);
+
+export type DeviceConnectionState = z.infer<typeof deviceConnectionStateSchema>;
+
+export const deviceConnectionChangedEvent = defineEvent(
+  'device.connection-changed',
+  z.object({
+    deviceId: z.string(),
+    deviceName: z.string(),
+    state: deviceConnectionStateSchema,
+    reason: z.string().optional(),
+  }),
+);
+
+export type DeviceConnectionChangedPayload = z.infer<typeof deviceConnectionChangedEvent.schema>;
+
+export const timestampOriginSchema = z.enum(['device', 'receive']);
+
+export type TimestampOrigin = z.infer<typeof timestampOriginSchema>;
+
+export const measurementPayloadSchema = z.object({
+  deviceId: z.string().min(1),
+  value: z.number(),
+  measuredAt: z.number(),
+  receivedAt: z.number(),
+  timestampOrigin: timestampOriginSchema,
+});
+
+export type MeasurementPayload = z.infer<typeof measurementPayloadSchema>;
+
+export const measurementPowerEvent = defineEvent('measurement.power', measurementPayloadSchema);
+
+export const measurementCadenceEvent = defineEvent('measurement.cadence', measurementPayloadSchema);

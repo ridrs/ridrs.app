@@ -9,7 +9,8 @@ Open-source, modular, headless-first indoor cycling platform.
 - `apps/headless/`: Headless CLI composition root (`@ridrs/headless`).
 - `packages/contracts/`: Public plugin, manifest, event, and capability contracts (`@ridrs/contracts`, `Apache-2.0`).
 - `packages/core/`: Application core: discovery, capability resolution, lifecycle, diagnostics, and typed event bus (`@ridrs/core`, `AGPL-3.0-or-later`).
-- `plugins/`: Production plugins directory (plugins start in Phase 2).
+- `plugins/`: Production plugins (BLE transport, FTMS trainer, power/cadence metrics, console output).
+- `packages/testing/`: In-process BLE simulator for tests (`@ridrs/testing`).
 - `tests/`: Executable Gherkin specifications (`tests/features/`), step definitions, test harness, and fixture plugins.
 - `docs/`: Architecture documentation (`docs/architecture/`) and Architecture Decision Records (`docs/decisions/`).
 - `web/`: Cloudflare Worker application serving the project web page ([ridrs.app](https://ridrs.app)).
@@ -32,6 +33,22 @@ pnpm --filter @ridrs/headless start -- --plugins tests/fixtures/plugins/ping-pon
 ```
 
 Press `Ctrl+C` (`SIGINT`) to gracefully stop and dispose all plugins.
+
+### Live power and cadence
+
+With hardware (a powered-on FTMS trainer nearby; on macOS the terminal app needs Bluetooth permission):
+
+```bash
+pnpm --filter @ridrs/headless start -- --plugins plugins
+```
+
+The console shows `searching`, `connecting`, `connected`, then live power and cadence. Switching the trainer off shows `reconnecting` and unavailable values; `Ctrl+C` disconnects and exits with code 0.
+
+Without hardware (simulated trainer `SIM KICKR`):
+
+```bash
+pnpm --filter @ridrs/headless start -- --plugins plugins --plugins tests/fixtures/plugins/simulated-trainer --disable transport-ble-noble
+```
 
 ## Web Application
 

@@ -1,0 +1,9 @@
+{
+  "id": "metric-power",
+  "name": "Power Metric",
+  "version": "0.1.0",
+  "types": ["metric"],
+  "provides": ["metric.power"],
+  "requires": [],
+  "entry": "index.ts"
+}
