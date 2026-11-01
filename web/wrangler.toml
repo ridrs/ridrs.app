@@ -1,0 +1,11 @@
+name = "ridrs-app"
+main = "src/index.js"
+compatibility_date = "2024-10-30"
+
+[[routes]]
+pattern = "ridrs.app"
+custom_domain = true
+
+[[routes]]
+pattern = "www.ridrs.app"
+custom_domain = true
