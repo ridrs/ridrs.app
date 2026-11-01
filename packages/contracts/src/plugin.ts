@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Logger } from 'pino';
 import type { PluginCapabilitiesContext } from './capabilities.ts';
 import type { Clock } from './clock.ts';
 import type { DiagnosticCode } from './diagnostics.ts';
@@ -16,7 +15,22 @@ export type PluginState =
   | 'failed'
   | 'blocked';
 
-export type PluginLogger = Logger;
+export interface PluginLogFn {
+  (message: string): void;
+  (bindings: Readonly<Record<string, unknown>>, message?: string): void;
+}
+
+/**
+ * Structured logger handed to plugins. Structural on purpose: pino satisfies it in the headless
+ * app, a console adapter in the native app; no host has to fake a specific logging library.
+ */
+export interface PluginLogger {
+  readonly debug: PluginLogFn;
+  readonly info: PluginLogFn;
+  readonly warn: PluginLogFn;
+  readonly error: PluginLogFn;
+  child(bindings: Readonly<Record<string, unknown>>): PluginLogger;
+}
 
 export interface PluginContext {
   readonly manifest: Readonly<PluginManifest>;

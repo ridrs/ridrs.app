@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { randomUUID } from 'node:crypto';
 import {
   type Clock,
   type EventDefinition,
@@ -80,7 +79,7 @@ export class EventBus {
     }
 
     const envelope: EventEnvelope<TPayload, TType> = Object.freeze({
-      id: randomUUID(),
+      id: globalThis.crypto.randomUUID(),
       type: event.id,
       payload: parsed.data,
       source,

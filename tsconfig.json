@@ -4,6 +4,7 @@
     "paths": {
       "@ridrs/contracts": ["./packages/contracts/src/index.ts"],
       "@ridrs/core": ["./packages/core/src/index.ts"],
+      "@ridrs/core/node": ["./packages/core/src/node/index.ts"],
       "@ridrs/testing": ["./packages/testing/src/index.ts"]
     }
   },

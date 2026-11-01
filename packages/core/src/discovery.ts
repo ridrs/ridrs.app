@@ -1,64 +1,65 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { type PluginManifest, parseManifestJson } from '@ridrs/contracts';
-import { glob } from 'tinyglobby';
 import type { DiagnosticCollector } from './diagnostics.ts';
+
+/**
+ * One plugin folder as a plugin source sees it. How folders are found, manifests read and modules
+ * loaded is the source's business (file system, bundle); validation stays in the core.
+ */
+export interface PluginCandidate {
+  readonly folder: string;
+  /** Human-readable location for logs and diagnostics only. */
+  readonly location: string;
+  /** Raw manifest JSON, or `undefined` when the folder has no manifest. Throws when unreadable. */
+  readManifest(): Promise<string | undefined>;
+  /** Whether a file relative to the plugin folder is available to load. */
+  hasModule(relativePath: string): Promise<boolean>;
+  /** Loads an ES module relative to the plugin folder. */
+  loadModule(relativePath: string): Promise<unknown>;
+}
+
+/** Discovery port: lists the plugin folders a host can see. */
+export interface PluginSource {
+  list(): Promise<readonly PluginCandidate[]>;
+}
 
 export interface DiscoveredPlugin {
   readonly folder: string;
-  readonly folderPath: string;
-  readonly entryPath: string;
+  readonly location: string;
   readonly manifest: Readonly<PluginManifest>;
+  readonly candidate: PluginCandidate;
 }
 
 export async function discoverPlugins(
-  pluginsDir: string | readonly string[],
+  sources: readonly PluginSource[],
   diagnostics: DiagnosticCollector,
 ): Promise<DiscoveredPlugin[]> {
-  const dirs = typeof pluginsDir === 'string' ? [pluginsDir] : pluginsDir;
   const candidates: DiscoveredPlugin[] = [];
 
-  for (const dir of dirs) {
-    const rootDir = resolve(dir);
+  for (const source of sources) {
+    const listed = [...(await source.list())].sort((a, b) => a.folder.localeCompare(b.folder));
 
-    const [rawFolders, manifestMatches] = await Promise.all([
-      glob('*', { cwd: rootDir, onlyDirectories: true }),
-      glob('*/manifest.json', { cwd: rootDir }),
-    ]);
-
-    const folders = rawFolders
-      .map((f) => f.replace(/\/+$/, ''))
-      .filter((f) => f.length > 0 && !f.includes('/'))
-      .sort((a, b) => a.localeCompare(b));
-
-    const foldersWithManifest = new Set(
-      manifestMatches.map((m) => m.split('/')[0]).filter((f): f is string => Boolean(f)),
-    );
-
-    for (const folder of folders) {
-      if (!foldersWithManifest.has(folder)) {
-        diagnostics.report({
-          code: 'missing-manifest',
-          folder,
-          message: `Plugin folder "${folder}" is missing a manifest.json file`,
-        });
-        continue;
-      }
-
-      const folderPath = join(rootDir, folder);
-      const manifestPath = join(folderPath, 'manifest.json');
-
-      let rawJson: string;
+    for (const candidate of listed) {
+      const { folder } = candidate;
+      let rawJson: string | undefined;
       try {
-        rawJson = await readFile(manifestPath, 'utf8');
+        rawJson = await candidate.readManifest();
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         diagnostics.report({
           code: 'missing-manifest',
           folder,
           message: `Could not read manifest.json in folder "${folder}": ${reason}`,
+        });
+        continue;
+      }
+
+      if (rawJson === undefined) {
+        diagnostics.report({
+          code: 'missing-manifest',
+          folder,
+          message: `Plugin folder "${folder}" is missing a manifest.json file`,
         });
         continue;
       }
@@ -80,12 +81,7 @@ export async function discoverPlugins(
         requires: [...validation.data.requires],
       });
 
-      candidates.push({
-        folder,
-        folderPath,
-        entryPath: resolve(folderPath, manifest.entry),
-        manifest,
-      });
+      candidates.push({ folder, location: candidate.location, manifest, candidate });
     }
   }
 

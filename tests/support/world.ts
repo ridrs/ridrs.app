@@ -18,7 +18,8 @@ import {
   metricCadenceCapability,
   metricPowerCapability,
 } from '@ridrs/contracts';
-import { PluginHost } from '@ridrs/core';
+import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
+import { createFileSystemPluginSource } from '@ridrs/core/node';
 import type { BleSimulator, SimulatedPeripheral } from '@ridrs/testing';
 import type FakeTimers from '@sinonjs/fake-timers';
 import type { ResultPromise } from 'execa';
@@ -81,6 +82,7 @@ export class RidrsWorld extends World {
   readonly stopMarks = new Map<string, { observed: number; connectAttempts: number }>();
 
   host?: PluginHost;
+  bundled?: { manifests: Record<string, string>; modules: Record<string, () => Promise<unknown>> };
   readonly capabilityContracts = new Map<string, CapabilityContract>();
   readonly eventDefinitions = new Map<string, EventDefinition>();
   readonly behaviors = new Map<string, ProbeBehavior>();
@@ -146,17 +148,46 @@ export class RidrsWorld extends World {
 
   ensureHost(): PluginHost {
     if (!this.host) {
+      const dirs =
+        this.realPluginIds.length > 0
+          ? [this.tempPluginDir, REAL_PLUGINS_DIR]
+          : [this.tempPluginDir];
       this.host = new PluginHost({
-        pluginsDir:
-          this.realPluginIds.length > 0
-            ? [this.tempPluginDir, REAL_PLUGINS_DIR]
-            : this.tempPluginDir,
+        sources: this.bundled
+          ? [createBundledPluginSource(this.bundled satisfies BundledPluginSet)]
+          : dirs.map(createFileSystemPluginSource),
         disabledPlugins: this.realPluginIds.length > 0 ? this.unusedRealPlugins() : [],
         clock: this.clock,
         capabilities: this.capabilityContracts.values(),
       });
     }
     return this.host;
+  }
+
+  bundle(): NonNullable<RidrsWorld['bundled']> {
+    this.bundled ??= { manifests: {}, modules: {} };
+    return this.bundled;
+  }
+
+  /** Adds a probe plugin to the in-memory bundle, as `import.meta.glob` would deliver it. */
+  addBundledProbePlugin(options: {
+    folder: string;
+    id: string;
+    types: string[];
+    provides: string[];
+    requires: string[];
+  }): void {
+    const bundle = this.bundle();
+    bundle.manifests[`plugins/${options.folder}/manifest.json`] = JSON.stringify({
+      id: options.id,
+      name: `Plugin ${options.id}`,
+      version: '1.0.0',
+      types: options.types.length > 0 ? options.types : ['example'],
+      provides: options.provides,
+      requires: options.requires,
+      entry: 'index.ts',
+    });
+    bundle.modules[`plugins/${options.folder}/index.ts`] = () => import('./probe-plugin.ts');
   }
 
   getBehavior(pluginId: string): ProbeBehavior {
