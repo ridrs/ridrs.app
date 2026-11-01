@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
-import { eventIdSchema } from './manifest.ts';
+import { eventIdSchema } from './manifest-ids.ts';
 
 export interface EventDefinition<TPayload = unknown, TType extends string = string> {
   readonly id: TType;

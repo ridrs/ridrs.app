@@ -1,0 +1,9 @@
+{
+  "id": "activity-session",
+  "name": "Activity Session",
+  "version": "0.1.0",
+  "types": ["activity"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts"
+}

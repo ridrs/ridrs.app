@@ -6,17 +6,26 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setWorldConstructor, World } from '@cucumber/cucumber';
 import {
+  activityFinishRequestedEvent,
+  activityStartRequestedEvent,
+  activityStateChangedEvent,
   bleCentralCapability,
   type CapabilityCardinality,
   type CapabilityContract,
   type Clock,
   defineCapability,
   defineEvent,
+  deviceConnectionChangedEvent,
   type EventDefinition,
   type EventEnvelope,
   type EventSubscription,
+  measurementCadenceEvent,
+  measurementPowerEvent,
   metricCadenceCapability,
+  metricCadenceEvent,
   metricPowerCapability,
+  metricPowerEvent,
+  uiRegistryChangedEvent,
 } from '@ridrs/contracts';
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
@@ -49,6 +58,25 @@ export function createDefaultProbeBehavior(): ProbeBehavior {
   };
 }
 
+/** Events of the real ridrs contracts that scenarios publish or observe by id. */
+const PHASE_3_EVENTS: readonly EventDefinition[] = [
+  activityStartRequestedEvent,
+  activityFinishRequestedEvent,
+  activityStateChangedEvent,
+  metricPowerEvent,
+  metricCadenceEvent,
+  measurementPowerEvent,
+  measurementCadenceEvent,
+  deviceConnectionChangedEvent,
+  uiRegistryChangedEvent,
+];
+
+/** Events the World records from the bus directly (host-level), independent of any plugin. */
+const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
+  uiRegistryChangedEvent,
+  activityStateChangedEvent,
+];
+
 const ACTIVE_WORLD_SYMBOL = Symbol.for('ridrs.test.activeWorld');
 
 export function setActiveWorld(world: RidrsWorld | undefined): void {
@@ -79,8 +107,14 @@ export class RidrsWorld extends World {
   tauriBridge?: SimulatedTauriBridge;
   trainer?: SimulatedPeripheral;
   readonly observed: EventEnvelope[] = [];
+  /** Events recorded by the World's own host-level subscriptions (see HOST_OBSERVED_EVENTS). */
+  readonly hostObserved: EventEnvelope[] = [];
+  readonly pendingUi = new Map<string, Record<string, unknown>>();
   packetMark = 0;
-  readonly stopMarks = new Map<string, { observed: number; connectAttempts: number }>();
+  readonly stopMarks = new Map<
+    string,
+    { observed: number; hostObserved: number; connectAttempts: number }
+  >();
 
   host?: PluginHost;
   bundled?: { manifests: Record<string, string>; modules: Record<string, () => Promise<unknown>> };
@@ -114,6 +148,9 @@ export class RidrsWorld extends World {
     this.tempPluginDir = await mkdtemp(join(tmpdir(), 'ridrs-phase1-'));
     for (const contract of [bleCentralCapability, metricPowerCapability, metricCadenceCapability]) {
       this.capabilityContracts.set(contract.id, contract);
+    }
+    for (const event of PHASE_3_EVENTS) {
+      this.eventDefinitions.set(event.id, event);
     }
   }
 
@@ -162,7 +199,13 @@ export class RidrsWorld extends World {
         disabledPlugins: this.realPluginIds.length > 0 ? this.unusedRealPlugins() : [],
         clock: this.clock,
         capabilities: this.capabilityContracts.values(),
+        events: this.eventDefinitions.values(),
       });
+      for (const event of HOST_OBSERVED_EVENTS) {
+        this.host.subscribeEvent('test-world', event, (envelope) => {
+          this.hostObserved.push(envelope);
+        });
+      }
     }
     return this.host;
   }
@@ -257,6 +300,7 @@ export class RidrsWorld extends World {
     requires?: string[];
     createEntry?: boolean;
     module?: string;
+    ui?: Record<string, unknown>;
   }): Promise<void> {
     const folderPath = join(this.tempPluginDir, options.folder);
     await mkdir(folderPath, { recursive: true });
@@ -269,7 +313,14 @@ export class RidrsWorld extends World {
       provides: options.provides ?? [],
       requires: options.requires ?? [],
       entry: 'index.ts',
+      ...(options.ui ? { ui: options.ui } : {}),
     };
+
+    if (typeof options.ui?.client === 'string') {
+      const clientPath = join(folderPath, options.ui.client);
+      await mkdir(join(clientPath, '..'), { recursive: true });
+      await writeFile(clientPath, '// empty client module\n', 'utf8');
+    }
 
     await writeFile(join(folderPath, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
 

@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export {
+  type ActivityState,
+  activityFinishRequestedEvent,
+  activityStartRequestedEvent,
+  activityStateChangedEvent,
+  activityStateSchema,
+} from './activity.ts';
+export {
   type BleCentral,
   type BleCharacteristicTarget,
   type BleConnection,
@@ -79,3 +86,17 @@ export {
   type PluginLogger,
   type PluginState,
 } from './plugin.ts';
+export {
+  type UiManifestSection,
+  type UiRegistry,
+  type UiRegistryContribution,
+  type UiRegistryEvents,
+  type UiRegistryScreen,
+  uiContributionSchema,
+  uiEventsSchema,
+  uiManifestSectionSchema,
+  uiPathPattern,
+  uiPathSchema,
+  uiRegistryChangedEvent,
+  uiScreenSchema,
+} from './ui.ts';

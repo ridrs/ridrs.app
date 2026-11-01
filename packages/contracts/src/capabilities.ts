@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { capabilityIdSchema } from './manifest.ts';
+import { capabilityIdSchema } from './manifest-ids.ts';
 
 export type CapabilityCardinality = 'single' | 'multiple';
 

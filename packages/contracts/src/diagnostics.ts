@@ -14,9 +14,20 @@ export type DiagnosticCode =
   | 'undeclared-capability'
   | 'event-handler-failure'
   | 'malformed-packet'
-  | 'multiple-sources';
+  | 'multiple-sources'
+  | 'invalid-transition'
+  | 'unknown-extension-point'
+  | 'duplicate-screen'
+  | 'duplicate-extension-point'
+  | 'client-entry-missing'
+  | 'client-load-failure';
 
-export type RidrsErrorCode = DiagnosticCode | 'invalid-event-payload' | 'plugin-not-active';
+export type RidrsErrorCode =
+  | DiagnosticCode
+  | 'invalid-event-payload'
+  | 'plugin-not-active'
+  | 'event-not-allowed'
+  | 'undeclared-event';
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;
