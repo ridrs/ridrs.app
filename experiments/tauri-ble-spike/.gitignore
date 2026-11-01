@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+node_modules/
+dist/
+dist-probe/
+src-tauri/target/
+src-tauri/gen/schemas/

@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+  <head><meta charset="UTF-8" /><title>ridrs bundled discovery probe</title></head>
+  <body>
+    <pre id="out">running…</pre>
+    <script type="module">
+      import { discoverBundledPlugins } from '/src/probe/bundled-discovery.ts';
+      const out = document.getElementById('out');
+      const { plugins, problems } = discoverBundledPlugins();
+      const lines = [`problems: ${JSON.stringify(problems)}`];
+      for (const p of plugins) {
+        try { const d = await p.load(); lines.push(`${p.manifest.id}: loaded, start=${typeof d.start}`); }
+        catch (e) { lines.push(`${p.manifest.id}: load failed ${e}`); }
+      }
+      out.textContent = lines.join('\n');
+    </script>
+  </body>
+</html>

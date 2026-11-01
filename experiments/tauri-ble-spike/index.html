@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>ridrs BLE spike</title>
+    <style>
+      body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 12px; padding-top: max(12px, env(safe-area-inset-top)); }
+      button { font: inherit; margin: 2px; padding: 6px 10px; }
+      section { border: 1px solid #ccc; border-radius: 6px; padding: 8px; margin-bottom: 10px; }
+      h2 { font-size: 15px; margin: 0 0 6px; }
+      .device { border-top: 1px solid #ddd; padding: 6px 0; }
+      .value { font-size: 22px; font-weight: 600; }
+      .muted { color: #666; font-size: 12px; word-break: break-all; }
+      pre { max-height: 200px; overflow: auto; font-size: 11px; background: #f5f5f5; padding: 6px; }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h2>ridrs Tauri BLE spike</h2>
+      <div class="muted" id="env"></div>
+      <button id="perm">Check BLE permissions</button>
+      <button id="export">Export packet log</button>
+      <div class="muted" id="status"></div>
+    </section>
+    <section>
+      <h2>Scan (no system picker)</h2>
+      <button data-scan="ftms">Scan FTMS</button>
+      <button data-scan="hr">Scan HR</button>
+      <button data-scan="zwift">Scan Zwift Ride</button>
+      <button id="stop-scan">Stop scan</button>
+      <div id="found"></div>
+      <h2>Remembered (reconnect without scan)</h2>
+      <div id="remembered"></div>
+    </section>
+    <section>
+      <h2>Devices</h2>
+      <div id="devices"></div>
+    </section>
+    <section>
+      <h2>Measurements</h2>
+      <div id="latency" class="muted"></div>
+      <div id="timers" class="muted"></div>
+    </section>
+    <section>
+      <h2>Portability probe</h2>
+      <div class="muted" id="probe-stage"></div>
+      <button id="probe-start">Stage 2: start real device-ftms-trainer plugin</button>
+      <button id="probe-stop">Stop plugin</button>
+      <pre id="probe-log"></pre>
+    </section>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
