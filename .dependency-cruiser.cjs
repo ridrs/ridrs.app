@@ -27,6 +27,44 @@ module.exports = {
       },
     },
     {
+      name: 'runtime-neutral-core-and-contracts',
+      comment:
+        'packages/core and packages/contracts run in Node and in a WebView: no node:* builtins and no Node-only libraries. Only packages/core/src/node/ (the Node-only entry) may use them.',
+      severity: 'error',
+      from: {
+        path: '^packages/(core|contracts)/',
+        pathNot: '(^packages/core/src/node/|\\.test\\.ts$)',
+      },
+      to: {
+        dependencyTypesNot: ['type-only'],
+        path: '^(node:|fs$|path$|url$|crypto$|os$)|tinyglobby|pino',
+      },
+    },
+    {
+      name: 'core-builtins-forbidden',
+      comment:
+        'Node builtins (dependency type "core") are only allowed in the Node-only core entry.',
+      severity: 'error',
+      from: {
+        path: '^packages/(core|contracts)/',
+        pathNot: '(^packages/core/src/node/|\\.test\\.ts$)',
+      },
+      to: {
+        dependencyTypes: ['core'],
+      },
+    },
+    {
+      name: 'core-main-entry-not-node-entry',
+      comment: 'The runtime-neutral core never imports its Node-only entry.',
+      severity: 'error',
+      from: {
+        path: '^packages/core/src/(?!node/)',
+      },
+      to: {
+        path: '^packages/core/src/node/',
+      },
+    },
+    {
       name: 'testing-only-in-tests',
       comment:
         'packages/testing may be imported by tests/** and tests/fixtures/** only - never by plugins/**, packages/core, packages/contracts, or apps/**.',

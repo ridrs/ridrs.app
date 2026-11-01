@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { Diagnostic } from '@ridrs/contracts';
-import type { Logger } from 'pino';
+import type { Diagnostic, PluginLogger } from '@ridrs/contracts';
 
 export class DiagnosticCollector {
   private readonly diagnostics: Diagnostic[] = [];
-  private readonly logger: Logger;
+  private readonly logger: PluginLogger;
 
-  constructor(logger: Logger) {
+  constructor(logger: PluginLogger) {
     this.logger = logger;
   }
 

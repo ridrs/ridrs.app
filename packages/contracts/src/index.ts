@@ -75,6 +75,7 @@ export {
   definePlugin,
   type PluginContext,
   type PluginDefinition,
+  type PluginLogFn,
   type PluginLogger,
   type PluginState,
 } from './plugin.ts';

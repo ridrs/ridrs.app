@@ -9,6 +9,7 @@ import {
   metricPowerCapability,
 } from '@ridrs/contracts';
 import { createSystemClock, PluginHost } from '@ridrs/core';
+import { createFileSystemPluginSource } from '@ridrs/core/node';
 import pino from 'pino';
 import pretty from 'pino-pretty';
 
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
   const logger = pino({ name: 'ridrs-headless' }, stream);
 
   const host = new PluginHost({
-    pluginsDir: pluginsDirs,
+    sources: pluginsDirs.map(createFileSystemPluginSource),
     disabledPlugins,
     clock: createSystemClock(),
     logger,

@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@ridrs/contracts': resolve(import.meta.dirname, 'packages/contracts/src/index.ts'),
+      '@ridrs/core/node': resolve(import.meta.dirname, 'packages/core/src/node/index.ts'),
       '@ridrs/core': resolve(import.meta.dirname, 'packages/core/src/index.ts'),
     },
   },

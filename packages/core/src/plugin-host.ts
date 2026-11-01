@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { pathToFileURL } from 'node:url';
 import {
   type CapabilityContract,
   type Clock,
@@ -9,24 +8,26 @@ import {
   hostStartedEvent,
   type PluginContext,
   type PluginDefinition,
+  type PluginLogger,
   type PluginManifest,
   type PluginState,
   RidrsError,
 } from '@ridrs/contracts';
 import type { DepGraph } from 'dependency-graph';
-import pino, { type Logger } from 'pino';
 import { CapabilityRegistry } from './capability-registry.ts';
 import { createSystemClock } from './clock.ts';
 import { DiagnosticCollector } from './diagnostics.ts';
-import { type DiscoveredPlugin, discoverPlugins } from './discovery.ts';
+import { type DiscoveredPlugin, discoverPlugins, type PluginSource } from './discovery.ts';
 import { EventBus } from './event-bus.ts';
+import { createSilentLogger } from './logger.ts';
 import { resolveCapabilities } from './resolution.ts';
 
 export interface PluginHostOptions {
-  readonly pluginsDir: string | readonly string[];
+  /** Where plugins come from: a file-system source in Node hosts, a bundled source in apps. */
+  readonly sources: readonly PluginSource[];
   readonly disabledPlugins?: Iterable<string>;
   readonly clock?: Clock;
-  readonly logger?: Logger;
+  readonly logger?: PluginLogger;
   readonly capabilities?: Iterable<CapabilityContract>;
 }
 
@@ -40,10 +41,10 @@ interface ManagedPlugin {
 }
 
 export class PluginHost {
-  private readonly pluginsDir: string | readonly string[];
+  private readonly sources: readonly PluginSource[];
   private readonly disabledPlugins: Set<string>;
   private readonly clock: Clock;
-  private readonly logger: Logger;
+  private readonly logger: PluginLogger;
   private readonly diagnostics: DiagnosticCollector;
   private readonly capabilityRegistry: CapabilityRegistry;
   private readonly eventBus: EventBus;
@@ -55,10 +56,10 @@ export class PluginHost {
   private running = false;
 
   constructor(options: PluginHostOptions) {
-    this.pluginsDir = options.pluginsDir;
+    this.sources = options.sources;
     this.disabledPlugins = new Set(options.disabledPlugins ?? []);
     this.clock = options.clock ?? createSystemClock();
-    this.logger = options.logger ?? pino({ level: 'silent' });
+    this.logger = options.logger ?? createSilentLogger();
     this.diagnostics = new DiagnosticCollector(this.logger);
     this.capabilityRegistry = new CapabilityRegistry();
     if (options.capabilities) {
@@ -83,7 +84,7 @@ export class PluginHost {
   }
 
   async discover(): Promise<readonly PluginManifest[]> {
-    const discoveredList = await discoverPlugins(this.pluginsDir, this.diagnostics);
+    const discoveredList = await discoverPlugins(this.sources, this.diagnostics);
     this.plugins.clear();
     for (const item of discoveredList) {
       this.plugins.set(item.manifest.id, {
@@ -369,8 +370,9 @@ export class PluginHost {
   private async loadPluginEntry(managed: ManagedPlugin): Promise<PluginDefinition | undefined> {
     const pluginId = managed.discovered.manifest.id;
     try {
-      const fileUrl = pathToFileURL(managed.discovered.entryPath).href;
-      const imported = (await import(fileUrl)) as { default?: unknown };
+      const imported = (await managed.discovered.candidate.loadModule(
+        managed.discovered.manifest.entry,
+      )) as { default?: unknown };
       if (!imported || typeof imported.default !== 'object' || imported.default === null) {
         this.diagnostics.report({
           code: 'entry-load-failure',
