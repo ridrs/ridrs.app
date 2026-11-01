@@ -1,0 +1,28 @@
+{
+  "id": "ui-main-screen",
+  "name": "Main Screen",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "main",
+        "export": "MainScreen"
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "activity.state-changed"
+      ],
+      "publish": [
+        "activity.start-requested"
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "ui-activity-screen",
+  "name": "Activity Screen",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "activity",
+        "export": "ActivityScreen",
+        "extensionPoints": [
+          "activity/landscape",
+          "activity/hud"
+        ]
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "activity.state-changed"
+      ],
+      "publish": [
+        "activity.finish-requested"
+      ]
+    }
+  }
+}

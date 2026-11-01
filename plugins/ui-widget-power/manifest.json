@@ -1,0 +1,29 @@
+{
+  "id": "ui-widget-power",
+  "name": "Power Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui",
+    "metric-widget"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "power",
+        "extensionPoint": "hud/widget",
+        "export": "PowerWidget",
+        "order": 0
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "metric.power"
+      ],
+      "publish": []
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "fixture-ui-broken-widget",
+  "name": "Broken Widget (fixture)",
+  "version": "0.1.0",
+  "types": ["ui", "metric-widget"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "contributions": [
+      { "id": "broken", "extensionPoint": "hud/widget", "export": "BrokenWidget", "order": 2 }
+    ]
+  }
+}
