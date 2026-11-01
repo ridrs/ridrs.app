@@ -101,17 +101,17 @@ export default {
 </head>
 <body>
   <div class="container">
-    <div class="badge">Cloudflare Workers • Active</div>
+    <div class="badge">Active</div>
     <h1>Hello World</h1>
-    <p>Welcome to <strong>ridrs.app</strong>! Your Cloudflare Worker application is successfully up and running.</p>
+    <p>Welcome to <strong>ridrs.app</strong>! Your application is successfully up and running.</p>
     <div class="info-box">
       <div class="info-row">
         <span class="info-label">Domain</span>
         <span>ridrs.app</span>
       </div>
       <div class="info-row">
-        <span class="info-label">Runtime</span>
-        <span>Cloudflare Workers</span>
+        <span class="info-label">Status</span>
+        <span>Operational</span>
       </div>
     </div>
   </div>
