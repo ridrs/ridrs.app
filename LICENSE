@@ -1,0 +1,11 @@
+ridrs Licensing
+===============
+
+Default Core Platform License: GNU Affero General Public License v3.0 or later (SPDX: AGPL-3.0-or-later).
+
+In accordance with LICENSING.md:
+- Core platform, official plugins, and application modules (`apps/*`, `packages/core`, `tests/*`): `AGPL-3.0-or-later`
+- Public developer contracts and SDK packages (`packages/contracts`): `Apache-2.0`
+- Documentation (`docs/*`, `*.md`): `CC-BY-SA-4.0`
+
+See `LICENSING.md` for full licensing policy details and `NOTICE` for third-party dependency attributions.

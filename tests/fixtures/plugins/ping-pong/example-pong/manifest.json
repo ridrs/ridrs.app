@@ -1,0 +1,9 @@
+{
+  "id": "example-pong",
+  "name": "Example Pong",
+  "version": "1.0.0",
+  "types": ["example"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts"
+}

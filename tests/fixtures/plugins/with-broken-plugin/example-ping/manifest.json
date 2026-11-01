@@ -1,0 +1,9 @@
+{
+  "id": "example-ping",
+  "name": "Example Ping",
+  "version": "1.0.0",
+  "types": ["example"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts"
+}

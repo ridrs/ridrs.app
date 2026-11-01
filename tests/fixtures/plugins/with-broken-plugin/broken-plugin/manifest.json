@@ -1,0 +1,9 @@
+{
+  "id": "broken-plugin",
+  "name": "Broken Plugin",
+  "version": "not-a-semver",
+  "types": ["example"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts"
+}

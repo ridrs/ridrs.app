@@ -1,0 +1,23 @@
+ridrs Notices and Third-Party Dependencies
+==========================================
+
+This project incorporates third-party open-source dependencies under the following licenses:
+
+| Package | Version | SPDX License | Purpose |
+|---|---|---|---|
+| `rxjs` | 7.8.2 | Apache-2.0 | Typed in-memory event bus (`Subject`, `Subscription`, `queueScheduler`) |
+| `zod` | 4.6.7 | MIT | Manifest and event payload schema validation |
+| `semver` | 7.8.5 | ISC | Semantic version validation for plugin manifests |
+| `dependency-graph` | 1.0.0 | MIT | Capability dependency ordering, transitive dependents, and cycle detection |
+| `tinyglobby` | 0.2.17 | MIT | Plugin directory and manifest file discovery |
+| `pino` | 10.4.0 | MIT | Structured JSON logging and plugin child loggers |
+| `pino-pretty` | 13.2.0 | MIT | Pretty-printed log formatting in development |
+| `@cucumber/cucumber` | 13.3.0 | MIT | Executable Gherkin acceptance tests |
+| `vitest` | 5.0.5 | MIT | Unit testing framework |
+| `execa` | 10.2.1 | MIT | Process spawning for headless CLI end-to-end tests |
+| `tsx` | 4.23.15 | MIT | TypeScript ESM execution |
+| `typescript` | 6.0.3 | Apache-2.0 | Static type checking |
+| `dependency-cruiser` | 18.7.0 | MIT | Architectural import boundary enforcement |
+| `@biomejs/biome` | 2.6.4 | MIT OR Apache-2.0 | Linting and code formatting |
+| `@types/node` | 26.6.6 | MIT | Node.js TypeScript definitions |
+| `@types/semver` | 7.8.0 | MIT | semver TypeScript definitions |

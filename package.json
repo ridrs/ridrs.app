@@ -1,0 +1,35 @@
+{
+  "name": "ridrs",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check . && pnpm depcruise",
+    "format": "biome format --write .",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs apps packages tests",
+    "test:unit": "vitest run",
+    "test:bdd": "NODE_OPTIONS=\"--import tsx\" cucumber-js",
+    "test": "pnpm test:unit && pnpm test:bdd"
+  },
+  "dependencies": {
+    "@ridrs/contracts": "workspace:*",
+    "@ridrs/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@cucumber/cucumber": "13.3.0",
+    "@types/node": "26.6.6",
+    "@types/semver": "7.8.0",
+    "dependency-cruiser": "18.7.0",
+    "execa": "10.2.1",
+    "pino": "10.4.0",
+    "pino-pretty": "13.2.0",
+    "semver": "7.8.5",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5",
+    "zod": "4.6.7"
+  }
+}
