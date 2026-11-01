@@ -116,6 +116,9 @@ export class RidrsWorld extends World {
   // UI state (@ui scenarios): the in-process bridge is created with the host, like in apps/native.
   uiEnabled = false;
   uiBridge?: InProcessUiBridge;
+  /** The native app's composition root, when a scenario starts it instead of a bare host. */
+  nativeApp?: { readonly host: PluginHost; close(): Promise<void> };
+  readonly keepAwakeRequests: boolean[] = [];
   readonly uiViews: Array<{ readonly root: HTMLElement; dispose: () => void }> = [];
   packetMark = 0;
   readonly stopMarks = new Map<
@@ -192,6 +195,8 @@ export class RidrsWorld extends World {
 
   /** Unmounts every UI view, then disposes the bridge and the host. */
   async disposeHost(): Promise<void> {
+    await this.nativeApp?.close();
+    this.nativeApp = undefined;
     for (const view of this.uiViews.splice(0)) {
       view.dispose();
       view.root.remove();

@@ -1,0 +1,25 @@
+{
+  "name": "@ridrs/native",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@ridrs/contracts": "workspace:*",
+    "@ridrs/core": "workspace:*",
+    "@ridrs/ui-bridge": "workspace:*",
+    "@ridrs/ui-sdk": "workspace:*",
+    "@ridrs/ui-shell": "workspace:*",
+    "@tauri-apps/api": "2.12.4"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "@vitejs/plugin-react": "6.1.2",
+    "vite": "8.3.5"
+  }
+}

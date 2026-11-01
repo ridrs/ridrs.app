@@ -10,7 +10,7 @@ This project incorporates third-party open-source dependencies under the followi
 | `semver` | 7.8.5 | ISC | Semantic version validation for plugin manifests |
 | `dependency-graph` | 1.0.0 | MIT | Capability dependency ordering, transitive dependents, and cycle detection |
 | `tinyglobby` | 0.2.17 | MIT | Plugin directory and manifest file discovery |
-| `pino` | 10.4.0 | MIT | Structured JSON logging and plugin child loggers |
+| `pino` | 10.4.0 | MIT | Structured JSON logging in the headless app (structural `PluginLogger` in contracts) |
 | `pino-pretty` | 13.2.0 | MIT | Pretty-printed log formatting in development |
 | `@cucumber/cucumber` | 13.3.0 | MIT | Executable Gherkin acceptance tests |
 | `vitest` | 5.0.5 | MIT | Unit testing framework |
@@ -21,3 +21,22 @@ This project incorporates third-party open-source dependencies under the followi
 | `@biomejs/biome` | 2.6.4 | MIT OR Apache-2.0 | Linting and code formatting |
 | `@types/node` | 26.6.6 | MIT | Node.js TypeScript definitions |
 | `@types/semver` | 7.8.0 | MIT | semver TypeScript definitions |
+| `react` / `react-dom` | 19.3.1 | MIT | Rendering inside UI plugin clients |
+| `@tauri-apps/api` | 2.12.4 | Apache-2.0 OR MIT | IPC between the native app's WebView and its Rust side; IPC mocks in tests |
+| `@tauri-apps/cli` | 2.12.4 | Apache-2.0 OR MIT | Building and running `apps/native` |
+| `vite` | 8.3.5 | MIT | Bundling the native app frontend and its plugin set |
+| `@vitejs/plugin-react` | 6.1.2 | MIT | JSX compilation in the native app build |
+| `happy-dom` / `@happy-dom/global-registrator` | 21.0.4 | MIT | Headless DOM for UI scenarios |
+| `@testing-library/dom` | 10.4.2 | MIT | Auto-retrying DOM queries in UI scenarios |
+| `@types/react` / `@types/react-dom` | 19.3.0 | MIT | React TypeScript definitions |
+
+Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/src-tauri/Cargo.lock`):
+
+| Crate | Version | SPDX License | Purpose |
+|---|---|---|---|
+| `tauri` / `tauri-build` | 2.12.5 / 2.7.4 | Apache-2.0 OR MIT | Native app shell |
+| `tauri-plugin-blec` / `blec` | 0.18.0 | MIT OR Apache-2.0 | BLE platform backends (incl. Android) |
+| `btleplug` | 0.13.5 | MIT/Apache-2.0/BSD-3-Clause | BLE on Windows, macOS, iOS (via blec) |
+| `keepawake` | 0.6.1 | MIT | Keeping the display on during a ride (desktop) |
+
+MPL-2.0 components (approved by the maintainer, decision D9 in `experiments/tauri-ble-spike/HANDOVER-PHASE-3.md`; MPL-2.0 §3.3 permits combination with AGPL-3.0-or-later): the Rust crates `cssparser`, `cssparser-macros`, `selectors`, `dtoa-short` and `option-ext`, pulled in by Tauri, and `lightningcss`, used by Vite at build time only. Their source code is available from crates.io and npm under MPL-2.0.
