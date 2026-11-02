@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/** Below this speed the drive force is bounded: 200 W at standstill push with 200 N. */
-export const VIRTUAL_SPEED_DEFAULTS = Object.freeze({ minimumDriveSpeed: 1 });
+/**
+ * Below `minimumDriveSpeed` the drive force is bounded: 200 W at standstill push with 200 N.
+ * A road sample is valid while its gradient is finite and within ±`maximumGradient` (±30 %).
+ */
+export const VIRTUAL_SPEED_DEFAULTS = Object.freeze({ minimumDriveSpeed: 1, maximumGradient: 0.3 });
+
+export function isValidGradient(gradient: number): boolean {
+  return Number.isFinite(gradient) && Math.abs(gradient) <= VIRTUAL_SPEED_DEFAULTS.maximumGradient;
+}
 
 export interface IntegratorStep {
   /** Speed of the previous state, m/s. */
@@ -32,7 +39,8 @@ export function driveForce(wheelPower: number, speed: number): number {
 
 /**
  * One semi-implicit Euler step: forces from the previous speed, distance from the new one. Speed
- * never becomes negative, so a coasting rider comes to rest and stays there.
+ * never becomes negative, so a coasting rider comes to rest and stays there - also on a climb,
+ * where gravity would pull backwards ("brakes held"; there is no reverse motion).
  */
 export function integrate(step: IntegratorStep): IntegratorResult {
   const force = driveForce(step.wheelPower, step.speed);

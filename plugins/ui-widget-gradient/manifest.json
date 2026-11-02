@@ -1,0 +1,29 @@
+{
+  "id": "ui-widget-gradient",
+  "name": "Gradient Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui",
+    "physics-widget"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "gradient",
+        "extensionPoint": "hud/widget",
+        "export": "GradientWidget",
+        "order": 6
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "physics.state"
+      ],
+      "publish": []
+    }
+  }
+}

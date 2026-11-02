@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "types": ["physics"],
   "provides": ["physics.motion"],
-  "requires": ["physics.bicycle", "physics.powertrain", "physics.rider", "physics.total-resistance"],
+  "requires": [
+    "physics.bicycle",
+    "physics.powertrain", "physics.rider",
+    "physics.road",
+    "physics.total-resistance"
+  ],
   "entry": "index.ts"
 }

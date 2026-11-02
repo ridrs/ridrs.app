@@ -17,6 +17,7 @@ function result(at: number, speed = 0): MotionResult {
     wheelPower: 0,
     driveForce: 0,
     resistance: { total: 0, contributions: [] },
+    road: { gradient: 0, origin: 'default' },
   };
 }
 

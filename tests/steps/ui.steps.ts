@@ -218,6 +218,7 @@ for (const kind of [
   'power-heart-rate-ratio',
   'virtual-speed',
   'virtual-distance',
+  'gradient',
 ]) {
   Then(
     `eventually the ${kind} widget shows {string} {string}`,
@@ -314,14 +315,19 @@ for (const kind of ['virtual-speed', 'virtual-distance']) {
     );
   }
 
-  Then(`the ${kind} widget keeps rising`, async function (this: RidrsWorld) {
-    const element = await widget(this, kind);
-    const unit = within(element).getByTestId('unit').textContent ?? '';
-    const before = shownNumber(element, unit);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    const after = shownNumber(element, unit);
-    assert.ok(after > before, `${before} ${unit}, then ${after} ${unit} one second later`);
-  });
+  for (const [wording, holds] of [
+    ['rising', (before: number, after: number) => after > before],
+    ['falling', (before: number, after: number) => after < before],
+  ] as const) {
+    Then(`the ${kind} widget keeps ${wording}`, async function (this: RidrsWorld) {
+      const element = await widget(this, kind);
+      const unit = within(element).getByTestId('unit').textContent ?? '';
+      const before = shownNumber(element, unit);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const after = shownNumber(element, unit);
+      assert.ok(holds(before, after), `${before} ${unit}, then ${after} ${unit} one second later`);
+    });
+  }
 }
 
 /** How far the road has moved (m), as the landscape reports it on its lane markings. */

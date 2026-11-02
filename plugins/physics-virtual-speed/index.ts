@@ -11,9 +11,11 @@ import {
   physicsMotionCapability,
   physicsPowertrainCapability,
   physicsRiderCapability,
+  physicsRoadCapability,
   physicsTotalResistanceCapability,
+  type RoadSample,
 } from '@ridrs/contracts';
-import { driveForce, integrate } from './integrator.ts';
+import { driveForce, integrate, isValidGradient } from './integrator.ts';
 
 function assertFinite(ctx: PluginContext, what: string, value: number): number {
   if (!Number.isFinite(value)) {
@@ -30,31 +32,47 @@ function massOf(ctx: PluginContext, what: string, parameter: PhysicsParameter): 
   return mass;
 }
 
-/** The forces and inputs that act on a state at `at`, moving at `speed`. */
-function forcesAt(ctx: PluginContext, at: number, speed: number) {
+/** The road at `distance`; an invalid sample fails the step, naming the road plugin. */
+function roadAt(ctx: PluginContext, distance: number): RoadSample {
+  const provider = ctx.capabilities.get(physicsRoadCapability);
+  const road = provider.at(distance);
+  if (!isValidGradient(road.gradient)) {
+    throw new PhysicsStepError(`Invalid gradient ${road.gradient} at ${distance} m`, {
+      pluginId: provider.source,
+    });
+  }
+  return road;
+}
+
+/**
+ * The forces and inputs that act on a state at `at`, moving at `speed` at `distance`. Mass and
+ * road are looked up once, so every force uses the same values.
+ */
+function forcesAt(ctx: PluginContext, at: number, speed: number, distance: number) {
   const capabilities = ctx.capabilities;
   const mass =
     massOf(ctx, 'rider mass', capabilities.get(physicsRiderCapability).parameters().mass) +
     massOf(ctx, 'bicycle mass', capabilities.get(physicsBicycleCapability).parameters().mass);
   const power = capabilities.get(physicsPowertrainCapability).wheelPower(at);
   assertFinite(ctx, 'wheel power', power.wheelPower);
+  const road = roadAt(ctx, distance);
   const resistance = capabilities
     .get(physicsTotalResistanceCapability)
-    .evaluate({ at, speed, mass });
+    .evaluate({ at, speed, mass, road });
   assertFinite(ctx, 'total resistance', resistance.total);
-  return { mass, power, resistance };
+  return { mass, power, road, resistance };
 }
 
 /**
- * The integrator: drive force, acceleration, speed and distance of a virtual rider on a flat road.
- * Power comes from the new state's time, forces from the previous speed - a step never consumes
- * its own output.
+ * The integrator: drive force, acceleration, speed and distance of a virtual rider on the road.
+ * Power comes from the new state's time, forces from the previous speed and distance - a step
+ * never consumes its own output.
  */
 export default definePlugin({
   initialize(ctx) {
     ctx.capabilities.provide(physicsMotionCapability, {
       initial(at): MotionResult {
-        const { mass, power, resistance } = forcesAt(ctx, at, 0);
+        const { mass, power, road, resistance } = forcesAt(ctx, at, 0, 0);
         return {
           at,
           speed: 0,
@@ -65,11 +83,17 @@ export default definePlugin({
           wheelPower: power.wheelPower,
           driveForce: assertFinite(ctx, 'drive force', driveForce(power.wheelPower, 0)),
           resistance,
+          road,
         };
       },
 
       advance(previous: MotionState, at): MotionResult {
-        const { mass, power, resistance } = forcesAt(ctx, at, previous.speed);
+        const { mass, power, road, resistance } = forcesAt(
+          ctx,
+          at,
+          previous.speed,
+          previous.distance,
+        );
         const next = integrate({
           speed: previous.speed,
           distance: previous.distance,
@@ -89,6 +113,7 @@ export default definePlugin({
           wheelPower: power.wheelPower,
           driveForce: assertFinite(ctx, 'drive force', next.driveForce),
           resistance,
+          road,
         };
       },
     });

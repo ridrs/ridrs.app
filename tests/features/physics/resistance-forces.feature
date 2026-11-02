@@ -27,7 +27,7 @@ Feature: Resistance forces
 
   Scenario: Contributions are listed in a stable order
     When "test-physics" evaluates the total resistance at 10 m/s with a mass of 85 kg
-    Then the contributions are "physics-aerodynamics, physics-rolling-resistance" in this order
+    Then the contributions are "physics-aerodynamics, physics-gravity-resistance, physics-rolling-resistance" in this order
 
   Scenario: Default parameters are labelled as defaults
     Then the bicycle parameters are a mass of 10 kg and a rolling resistance coefficient of 0.004, all with the origin "default"

@@ -10,10 +10,12 @@ import {
   metricPowerCapability,
   metricPowerHeartRateRatioCapability,
   physicsBicycleCapability,
+  physicsEnvironmentCapability,
   physicsMotionCapability,
   physicsPowertrainCapability,
   physicsResistanceCapability,
   physicsRiderCapability,
+  physicsRoadCapability,
   physicsTotalResistanceCapability,
 } from '@ridrs/contracts';
 import { createSystemClock, PluginHost } from '@ridrs/core';
@@ -77,6 +79,8 @@ async function main(): Promise<void> {
       metricPowerHeartRateRatioCapability,
       physicsBicycleCapability,
       physicsRiderCapability,
+      physicsEnvironmentCapability,
+      physicsRoadCapability,
       physicsResistanceCapability,
       physicsTotalResistanceCapability,
       physicsPowertrainCapability,

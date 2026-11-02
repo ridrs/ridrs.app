@@ -1,0 +1,9 @@
+{
+  "id": "physics-gravity-resistance",
+  "name": "Gravity Resistance",
+  "version": "0.1.0",
+  "types": ["physics", "physics-resistance"],
+  "provides": ["physics.resistance"],
+  "requires": [],
+  "entry": "index.ts"
+}

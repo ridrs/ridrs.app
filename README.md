@@ -98,6 +98,18 @@ Manual check (`tauri dev` / `tauri android dev` as above) with a real smart trai
 
 Record the platform, the power source, the time to reach 30 km/h at 200 W, and whether the speed display looks smooth enough at 4 updates per second (Phase 7 makes it fluid). Without hardware the same composition runs in `tests/features/apps/ride-with-virtual-speed.feature` with the `simulated-trainer` fixture.
 
+## Climbs and descents: extended physics
+
+Since Phase 6 the virtual rider rides a built-in demo course: 2 km flat, 1 km at 5 %, 500 m flat, 1 km at −5 %, then flat. Gravity opposes the rider uphill and pushes them downhill; air density comes from `physics-environment`. The HUD shows the current gradient after speed and distance. At a steady 200 W the speed settles near 34.2 km/h on the flat, about 14.9 km/h on the climb and about 57.9 km/h on the descent. Without pedalling the rider keeps rolling downhill but comes to rest on a climb and stays there (no rolling back). See `docs/architecture/physics.md` and ADR 0027.
+
+Manual check (`tauri dev` / `tauri android dev` as above) with a real smart trainer, or with the developer companion's simulated trainer, on the demo course:
+
+- At about 200 W the gradient shows 0.0 % for about 3.7 minutes, then **5.0 %**. Within a few seconds the speed drops from about 34 to about 15 km/h.
+- After the climb and 500 m of flat, the gradient shows **-5.0 %** and the speed rises towards about 58 km/h.
+- Stop pedalling on the descent: the rider keeps rolling. Stop on the climb: the rider comes to rest and stays there.
+
+Record the platform and the power source, the speed on each segment, and whether the jump at the segment boundaries feels acceptable. Without hardware a short climb runs in `tests/features/apps/ride-a-climb.feature` with the `simulated-trainer` and `short-climb` fixtures.
+
 ## The companion bridge: a phone holds the Bluetooth link
 
 When the device running ridrs cannot reach the trainer (a Mac or TV far from the bike, flaky Bluetooth), a phone next to the bike runs the **ridrs companion** (`apps/companion`). It connects to the trainer and forwards raw Bluetooth traffic to ridrs over the local network. Device plugins in ridrs decode the bytes as usual. See `docs/architecture/ble-bridge.md`.

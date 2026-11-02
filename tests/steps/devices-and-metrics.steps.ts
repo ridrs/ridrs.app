@@ -561,6 +561,10 @@ Then('the manifest of {string} requires no capability', function (this: RidrsWor
   assert.deepEqual(this.ensureHost().getPluginManifest(id)?.requires, []);
 });
 
+Then('the manifest of {string} requires nothing', function (this: RidrsWorld, id: string) {
+  assert.deepEqual(this.ensureHost().getPluginManifest(id)?.requires, []);
+});
+
 Then(
   'the manifest of {string} requires exactly {string}',
   function (this: RidrsWorld, id: string, capabilities: string) {

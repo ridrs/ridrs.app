@@ -11,10 +11,10 @@ Feature: Physics as replaceable plugins
     Examples:
       | plugin                     | requires                                                                       |
       | physics-engine             | physics.motion                                                                 |
-      | physics-virtual-speed      | physics.bicycle, physics.powertrain, physics.rider, physics.total-resistance   |
+      | physics-virtual-speed      | physics.bicycle, physics.powertrain, physics.rider, physics.road, physics.total-resistance |
       | physics-total-resistance   | physics.resistance                                                             |
       | physics-rolling-resistance | physics.bicycle                                                                |
-      | physics-aerodynamics       | physics.rider                                                                  |
+      | physics-aerodynamics       | physics.environment, physics.rider                                             |
       | physics-powertrain         | metric.power                                                                   |
 
   Scenario: A different rider changes the speed, not the code
