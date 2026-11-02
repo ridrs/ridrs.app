@@ -324,6 +324,29 @@ for (const kind of ['virtual-speed', 'virtual-distance']) {
   });
 }
 
+/** How far the road has moved (m), as the landscape reports it on its lane markings. */
+async function roadPosition(world: RidrsWorld): Promise<number> {
+  const markings = await within(ui(world)).findByTestId('lane-markings');
+  const position = Number(markings.dataset.position);
+  assert.ok(Number.isFinite(position), `position "${markings.dataset.position}"`);
+  return position;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+Then('the lane markings move', async function (this: RidrsWorld) {
+  const before = await roadPosition(this);
+  await sleep(500);
+  const after = await roadPosition(this);
+  assert.ok(after > before, `road at ${before} m, then ${after} m half a second later`);
+});
+
+Then('the lane markings stand still', async function (this: RidrsWorld) {
+  const before = await roadPosition(this);
+  await sleep(500);
+  assert.equal(await roadPosition(this), before);
+});
+
 Then('the cadence widget is shown after the power widget', async function (this: RidrsWorld) {
   const power = await widget(this, 'power');
   const cadence = await widget(this, 'cadence');

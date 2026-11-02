@@ -16,6 +16,12 @@
         "extensionPoint": "activity/landscape",
         "export": "FlatLandscape"
       }
-    ]
+    ],
+    "events": {
+      "subscribe": [
+        "physics.state"
+      ],
+      "publish": []
+    }
   }
 }
