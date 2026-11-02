@@ -1,0 +1,9 @@
+{
+  "id": "fixture-bridge-connector",
+  "name": "Simulated Companion Network (fixture)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["ble-bridge.connector"],
+  "requires": [],
+  "entry": "index.ts"
+}

@@ -2,10 +2,15 @@
 
 import { activityStartRequestedEvent, activityStateChangedEvent } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
 function MainScreenView({ ctx }: { readonly ctx: UiContext }) {
+  const panel = useRef<HTMLDivElement>(null);
+
+  // Panels below the start button (device pairing and the like); the screen does not know them.
+  useEffect(() => (panel.current ? ctx.slot('main/panel', panel.current) : undefined), [ctx]);
+
   // Navigation follows the activity state, not the click: a replayed "running" state after a
   // reload leads back into the ride as well.
   useEffect(
@@ -38,6 +43,7 @@ function MainScreenView({ ctx }: { readonly ctx: UiContext }) {
       >
         Start ride
       </button>
+      <div data-testid="slot-main-panel" ref={panel} />
     </main>
   );
 }

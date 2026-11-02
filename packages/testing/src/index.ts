@@ -4,5 +4,7 @@ export {
   BleSimulator,
   SimulatedPeripheral,
   type SimulatedPeripheralOptions,
-} from './ble-simulator.ts';
+} from '@ridrs/ble-simulator';
+export { SimulatedBridgeConnector, SimulatedNetwork } from './bridge-network.ts';
+export { SimulatedCompanion, type SimulatedCompanionOptions } from './simulated-companion.ts';
 export { SimulatedTauriBridge } from './tauri-bridge.ts';

@@ -2,6 +2,9 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "paths": {
+      "@ridrs/ble-bridge": ["./packages/ble-bridge/src/index.ts"],
+      "@ridrs/ble-simulator": ["./packages/ble-simulator/src/index.ts"],
+      "@ridrs/ble-tauri": ["./packages/ble-tauri/src/index.ts"],
       "@ridrs/contracts": ["./packages/contracts/src/index.ts"],
       "@ridrs/core": ["./packages/core/src/index.ts"],
       "@ridrs/core/node": ["./packages/core/src/node/index.ts"],
@@ -12,6 +15,7 @@
     }
   },
   "include": [
+    "apps/companion/scripts/*.ts",
     "apps/**/*.ts",
     "apps/**/*.tsx",
     "packages/**/*.ts",
@@ -20,5 +24,12 @@
     "tests/**/*.ts",
     "vitest.config.ts"
   ],
-  "exclude": ["node_modules", "dist", "web", "experiments", "apps/native/src-tauri"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "web",
+    "experiments",
+    "apps/native/src-tauri",
+    "apps/companion/src-tauri"
+  ]
 }

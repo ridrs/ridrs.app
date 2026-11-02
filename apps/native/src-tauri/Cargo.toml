@@ -19,10 +19,11 @@ tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
 tauri = { version = "2.12.5", features = [] }
+# Direct dependency on purpose: Tauri finds a plugin's Android part only via direct dependencies.
 tauri-plugin-blec = "0.18.0"
+ridrs-ble = { path = "../../../crates/ridrs-ble" }
+ridrs-bridge = { path = "../../../crates/ridrs-bridge" }
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = ["sync"] }
-uuid = "1"
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 keepawake = "0.6.1"

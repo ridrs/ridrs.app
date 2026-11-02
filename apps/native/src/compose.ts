@@ -4,7 +4,17 @@ import {
   activityFinishRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  type BleTransport,
+  bleBridgeConnectorCapability,
   bleCentralCapability,
+  bleTransportRequestedEvent,
+  bridgeCompanionsChangedEvent,
+  bridgeConnectRequestedEvent,
+  bridgeDisconnectRequestedEvent,
+  bridgeForgetRequestedEvent,
+  bridgePairingOfferEvent,
+  bridgePairRequestedEvent,
+  bridgeStateChangedEvent,
   type Clock,
   deviceConnectionChangedEvent,
   type EventDefinition,
@@ -31,7 +41,24 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   measurementCadenceEvent,
   metricPowerEvent,
   metricCadenceEvent,
+  bridgeCompanionsChangedEvent,
+  bridgePairingOfferEvent,
+  bridgePairRequestedEvent,
+  bridgeConnectRequestedEvent,
+  bridgeDisconnectRequestedEvent,
+  bridgeForgetRequestedEvent,
+  bridgeStateChangedEvent,
+  bleTransportRequestedEvent,
 ];
+
+/**
+ * `ble.central` has exactly one provider: the plugins of the transport not chosen are disabled.
+ * The connector plugin is the platform half of the bridge (mDNS + sockets in Rust).
+ */
+const TRANSPORT_PLUGINS: Record<BleTransport, readonly string[]> = {
+  local: ['transport-ble-tauri', 'transport-ble-noble'],
+  bridge: ['transport-ble-bridge', 'bridge-connector-tauri'],
+};
 
 /** Port to the platform's "keep the display on" facility. */
 export interface KeepAwakePort {
@@ -47,6 +74,10 @@ export interface RidrsAppOptions {
   readonly disabledPlugins?: Iterable<string>;
   /** Keeps the display on while a ride runs: nobody touches the screen while pedalling. */
   readonly keepAwake?: KeepAwakePort;
+  /** Bluetooth of this device (default) or a companion phone in the same network. */
+  readonly bleTransport?: BleTransport;
+  /** The rider asked for the other transport; the app persists it and restarts. */
+  readonly onBleTransportRequested?: (transport: BleTransport) => void;
 }
 
 export interface RidrsApp {
@@ -60,12 +91,19 @@ export interface RidrsApp {
  * by the Tauri WebView (bundled plugins) and the Cucumber e2e scenarios (plugin folders).
  */
 export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp> {
+  const transport = options.bleTransport ?? 'local';
+  const otherTransport: BleTransport = transport === 'local' ? 'bridge' : 'local';
   const host = new PluginHost({
     sources: options.sources,
-    disabledPlugins: options.disabledPlugins,
+    disabledPlugins: [...(options.disabledPlugins ?? []), ...TRANSPORT_PLUGINS[otherTransport]],
     clock: options.clock,
     logger: options.logger,
-    capabilities: [bleCentralCapability, metricPowerCapability, metricCadenceCapability],
+    capabilities: [
+      bleCentralCapability,
+      bleBridgeConnectorCapability,
+      metricPowerCapability,
+      metricCadenceCapability,
+    ],
     events: RIDRS_EVENTS,
   });
   // Before start, so values published while plugins start (the initial activity state) are cached.
@@ -75,6 +113,14 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
     ? host.subscribeEvent('ridrs-app', activityStateChangedEvent, ({ payload }) =>
         keepAwake.setKeepAwake(payload.state === 'running'),
       )
+    : undefined;
+  const onTransport = options.onBleTransportRequested;
+  const transportWatch = onTransport
+    ? host.subscribeEvent('ridrs-app', bleTransportRequestedEvent, ({ payload }) => {
+        if (payload.transport !== transport) {
+          onTransport(payload.transport);
+        }
+      })
     : undefined;
   await host.start();
   const unmount = mountShell(options.root, bridge, { logger: options.uiLogger ?? console });
@@ -87,6 +133,7 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
       closing ??= (async () => {
         unmount();
         rideWatch?.unsubscribe();
+        transportWatch?.unsubscribe();
         keepAwake?.setKeepAwake(false);
         bridge.dispose();
         await host.dispose();

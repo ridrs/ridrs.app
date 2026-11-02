@@ -5,5 +5,11 @@
 <dict>
   <key>NSBluetoothAlwaysUsageDescription</key>
   <string>ridrs connects to your smart trainer, heart-rate strap and controllers over Bluetooth.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>ridrs finds and connects to the ridrs companion app on your phone in the same network.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_ridrs-bridge._tcp</string>
+  </array>
 </dict>
 </plist>

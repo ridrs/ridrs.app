@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+[package]
+name = "ridrs-companion"
+version = "0.1.0"
+description = "ridrs companion: forwards a phone's Bluetooth to ridrs over the local network"
+license = "AGPL-3.0-or-later"
+edition = "2021"
+rust-version = "1.80"
+publish = false
+
+[lib]
+# The `_lib` suffix avoids a name clash with the bin target on Windows.
+name = "ridrs_companion_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+# Direct dependency on purpose: Tauri finds a plugin's Android part only via direct dependencies.
+tauri-plugin-blec = "0.18.0"
+ridrs-ble = { path = "../../../crates/ridrs-ble" }
+ridrs-bridge = { path = "../../../crates/ridrs-bridge" }
+
+# The phone scans the pairing QR code ridrs shows (mobile only).
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-barcode-scanner = "2.5.3"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

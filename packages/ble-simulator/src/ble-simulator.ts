@@ -307,6 +307,23 @@ export class BleSimulator implements BleCentral {
     });
   }
 
+  /**
+   * The peripheral vanishes: an open connection drops, scans and connects no longer find it.
+   * Lookups by name still return it, so a test can talk about the device it just removed.
+   */
+  removePeripheral(peripheralId: string): void {
+    const peripheral = this.peripheralsById.get(peripheralId);
+    if (!peripheral) {
+      return;
+    }
+    peripheral.switchOff();
+    this.peripheralsById.delete(peripheralId);
+  }
+
+  peripherals(): readonly SimulatedPeripheral[] {
+    return [...this.peripheralsById.values()];
+  }
+
   /** Total connection attempts the central made against all peripherals. */
   connectAttemptCount(): number {
     let total = 0;

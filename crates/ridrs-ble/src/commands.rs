@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Native BLE surface behind `ble.central` (plugins/transport-ble-tauri): scan, connect,
-//! subscribe, disconnect, connection-lost.
-//!
-//! Platform backends come from `tauri-plugin-blec` (btleplug on Windows/macOS/iOS, its own Kotlin
-//! backend on Android). This module only adds what the ridrs `BleCentral` needs and blec's own
-//! JS commands lack: a service-UUID scan filter, a Rust-side receive timestamp per notification,
-//! and binary (not JSON number array) notification frames. It never interprets payloads.
-
 use std::sync::OnceLock;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 

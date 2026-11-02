@@ -15,9 +15,13 @@ export interface NotificationFrame {
  * Decodes a notification frame: u64 LE monotonic µs, f64 LE wall-clock ms, payload.
  * Raw channel bodies arrive as ArrayBuffer; a JSON number array is accepted as a fallback.
  */
-export function decodeNotificationFrame(message: ArrayBuffer | ArrayLike<number>): NotificationFrame {
+export function decodeNotificationFrame(
+  message: ArrayBuffer | ArrayLike<number>,
+): NotificationFrame {
   const bytes =
-    message instanceof ArrayBuffer ? new Uint8Array(message) : Uint8Array.from(message as ArrayLike<number>);
+    message instanceof ArrayBuffer
+      ? new Uint8Array(message)
+      : Uint8Array.from(message as ArrayLike<number>);
   if (bytes.byteLength < FRAME_HEADER_BYTES) {
     throw new RangeError(`Notification frame too short: ${bytes.byteLength} bytes`);
   }

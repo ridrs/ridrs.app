@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>The ridrs companion connects to your smart trainer over Bluetooth and forwards it to ridrs.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Scan the pairing QR code ridrs shows, to connect this phone to ridrs.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>ridrs on your computer or tablet connects to this companion over your local network.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_ridrs-bridge._tcp</string>
+  </array>
+</dict>
+</plist>

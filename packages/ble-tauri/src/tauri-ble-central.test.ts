@@ -50,7 +50,10 @@ describe('TauriBleCentral.scan', () => {
     const seen: string[] = [];
 
     const done = (async () => {
-      for await (const peripheral of central.scan({ serviceUuids: ['1826'], signal: controller.signal })) {
+      for await (const peripheral of central.scan({
+        serviceUuids: ['1826'],
+        signal: controller.signal,
+      })) {
         seen.push(peripheral.peripheralId);
       }
     })();
@@ -139,7 +142,9 @@ describe('TauriBleConnection', () => {
       calls += 1;
     });
     await connection.disconnect();
-    ipc.channel<{ peripheralId: string }>('ble_connect', 'onConnectionLost').onmessage({ peripheralId: 'trainer' });
+    ipc
+      .channel<{ peripheralId: string }>('ble_connect', 'onConnectionLost')
+      .onmessage({ peripheralId: 'trainer' });
     expect(calls).toBe(0);
     expect(ipc.callsOf('ble_disconnect')[0]?.args).toEqual({ peripheralId: 'trainer' });
   });
@@ -152,7 +157,9 @@ describe('TauriBleConnection', () => {
       calls += 1;
     });
     off();
-    ipc.channel<{ peripheralId: string }>('ble_connect', 'onConnectionLost').onmessage({ peripheralId: 'trainer' });
+    ipc
+      .channel<{ peripheralId: string }>('ble_connect', 'onConnectionLost')
+      .onmessage({ peripheralId: 'trainer' });
     expect(calls).toBe(0);
   });
 
@@ -168,7 +175,9 @@ describe('TauriBleConnection', () => {
     ipc.on('ble_connect', () => {
       controller.abort();
     });
-    await expect(central.connect('trainer', { signal: controller.signal })).rejects.toThrow(/abort/i);
+    await expect(central.connect('trainer', { signal: controller.signal })).rejects.toThrow(
+      /abort/i,
+    );
     expect(ipc.callsOf('ble_disconnect')).toHaveLength(1);
   });
 });

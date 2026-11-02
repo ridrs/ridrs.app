@@ -13,7 +13,10 @@
     "screens": [
       {
         "id": "main",
-        "export": "MainScreen"
+        "export": "MainScreen",
+        "extensionPoints": [
+          "main/panel"
+        ]
       }
     ],
     "events": {

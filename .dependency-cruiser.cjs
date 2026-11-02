@@ -32,13 +32,37 @@ module.exports = {
         'packages/core and packages/contracts run in Node and in a WebView: no node:* builtins and no Node-only libraries. Only packages/core/src/node/ (the Node-only entry) may use them.',
       severity: 'error',
       from: {
-        path: '^packages/(core|contracts)/',
+        path: '^packages/(core|contracts|ble-bridge|ble-simulator)/',
         pathNot: '(^packages/core/src/node/|\\.test\\.ts$)',
       },
       to: {
         dependencyTypesNot: ['type-only'],
         path: '^(node:|fs$|path$|url$|crypto$|os$)|tinyglobby|pino',
       },
+    },
+    {
+      name: 'ble-bridge-only-imports-contracts',
+      comment:
+        'packages/ble-bridge is the bridge protocol (companion and ridrs side): it imports packages/contracts only.',
+      severity: 'error',
+      from: { path: '^packages/ble-bridge/' },
+      to: { path: '^(packages/(?!contracts/|ble-bridge/)|plugins/|apps/|tests/)' },
+    },
+    {
+      name: 'ble-simulator-not-in-release-code',
+      comment:
+        'Dummy devices are for tests and the developer companion only: packages/ble-simulator may be imported by packages/testing, tests/** and the companion app (behind VITE_DUMMY_DEVICES).',
+      severity: 'error',
+      from: { path: '^(packages/(?!testing/|ble-simulator/)|plugins/|apps/(?!companion/))' },
+      to: { path: '^packages/ble-simulator/' },
+    },
+    {
+      name: 'bridge-transport-imports-protocol-only',
+      comment:
+        'transport-ble-bridge knows the bridge protocol and contracts; the platform comes in as the ble-bridge.connector capability.',
+      severity: 'error',
+      from: { path: '^plugins/transport-ble-bridge/' },
+      to: { path: '^packages/(?!contracts/|ble-bridge/)' },
     },
     {
       name: 'core-builtins-forbidden',
@@ -103,9 +127,12 @@ module.exports = {
     {
       name: 'tauri-only-in-transport-native-and-testing',
       comment:
-        '@tauri-apps/* may only be imported by plugins/transport-ble-tauri, apps/native and the simulated bridge in packages/testing.',
+        '@tauri-apps/* may only be imported by the Tauri BLE package, the Tauri plugins (transport, bridge connector), the Tauri apps and the simulated bridge in packages/testing.',
       severity: 'error',
-      from: { pathNot: '^(plugins/transport-ble-tauri/|apps/native/|packages/testing/)' },
+      from: {
+        pathNot:
+          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri)/|apps/(native|companion)/|packages/testing/)',
+      },
       to: { path: '@tauri-apps' },
     },
     {
@@ -124,9 +151,10 @@ module.exports = {
     },
     {
       name: 'react-only-in-ui-code',
-      comment: 'React is an implementation detail of UI plugin clients and the native app entry.',
+      comment:
+        'React is an implementation detail of UI plugin clients, the native app entry and the companion app UI.',
       severity: 'error',
-      from: { pathNot: '^(plugins/ui-[^/]+/client/|apps/native/src/|tests/)' },
+      from: { pathNot: '^(plugins/ui-[^/]+/client/|apps/(native|companion)/src/|tests/)' },
       to: { path: '(^|/)node_modules/.*/(react|react-dom)/' },
     },
     {

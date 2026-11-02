@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-mod ble;
 mod keep_awake;
+mod settings;
+
+use ridrs_ble::commands as ble;
+use ridrs_bridge::client as bridge;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,6 +14,7 @@ pub fn run() {
         // shared BLE handler that `ble.rs` drives. blec's own JS commands are not used.
         .plugin(tauri_plugin_blec::init())
         .manage(keep_awake::KeepAwakeState::default())
+        .manage(bridge::ClientState::default())
         .invoke_handler(tauri::generate_handler![
             ble::ble_check_permissions,
             ble::ble_adapter_state,
@@ -20,7 +24,14 @@ pub fn run() {
             ble::ble_disconnect,
             ble::ble_subscribe,
             ble::ble_unsubscribe,
+            bridge::bridge_browse,
+            bridge::bridge_stop_browse,
+            bridge::bridge_open,
+            bridge::bridge_send_text,
+            bridge::bridge_close,
             keep_awake::keep_awake,
+            settings::ble_transport_get,
+            settings::ble_transport_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

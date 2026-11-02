@@ -20,7 +20,10 @@ export type DiagnosticCode =
   | 'duplicate-screen'
   | 'duplicate-extension-point'
   | 'client-entry-missing'
-  | 'client-load-failure';
+  | 'client-load-failure'
+  | 'bridge-unreachable'
+  | 'bridge-rejected'
+  | 'bridge-protocol-error';
 
 export type RidrsErrorCode =
   | DiagnosticCode

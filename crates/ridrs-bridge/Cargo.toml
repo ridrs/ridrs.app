@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+[package]
+name = "ridrs-bridge"
+version = "0.1.0"
+description = "ridrs: the network half of the companion bridge (mDNS, WebSocket) as Tauri commands"
+license = "AGPL-3.0-or-later"
+edition = "2021"
+rust-version = "1.80"
+publish = false
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["net", "sync", "time", "macros", "rt"] }
+tokio-tungstenite = "0.30.0"
+futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+mdns-sd = "0.21.7"
+if-addrs = "0.15.0"
