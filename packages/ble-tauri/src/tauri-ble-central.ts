@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { SharedBleScan } from '@ridrs/ble-peripheral';
 import {
   type BleCentral,
   type BleCharacteristicTarget,
@@ -89,60 +90,30 @@ class TauriBleConnection implements BleConnection {
 
 /** `BleCentral` on top of the app-local Rust BLE commands (native backends via tauri-plugin-blec). */
 export class TauriBleCentral implements BleCentral {
-  constructor(private readonly ipc: BleIpc) {}
+  /** blec runs one scan at a time; device plugins scan concurrently for their own services. */
+  private readonly scans: SharedBleScan;
 
-  async *scan(options: BleScanOptions): AsyncIterable<BleDiscoveredPeripheral> {
-    const { signal } = options;
-    if (signal?.aborted) {
-      return;
-    }
-
-    const queue: BleDiscoveredPeripheral[] = [];
-    const seen = new Set<string>();
-    let wake: (() => void) | undefined;
-    let finished = false;
-    const finish = () => {
-      finished = true;
-      wake?.();
-    };
-
-    const channel = this.ipc.createChannel<ScanEvent>();
-    channel.onmessage = (event) => {
-      if (finished || seen.has(event.peripheralId)) {
-        return;
-      }
-      seen.add(event.peripheralId);
-      queue.push({
-        peripheralId: event.peripheralId,
-        name: event.name,
-        serviceUuids: event.serviceUuids.map(normalizeBleUuid),
-      });
-      wake?.();
-    };
-    signal?.addEventListener('abort', finish, { once: true });
-
-    try {
-      await this.ipc.invoke('ble_scan', {
-        serviceUuids: options.serviceUuids.map(normalizeBleUuid),
-        onEvent: channel,
-      });
-      while (!finished) {
-        const next = queue.shift();
-        if (next) {
-          yield next;
-          continue;
-        }
-        await new Promise<void>((resolve) => {
-          wake = resolve;
+  constructor(private readonly ipc: BleIpc) {
+    this.scans = new SharedBleScan(async (serviceUuids, onDiscovered) => {
+      const channel = this.ipc.createChannel<ScanEvent>();
+      channel.onmessage = (event) =>
+        onDiscovered({
+          peripheralId: event.peripheralId,
+          name: event.name,
+          serviceUuids: event.serviceUuids,
         });
-        wake = undefined;
-      }
-    } finally {
-      finished = true;
-      channel.onmessage = () => undefined;
-      signal?.removeEventListener('abort', finish);
-      await this.ipc.invoke('ble_stop_scan').catch(() => undefined);
-    }
+      await this.ipc.invoke('ble_scan', { serviceUuids, onEvent: channel });
+      return {
+        stop: async () => {
+          channel.onmessage = () => undefined;
+          await this.ipc.invoke('ble_stop_scan').catch(() => undefined);
+        },
+      };
+    });
+  }
+
+  scan(options: BleScanOptions): AsyncIterable<BleDiscoveredPeripheral> {
+    return this.scans.scan(options);
   }
 
   async connect(

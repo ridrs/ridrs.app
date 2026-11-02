@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
 import {
+  type CapabilityContract,
   type DeviceConnectionChangedPayload,
   deviceConnectionChangedEvent,
   type EventDefinition,
@@ -10,9 +11,8 @@ import {
   type MetricCapability,
   type MetricReading,
   measurementCadenceEvent,
+  measurementHeartRateEvent,
   measurementPowerEvent,
-  metricCadenceCapability,
-  metricPowerCapability,
 } from '@ridrs/contracts';
 import { BleSimulator, type SimulatedPeripheral, SimulatedTauriBridge } from '@ridrs/testing';
 import type { RidrsWorld } from '../support/world.ts';
@@ -20,7 +20,22 @@ import type { RidrsWorld } from '../support/world.ts';
 const METRIC_PLUGIN_CAPABILITIES: Record<string, string> = {
   'metric-power': 'metric.power',
   'metric-cadence': 'metric.cadence',
+  'metric-heart-rate': 'metric.heart-rate',
+  'metric-power-heart-rate-ratio': 'metric.power-heart-rate-ratio',
 };
+
+/** Measurement events by the word scenarios use for them. */
+const MEASUREMENT_EVENTS: Record<string, EventDefinition<MeasurementPayload>> = {
+  power: measurementPowerEvent,
+  cadence: measurementCadenceEvent,
+  'heart-rate': measurementHeartRateEvent,
+};
+
+function measurementEvent(kind: string): EventDefinition<MeasurementPayload> {
+  const event = MEASUREMENT_EVENTS[kind];
+  assert.ok(event, `Unknown measurement kind "${kind}"`);
+  return event;
+}
 
 export function splitCsv(value: string): string[] {
   return value
@@ -46,6 +61,11 @@ export function peripheral(world: RidrsWorld, name: string): SimulatedPeripheral
   const found = simulator(world).getPeripheralByName(name);
   assert.ok(found, `Unknown simulated peripheral "${name}"`);
   return found;
+}
+
+function currentHeartRateSensor(world: RidrsWorld): SimulatedPeripheral {
+  assert.ok(world.heartRateSensor, 'Expected a simulated heart-rate sensor');
+  return world.heartRateSensor;
 }
 
 function currentTrainer(world: RidrsWorld): SimulatedPeripheral {
@@ -118,11 +138,9 @@ function lastMeasurement(
 export function latestMetric(world: RidrsWorld, capabilityId: string): MetricReading {
   const ctx = world.ensureHost().getPluginContext('test-reader');
   assert.ok(ctx, 'Expected the test reader plugin to be running');
-  const capability: MetricCapability =
-    capabilityId === 'metric.power'
-      ? ctx.capabilities.get(metricPowerCapability)
-      : ctx.capabilities.get(metricCadenceCapability);
-  return capability.latest();
+  const contract = world.capabilityContracts.get(capabilityId);
+  assert.ok(contract?.cardinality === 'single', `Unknown metric "${capabilityId}"`);
+  return ctx.capabilities.get(contract as CapabilityContract<MetricCapability, 'single'>).latest();
 }
 
 // ---- Environment setup -------------------------------------------------------------------
@@ -209,21 +227,23 @@ When('the trainer {string} is switched on', async function (this: RidrsWorld, na
   await this.settle();
 });
 
-When(
-  'the trainer {string} drops the connection and refuses new connections',
-  async function (this: RidrsWorld, name: string) {
-    peripheral(this, name).dropConnectionAndRefuseNew();
-    await this.settle();
-  },
-);
+for (const device of ['trainer', 'heart-rate sensor']) {
+  When(
+    `the ${device} {string} drops the connection and refuses new connections`,
+    async function (this: RidrsWorld, name: string) {
+      peripheral(this, name).dropConnectionAndRefuseNew();
+      await this.settle();
+    },
+  );
 
-When(
-  'the trainer {string} accepts connections again',
-  async function (this: RidrsWorld, name: string) {
-    peripheral(this, name).acceptConnections();
-    await this.settle();
-  },
-);
+  When(
+    `the ${device} {string} accepts connections again`,
+    async function (this: RidrsWorld, name: string) {
+      peripheral(this, name).acceptConnections();
+      await this.settle();
+    },
+  );
+}
 
 When(
   'the trainer sends the Indoor Bike Data packet {string}',
@@ -286,9 +306,11 @@ Then('the trainer {string} is no longer connected', function (this: RidrsWorld, 
   assert.equal(peripheral(this, name).isConnected(), false);
 });
 
-Then('the trainer {string} is still connected', function (this: RidrsWorld, name: string) {
-  assert.ok(peripheral(this, name).isConnected());
-});
+for (const device of ['trainer', 'heart-rate sensor']) {
+  Then(`the ${device} {string} is still connected`, function (this: RidrsWorld, name: string) {
+    assert.ok(peripheral(this, name).isConnected());
+  });
+}
 
 Then(
   'the reconnection attempts were made after waiting {string} seconds',
@@ -338,7 +360,7 @@ Then('the power measurement was received at {string}', function (this: RidrsWorl
 Then(
   'its measurement time is {string} with the timestamp origin {string}',
   function (this: RidrsWorld, time: string, origin: string) {
-    const m = lastMeasurement(this, measurementPowerEvent);
+    const m = lastMeasurementOfAnyKind(this);
     assert.equal(m?.measuredAt, parseTime(time));
     assert.equal(m?.timestampOrigin, origin);
   },
@@ -347,6 +369,13 @@ Then(
 Then('it names the trainer {string} as its device', function (this: RidrsWorld, name: string) {
   assert.equal(lastMeasurement(this, measurementPowerEvent)?.deviceId, deviceId(this, name));
 });
+
+function lastMeasurementOfAnyKind(world: RidrsWorld): MeasurementPayload | undefined {
+  const types = new Set(Object.values(MEASUREMENT_EVENTS).map((event) => event.id));
+  return world.observed.filter((e) => types.has(e.type)).at(-1)?.payload as
+    | MeasurementPayload
+    | undefined;
+}
 
 function assertMeasurementTable(world: RidrsWorld, event: EventDefinition, table: DataTable) {
   const actual = eventsOf<MeasurementPayload>(world, event).map((m) => ({
@@ -369,8 +398,9 @@ Then('the cadence measurements were:', function (this: RidrsWorld, table: DataTa
 });
 
 Then('no measurement events were published', function (this: RidrsWorld) {
-  assert.equal(eventsOf(this, measurementPowerEvent).length, 0);
-  assert.equal(eventsOf(this, measurementCadenceEvent).length, 0);
+  for (const event of Object.values(MEASUREMENT_EVENTS)) {
+    assert.equal(eventsOf(this, event).length, 0, `${event.id} was published`);
+  }
 });
 
 // ---- Problems reported by the host -------------------------------------------------------
@@ -398,7 +428,7 @@ function publishMeasurement(
   const ctx = world.ensureHost().getPluginContext(pluginId);
   assert.ok(ctx, `Expected context for plugin "${pluginId}"`);
   const now = world.clock.now();
-  ctx.events.publish(kind === 'power' ? measurementPowerEvent : measurementCadenceEvent, {
+  ctx.events.publish(measurementEvent(kind), {
     deviceId: device,
     value,
     measuredAt: now,
@@ -533,7 +563,210 @@ Then('the manifest of {string} requires no capability', function (this: RidrsWor
 
 Then(
   'the manifest of {string} requires exactly {string}',
-  function (this: RidrsWorld, id: string, capability: string) {
-    assert.deepEqual(this.ensureHost().getPluginManifest(id)?.requires, [capability]);
+  function (this: RidrsWorld, id: string, capabilities: string) {
+    assert.deepEqual(this.ensureHost().getPluginManifest(id)?.requires, splitCsv(capabilities));
+  },
+);
+
+// ---- Phase 4: rates, interleaved sources, derived metrics ----------------------------------
+
+When(
+  '{string} publishes {int} {word} measurements of {float} {word} from device {string} every {float} second(s)',
+  async function (
+    this: RidrsWorld,
+    plugin: string,
+    count: number,
+    kind: string,
+    value: number,
+    _unit: string,
+    device: string,
+    seconds: number,
+  ) {
+    assert.ok(this.fakeClock, 'Time can only pass in @fake-timers scenarios');
+    for (let i = 0; i < count; i += 1) {
+      if (i > 0) {
+        await this.fakeClock.tickAsync(Math.round(seconds * 1000));
+      }
+      publishMeasurement(this, plugin, kind, value, device);
+      await this.settle();
+    }
+  },
+);
+
+interface Delivery {
+  readonly kind: 'power' | 'heart-rate';
+  readonly device: string;
+  readonly value: number;
+  readonly everyMs: number;
+}
+
+/**
+ * Delivers interleaved series from `start` to `end`: each at its own interval, power before heart
+ * rate at equal times, ending with the clock at the last delivery. A "more" delivery continues
+ * one interval after each series' previous delivery, so nothing is delivered twice.
+ */
+async function deliver(
+  world: RidrsWorld,
+  plugin: string,
+  deliveries: readonly Delivery[],
+  seconds: number,
+  more: boolean,
+): Promise<void> {
+  assert.ok(world.fakeClock, 'Time can only pass in @fake-timers scenarios');
+  const start = world.clock.now();
+  const end = start + Math.round(seconds * 1000);
+  const plan: Array<{ at: number; delivery: Delivery }> = [];
+  for (const delivery of deliveries) {
+    const previous = world.lastDeliveries.get(delivery.kind);
+    const first = more && previous !== undefined ? previous + delivery.everyMs : start;
+    for (let at = first; at <= end; at += delivery.everyMs) {
+      plan.push({ at, delivery });
+    }
+  }
+  plan.sort((a, b) => a.at - b.at);
+  for (const { at, delivery } of plan) {
+    await world.fakeClock.tickAsync(at - world.clock.now());
+    publishMeasurement(world, plugin, delivery.kind, delivery.value, delivery.device);
+    world.lastDeliveries.set(delivery.kind, at);
+    await world.settle();
+  }
+}
+
+for (const verb of ['delivers', 'delivered']) {
+  for (const more of [false, true]) {
+    When(
+      `{string} ${verb} power {float} W every {float} s and heart rate {float} bpm every {float} s for {float} ${more ? 'more ' : ''}second(s)`,
+      async function (
+        this: RidrsWorld,
+        plugin: string,
+        power: number,
+        powerEvery: number,
+        heartRate: number,
+        heartRateEvery: number,
+        seconds: number,
+      ) {
+        await deliver(
+          this,
+          plugin,
+          [
+            { kind: 'power', device: 'trainer-1', value: power, everyMs: powerEvery * 1000 },
+            {
+              kind: 'heart-rate',
+              device: 'hrm-1',
+              value: heartRate,
+              everyMs: heartRateEvery * 1000,
+            },
+          ],
+          seconds,
+          more,
+        );
+      },
+    );
+  }
+}
+
+When(
+  '{string} delivers only power {float} W every {float} s for {float} more second(s)',
+  async function (this: RidrsWorld, plugin: string, power: number, every: number, seconds: number) {
+    await deliver(
+      this,
+      plugin,
+      [{ kind: 'power', device: 'trainer-1', value: power, everyMs: every * 1000 }],
+      seconds,
+      true,
+    );
+  },
+);
+
+Then(
+  'the latest {string} is {float} {word}',
+  function (this: RidrsWorld, capability: string, expected: number, unit: string) {
+    const reading = latestMetric(this, capability);
+    assert.equal(reading.status, 'available', JSON.stringify(reading));
+    assert.ok(reading.status === 'available');
+    assert.equal(reading.unit, unit);
+    // Compared after rounding half up to the precision the scenario states.
+    const decimals = String(expected).split('.')[1]?.length ?? 0;
+    const rounded = Math.round(Number(`${reading.value}e${decimals}`)) / 10 ** decimals;
+    assert.equal(rounded, expected, `value ${reading.value}`);
+  },
+);
+
+// ---- Phase 4: heart-rate sensor ----------------------------------------------------------
+
+Given(
+  'a simulated BLE environment with a heart-rate sensor {string}',
+  function (this: RidrsWorld, name: string) {
+    this.bleSimulator = new BleSimulator({ clock: this.clock });
+    this.heartRateSensor = this.bleSimulator.addHeartRateSensor(name);
+  },
+);
+
+Given(
+  'the simulated BLE environment also contains an FTMS trainer {string}',
+  function (this: RidrsWorld, name: string) {
+    this.trainer = simulator(this).addFtmsTrainer(name);
+  },
+);
+
+Given(
+  'the ridrs plugin {string} is running with the simulated BLE central',
+  async function (this: RidrsWorld, pluginId: string) {
+    // The host has no runtime discovery: compose it again with one more plugin, like an app
+    // restart. The simulated devices keep their history.
+    await this.disposeHost();
+    this.realPluginIds.push(pluginId);
+    await this.ensureHost().start();
+    await this.settle();
+  },
+);
+
+Given('the heart-rate sensor {string} is connected', function (this: RidrsWorld, name: string) {
+  assert.ok(peripheral(this, name).isConnected(), `Expected "${name}" to be connected`);
+});
+
+When(
+  'the heart-rate sensor sends the Heart Rate Measurement packet {string}',
+  async function (this: RidrsWorld, hex: string) {
+    this.packetMark = this.observed.length;
+    currentHeartRateSensor(this).notifyHeartRateMeasurement(hex);
+    await this.settle();
+  },
+);
+
+Then(
+  'the published heart-rate measurement is {string}',
+  function (this: RidrsWorld, expected: string) {
+    const m = lastMeasurement(this, measurementHeartRateEvent, this.packetMark);
+    assert.equal(describe(m?.value, 'bpm'), expected);
+  },
+);
+
+Then(
+  'the heart-rate measurement was received at {string}',
+  function (this: RidrsWorld, time: string) {
+    assert.equal(lastMeasurement(this, measurementHeartRateEvent)?.receivedAt, parseTime(time));
+  },
+);
+
+Then(
+  'it names the heart-rate sensor {string} as its device',
+  function (this: RidrsWorld, name: string) {
+    assert.equal(lastMeasurement(this, measurementHeartRateEvent)?.deviceId, deviceId(this, name));
+  },
+);
+
+Then(
+  'the plugin {string} never connected to {string}',
+  function (this: RidrsWorld, pluginId: string, name: string) {
+    const states = this.observed.filter(
+      (e) => e.type === deviceConnectionChangedEvent.id && e.source === pluginId,
+    );
+    assert.ok(states.length > 0, `"${pluginId}" published no connection states`);
+    const id = deviceId(this, name);
+    const named = states.filter(
+      (e) => (e.payload as DeviceConnectionChangedPayload).deviceId === id,
+    );
+    assert.deepEqual(named, [], `"${pluginId}" connected to "${name}"`);
   },
 );

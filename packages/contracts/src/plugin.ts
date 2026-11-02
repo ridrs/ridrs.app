@@ -5,6 +5,7 @@ import type { Clock } from './clock.ts';
 import type { DiagnosticCode } from './diagnostics.ts';
 import type { PluginEventsContext } from './events.ts';
 import type { PluginManifest } from './manifest.ts';
+import type { PluginTemporalContext } from './temporal.ts';
 import type { UiRegistry } from './ui.ts';
 
 export type PluginState =
@@ -39,6 +40,8 @@ export interface PluginContext {
   readonly clock: Clock;
   readonly events: PluginEventsContext;
   readonly capabilities: PluginCapabilitiesContext;
+  /** The temporal data layer: series history, freshness, values at a time, aligned snapshots. */
+  readonly temporal: PluginTemporalContext;
   readonly signal: AbortSignal;
   /** Read-only view of the UI registry; `core.ui-registry.changed` announces new revisions. */
   readonly ui: { registry(): UiRegistry };

@@ -10,9 +10,11 @@ Open-source, modular, headless-first indoor cycling platform.
 - `apps/companion/`: Companion app (Tauri 2, Android/iOS) that forwards a phone's Bluetooth to ridrs over the local network (`@ridrs/companion`).
 - `apps/headless/`: Headless CLI composition root (`@ridrs/headless`).
 - `packages/contracts/`: Public plugin, manifest, event, and capability contracts (`@ridrs/contracts`, `Apache-2.0`).
-- `packages/core/`: Runtime-neutral application core: discovery ports, capability resolution, lifecycle, diagnostics, UI registry and typed event bus (`@ridrs/core`, `AGPL-3.0-or-later`; Node-only adapters in `@ridrs/core/node`).
+- `packages/core/`: Runtime-neutral application core: discovery ports, capability resolution, lifecycle, diagnostics, UI registry, typed event bus and the temporal data layer service `ctx.temporal` (`@ridrs/core`, `AGPL-3.0-or-later`; Node-only adapters in `@ridrs/core/node`).
+- `packages/temporal/`: Pure, deterministic math of the temporal data layer: sampling intervals, freshness, values at a time, damped trend, time-weighted averages, snapshots (`@ridrs/temporal`).
+- `packages/metric-source/` and `packages/ble-peripheral/`: Shared logic of the metric plugins and of the BLE device plugins (`@ridrs/metric-source`, `@ridrs/ble-peripheral`).
 - `packages/ui-sdk/`: Client contract for UI plugins (`@ridrs/ui-sdk`, `Apache-2.0`); `packages/ui-shell/`: the shell that composes screens and slots; `packages/ui-bridge/`: in-process bridge between shell and host.
-- `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, power/cadence metrics, console output, activity session, UI screens, HUD and widgets).
+- `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, heart-rate sensor, power/cadence/heart-rate metrics, power-to-heart-rate ratio, console output, activity session, UI screens, HUD and widgets).
 - `packages/ble-bridge/`: The companion bridge protocol: pairing, GATT forwarding, heartbeat; companion and ridrs side (`@ridrs/ble-bridge`). `packages/ble-tauri/`: `BleCentral` on the native BLE commands (`@ridrs/ble-tauri`). `packages/ble-simulator/`: in-process BLE simulator and dummy devices (`@ridrs/ble-simulator`).
 - `crates/`: Rust crates hosted by both Tauri apps: `ridrs-ble` (native BLE commands) and `ridrs-bridge` (mDNS and WebSocket of the companion bridge).
 - `packages/testing/`: Test harness: simulated Tauri bridge, simulated companion network (`@ridrs/testing`).
@@ -70,6 +72,18 @@ pnpm --filter @ridrs/native tauri android dev
 Manual check with a real FTMS trainer: press **Start ride**, pedal: power and cadence appear in the lower corners over the landscape. Switch the trainer off: both show `–` with "disconnected"; switch it on: values return. Press **Finish ride**: back to the main screen. The screen stays on while a ride runs. On Android the app asks for "Nearby devices" first. On macOS the app needs Bluetooth permission on first use.
 
 Without hardware the same composition runs in the tests with the simulated trainer (`tests/features/apps/ride-in-native-app.feature`). The frontend alone also runs in a browser (`pnpm --filter @ridrs/native build`, then `pnpm --filter @ridrs/native exec vite preview`): without Tauri there is no BLE, so the widgets show dashes.
+
+## Heart rate and values at different rates
+
+Since Phase 4 the app also connects to a Bluetooth heart-rate sensor (strap or band, Heart Rate Service `0x180D`) and shows four HUD widgets: power, cadence, heart rate and the power-to-heart-rate ratio (10 s averages, W/bpm). Each source is flagged "no signal" after a silence that fits its own rate: about 2 s for a 4 Hz trainer, 8–10 s for a heart-rate sensor. See `docs/architecture/temporal-data-layer.md`.
+
+Manual check with a real heart-rate sensor, on a phone or the Mac (`tauri dev` / `tauri android dev` as above), with or without a trainer:
+
+- Without a trainer: heart rate appears; power shows `–`, the ratio `–` with "no source".
+- With a trainer: all four widgets show values. The ratio shows "warming up" for about 8 s, then a value.
+- Take the sensor off (or move out of range): the heart-rate widget shows "no signal" or "disconnected" while power stays live, and the ratio follows.
+
+Record the sensor model, its notification interval (count the updates over 30 s) and the time from taking it off until "no signal". Without hardware the same composition runs in `tests/features/apps/ride-with-heart-rate.feature` with the `simulated-ride` fixture (`SIM KICKR` and `SIM HRM`).
 
 ## The companion bridge: a phone holds the Bluetooth link
 

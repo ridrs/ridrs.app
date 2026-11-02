@@ -94,3 +94,8 @@ export type MeasurementPayload = z.infer<typeof measurementPayloadSchema>;
 export const measurementPowerEvent = defineEvent('measurement.power', measurementPayloadSchema);
 
 export const measurementCadenceEvent = defineEvent('measurement.cadence', measurementPayloadSchema);
+
+export const measurementHeartRateEvent = defineEvent(
+  'measurement.heart-rate',
+  measurementPayloadSchema,
+);

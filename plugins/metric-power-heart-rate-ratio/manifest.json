@@ -1,0 +1,9 @@
+{
+  "id": "metric-power-heart-rate-ratio",
+  "name": "Power-to-Heart-Rate Ratio",
+  "version": "0.1.0",
+  "types": ["metric"],
+  "provides": ["metric.power-heart-rate-ratio"],
+  "requires": ["metric.heart-rate", "metric.power"],
+  "entry": "index.ts"
+}

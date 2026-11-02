@@ -15,6 +15,8 @@ export {
   type BleScanOptions,
   bleCentralCapability,
   FTMS_SERVICE_UUID,
+  HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID,
+  HEART_RATE_SERVICE_UUID,
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
   normalizeBleUuid,
 } from './ble.ts';
@@ -80,6 +82,7 @@ export {
   hostStartedEvent,
   type MeasurementPayload,
   measurementCadenceEvent,
+  measurementHeartRateEvent,
   measurementPayloadSchema,
   measurementPowerEvent,
   type PluginEventsContext,
@@ -99,17 +102,23 @@ export {
 } from './manifest.ts';
 export {
   cadenceMetricReadingSchema,
+  heartRateMetricReadingSchema,
   type MetricCapability,
   type MetricReading,
   type MetricUnavailableReason,
   type MetricUnit,
   metricCadenceCapability,
   metricCadenceEvent,
+  metricHeartRateCapability,
+  metricHeartRateEvent,
   metricPowerCapability,
   metricPowerEvent,
+  metricPowerHeartRateRatioCapability,
+  metricPowerHeartRateRatioEvent,
   metricReadingSchema,
   metricUnavailableReasonSchema,
   metricUnitSchema,
+  powerHeartRateRatioMetricReadingSchema,
   powerMetricReadingSchema,
 } from './metrics.ts';
 export {
@@ -120,6 +129,20 @@ export {
   type PluginLogger,
   type PluginState,
 } from './plugin.ts';
+export type {
+  EstimationStrategy,
+  Freshness,
+  PluginTemporalContext,
+  TemporalAverage,
+  TemporalMeasurement,
+  TemporalQuality,
+  TemporalRecordResult,
+  TemporalSeriesReader,
+  TemporalSeriesWriter,
+  TemporalSnapshot,
+  TemporalUnavailableReason,
+  TemporalValue,
+} from './temporal.ts';
 export {
   type UiManifestSection,
   type UiRegistry,

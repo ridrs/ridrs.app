@@ -6,6 +6,6 @@
   "type": "module",
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
-    "rxjs": "7.8.2"
+    "@ridrs/metric-source": "workspace:*"
   }
 }

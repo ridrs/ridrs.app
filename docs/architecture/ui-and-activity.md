@@ -16,7 +16,8 @@ apps/native  (one process: the Tauri WebView)
    └─ screen "activity"  ui-activity-screen      declares: activity/landscape, activity/hud   [Finish ride]
          ├─ activity/landscape  ◄─ ui-landscape-flat
          └─ activity/hud        ◄─ ui-hud                declares: hud/widget
-               └─ hud/widget    ◄─ ui-widget-power, ui-widget-cadence
+               └─ hud/widget    ◄─ ui-widget-power, ui-widget-cadence,
+                                   ui-widget-heart-rate, ui-widget-power-heart-rate-ratio (Phase 4)
 
 activity-session  (headless)   activity.start-requested / finish-requested → activity.state-changed
 ```
@@ -55,7 +56,7 @@ The core never knows what a screen or extension point means and never names one.
 
 ## Client contract, shell and bridge
 
-- **`@ridrs/ui-sdk`** (Apache-2.0, imports contracts only): `UiComponent = (container, ctx) => cleanup | void`, the `UiContext` (`events.subscribe/publish` limited to the plugin's own declared events, `slot(point, container)`, `navigate(path)`), the `UiBridge` port, and the shared metric display rules (`describeMetricReading`).
+- **`@ridrs/ui-sdk`** (Apache-2.0, imports contracts only): `UiComponent = (container, ctx) => cleanup | void`, the `UiContext` (`events.subscribe/publish` limited to the plugin's own declared events, `slot(point, container)`, `navigate(path)`), the `UiBridge` port, and the shared metric display rules (`describeMetricReading`: values rounded half up to their unit's precision - `W`, `rpm`, `bpm` whole numbers, `W/bpm` two decimals; reasons `no source`, `disconnected`, `no signal`, `warming up`).
 - **`@ridrs/ui-shell`**: plain DOM, no framework. Renders exactly one screen (`main` first, else the alphabetically first), mounts each contribution in a wrapper `data-contribution="<pluginId>/<contributionId>"`, keeps slots in sync with the registry without remounting unchanged contributions, and releases everything a component obtained through its context when it unmounts. A component that fails to load or throws is isolated: its wrapper stays empty and the shell reports `client-load-failure`. Navigation is deferred by a microtask, so components may navigate from their own handlers.
 - **`@ridrs/ui-bridge`**: `createInProcessUiBridge(host, events)`. Enforces the allow-list (`event-not-allowed`), publishes on behalf of client code with the source `ui-bridge` (payloads validated by the bus: `invalid-event-payload`), and replays the **latest envelope per event** to every new subscriber, so a reloaded or second UI knows the current ride state and metric values. It is created before `host.start()`.
 
@@ -74,3 +75,7 @@ A remote bridge (the deferred `ui-gateway-web`, WebSocket) would implement the s
 - Registry, activity and bundled discovery: Cucumber through the real host with probe plugins.
 - `transport-ble-tauri`: Cucumber against a simulated Tauri bridge (`@tauri-apps/api/mocks` + `BleSimulator`), plus Vitest unit tests.
 - Composition and the vertical use case: Cucumber `@ui` scenarios run the real host, bridge, shell and UI plugins in happy-dom (profile `ui`); `ride-in-native-app.feature` uses the native app's own composition root `startRidrsApp` with the simulated trainer.
+
+## Phase 4 widgets
+
+`ui-widget-heart-rate` (`widget-heart-rate`, bpm, order 2) and `ui-widget-power-heart-rate-ratio` (`widget-power-heart-rate-ratio`, W/bpm with two decimals, order 3) follow the Phase 3 widgets: same test ids (`value`, `unit`, `reason`, `data-status`), same display rules, one subscribed metric event each. `ride-with-heart-rate.feature` runs `startRidrsApp` with the `simulated-ride` fixture (trainer and heart-rate band).

@@ -8,6 +8,8 @@ import {
   type BleScanOptions,
   type Clock,
   FTMS_SERVICE_UUID,
+  HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID,
+  HEART_RATE_SERVICE_UUID,
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
   normalizeBleUuid,
 } from '@ridrs/contracts';
@@ -22,6 +24,12 @@ export interface SimulatedPeripheralOptions {
 
 function characteristicKey(serviceUuid: string, characteristicUuid: string): string {
   return `${normalizeBleUuid(serviceUuid)}:${normalizeBleUuid(characteristicUuid)}`;
+}
+
+function toBytes(bytesOrHex: Uint8Array | string): Uint8Array {
+  return typeof bytesOrHex === 'string'
+    ? new Uint8Array(Buffer.from(bytesOrHex.replace(/\s+/g, ''), 'hex'))
+    : bytesOrHex;
 }
 
 function slugifyName(name: string): string {
@@ -157,11 +165,15 @@ export class SimulatedPeripheral {
   }
 
   notifyIndoorBikeData(bytesOrHex: Uint8Array | string): void {
-    const bytes =
-      typeof bytesOrHex === 'string'
-        ? new Uint8Array(Buffer.from(bytesOrHex.replace(/\s+/g, ''), 'hex'))
-        : bytesOrHex;
-    this.notify(FTMS_SERVICE_UUID, INDOOR_BIKE_DATA_CHARACTERISTIC_UUID, bytes);
+    this.notify(FTMS_SERVICE_UUID, INDOOR_BIKE_DATA_CHARACTERISTIC_UUID, toBytes(bytesOrHex));
+  }
+
+  notifyHeartRateMeasurement(bytesOrHex: Uint8Array | string): void {
+    this.notify(
+      HEART_RATE_SERVICE_UUID,
+      HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID,
+      toBytes(bytesOrHex),
+    );
   }
 
   /** Registers a callback for every connection the central establishes with this peripheral. */
@@ -304,6 +316,17 @@ export class BleSimulator implements BleCentral {
       serviceUuids: [FTMS_SERVICE_UUID],
       poweredOn: options?.poweredOn ?? true,
       acceptingConnections: options?.acceptingConnections ?? true,
+    });
+  }
+
+  addHeartRateSensor(
+    name: string,
+    options?: { readonly peripheralId?: string },
+  ): SimulatedPeripheral {
+    return this.addPeripheral({
+      peripheralId: options?.peripheralId,
+      name,
+      serviceUuids: [HEART_RATE_SERVICE_UUID],
     });
   }
 

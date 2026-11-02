@@ -1,0 +1,9 @@
+{
+  "id": "device-heart-rate",
+  "name": "BLE Heart Rate Sensor",
+  "version": "0.1.0",
+  "types": ["device"],
+  "provides": [],
+  "requires": ["ble.central"],
+  "entry": "index.ts"
+}

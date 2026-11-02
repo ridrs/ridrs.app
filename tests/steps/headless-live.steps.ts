@@ -23,9 +23,13 @@ function logLines(world: RidrsWorld): LogLine[] {
   return lines;
 }
 
-function connectionStates(world: RidrsWorld): string[] {
-  return logLines(world)
+/** Connection states logged by the plugin(s) that logged `deviceName` (other devices' plugins search too). */
+function connectionStates(world: RidrsWorld, deviceName: string): string[] {
+  const lines = logLines(world);
+  const plugins = new Set(lines.filter((l) => l.deviceName === deviceName).map((l) => l.pluginId));
+  return lines
     .filter((l) => typeof l.state === 'string' && typeof l.deviceName === 'string')
+    .filter((l) => plugins.has(l.pluginId))
     .map((l) => l.state as string);
 }
 
@@ -121,13 +125,14 @@ When(
 Then(
   'the app logged the connection states {string} for {string}',
   function (this: RidrsWorld, expectedCsv: string, deviceName: string) {
-    // The searching state is logged before a device name is known, so all states are compared.
+    // The searching state is logged before a device name is known, so all states of the
+    // plugin that found the device are compared.
     assert.ok(
       logLines(this).some((l) => l.deviceName === deviceName),
       `Expected log lines for "${deviceName}"`,
     );
     assert.deepEqual(
-      connectionStates(this),
+      connectionStates(this, deviceName),
       expectedCsv.split(',').map((s) => s.trim()),
     );
   },

@@ -1,0 +1,9 @@
+{
+  "id": "metric-heart-rate",
+  "name": "Heart Rate Metric",
+  "version": "0.1.0",
+  "types": ["metric"],
+  "provides": ["metric.heart-rate"],
+  "requires": [],
+  "entry": "index.ts"
+}

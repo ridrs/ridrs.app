@@ -3,11 +3,14 @@
   "compilerOptions": {
     "paths": {
       "@ridrs/ble-bridge": ["./packages/ble-bridge/src/index.ts"],
+      "@ridrs/ble-peripheral": ["./packages/ble-peripheral/src/index.ts"],
       "@ridrs/ble-simulator": ["./packages/ble-simulator/src/index.ts"],
       "@ridrs/ble-tauri": ["./packages/ble-tauri/src/index.ts"],
       "@ridrs/contracts": ["./packages/contracts/src/index.ts"],
       "@ridrs/core": ["./packages/core/src/index.ts"],
       "@ridrs/core/node": ["./packages/core/src/node/index.ts"],
+      "@ridrs/metric-source": ["./packages/metric-source/src/index.ts"],
+      "@ridrs/temporal": ["./packages/temporal/src/index.ts"],
       "@ridrs/testing": ["./packages/testing/src/index.ts"],
       "@ridrs/ui-bridge": ["./packages/ui-bridge/src/index.ts"],
       "@ridrs/ui-sdk": ["./packages/ui-sdk/src/index.ts"],

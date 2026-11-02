@@ -1,0 +1,29 @@
+{
+  "id": "ui-widget-heart-rate",
+  "name": "Heart Rate Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui",
+    "metric-widget"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "heart-rate",
+        "extensionPoint": "hud/widget",
+        "export": "HeartRateWidget",
+        "order": 2
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "metric.heart-rate"
+      ],
+      "publish": []
+    }
+  }
+}
