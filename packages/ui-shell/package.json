@@ -10,6 +10,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
+    "@ridrs/presentation": "workspace:*",
     "@ridrs/ui-sdk": "workspace:*"
   }
 }

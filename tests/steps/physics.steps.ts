@@ -26,7 +26,7 @@ import type { RidrsWorld } from '../support/world.ts';
 import { publishMeasurement, splitCsv, useRealPlugins } from './devices-and-metrics.steps.ts';
 
 /** Absolute tolerance of numeric comparisons; expected values are rounded to two decimals. */
-const TOLERANCE = 0.005;
+export const TOLERANCE = 0.005;
 
 /** "The ridrs physics plugins", loaded through discovery. */
 const PHYSICS_PLUGINS = [
@@ -46,18 +46,18 @@ const PHYSICS_PLUGINS = [
 ];
 
 /** "+250 ms" and "+10 s" mean that long after T0 = 2026-11-01T10:00:00.000Z. */
-function parseOffset(text: string): number {
+export function parseOffset(text: string): number {
   const match = /^\+(\d+(?:\.\d+)?) (ms|s)$/.exec(text.trim());
   assert.ok(match, `Unrecognized time "${text}", expected e.g. "+250 ms" or "+10 s"`);
   const amount = Number(match[1]);
   return DEFAULT_FAKE_START + Math.round(match[2] === 's' ? amount * 1000 : amount);
 }
 
-function formatOffset(time: number): string {
+export function formatOffset(time: number): string {
   return `+${time - DEFAULT_FAKE_START} ms`;
 }
 
-function assertClose(actual: number | undefined, expected: number, what: string): void {
+export function assertClose(actual: number | undefined, expected: number, what: string): void {
   assert.ok(
     actual !== undefined && Math.abs(actual - expected) <= TOLERANCE,
     `${what}: expected ${expected}, got ${actual}`,
@@ -71,7 +71,7 @@ function activityStates(world: RidrsWorld): ActivityState[] {
 }
 
 /** The session of the latest ride that ran. */
-function currentSessionId(world: RidrsWorld): string {
+export function currentSessionId(world: RidrsWorld): string {
   const ride = activityStates(world)
     .filter((state) => state.state !== 'idle')
     .at(-1);
@@ -120,14 +120,14 @@ function capabilityOf<T>(
 
 // ---- Setup -------------------------------------------------------------------------------
 
-async function usePhysicsPlugins(world: RidrsWorld, without: string[] = []): Promise<void> {
+export async function usePhysicsPlugins(world: RidrsWorld, without: string[] = []): Promise<void> {
   await useRealPlugins(
     world,
     PHYSICS_PLUGINS.filter((id) => !without.includes(id)),
   );
 }
 
-async function addProbe(
+export async function addProbe(
   world: RidrsWorld,
   id: string,
   options: { types?: string[]; provides?: string[]; requires?: string[] } = {},

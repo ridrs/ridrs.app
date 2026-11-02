@@ -13,7 +13,7 @@ Open-source, modular, headless-first indoor cycling platform.
 - `packages/core/`: Runtime-neutral application core: discovery ports, capability resolution, lifecycle, diagnostics, UI registry, typed event bus and the temporal data layer service `ctx.temporal` (`@ridrs/core`, `AGPL-3.0-or-later`; Node-only adapters in `@ridrs/core/node`).
 - `packages/temporal/`: Pure, deterministic math of the temporal data layer: sampling intervals, freshness, values at a time, damped trend, time-weighted averages, snapshots (`@ridrs/temporal`).
 - `packages/metric-source/` and `packages/ble-peripheral/`: Shared logic of the metric plugins and of the BLE device plugins (`@ridrs/metric-source`, `@ridrs/ble-peripheral`).
-- `packages/ui-sdk/`: Client contract for UI plugins (`@ridrs/ui-sdk`, `Apache-2.0`); `packages/ui-shell/`: the shell that composes screens and slots; `packages/ui-bridge/`: in-process bridge between shell and host.
+- `packages/ui-sdk/`: Client contract for UI plugins (`@ridrs/ui-sdk`, `Apache-2.0`); `packages/ui-shell/`: the shell that composes screens and slots; `packages/ui-bridge/`: in-process bridge between shell and host; `packages/presentation/`: interpolated physics states and the frame clock for frame-driven UI plugins (`@ridrs/presentation`).
 - `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, heart-rate sensor, power/cadence/heart-rate metrics, power-to-heart-rate ratio, console output, activity session, physics engine and models, UI screens, HUD and widgets).
 - `packages/ble-bridge/`: The companion bridge protocol: pairing, GATT forwarding, heartbeat; companion and ridrs side (`@ridrs/ble-bridge`). `packages/ble-tauri/`: `BleCentral` on the native BLE commands (`@ridrs/ble-tauri`). `packages/ble-simulator/`: in-process BLE simulator and dummy devices (`@ridrs/ble-simulator`).
 - `crates/`: Rust crates hosted by both Tauri apps: `ridrs-ble` (native BLE commands) and `ridrs-bridge` (mDNS and WebSocket of the companion bridge).
@@ -109,6 +109,18 @@ Manual check (`tauri dev` / `tauri android dev` as above) with a real smart trai
 - Stop pedalling on the descent: the rider keeps rolling. Stop on the climb: the rider comes to rest and stays there.
 
 Record the platform and the power source, the speed on each segment, and whether the jump at the segment boundaries feels acceptable. Without hardware a short climb runs in `tests/features/apps/ride-a-climb.feature` with the `simulated-trainer` and `short-climb` fixtures.
+
+## Smooth rendering: simulation and rendering decoupled
+
+Since Phase 7 the GUI renders on its own clock at the display's refresh rate while the physics keeps its fixed 100 Hz. The engine streams every step in batches of five (50 ms); the landscape shows the physics 60 ms in the past, interpolated between the two neighbouring steps, so the road markings move smoothly. Rendering never drives or changes the simulation: speed, distance and gradient are exactly those of Phase 6, and the HUD numbers still update at 4 Hz. See `docs/architecture/presentation.md` and ADR 0028.
+
+Manual check (`tauri dev` / `tauri android dev` as above) on the Mac and on an Android phone (e.g. a Pixel 8), with a real smart trainer or the developer companion's simulated trainer:
+
+- The road markings move smoothly from the first seconds of the ride. Riding faster makes them move faster; on the demo course's climb they slow down.
+- Hide the app and show it again: the markings continue at the right place, and speed and distance were not affected.
+- At ride finish the landscape logs `Landscape presentation at ride finish: {frames, exact, interpolated, held, none}` (WebView developer tools console).
+
+Record the platform and its display refresh rate, the share of `held` frames at ride finish, visible stutter (yes/no), and frame drops from the WebView's developer tools, if available. This is the evidence for or against moving the physics to a Web Worker later. Without hardware the same composition runs in `tests/features/apps/ride-with-moving-road.feature` with the `simulated-trainer` fixture and a 60 FPS frame source.
 
 ## The companion bridge: a phone holds the Bluetooth link
 

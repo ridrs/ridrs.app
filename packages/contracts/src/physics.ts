@@ -253,3 +253,49 @@ export const physicsStateSchema: z.ZodType<PhysicsState> = z.object({
 
 /** Interim publication of the simulation state at about 4 Hz of simulation time. */
 export const physicsStateEvent = defineEvent('physics.state', physicsStateSchema);
+
+/**
+ * What a renderer needs of one step: a projection of its `PhysicsState`, values copied, never
+ * recomputed.
+ */
+export interface PhysicsSample {
+  readonly step: number;
+  /** epoch ms, `startedAt + 10 · step` */
+  readonly at: number;
+  /** m/s */
+  readonly speed: number;
+  /** m */
+  readonly distance: number;
+  /** m/s² */
+  readonly acceleration: number;
+  /** Rise over run, from the state's road sample. */
+  readonly gradient: number;
+}
+
+/** Consecutive step samples of one session, ascending: every step goes out in exactly one batch. */
+export interface PhysicsStateBatch {
+  readonly sessionId: string;
+  /** 1–5 entries. */
+  readonly samples: readonly PhysicsSample[];
+}
+
+const physicsSampleSchema: z.ZodType<PhysicsSample> = z.object({
+  step: z.number().int().nonnegative(),
+  at: z.number(),
+  speed: finite.nonnegative(),
+  distance: finite.nonnegative(),
+  acceleration: finite,
+  gradient: finite,
+});
+
+export const physicsStateBatchSchema: z.ZodType<PhysicsStateBatch> = z
+  .object({
+    sessionId: z.string().min(1),
+    samples: z.array(physicsSampleSchema).min(1).max(5),
+  })
+  .refine(({ samples }) => samples.every((sample, n) => sample.step - n === samples[0]?.step), {
+    message: 'samples must be consecutive steps in ascending order',
+  });
+
+/** Every step's sample, in batches of five steps (50 ms of simulation time), for presentation. */
+export const physicsStateBatchEvent = defineEvent('physics.state-batch', physicsStateBatchSchema);

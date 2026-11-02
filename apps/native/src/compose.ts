@@ -37,10 +37,12 @@ import {
   physicsResistanceCapability,
   physicsRiderCapability,
   physicsRoadCapability,
+  physicsStateBatchEvent,
   physicsStateEvent,
   physicsTotalResistanceCapability,
 } from '@ridrs/contracts';
 import { PluginHost, type PluginSource } from '@ridrs/core';
+import type { FrameSource } from '@ridrs/presentation';
 import { createInProcessUiBridge } from '@ridrs/ui-bridge';
 import type { UiLogger } from '@ridrs/ui-sdk';
 import { mountShell } from '@ridrs/ui-shell';
@@ -59,6 +61,7 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   metricHeartRateEvent,
   metricPowerHeartRateRatioEvent,
   physicsStateEvent,
+  physicsStateBatchEvent,
   bridgeCompanionsChangedEvent,
   bridgePairingOfferEvent,
   bridgePairRequestedEvent,
@@ -96,6 +99,8 @@ export interface RidrsAppOptions {
   readonly bleTransport?: BleTransport;
   /** The rider asked for the other transport; the app persists it and restarts. */
   readonly onBleTransportRequested?: (transport: BleTransport) => void;
+  /** Paces the UI's render clock; requestAnimationFrame by default (tests pass a timer source). */
+  readonly frameSource?: FrameSource;
 }
 
 export interface RidrsApp {
@@ -151,7 +156,10 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
       })
     : undefined;
   await host.start();
-  const unmount = mountShell(options.root, bridge, { logger: options.uiLogger ?? console });
+  const unmount = mountShell(options.root, bridge, {
+    logger: options.uiLogger ?? console,
+    frameSource: options.frameSource,
+  });
   options.logger.info('ridrs app started');
 
   let closing: Promise<void> | undefined;

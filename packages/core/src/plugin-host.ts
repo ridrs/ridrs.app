@@ -405,6 +405,11 @@ export class PluginHost {
     return this.running;
   }
 
+  /** The host's injected clock (epoch ms). */
+  now(): number {
+    return this.clock.now();
+  }
+
   getKnownPlugins(): readonly PluginManifest[] {
     return [...this.plugins.values()].map((p) => p.discovered.manifest);
   }

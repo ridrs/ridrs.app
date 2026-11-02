@@ -120,6 +120,6 @@ There is no configuration, persistence or settings UI.
 ## What later phases extend
 
 - **Later (plan):** wind with a real wind source (`physics-environment`, `v_rel` in `physics-aerodynamics`), other tyres and surfaces, drafting, braking and reverse motion, extended powertrain models. Each is one more provider behind the existing capabilities.
-- **Phase 7:** state history and presentation interpolation replace `physics.state` for rendering; physics may move to a worker.
+- **Phase 7 (done):** the engine also streams every step in `physics.state-batch` (batches of 5 steps); a UI-side presentation interpolates them per frame, 60 ms in the past. `physics.state` stays unchanged for the HUD and headless consumers. See [presentation.md](presentation.md) and ADR 0028. Whether the physics moves to a worker is decided from the Phase 7 manual check.
 - **Phase 8:** trainer control from the virtual state (resistance, ERG), e.g. the gradient of `physics.state.road`.
 - **Phase 10:** route geometry replaces the demo course behind `physics.road`.

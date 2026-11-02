@@ -8,12 +8,25 @@ import {
   type UiRegistryContribution,
   type UiRegistryScreen,
 } from '@ridrs/contracts';
+import { FrameClock, type FrameSource } from '@ridrs/presentation';
 import type { UiBridge, UiComponent, UiContext, UiLogger, Unsubscribe } from '@ridrs/ui-sdk';
 
 export interface ShellOptions {
   readonly logger?: UiLogger;
   /** Screen shown first. The shell is an app, so this convention lives here and nowhere else. */
   readonly initialScreen?: string;
+  /** Paces the render clock; requestAnimationFrame of the root's window by default. */
+  readonly frameSource?: FrameSource;
+}
+
+/** Frames at the display's refresh rate; the WebView pauses them while it is hidden. */
+function animationFrameSource(view: Window): FrameSource {
+  return {
+    request(callback) {
+      const id = view.requestAnimationFrame(() => callback());
+      return () => view.cancelAnimationFrame(id);
+    },
+  };
 }
 
 type Entry = UiRegistryScreen | UiRegistryContribution;
@@ -34,7 +47,8 @@ const keyOf = (entry: Entry) => `${entry.pluginId}/${entry.id}`;
 /**
  * Renders exactly one screen of the UI registry at a time into `root`, mounts contributions into
  * the slots screens and contributions open, and keeps everything in sync with registry changes.
- * Knows no screen, extension point or plugin by name.
+ * Owns the one frame clock that components reach through `ctx.frames`. Knows no screen,
+ * extension point or plugin by name.
  */
 export function mountShell(
   root: HTMLElement,
@@ -44,6 +58,23 @@ export function mountShell(
   const logger = options.logger ?? console;
   const initialScreen = options.initialScreen ?? 'main';
   const document = root.ownerDocument;
+  const view = document.defaultView;
+  const frameSource = options.frameSource ?? (view ? animationFrameSource(view) : undefined);
+  if (!frameSource) {
+    throw new Error('The shell needs a frame source: its root is in no window');
+  }
+  // The one render clock of the app: on the host's time axis, running only while subscribed.
+  const frames = new FrameClock({
+    source: frameSource,
+    now: () => bridge.now(),
+    onError: (error, owner) => {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`A frame handler of "${owner}" failed: ${message}`);
+      if (owner) {
+        bridge.reportClientError(owner, `frame handler: ${message}`);
+      }
+    },
+  });
   const modules = new Map<string, Promise<Record<string, unknown>>>();
   const slots = new Set<Slot>();
   let registry = bridge.registry();
@@ -112,6 +143,9 @@ export function mountShell(
         },
       },
       slot: (point, slotContainer) => own(openSlot(point, slotContainer)),
+      frames: {
+        onFrame: (handler) => own(frames.onFrame(handler, entry.pluginId)),
+      },
       navigate: (path) => {
         // Deferred so a component may navigate from inside its own render or event handler.
         queueMicrotask(() => navigate(path));

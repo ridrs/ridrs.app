@@ -19,7 +19,8 @@
     ],
     "events": {
       "subscribe": [
-        "physics.state"
+        "activity.state-changed",
+        "physics.state-batch"
       ],
       "publish": []
     }

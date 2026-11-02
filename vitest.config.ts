@@ -14,6 +14,7 @@ export default defineConfig({
       '@ridrs/core/node': resolve(import.meta.dirname, 'packages/core/src/node/index.ts'),
       '@ridrs/core': resolve(import.meta.dirname, 'packages/core/src/index.ts'),
       '@ridrs/metric-source': resolve(import.meta.dirname, 'packages/metric-source/src/index.ts'),
+      '@ridrs/presentation': resolve(import.meta.dirname, 'packages/presentation/src/index.ts'),
       '@ridrs/temporal': resolve(import.meta.dirname, 'packages/temporal/src/index.ts'),
       '@ridrs/ui-sdk': resolve(import.meta.dirname, 'packages/ui-sdk/src/index.ts'),
       '@ridrs/ui-shell': resolve(import.meta.dirname, 'packages/ui-shell/src/index.ts'),

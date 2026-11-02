@@ -103,6 +103,8 @@ export function createInProcessUiBridge(
       });
     },
 
+    now: () => host.now(),
+
     dispose(): void {
       for (const subscription of busSubscriptions.splice(0)) {
         subscription.unsubscribe();

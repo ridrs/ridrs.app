@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { physicsStateEvent } from '@ridrs/contracts';
+import { activityStateChangedEvent } from '@ridrs/contracts';
+import { createPhysicsPresentation, type PresentedPhysics } from '@ridrs/presentation';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { laneDashes } from './lane-markings.ts';
-
-/** A frame later than this (a hidden or stalled window) moves the road by this much at most. */
-const MAX_FRAME_SECONDS = 0.1;
 
 function dashesPath(position: number): string {
   return laneDashes(position)
@@ -16,52 +14,58 @@ function dashesPath(position: number): string {
 }
 
 /**
- * Moves the lane markings at the virtual rider's speed. Speed comes from `physics.state` (4 Hz);
- * the road position is advanced every animation frame, so the markings move smoothly between
- * states. It is presentation only: the physics' distance stays the authoritative one.
+ * Moves the lane markings by the presented distance, every frame of the shell's render clock.
+ * The presentation interpolates the physics' own step states; the landscape never smooths,
+ * predicts or integrates anything itself.
  */
 function useMovingRoad(ctx: UiContext) {
+  const svg = useRef<SVGSVGElement>(null);
   const markings = useRef<SVGGElement>(null);
   const dashes = useRef<SVGPathElement>(null);
 
   useEffect(() => {
-    let speed = 0;
+    const presentation = createPhysicsPresentation(ctx.events);
     let position = 0;
-    let last: number | undefined;
-    let frame = 0;
-    const draw = () => {
-      dashes.current?.setAttribute('d', dashesPath(position));
-      markings.current?.setAttribute('data-position', position.toFixed(3));
-    };
-    const tick = (now: number) => {
-      const seconds = last === undefined ? 0 : Math.min((now - last) / 1000, MAX_FRAME_SECONDS);
-      last = now;
-      if (speed > 0) {
-        position += speed * seconds;
-        draw();
+    const draw = (shown: PresentedPhysics) => {
+      if (shown.status === 'available' && shown.distance !== position) {
+        position = shown.distance;
+        dashes.current?.setAttribute('d', dashesPath(position));
+        markings.current?.setAttribute('data-position', position.toFixed(3));
       }
-      frame = requestAnimationFrame(tick);
+      svg.current?.setAttribute(
+        'data-distance',
+        shown.status === 'available' ? shown.distance.toFixed(2) : '',
+      );
+      svg.current?.setAttribute('data-basis', shown.status === 'available' ? shown.basis : 'none');
     };
-    draw();
-    frame = requestAnimationFrame(tick);
-    const unsubscribe = ctx.events.subscribe(physicsStateEvent, ({ payload }) => {
-      speed = payload.speed;
+    dashes.current?.setAttribute('d', dashesPath(position));
+    markings.current?.setAttribute('data-position', position.toFixed(3));
+    const stopFrames = ctx.frames.onFrame((frame) => draw(presentation.at(frame.time)));
+    // For the manual check: how many frames had an exact, interpolated or held state.
+    const stopWatching = ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
+      if (payload.state === 'finished') {
+        ctx.logger.info(`Landscape presentation at ride finish: ${JSON.stringify(presentation.stats())}`);
+      }
     });
     return () => {
-      cancelAnimationFrame(frame);
-      unsubscribe();
+      stopFrames();
+      stopWatching();
+      presentation.dispose();
     };
   }, [ctx]);
 
-  return { markings, dashes };
+  return { svg, markings, dashes };
 }
 
 /** A deliberately flat backdrop: sky, ground and a road to the horizon. */
 function FlatLandscapeView({ ctx }: { readonly ctx: UiContext }) {
-  const { markings, dashes } = useMovingRoad(ctx);
+  const { svg, markings, dashes } = useMovingRoad(ctx);
   return (
     <svg
+      ref={svg}
       data-testid="landscape-flat"
+      data-distance=""
+      data-basis="none"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}

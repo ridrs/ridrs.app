@@ -23,6 +23,10 @@ describe('laneDashes', () => {
     expect(bottomOf(after[1] ?? [])).toBeGreaterThan(bottomOf(before[1] ?? []));
   });
 
+  it('has a dash period of 8 m', () => {
+    expect(LANE_MARKINGS.dashLength + LANE_MARKINGS.gapLength).toBe(8);
+  });
+
   it('repeats after one dash period', () => {
     const period = LANE_MARKINGS.dashLength + LANE_MARKINGS.gapLength;
     const once = laneDashes(3);
