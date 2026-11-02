@@ -15,6 +15,7 @@ export type DiagnosticCode =
   | 'event-handler-failure'
   | 'malformed-packet'
   | 'multiple-sources'
+  | 'late-measurement'
   | 'invalid-transition'
   | 'unknown-extension-point'
   | 'duplicate-screen'

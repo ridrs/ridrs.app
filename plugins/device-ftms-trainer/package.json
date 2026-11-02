@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "dependencies": {
-    "@ridrs/contracts": "workspace:*",
-    "p-retry": "8.0.1"
+    "@ridrs/ble-peripheral": "workspace:*",
+    "@ridrs/contracts": "workspace:*"
   }
 }

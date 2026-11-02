@@ -29,6 +29,7 @@ This project incorporates third-party open-source dependencies under the followi
 | `happy-dom` / `@happy-dom/global-registrator` | 21.0.4 | MIT | Headless DOM for UI scenarios |
 | `@testing-library/dom` | 10.4.2 | MIT | Auto-retrying DOM queries in UI scenarios |
 | `@types/react` / `@types/react-dom` | 19.3.0 | MIT | React TypeScript definitions |
+| `simple-statistics` | 7.12.1 | ISC | Median and least-squares slope in the temporal data layer (`@ridrs/temporal`) |
 
 Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/src-tauri/Cargo.lock`):
 

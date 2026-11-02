@@ -207,7 +207,37 @@ Then(
   },
 );
 
-for (const kind of ['power', 'cadence']) {
+/** How long "eventually" waits: the ui profile runs on real time and sensors take seconds. */
+const EVENTUALLY = { timeout: 25_000, interval: 100 } as const;
+const EVENTUALLY_STEP = { timeout: 30_000 } as const;
+
+for (const kind of ['power', 'cadence', 'heart-rate', 'power-heart-rate-ratio']) {
+  Then(
+    `eventually the ${kind} widget shows {string} {string}`,
+    EVENTUALLY_STEP,
+    async function (this: RidrsWorld, value: string, unit: string) {
+      const element = await widget(this, kind);
+      await waitFor(() => {
+        assert.equal(element.dataset.status, 'available');
+        assert.equal(within(element).getByTestId('value').textContent, value);
+        assert.equal(within(element).getByTestId('unit').textContent, unit);
+      }, EVENTUALLY);
+    },
+  );
+
+  Then(
+    `eventually the ${kind} widget is unavailable with the reason {string}`,
+    EVENTUALLY_STEP,
+    async function (this: RidrsWorld, reason: string) {
+      const element = await widget(this, kind);
+      await waitFor(() => {
+        assert.equal(element.dataset.status, 'unavailable');
+        assert.equal(within(element).getByTestId('value').textContent, EN_DASH);
+        assert.equal(within(element).getByTestId('reason').textContent, reason);
+      }, EVENTUALLY);
+    },
+  );
+
   Then(
     `the ${kind} widget shows {string} {string}`,
     async function (this: RidrsWorld, value: string, unit: string) {
@@ -252,4 +282,22 @@ Then('the cadence widget is shown after the power widget', async function (this:
   const power = await widget(this, 'power');
   const cadence = await widget(this, 'cadence');
   assert.ok(power.compareDocumentPosition(cadence) & Node.DOCUMENT_POSITION_FOLLOWING);
+});
+
+// ---- Phase 4: the simulated-ride fixture ---------------------------------------------------
+
+/** The fixture's switches (see tests/fixtures/plugins/simulated-ride/.../README.md). */
+const SIMULATED_RIDE_TRAINER_ENV = 'RIDRS_SIMULATED_RIDE_TRAINER';
+const SIMULATED_RIDE_CONTROL = Symbol.for('ridrs.fixture.simulated-ride');
+
+Given('the simulated trainer is switched off', function (this: RidrsWorld) {
+  this.setEnv(SIMULATED_RIDE_TRAINER_ENV, 'off');
+});
+
+When('the heart-rate band {string} stops sending', function (this: RidrsWorld, _name: string) {
+  const control = (globalThis as Record<symbol, unknown>)[SIMULATED_RIDE_CONTROL] as
+    | { stopHeartRate(): void }
+    | undefined;
+  assert.ok(control, 'Expected the simulated-ride fixture to be running');
+  control.stopHeartRate();
 });

@@ -5,13 +5,16 @@ import {
   deviceConnectionChangedEvent,
   type EventDefinition,
   measurementCadenceEvent,
+  measurementHeartRateEvent,
   measurementPowerEvent,
   metricCadenceEvent,
+  metricHeartRateEvent,
   metricPowerEvent,
+  metricPowerHeartRateRatioEvent,
 } from '@ridrs/contracts';
 import { getActiveWorld } from './world.ts';
 
-/** Records every Phase 2 event in the World so steps can assert on them. */
+/** Records every device, measurement and metric event in the World so steps can assert on them. */
 export default definePlugin({
   // Subscribes in initialize so that events published while other plugins start are not missed.
   initialize(ctx) {
@@ -20,8 +23,11 @@ export default definePlugin({
       deviceConnectionChangedEvent,
       measurementPowerEvent,
       measurementCadenceEvent,
+      measurementHeartRateEvent,
       metricPowerEvent,
       metricCadenceEvent,
+      metricHeartRateEvent,
+      metricPowerHeartRateRatioEvent,
     ];
     for (const event of events) {
       ctx.events.subscribe(event, (envelope) => {

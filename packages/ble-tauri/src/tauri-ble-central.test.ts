@@ -91,6 +91,32 @@ describe('TauriBleCentral.scan', () => {
     await done;
     expect(ipc.callsOf('ble_stop_scan')).toHaveLength(1);
   });
+
+  it('lets a trainer and a heart-rate plugin scan at the same time', async () => {
+    const ipc = new FakeIpc();
+    const central = new TauriBleCentral(ipc);
+    const found = async (service: string) => {
+      for await (const peripheral of central.scan({ serviceUuids: [service] })) {
+        return peripheral.peripheralId;
+      }
+    };
+    const trainer = found('1826');
+    await flush();
+    const heartRate = found('180d');
+    await flush();
+    expect(ipc.callsOf('ble_scan').map((call) => call.args.serviceUuids)).toEqual([
+      ['1826'],
+      ['180d', '1826'],
+    ]);
+    const channel = ipc.channel<ReturnType<typeof scanEvent>>('ble_scan', 'onEvent');
+    channel.onmessage(scanEvent('band', ['0000180d-0000-1000-8000-00805f9b34fb']));
+    channel.onmessage(scanEvent('kickr'));
+    expect(await trainer).toBe('kickr');
+    expect(await heartRate).toBe('band');
+    await flush();
+    // Stopped for the restart with both services, and once more when both are done.
+    expect(ipc.callsOf('ble_stop_scan')).toHaveLength(2);
+  });
 });
 
 describe('TauriBleConnection', () => {

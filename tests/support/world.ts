@@ -26,15 +26,25 @@ import {
   defineCapability,
   defineEvent,
   deviceConnectionChangedEvent,
+  type EstimationStrategy,
   type EventDefinition,
   type EventEnvelope,
   type EventSubscription,
+  type Freshness,
   measurementCadenceEvent,
+  measurementHeartRateEvent,
   measurementPowerEvent,
   metricCadenceCapability,
   metricCadenceEvent,
+  metricHeartRateCapability,
+  metricHeartRateEvent,
   metricPowerCapability,
   metricPowerEvent,
+  metricPowerHeartRateRatioCapability,
+  metricPowerHeartRateRatioEvent,
+  type TemporalRecordResult,
+  type TemporalSeriesWriter,
+  type TemporalSnapshot,
   uiRegistryChangedEvent,
 } from '@ridrs/contracts';
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
@@ -63,6 +73,10 @@ export interface ProbeBehavior {
   readonly skipProvideCapabilities: Set<string>;
   readonly extraProvideCapabilities: Map<string, unknown>;
   missingEntry: boolean;
+  /** Phase 4: the temporal series this probe writes, reads (freshness log) and combines. */
+  temporalWrite?: { readonly series: string; readonly strategy: EstimationStrategy };
+  readonly temporalReads: string[];
+  readonly temporalCombines: string[][];
 }
 
 export function createDefaultProbeBehavior(): ProbeBehavior {
@@ -73,6 +87,8 @@ export function createDefaultProbeBehavior(): ProbeBehavior {
     skipProvideCapabilities: new Set(),
     extraProvideCapabilities: new Map(),
     missingEntry: false,
+    temporalReads: [],
+    temporalCombines: [],
   };
 }
 
@@ -83,8 +99,11 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   activityStateChangedEvent,
   metricPowerEvent,
   metricCadenceEvent,
+  metricHeartRateEvent,
+  metricPowerHeartRateRatioEvent,
   measurementPowerEvent,
   measurementCadenceEvent,
+  measurementHeartRateEvent,
   deviceConnectionChangedEvent,
   uiRegistryChangedEvent,
   bridgeCompanionsChangedEvent,
@@ -140,6 +159,7 @@ export class RidrsWorld extends World {
   companionCentral?: BleCentral;
   readonly bridgeSessions: BridgeSession[] = [];
   trainer?: SimulatedPeripheral;
+  heartRateSensor?: SimulatedPeripheral;
   readonly observed: EventEnvelope[] = [];
   /** Events recorded by the World's own host-level subscriptions (see HOST_OBSERVED_EVENTS). */
   readonly hostObserved: EventEnvelope[] = [];
@@ -175,6 +195,19 @@ export class RidrsWorld extends World {
   readonly receivedEvents = new Map<string, EventEnvelope[]>();
   readonly subscriptions = new Map<string, Map<string, EventSubscription>>();
   readonly capabilityAnswers = new Map<string, string>();
+  // Phase 4 state: temporal probes, keyed by series id (writers, freshness log) or plugin id.
+  readonly temporalWriters = new Map<
+    string,
+    { readonly pluginId: string; readonly writer: TemporalSeriesWriter }
+  >();
+  readonly freshnessChanges = new Map<string, Array<{ freshness: Freshness; at: number }>>();
+  readonly snapshots = new Map<string, TemporalSnapshot[]>();
+  lastRecordResult?: TemporalRecordResult;
+  requestedSnapshot?: TemporalSnapshot;
+  /** Last delivery per series of the "delivers ... every ..." steps. */
+  readonly lastDeliveries = new Map<string, number>();
+  /** Environment variables a scenario set; restored afterwards. */
+  readonly envOverrides = new Map<string, string | undefined>();
   lastPublishError?: unknown;
   lastCapabilityError?: unknown;
 
@@ -196,6 +229,8 @@ export class RidrsWorld extends World {
       bleBridgeConnectorCapability,
       metricPowerCapability,
       metricCadenceCapability,
+      metricHeartRateCapability,
+      metricPowerHeartRateRatioCapability,
     ]) {
       this.capabilityContracts.set(contract.id, contract);
     }
@@ -235,6 +270,36 @@ export class RidrsWorld extends World {
     }
     this.fakeClock?.uninstall();
     this.fakeClock = undefined;
+    for (const [name, value] of this.envOverrides) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+    this.envOverrides.clear();
+  }
+
+  /** Sets an environment variable for this scenario only. */
+  setEnv(name: string, value: string): void {
+    if (!this.envOverrides.has(name)) {
+      this.envOverrides.set(name, process.env[name]);
+    }
+    process.env[name] = value;
+  }
+
+  /** (Re)writes a probe plugin folder from its temporal behavior: writes provide, reads require. */
+  async writeTemporalProbe(pluginId: string): Promise<void> {
+    const behavior = this.getBehavior(pluginId);
+    const write = behavior.temporalWrite;
+    await this.writeProbePluginFolder({
+      folder: pluginId,
+      id: pluginId,
+      provides: write ? [write.series] : [],
+      requires: [
+        ...new Set([...behavior.temporalReads, ...behavior.temporalCombines.flat()]),
+      ].filter((series) => series !== write?.series),
+    });
   }
 
   /** Unmounts every UI view, then disposes the bridge and the host. */

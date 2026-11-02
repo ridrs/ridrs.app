@@ -1,0 +1,9 @@
+{
+  "id": "fixture-ble-simulator-ride",
+  "name": "Simulated BLE Trainer and Heart-Rate Band (fixture)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["ble.central"],
+  "requires": [],
+  "entry": "index.ts"
+}

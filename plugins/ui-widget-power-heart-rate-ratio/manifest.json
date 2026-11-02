@@ -1,0 +1,29 @@
+{
+  "id": "ui-widget-power-heart-rate-ratio",
+  "name": "Power-to-Heart-Rate Ratio Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui",
+    "metric-widget"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "power-heart-rate-ratio",
+        "extensionPoint": "hud/widget",
+        "export": "PowerHeartRateRatioWidget",
+        "order": 3
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "metric.power-heart-rate-ratio"
+      ],
+      "publish": []
+    }
+  }
+}

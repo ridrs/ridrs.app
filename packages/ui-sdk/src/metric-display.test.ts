@@ -29,6 +29,43 @@ describe('describeMetricReading', () => {
     ).toBe('–');
   });
 
+  it('shows two decimals for W/bpm, half up', () => {
+    const ratio = (value: number) =>
+      describeMetricReading({
+        status: 'available',
+        value,
+        unit: 'W/bpm',
+        deviceId: 'metric-power-heart-rate-ratio',
+        measuredAt: 0,
+        receivedAt: 0,
+      }).text;
+    expect(ratio(200 / 150)).toBe('1.33');
+    expect(ratio(220 / 145)).toBe('1.52');
+    expect(ratio(1.005)).toBe('1.01');
+    expect(ratio(2)).toBe('2.00');
+  });
+
+  it('shows whole beats per minute and labels a warming-up metric', () => {
+    expect(
+      describeMetricReading({
+        status: 'available',
+        value: 144.5,
+        unit: 'bpm',
+        deviceId: 'hrm-1',
+        measuredAt: 0,
+        receivedAt: 0,
+      }).text,
+    ).toBe('145');
+    expect(
+      describeMetricReading({
+        status: 'unavailable',
+        unit: 'W/bpm',
+        reason: 'insufficient-data',
+        since: 0,
+      }).reason,
+    ).toBe('warming up');
+  });
+
   it('shows a dash without a reason before the first reading', () => {
     expect(describeMetricReading(undefined)).toEqual({ status: 'unavailable', text: '–' });
   });

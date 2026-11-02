@@ -10,6 +10,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
+    "@ridrs/ble-peripheral": "workspace:*",
     "@ridrs/contracts": "workspace:*",
     "@tauri-apps/api": "2.12.4"
   }

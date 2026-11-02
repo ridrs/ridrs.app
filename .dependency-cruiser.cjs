@@ -17,13 +17,13 @@ module.exports = {
     {
       name: 'core-only-imports-contracts',
       comment:
-        'packages/core may import contracts; it must never import testing, plugins/, apps/, or tests/.',
+        'packages/core may import contracts and the temporal math; it must never import testing, plugins/, apps/, or tests/.',
       severity: 'error',
       from: {
         path: '^packages/core/',
       },
       to: {
-        path: '^(packages/(?!contracts/|core/)|plugins/|apps/|tests/)',
+        path: '^(packages/(?!contracts/|core/|temporal/)|plugins/|apps/|tests/)',
       },
     },
     {
@@ -32,7 +32,7 @@ module.exports = {
         'packages/core and packages/contracts run in Node and in a WebView: no node:* builtins and no Node-only libraries. Only packages/core/src/node/ (the Node-only entry) may use them.',
       severity: 'error',
       from: {
-        path: '^packages/(core|contracts|ble-bridge|ble-simulator)/',
+        path: '^packages/(core|contracts|ble-bridge|ble-simulator|temporal|metric-source|ble-peripheral)/',
         pathNot: '(^packages/core/src/node/|\\.test\\.ts$)',
       },
       to: {
@@ -86,6 +86,66 @@ module.exports = {
       },
       to: {
         path: '^packages/core/src/node/',
+      },
+    },
+    {
+      name: 'temporal-is-pure-math',
+      comment:
+        'packages/temporal is deterministic math: simple-statistics and type-only contracts, no clock, timers, rxjs or Node builtins.',
+      severity: 'error',
+      from: { path: '^packages/temporal/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^(packages/(?!temporal/|contracts/)|plugins/|apps/|tests/|node:)|node_modules/(?!\\.pnpm/simple-statistics@|simple-statistics/)',
+      },
+    },
+    {
+      name: 'temporal-no-undeclared-modules',
+      comment:
+        'An import packages/temporal cannot resolve (e.g. rxjs, which it does not declare) would bypass temporal-is-pure-math.',
+      severity: 'error',
+      from: { path: '^packages/temporal/' },
+      to: { couldNotResolve: true },
+    },
+    {
+      name: 'temporal-contracts-type-only',
+      comment: 'packages/temporal uses the contracts for types only.',
+      severity: 'error',
+      from: { path: '^packages/temporal/' },
+      to: { path: '^packages/contracts/', dependencyTypesNot: ['type-only'] },
+    },
+    {
+      name: 'temporal-no-builtins',
+      comment: 'packages/temporal has no I/O: no Node builtins.',
+      severity: 'error',
+      from: { path: '^packages/temporal/', pathNot: '\\.test\\.ts$' },
+      to: { dependencyTypes: ['core'] },
+    },
+    {
+      name: 'plugins-never-import-temporal',
+      comment:
+        'Plugins use ctx.temporal: one estimator implementation, and no plugin bypasses series ownership.',
+      severity: 'error',
+      from: { path: '^(plugins/|tests/fixtures/plugins/)' },
+      to: { path: '^packages/temporal/' },
+    },
+    {
+      name: 'shared-plugin-packages-import-contracts-only',
+      comment:
+        'packages/ble-peripheral and packages/metric-source import packages/contracts and their libraries (p-retry) only - never the core or a plugin.',
+      severity: 'error',
+      from: { path: '^packages/(ble-peripheral|metric-source)/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^(packages/(?!contracts/|ble-peripheral/|metric-source/)|plugins/|apps/|tests/)|node_modules/(?!\\.pnpm/p-retry@|p-retry/)',
+      },
+    },
+    {
+      name: 'derived-metrics-know-only-metrics',
+      comment:
+        'metric-power-heart-rate-ratio sees metrics and their series only: nothing device-, BLE- or UI-related.',
+      severity: 'error',
+      from: { path: '^plugins/metric-power-heart-rate-ratio/' },
+      to: {
+        path: '(^packages/(?!contracts/)|^packages/contracts/src/(ble|ble-bridge|ui)\\.ts$|^plugins/(?!metric-power-heart-rate-ratio/)|react)',
       },
     },
     {

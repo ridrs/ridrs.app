@@ -10,6 +10,7 @@ import {
   definePlugin,
   normalizeBleUuid,
 } from '@ridrs/contracts';
+import { SharedBleScan } from '@ridrs/ble-peripheral';
 import type * as NobleTypes from '@abandonware/noble';
 
 type Noble = typeof NobleTypes;
@@ -63,43 +64,30 @@ function toDiscovered(peripheral: NobleTypes.Peripheral): BleDiscoveredPeriphera
 function createCentral(): BleCentral {
   const known = new Map<string, NobleTypes.Peripheral>();
 
-  async function* scan(options: BleScanOptions): AsyncGenerator<BleDiscoveredPeripheral> {
-    const { signal } = options;
-    const queue: NobleTypes.Peripheral[] = [];
-    let wake: (() => void) | undefined;
+  // noble runs one scan at a time; device plugins scan concurrently for their own services.
+  const scans = new SharedBleScan(async (serviceUuids, onDiscovered, signal) => {
+    await waitForPoweredOn(signal);
     const onDiscover = (peripheral: NobleTypes.Peripheral): void => {
       known.set(peripheral.id, peripheral);
-      queue.push(peripheral);
-      wake?.();
+      onDiscovered(toDiscovered(peripheral));
     };
-    const onAbort = (): void => wake?.();
-
-    signal?.addEventListener('abort', onAbort, { once: true });
+    noble.on('discover', onDiscover);
     try {
-      await waitForPoweredOn(signal);
-      noble.on('discover', onDiscover);
-      await noble.startScanningAsync([...options.serviceUuids], false);
-      while (!signal?.aborted) {
-        const next = queue.shift();
-        if (next) {
-          yield toDiscovered(next);
-        } else {
-          await new Promise<void>((resolve) => {
-            wake = resolve;
-          });
-          wake = undefined;
-        }
-      }
+      await noble.startScanningAsync([...serviceUuids], false);
     } catch (error) {
-      if (!signal?.aborted) {
-        throw error;
-      }
-    } finally {
-      signal?.removeEventListener('abort', onAbort);
       noble.removeListener('discover', onDiscover);
-      await noble.stopScanningAsync().catch(() => undefined);
+      throw error;
     }
-  }
+    return {
+      stop: async () => {
+        noble.removeListener('discover', onDiscover);
+        await noble.stopScanningAsync().catch(() => undefined);
+      },
+    };
+  });
+
+  const scan = (options: BleScanOptions): AsyncIterable<BleDiscoveredPeripheral> =>
+    scans.scan(options);
 
   async function connect(
     peripheralId: string,

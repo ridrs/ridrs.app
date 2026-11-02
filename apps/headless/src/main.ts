@@ -6,7 +6,9 @@ import { parseArgs } from 'node:util';
 import {
   bleCentralCapability,
   metricCadenceCapability,
+  metricHeartRateCapability,
   metricPowerCapability,
+  metricPowerHeartRateRatioCapability,
 } from '@ridrs/contracts';
 import { createSystemClock, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
@@ -61,7 +63,13 @@ async function main(): Promise<void> {
     disabledPlugins,
     clock: createSystemClock(),
     logger,
-    capabilities: [bleCentralCapability, metricPowerCapability, metricCadenceCapability],
+    capabilities: [
+      bleCentralCapability,
+      metricPowerCapability,
+      metricCadenceCapability,
+      metricHeartRateCapability,
+      metricPowerHeartRateRatioCapability,
+    ],
   });
 
   const keepAlive = setInterval(() => {}, 60_000);

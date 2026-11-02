@@ -26,6 +26,7 @@ import { type DiscoveredPlugin, discoverPlugins, type PluginSource } from './dis
 import { EventBus } from './event-bus.ts';
 import { createSilentLogger } from './logger.ts';
 import { resolveCapabilities } from './resolution.ts';
+import { TemporalService } from './temporal-service.ts';
 import { computeUiRegistry } from './ui-registry.ts';
 
 export interface PluginHostOptions {
@@ -66,6 +67,7 @@ export class PluginHost {
   private readonly diagnostics: DiagnosticCollector;
   private readonly capabilityRegistry: CapabilityRegistry;
   private readonly eventBus: EventBus;
+  private readonly temporal: TemporalService;
   private readonly plugins = new Map<string, ManagedPlugin>();
   private dependencyGraph?: DepGraph<string>;
   private startOrder: string[] = [];
@@ -94,6 +96,11 @@ export class PluginHost {
         const managed = this.plugins.get(pluginId);
         return Boolean(managed?.publishingAllowed && managed.state === 'started');
       },
+    });
+    this.temporal = new TemporalService({
+      clock: this.clock,
+      diagnostics: this.diagnostics,
+      isPluginActive: (pluginId) => this.plugins.get(pluginId)?.state === 'started',
     });
   }
 
@@ -212,10 +219,7 @@ export class PluginHost {
       const abortController = new AbortController();
       managed.abortController = abortController;
       managed.definition = definition;
-      managed.context = this.createPluginContext(
-        managed.discovered.manifest,
-        abortController.signal,
-      );
+      managed.context = this.createPluginContext(managed, abortController.signal);
 
       try {
         await definition.initialize?.(managed.context);
@@ -238,6 +242,7 @@ export class PluginHost {
         }
         this.capabilityRegistry.removeProvidersForPlugin(pluginId);
         this.eventBus.removeSubscriptionsForPlugin(pluginId);
+        this.temporal.releasePlugin(pluginId);
         this.failPluginAndBlockDependents(pluginId);
         continue;
       }
@@ -256,6 +261,7 @@ export class PluginHost {
         });
         this.capabilityRegistry.removeProvidersForPlugin(pluginId);
         this.eventBus.removeSubscriptionsForPlugin(pluginId);
+        this.temporal.releasePlugin(pluginId);
         this.failPluginAndBlockDependents(pluginId);
         continue;
       }
@@ -290,6 +296,7 @@ export class PluginHost {
           details: { hook: 'start' },
         });
         this.eventBus.removeSubscriptionsForPlugin(pluginId);
+        this.temporal.releasePlugin(pluginId);
         this.failPluginAndBlockDependents(pluginId);
       }
     }
@@ -327,7 +334,7 @@ export class PluginHost {
     }
     const abortController = new AbortController();
     managed.abortController = abortController;
-    managed.context = this.createPluginContext(managed.discovered.manifest, abortController.signal);
+    managed.context = this.createPluginContext(managed, abortController.signal);
     managed.state = 'started';
     managed.publishingAllowed = true;
     managed.clientAvailable = await this.checkClient(managed);
@@ -344,6 +351,7 @@ export class PluginHost {
         details: { hook: 'start' },
       });
       this.eventBus.removeSubscriptionsForPlugin(pluginId);
+      this.temporal.releasePlugin(pluginId);
       this.failPluginAndBlockDependents(pluginId);
     }
     this.refreshUiRegistry();
@@ -388,6 +396,7 @@ export class PluginHost {
       } finally {
         this.capabilityRegistry.removeProvidersForPlugin(pluginId);
         this.eventBus.removeSubscriptionsForPlugin(pluginId);
+        this.temporal.releasePlugin(pluginId);
       }
     }
   }
@@ -442,19 +451,23 @@ export class PluginHost {
     } finally {
       managed.publishingAllowed = false;
       this.eventBus.removeSubscriptionsForPlugin(pluginId);
+      this.temporal.releasePlugin(pluginId);
     }
   }
 
-  private createPluginContext(
-    manifest: Readonly<PluginManifest>,
-    signal: AbortSignal,
-  ): PluginContext {
+  private createPluginContext(managed: ManagedPlugin, signal: AbortSignal): PluginContext {
+    const manifest = managed.discovered.manifest;
     return Object.freeze({
       manifest,
       logger: this.logger.child({ pluginId: manifest.id }),
       clock: this.clock,
       events: this.eventBus.createPluginEventsContext(manifest.id),
       capabilities: this.capabilityRegistry.createPluginCapabilitiesContext(manifest),
+      // Writers are handed out while the plugin initializes; its state is still 'discovered'.
+      temporal: this.temporal.createPluginTemporalContext(
+        manifest,
+        () => managed.state === 'discovered',
+      ),
       signal,
       ui: Object.freeze({ registry: () => this.uiRegistry }),
       reportDiagnostic: (
@@ -554,6 +567,7 @@ export class PluginHost {
         depManaged.state = 'blocked';
         depManaged.publishingAllowed = false;
         this.eventBus.removeSubscriptionsForPlugin(depId);
+        this.temporal.releasePlugin(depId);
         this.logger.warn({ pluginId: depId, state: 'blocked' }, `Plugin "${depId}" is blocked`);
       }
     }

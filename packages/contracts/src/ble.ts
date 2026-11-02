@@ -13,6 +13,12 @@ export const FTMS_SERVICE_UUID = '1826';
  */
 export const INDOOR_BIKE_DATA_CHARACTERISTIC_UUID = '2ad2';
 
+/** Canonical 16-bit UUID for the Bluetooth Heart Rate Service (0x180D). */
+export const HEART_RATE_SERVICE_UUID = '180d';
+
+/** Canonical 16-bit UUID for the Heart Rate Measurement characteristic (0x2A37). */
+export const HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID = '2a37';
+
 const BLUETOOTH_BASE_UUID_REGEX = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/;
 
 /**
