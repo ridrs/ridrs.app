@@ -14,7 +14,7 @@ Open-source, modular, headless-first indoor cycling platform.
 - `packages/temporal/`: Pure, deterministic math of the temporal data layer: sampling intervals, freshness, values at a time, damped trend, time-weighted averages, snapshots (`@ridrs/temporal`).
 - `packages/metric-source/` and `packages/ble-peripheral/`: Shared logic of the metric plugins and of the BLE device plugins (`@ridrs/metric-source`, `@ridrs/ble-peripheral`).
 - `packages/ui-sdk/`: Client contract for UI plugins (`@ridrs/ui-sdk`, `Apache-2.0`); `packages/ui-shell/`: the shell that composes screens and slots; `packages/ui-bridge/`: in-process bridge between shell and host.
-- `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, heart-rate sensor, power/cadence/heart-rate metrics, power-to-heart-rate ratio, console output, activity session, UI screens, HUD and widgets).
+- `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, heart-rate sensor, power/cadence/heart-rate metrics, power-to-heart-rate ratio, console output, activity session, physics engine and models, UI screens, HUD and widgets).
 - `packages/ble-bridge/`: The companion bridge protocol: pairing, GATT forwarding, heartbeat; companion and ridrs side (`@ridrs/ble-bridge`). `packages/ble-tauri/`: `BleCentral` on the native BLE commands (`@ridrs/ble-tauri`). `packages/ble-simulator/`: in-process BLE simulator and dummy devices (`@ridrs/ble-simulator`).
 - `crates/`: Rust crates hosted by both Tauri apps: `ridrs-ble` (native BLE commands) and `ridrs-bridge` (mDNS and WebSocket of the companion bridge).
 - `packages/testing/`: Test harness: simulated Tauri bridge, simulated companion network (`@ridrs/testing`).
@@ -84,6 +84,19 @@ Manual check with a real heart-rate sensor, on a phone or the Mac (`tauri dev` /
 - Take the sensor off (or move out of range): the heart-rate widget shows "no signal" or "disconnected" while power stays live, and the ratio follows.
 
 Record the sensor model, its notification interval (count the updates over 30 s) and the time from taking it off until "no signal". Without hardware the same composition runs in `tests/features/apps/ride-with-heart-rate.feature` with the `simulated-ride` fixture (`SIM KICKR` and `SIM HRM`).
+
+## Virtual speed: the physics engine
+
+Since Phase 5 measured power moves a virtual rider (75 kg, bicycle 10 kg, flat road, still air). The HUD shows its speed (km/h) and distance (km) after the metric widgets. At a steady 200 W the speed reaches about 22 km/h after 10 s and settles near 34.2 km/h after about a minute. The physics runs at a fixed 100 Hz from the power the temporal data layer reports for each step time; it never invents power. See `docs/architecture/physics.md`.
+
+Manual check (`tauri dev` / `tauri android dev` as above) with a real smart trainer, or with the developer companion's simulated trainer (profile `steady`, 220 W) if none is at hand:
+
+- Ride at a steady 200 W: the speed rises and settles near 34 km/h within about a minute.
+- Stop pedalling: about 2 s later the speed starts to decay (stale power) and slowly reaches 0.0 km/h. The distance stops growing.
+- Without a trainer: 0.0 km/h and 0.00 km, power shows `–` with "no source".
+- Finish and start a new ride: speed and distance start again at zero.
+
+Record the platform, the power source, the time to reach 30 km/h at 200 W, and whether the speed display looks smooth enough at 4 updates per second (Phase 7 makes it fluid). Without hardware the same composition runs in `tests/features/apps/ride-with-virtual-speed.feature` with the `simulated-trainer` fixture.
 
 ## The companion bridge: a phone holds the Bluetooth link
 

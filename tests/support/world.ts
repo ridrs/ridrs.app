@@ -42,6 +42,14 @@ import {
   metricPowerEvent,
   metricPowerHeartRateRatioCapability,
   metricPowerHeartRateRatioEvent,
+  physicsBicycleCapability,
+  physicsMotionCapability,
+  physicsPowertrainCapability,
+  physicsResistanceCapability,
+  physicsRiderCapability,
+  physicsStateEvent,
+  physicsTotalResistanceCapability,
+  type ResistanceBreakdown,
   type TemporalRecordResult,
   type TemporalSeriesWriter,
   type TemporalSnapshot,
@@ -101,6 +109,7 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   metricCadenceEvent,
   metricHeartRateEvent,
   metricPowerHeartRateRatioEvent,
+  physicsStateEvent,
   measurementPowerEvent,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -119,6 +128,7 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
 const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   uiRegistryChangedEvent,
   activityStateChangedEvent,
+  physicsStateEvent,
   bridgeCompanionsChangedEvent,
   bridgePairingOfferEvent,
   bridgeStateChangedEvent,
@@ -210,6 +220,8 @@ export class RidrsWorld extends World {
   readonly envOverrides = new Map<string, string | undefined>();
   lastPublishError?: unknown;
   lastCapabilityError?: unknown;
+  /** Phase 5: the last total resistance a probe evaluated. */
+  lastResistance?: ResistanceBreakdown;
 
   // Headless e2e state
   headlessPluginsDir = '';
@@ -231,6 +243,12 @@ export class RidrsWorld extends World {
       metricCadenceCapability,
       metricHeartRateCapability,
       metricPowerHeartRateRatioCapability,
+      physicsBicycleCapability,
+      physicsRiderCapability,
+      physicsResistanceCapability,
+      physicsTotalResistanceCapability,
+      physicsPowertrainCapability,
+      physicsMotionCapability,
     ]) {
       this.capabilityContracts.set(contract.id, contract);
     }

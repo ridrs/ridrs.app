@@ -1,0 +1,9 @@
+{
+  "id": "physics-aerodynamics",
+  "name": "Aerodynamics",
+  "version": "0.1.0",
+  "types": ["physics", "physics-resistance"],
+  "provides": ["physics.resistance"],
+  "requires": ["physics.rider"],
+  "entry": "index.ts"
+}

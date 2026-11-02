@@ -1,0 +1,9 @@
+{
+  "id": "physics-powertrain",
+  "name": "Powertrain",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": ["physics.powertrain"],
+  "requires": ["metric.power"],
+  "entry": "index.ts"
+}

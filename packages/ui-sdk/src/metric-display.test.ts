@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from 'vitest';
-import { describeMetricReading } from './metric-display.ts';
+import { describeMetricReading, formatDecimal } from './metric-display.ts';
 
 const available = (value: number) =>
   ({ status: 'available', value, unit: 'W', deviceId: 'd', measuredAt: 0, receivedAt: 0 }) as const;
@@ -68,5 +68,23 @@ describe('describeMetricReading', () => {
 
   it('shows a dash without a reason before the first reading', () => {
     expect(describeMetricReading(undefined)).toEqual({ status: 'unavailable', text: '–' });
+  });
+});
+
+describe('formatDecimal', () => {
+  it('rounds half up to the given decimals', () => {
+    expect(formatDecimal(1.005, 2)).toBe('1.01');
+    expect(formatDecimal(34.25, 1)).toBe('34.3');
+    expect(formatDecimal(0.004999, 2)).toBe('0.00');
+    expect(formatDecimal(12, 1)).toBe('12.0');
+  });
+
+  it('shows -0 as 0', () => {
+    expect(formatDecimal(-0, 1)).toBe('0.0');
+    expect(formatDecimal(-0.01, 1)).toBe('0.0');
+  });
+
+  it('handles values JavaScript prints in exponent notation', () => {
+    expect(formatDecimal(1.5e-7, 1)).toBe('0.0');
   });
 });

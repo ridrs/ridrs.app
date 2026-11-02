@@ -1,0 +1,9 @@
+{
+  "id": "physics-rolling-resistance",
+  "name": "Rolling Resistance",
+  "version": "0.1.0",
+  "types": ["physics", "physics-resistance"],
+  "provides": ["physics.resistance"],
+  "requires": ["physics.bicycle"],
+  "entry": "index.ts"
+}

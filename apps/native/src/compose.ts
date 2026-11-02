@@ -30,6 +30,13 @@ import {
   metricPowerHeartRateRatioCapability,
   metricPowerHeartRateRatioEvent,
   type PluginLogger,
+  physicsBicycleCapability,
+  physicsMotionCapability,
+  physicsPowertrainCapability,
+  physicsResistanceCapability,
+  physicsRiderCapability,
+  physicsStateEvent,
+  physicsTotalResistanceCapability,
 } from '@ridrs/contracts';
 import { PluginHost, type PluginSource } from '@ridrs/core';
 import { createInProcessUiBridge } from '@ridrs/ui-bridge';
@@ -49,6 +56,7 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   metricCadenceEvent,
   metricHeartRateEvent,
   metricPowerHeartRateRatioEvent,
+  physicsStateEvent,
   bridgeCompanionsChangedEvent,
   bridgePairingOfferEvent,
   bridgePairRequestedEvent,
@@ -113,6 +121,12 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
       metricCadenceCapability,
       metricHeartRateCapability,
       metricPowerHeartRateRatioCapability,
+      physicsBicycleCapability,
+      physicsRiderCapability,
+      physicsResistanceCapability,
+      physicsTotalResistanceCapability,
+      physicsPowertrainCapability,
+      physicsMotionCapability,
     ],
     events: RIDRS_EVENTS,
   });

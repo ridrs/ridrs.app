@@ -1,0 +1,29 @@
+{
+  "id": "ui-widget-virtual-speed",
+  "name": "Virtual Speed Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui",
+    "physics-widget"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "virtual-speed",
+        "extensionPoint": "hud/widget",
+        "export": "VirtualSpeedWidget",
+        "order": 4
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "physics.state"
+      ],
+      "publish": []
+    }
+  }
+}

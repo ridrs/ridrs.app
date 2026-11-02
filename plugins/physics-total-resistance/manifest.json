@@ -1,0 +1,9 @@
+{
+  "id": "physics-total-resistance",
+  "name": "Total Resistance",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": ["physics.total-resistance"],
+  "requires": ["physics.resistance"],
+  "entry": "index.ts"
+}

@@ -24,7 +24,8 @@ export type DiagnosticCode =
   | 'client-load-failure'
   | 'bridge-unreachable'
   | 'bridge-rejected'
-  | 'bridge-protocol-error';
+  | 'bridge-protocol-error'
+  | 'physics-step-failed';
 
 export type RidrsErrorCode =
   | DiagnosticCode

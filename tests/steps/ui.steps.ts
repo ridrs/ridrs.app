@@ -211,7 +211,14 @@ Then(
 const EVENTUALLY = { timeout: 25_000, interval: 100 } as const;
 const EVENTUALLY_STEP = { timeout: 30_000 } as const;
 
-for (const kind of ['power', 'cadence', 'heart-rate', 'power-heart-rate-ratio']) {
+for (const kind of [
+  'power',
+  'cadence',
+  'heart-rate',
+  'power-heart-rate-ratio',
+  'virtual-speed',
+  'virtual-distance',
+]) {
   Then(
     `eventually the ${kind} widget shows {string} {string}`,
     EVENTUALLY_STEP,
@@ -275,6 +282,45 @@ for (const kind of ['power', 'cadence', 'heart-rate', 'power-heart-rate-ratio'])
 
   Then(`the ${kind} widget is no longer shown`, async function (this: RidrsWorld) {
     await waitFor(() => assert.equal(within(ui(this)).queryByTestId(`widget-${kind}`), null));
+  });
+}
+
+// ---- Phase 5: the physics widgets, on real time ------------------------------------------
+
+/** The number a widget shows, once it shows one in the expected unit. */
+function shownNumber(element: HTMLElement, unit: string): number {
+  assert.equal(element.dataset.status, 'available');
+  assert.equal(within(element).getByTestId('unit').textContent, unit);
+  const value = Number(within(element).getByTestId('value').textContent);
+  assert.ok(Number.isFinite(value), 'Expected a number');
+  return value;
+}
+
+for (const kind of ['virtual-speed', 'virtual-distance']) {
+  for (const [wording, holds] of [
+    ['more than', (shown: number, bound: number) => shown > bound],
+    ['at least', (shown: number, bound: number) => shown >= bound],
+  ] as const) {
+    Then(
+      `eventually the ${kind} widget shows ${wording} {string} {string}`,
+      EVENTUALLY_STEP,
+      async function (this: RidrsWorld, bound: string, unit: string) {
+        const element = await widget(this, kind);
+        await waitFor(() => {
+          const shown = shownNumber(element, unit);
+          assert.ok(holds(shown, Number(bound)), `shows ${shown}, expected ${wording} ${bound}`);
+        }, EVENTUALLY);
+      },
+    );
+  }
+
+  Then(`the ${kind} widget keeps rising`, async function (this: RidrsWorld) {
+    const element = await widget(this, kind);
+    const unit = within(element).getByTestId('unit').textContent ?? '';
+    const before = shownNumber(element, unit);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const after = shownNumber(element, unit);
+    assert.ok(after > before, `${before} ${unit}, then ${after} ${unit} one second later`);
   });
 }
 

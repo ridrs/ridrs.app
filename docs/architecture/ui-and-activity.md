@@ -79,3 +79,7 @@ A remote bridge (the deferred `ui-gateway-web`, WebSocket) would implement the s
 ## Phase 4 widgets
 
 `ui-widget-heart-rate` (`widget-heart-rate`, bpm, order 2) and `ui-widget-power-heart-rate-ratio` (`widget-power-heart-rate-ratio`, W/bpm with two decimals, order 3) follow the Phase 3 widgets: same test ids (`value`, `unit`, `reason`, `data-status`), same display rules, one subscribed metric event each. `ride-with-heart-rate.feature` runs `startRidrsApp` with the `simulated-ride` fixture (trainer and heart-rate band).
+
+## Phase 5 widgets
+
+`ui-widget-virtual-speed` (`widget-virtual-speed`, km/h with one decimal, order 4) and `ui-widget-virtual-distance` (`widget-virtual-distance`, km with two decimals, order 5) show the virtual rider of the physics engine (see [physics.md](physics.md)). They subscribe to `physics.state` instead of a metric event, use the same test ids (`value`, `unit`, `data-status`) and show an en dash before the first state. Both round with `formatDecimal` from `@ridrs/ui-sdk`, the half-up formatter `describeMetricReading` uses too; no widget rounds on its own. The activity session starts and stops the simulation through `activity.state-changed`. `ride-with-virtual-speed.feature` runs `startRidrsApp` with the `simulated-trainer` fixture.

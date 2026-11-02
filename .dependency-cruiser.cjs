@@ -149,6 +149,31 @@ module.exports = {
       },
     },
     {
+      name: 'physics-plugins-import-contracts-only',
+      comment:
+        'Physics plugins import packages/contracts only (rxjs in physics-engine): nothing device-, BLE-, UI- or @ridrs/temporal-related. Estimation stays in the temporal data layer.',
+      severity: 'error',
+      from: { path: '^plugins/physics-', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '(^packages/(?!contracts/)|^packages/contracts/src/(ble|ble-bridge|ui)\\.ts$|^(apps|tests)/|node_modules/(?!\\.pnpm/rxjs@|rxjs/))',
+      },
+    },
+    {
+      name: 'only-the-physics-engine-owns-a-timer',
+      comment:
+        'physics-engine is the only clock-driven physics plugin; every other one computes only inside a step the engine calls. (Events and ctx timers are covered by the ADR 0026 review checklist and unit tests.)',
+      severity: 'error',
+      from: { path: '^plugins/physics-(?!engine/)' },
+      to: { path: 'rxjs' },
+    },
+    {
+      name: 'physics-widgets-know-contracts-sdk-and-react',
+      comment: 'The physics HUD widgets import packages/contracts, packages/ui-sdk and React only.',
+      severity: 'error',
+      from: { path: '^plugins/ui-widget-virtual-(speed|distance)/' },
+      to: { path: '^(packages/(?!contracts/|ui-sdk/)|apps/|tests/)' },
+    },
+    {
       name: 'ui-sdk-only-imports-contracts',
       comment:
         'packages/ui-sdk is the browser-safe client contract: it imports packages/contracts only.',

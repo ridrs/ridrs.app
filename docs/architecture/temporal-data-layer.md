@@ -146,4 +146,10 @@ One exception: a disconnect closes the stretch, so the **first measurement after
 
 ## How Phase 5 uses it
 
-The physics step (fixed 100 Hz) will query `valueAt(stepTime)` on a `metric.power` reader at every step time `t ≤ now`, and read `quality` to know how much of the input is estimated. It gets measured values at packet times, interpolated values between packets (only after the next packet arrived, i.e. in the past), and the damped trend after the last packet. Open questions for Phase 5: which strategy and horizon the step should use for power (the current `damped-trend` with τ = T extrapolates up to 3 T ≈ 750 ms at 4 Hz), and whether the 2 s minimum stale threshold is right for physics input.
+`physics-powertrain` holds the one physics reader of `metric.power` and asks `valueAt(t)` for every state time `t = startedAt + 10·n`, always `t ≤ now` (see [physics.md](physics.md)). It gets measured values at packet times, interpolated values between packets (once the next packet arrived), and the damped trend after the last packet. Any available quality drives the virtual rider; any unavailability means no drive and the rider coasts. The `TemporalValue` is carried in `physics.state` unchanged.
+
+The Phase 4 open questions are answered:
+
+- **Strategy and horizon:** `metric-power` keeps `damped-trend` with its defaults. At 4 Hz the trend is extrapolated up to 3 T ≈ 750 ms and then held; the series becomes stale 2 s after the last packet.
+- **Stale threshold:** the physics needs no strategy, horizon or threshold of its own. Two seconds of held power before coasting is acceptable for a rider who stops pedalling and rides through short BLE gaps. To be revisited with real rides.
+- A step computed late may see a measurement that arrived meanwhile and get `interpolated` instead of `extrapolated`: the better estimate, intended. The physics never writes into a series.
