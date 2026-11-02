@@ -10,8 +10,8 @@ export const LANE_MARKINGS = Object.freeze({
   farDistance: 160,
   /** m */
   dashLength: 3,
-  /** m */
-  gapLength: 9,
+  /** m; with the dash, a period of 8 m. */
+  gapLength: 5,
   /** Half the line width at the bottom edge, in view units. */
   halfWidthAtBottom: 1.5,
 });
@@ -27,7 +27,8 @@ function project(distance: number): { y: number; halfWidth: number } {
 
 /**
  * The visible dashes, nearest first, as quads in view coordinates, for a road that has moved by
- * `position` metres. Dashes repeat every dash + gap, so only the position modulo that matters.
+ * `position` metres. Dashes repeat every dash + gap (8 m), so only the position modulo that
+ * matters.
  */
 export function laneDashes(position: number): Quad[] {
   const { nearDistance, farDistance, dashLength, gapLength } = LANE_MARKINGS;

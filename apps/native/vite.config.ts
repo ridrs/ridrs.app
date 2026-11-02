@@ -17,6 +17,7 @@ export default defineConfig({
       '@ridrs/ble-tauri': workspace('packages/ble-tauri/src/index.ts'),
       '@ridrs/contracts': workspace('packages/contracts/src/index.ts'),
       '@ridrs/core': workspace('packages/core/src/index.ts'),
+      '@ridrs/presentation': workspace('packages/presentation/src/index.ts'),
       '@ridrs/ui-bridge': workspace('packages/ui-bridge/src/index.ts'),
       '@ridrs/ui-sdk': workspace('packages/ui-sdk/src/index.ts'),
       '@ridrs/ui-shell': workspace('packages/ui-shell/src/index.ts'),

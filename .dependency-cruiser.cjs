@@ -187,7 +187,7 @@ module.exports = {
         'Client modules, the shell and the client contract run in a WebView: no node builtins, no packages/core, no apps or tests.',
       severity: 'error',
       from: {
-        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/|packages/contracts/)',
+        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/|packages/presentation/|packages/contracts/)',
         pathNot: '\\.test\\.ts$',
       },
       to: { path: '^(node:|packages/core/|packages/testing/|apps/|tests/)' },
@@ -204,10 +204,53 @@ module.exports = {
     },
     {
       name: 'ui-shell-imports-sdk-and-contracts-only',
-      comment: 'The shell talks to the host only through the UiBridge port of packages/ui-sdk.',
+      comment:
+        'The shell talks to the host only through the UiBridge port of packages/ui-sdk; its frame clock comes from packages/presentation.',
       severity: 'error',
       from: { path: '^packages/ui-shell/' },
-      to: { path: '^(packages/(?!contracts/|ui-sdk/|ui-shell/)|plugins/|apps/|tests/)' },
+      to: {
+        path: '^(packages/(?!contracts/|ui-sdk/|ui-shell/|presentation/)|plugins/|apps/|tests/)',
+      },
+    },
+    {
+      name: 'presentation-imports-contracts-and-sdk-only',
+      comment:
+        'packages/presentation is DOM-free UI-side logic: packages/contracts and ui-sdk types only - no core, no React, no rxjs, no Node builtins.',
+      severity: 'error',
+      from: { path: '^packages/presentation/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^(packages/(?!contracts/|ui-sdk/|presentation/)|plugins/|apps/|tests/|node:)|(^|/)node_modules/',
+      },
+    },
+    {
+      name: 'presentation-no-undeclared-modules',
+      comment:
+        'An import packages/presentation cannot resolve (e.g. rxjs or react, which it does not declare) would bypass presentation-imports-contracts-and-sdk-only.',
+      severity: 'error',
+      from: { path: '^packages/presentation/' },
+      to: { couldNotResolve: true },
+    },
+    {
+      name: 'presentation-uses-sdk-types-only',
+      comment: 'packages/presentation uses packages/ui-sdk for types only.',
+      severity: 'error',
+      from: { path: '^packages/presentation/' },
+      to: { path: '^packages/ui-sdk/', dependencyTypesNot: ['type-only'] },
+    },
+    {
+      name: 'presentation-no-builtins',
+      comment: 'packages/presentation runs in a WebView: no Node builtins.',
+      severity: 'error',
+      from: { path: '^packages/presentation/', pathNot: '\\.test\\.ts$' },
+      to: { dependencyTypes: ['core'] },
+    },
+    {
+      name: 'simulation-knows-no-presentation',
+      comment:
+        'Physics plugins and the core never import UI or presentation code: the engine has no frame, render or UI concept.',
+      severity: 'error',
+      from: { path: '^(plugins/physics-|packages/(core|contracts|temporal)/)' },
+      to: { path: '^packages/(presentation|ui-)' },
     },
     {
       name: 'tauri-only-in-transport-native-and-testing',

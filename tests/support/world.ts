@@ -49,6 +49,7 @@ import {
   physicsResistanceCapability,
   physicsRiderCapability,
   physicsRoadCapability,
+  physicsStateBatchEvent,
   physicsStateEvent,
   physicsTotalResistanceCapability,
   type ResistanceBreakdown,
@@ -59,6 +60,7 @@ import {
 } from '@ridrs/contracts';
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
+import type { FrameSource } from '@ridrs/presentation';
 import type {
   BleSimulator,
   SimulatedBridgeConnector,
@@ -112,6 +114,7 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   metricHeartRateEvent,
   metricPowerHeartRateRatioEvent,
   physicsStateEvent,
+  physicsStateBatchEvent,
   measurementPowerEvent,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -131,6 +134,7 @@ const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   uiRegistryChangedEvent,
   activityStateChangedEvent,
   physicsStateEvent,
+  physicsStateBatchEvent,
   bridgeCompanionsChangedEvent,
   bridgePairingOfferEvent,
   bridgeStateChangedEvent,
@@ -185,6 +189,8 @@ export class RidrsWorld extends World {
   nativeApp?: { readonly host: PluginHost; close(): Promise<void> };
   readonly keepAwakeRequests: boolean[] = [];
   nativeBleTransport?: 'local' | 'bridge';
+  /** Phase 7: paces the native app's render clock instead of requestAnimationFrame. */
+  nativeFrameSource?: FrameSource;
   readonly bleTransportRequests: string[] = [];
   readonly uiViews: Array<{ readonly root: HTMLElement; dispose: () => void }> = [];
   packetMark = 0;

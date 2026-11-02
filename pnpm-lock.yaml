@@ -148,6 +148,9 @@ importers:
       '@ridrs/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@ridrs/presentation':
+        specifier: workspace:*
+        version: link:../../packages/presentation
       '@ridrs/ui-bridge':
         specifier: workspace:*
         version: link:../../packages/ui-bridge
@@ -258,6 +261,15 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
+  packages/presentation:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../ui-sdk
+
   packages/temporal:
     dependencies:
       '@ridrs/contracts':
@@ -305,6 +317,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ridrs/presentation':
+        specifier: workspace:*
+        version: link:../presentation
       '@ridrs/ui-sdk':
         specifier: workspace:*
         version: link:../ui-sdk
@@ -537,6 +552,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ridrs/presentation':
+        specifier: workspace:*
+        version: link:../../packages/presentation
       '@ridrs/ui-sdk':
         specifier: workspace:*
         version: link:../../packages/ui-sdk

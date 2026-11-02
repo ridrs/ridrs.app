@@ -6,6 +6,7 @@ import {
   type PluginContext,
   PhysicsStepError,
   physicsMotionCapability,
+  physicsStateBatchEvent,
   physicsStateEvent,
 } from '@ridrs/contracts';
 import { type Subscription, timer } from 'rxjs';
@@ -73,7 +74,8 @@ function arm(ctx: PluginContext, ride: RideSimulation, delay?: number): void {
 }
 
 /**
- * The simulation clock: a fixed 10 ms step while a ride runs, publishing `physics.state`. The
+ * The simulation clock: a fixed 10 ms step while a ride runs, publishing `physics.state` and
+ * every step's sample in `physics.state-batch`. It knows nothing about frames or rendering. The
  * only physics plugin with a timer and with events; it knows nothing but `physics.motion`.
  */
 export default definePlugin({
@@ -86,9 +88,10 @@ export default definePlugin({
       if (payload.state === 'running') {
         stopRide(engine);
         try {
-          engine.ride = new RideSimulation(payload.sessionId, payload.startedAt, motion, (state) =>
-            ctx.events.publish(physicsStateEvent, state),
-          );
+          engine.ride = new RideSimulation(payload.sessionId, payload.startedAt, motion, {
+            state: (state) => ctx.events.publish(physicsStateEvent, state),
+            batch: (batch) => ctx.events.publish(physicsStateBatchEvent, batch),
+          });
         } catch (error) {
           fail(ctx, payload.sessionId, 0, error);
           return;

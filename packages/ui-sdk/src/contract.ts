@@ -6,6 +6,14 @@ export type Unsubscribe = () => void;
 
 export type UiLogger = Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
 
+/** One frame of the shell's render clock. Every component in a frame sees the same frame. */
+export interface UiFrame {
+  /** 0, 1, 2 … since the frame clock started. */
+  readonly index: number;
+  /** The host clock (epoch ms) at the frame: render time is on the simulation's time axis. */
+  readonly time: number;
+}
+
 /**
  * What the shell hands to every screen and contribution. Mirrors the plugin context of the core:
  * subscriptions and slot mounts made through it belong to the component and are released when the
@@ -27,6 +35,11 @@ export interface UiContext {
   slot(extensionPoint: string, container: HTMLElement): Unsubscribe;
   /** Switches the active screen; unknown paths are logged and ignored. */
   navigate(path: string): void;
+  /** The shell's one render clock, at the display's refresh rate. Read-only: frames drive nothing. */
+  readonly frames: {
+    /** Called once per frame while subscribed. Only while the component is mounted. */
+    onFrame(handler: (frame: UiFrame) => void): Unsubscribe;
+  };
 }
 
 /**
@@ -53,4 +66,6 @@ export interface UiBridge {
   publish(eventId: string, payload: unknown): void;
   loadModule(pluginId: string): Promise<Record<string, unknown>>;
   reportClientError(pluginId: string, message: string): void;
+  /** The host clock (epoch ms). Exact in-process; a remote bridge would need clock sync. */
+  now(): number;
 }

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { MotionCapability, MotionResult, PhysicsState } from '@ridrs/contracts';
+import type {
+  MotionCapability,
+  MotionResult,
+  PhysicsState,
+  PhysicsStateBatch,
+} from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
 import { ENGINE_DEFAULTS, RideSimulation, stepTime } from './simulation.ts';
 
@@ -35,9 +40,19 @@ function recordingMotion(times: number[]): MotionCapability {
   };
 }
 
-function simulation(times: number[] = [], published: PhysicsState[] = []) {
-  return new RideSimulation('session', T0, recordingMotion(times), (s) => published.push(s));
+function simulation(
+  times: number[] = [],
+  published: PhysicsState[] = [],
+  batches: PhysicsStateBatch[] = [],
+) {
+  return new RideSimulation('session', T0, recordingMotion(times), {
+    state: (s) => published.push(s),
+    batch: (b) => batches.push(b),
+  });
 }
+
+/** The steps of each batch, e.g. [[0], [1, 2, 3, 4, 5]]. */
+const stepsOf = (batches: PhysicsStateBatch[]) => batches.map((b) => b.samples.map((s) => s.step));
 
 describe('stepTime', () => {
   it('computes step times from the index', () => {
@@ -106,6 +121,114 @@ describe('RideSimulation', () => {
       },
       advance: (_previous, at) => result(at),
     };
-    expect(() => new RideSimulation('s', T0, motion, () => undefined)).toThrow('broken');
+    expect(
+      () => new RideSimulation('s', T0, motion, { state: () => undefined, batch: () => undefined }),
+    ).toThrow('broken');
+  });
+});
+
+describe('RideSimulation batches', () => {
+  it('starts with a batch of step 0, right after its state', () => {
+    const order: string[] = [];
+    new RideSimulation('session', T0, recordingMotion([]), {
+      state: (s) => order.push(`state ${s.step}`),
+      batch: (b) => order.push(`batch ${b.samples.map((s) => s.step).join(',')}`),
+    });
+    expect(order).toEqual(['state 0', 'batch 0']);
+  });
+
+  it('publishes every five steps the steps since the previous batch', () => {
+    const batches: PhysicsStateBatch[] = [];
+    const sim = simulation([], [], batches);
+    sim.advanceUntil(T0 + 40);
+    expect(stepsOf(batches)).toEqual([[0]]);
+    sim.advanceUntil(T0 + 100);
+    expect(stepsOf(batches)).toEqual([[0], [1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]);
+    expect(batches.every((b) => b.sessionId === 'session')).toBe(true);
+  });
+
+  it('publishes the state of a 25th step before the batch that contains it', () => {
+    const order: string[] = [];
+    const sim = new RideSimulation('session', T0, recordingMotion([]), {
+      state: (s) => order.push(`state ${s.step}`),
+      batch: (b) => order.push(`batch ${b.samples.at(-1)?.step}`),
+    });
+    sim.advanceUntil(T0 + 250);
+    expect(order.slice(-2)).toEqual(['state 25', 'batch 25']);
+  });
+
+  it('projects samples from the states, copying values', () => {
+    const motion: MotionCapability = {
+      initial: (at) => result(at),
+      advance: (_previous, at) => ({
+        ...result(at, (at - T0) / 100),
+        distance: (at - T0) / 1000,
+        acceleration: 0.5,
+        road: { gradient: 0.05, origin: 'default' },
+      }),
+    };
+    const batches: PhysicsStateBatch[] = [];
+    new RideSimulation('session', T0, motion, {
+      state: () => undefined,
+      batch: (b) => batches.push(b),
+    }).advanceUntil(T0 + 50);
+    expect(batches[1]?.samples[4]).toEqual({
+      step: 5,
+      at: T0 + 50,
+      speed: 0.5,
+      distance: 0.05,
+      acceleration: 0.5,
+      gradient: 0.05,
+    });
+  });
+
+  it('sends the remaining steps at finish, once', () => {
+    const batches: PhysicsStateBatch[] = [];
+    simulation([], [], batches).finish(T0 + 1020);
+    expect(stepsOf(batches).at(-1)).toEqual([101, 102]);
+
+    const onBoundary: PhysicsStateBatch[] = [];
+    simulation([], [], onBoundary).finish(T0 + 1000);
+    expect(stepsOf(onBoundary).at(-1)).toEqual([96, 97, 98, 99, 100]);
+  });
+
+  it.each([
+    ENGINE_DEFAULTS.maxStepsPerWake,
+    997,
+  ])('keeps the batch boundaries across catch-up chunks of %i steps', (chunk) => {
+    const batches: PhysicsStateBatch[] = [];
+    const sim = simulation([], [], batches);
+    const now = T0 + 25_030;
+    // A chunk that is no multiple of 5 ends mid-batch; the batch boundaries must not move.
+    let more = true;
+    while (more) {
+      more = sim.advanceUntil(now, chunk);
+    }
+    const steps = stepsOf(batches);
+    expect(steps.flat()).toEqual(Array.from({ length: 2501 }, (_, n) => n));
+    expect(steps.slice(1).every((b) => b.length === 5 && (b[4] ?? 0) % 5 === 0)).toBe(true);
+    // 2501…2503 are computed but not yet due for a batch.
+    expect(steps.at(-1)).toEqual([2496, 2497, 2498, 2499, 2500]);
+  });
+
+  it('discards unbatched steps when a step fails', () => {
+    let calls = 0;
+    const motion: MotionCapability = {
+      initial: (at) => result(at),
+      advance: (_previous, at) => {
+        calls += 1;
+        if (calls === 8) {
+          throw new Error('broken');
+        }
+        return result(at);
+      },
+    };
+    const batches: PhysicsStateBatch[] = [];
+    const sim = new RideSimulation('session', T0, motion, {
+      state: () => undefined,
+      batch: (b) => batches.push(b),
+    });
+    expect(() => sim.advanceUntil(T0 + 100)).toThrow('broken');
+    expect(stepsOf(batches)).toEqual([[0], [1, 2, 3, 4, 5]]);
   });
 });

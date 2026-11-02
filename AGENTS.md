@@ -18,3 +18,4 @@ Do not introduce or change licenses without maintainer approval.
 7. **Determinism.** Time comes from the injected clock; ordering is deterministic.
 8. **Extend, don't fork.** Each phase builds on the previous one; no parallel implementations.
 9. **Every phase ends with a vertical use case** that runs through the real architecture.
+10. **Rendering reads, never drives.** Rendering never drives or writes the simulation; frame rate never changes physics results.

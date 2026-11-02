@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { MotionCapability, MotionResult, PhysicsState } from '@ridrs/contracts';
+import type {
+  MotionCapability,
+  MotionResult,
+  PhysicsSample,
+  PhysicsState,
+  PhysicsStateBatch,
+} from '@ridrs/contracts';
 
 export const ENGINE_DEFAULTS = Object.freeze({
   /** Fixed simulation step, 100 Hz. */
   stepMs: 10,
   /** `physics.state` goes out at step 0 and every this many steps (250 ms), plus at finish. */
   publishEverySteps: 25,
+  /** `physics.state-batch` goes out at step 0 and every this many steps (50 ms), plus at finish. */
+  batchEverySteps: 5,
   /** At most this many steps per wake, so a long catch-up never blocks the event loop in one piece. */
   maxStepsPerWake: 1000,
 });
@@ -14,6 +22,25 @@ export const ENGINE_DEFAULTS = Object.freeze({
 /** The time of state `step`: from the index, never by repeated addition. */
 export function stepTime(startedAt: number, step: number): number {
   return startedAt + ENGINE_DEFAULTS.stepMs * step;
+}
+
+/** Where a simulation's results go. */
+export interface SimulationOutputs {
+  /** The full state at step 0, every 25 steps and at finish. */
+  state(state: PhysicsState): void;
+  /** Every step's sample exactly once, in ascending batches with boundaries on step indices. */
+  batch(batch: PhysicsStateBatch): void;
+}
+
+function sampleOf(step: number, result: MotionResult): PhysicsSample {
+  return {
+    step,
+    at: result.at,
+    speed: result.speed,
+    distance: result.distance,
+    acceleration: result.acceleration,
+    gradient: result.road.gradient,
+  };
 }
 
 /**
@@ -25,15 +52,19 @@ export class RideSimulation {
   private current: MotionResult;
   private step = 0;
   private lastPublishedStep = -1;
+  /** Samples computed since the previous batch. */
+  private pending: PhysicsSample[] = [];
 
   constructor(
     readonly sessionId: string,
     readonly startedAt: number,
     private readonly motion: MotionCapability,
-    private readonly publish: (state: PhysicsState) => void,
+    private readonly outputs: SimulationOutputs,
   ) {
     this.current = motion.initial(startedAt);
+    this.pending.push(sampleOf(0, this.current));
     this.emit();
+    this.flush();
   }
 
   /** When the next step is due. */
@@ -46,8 +77,12 @@ export class RideSimulation {
     for (let done = 0; done < limit && this.nextDueAt() <= until; done += 1) {
       this.current = this.motion.advance(this.current, this.nextDueAt());
       this.step += 1;
+      this.pending.push(sampleOf(this.step, this.current));
       if (this.step % ENGINE_DEFAULTS.publishEverySteps === 0) {
         this.emit();
+      }
+      if (this.step % ENGINE_DEFAULTS.batchEverySteps === 0) {
+        this.flush();
       }
     }
     return this.nextDueAt() <= until;
@@ -59,6 +94,7 @@ export class RideSimulation {
     if (this.lastPublishedStep !== this.step) {
       this.emit();
     }
+    this.flush();
   }
 
   /** The step the next advance computes; while one fails, the failing step. */
@@ -68,6 +104,15 @@ export class RideSimulation {
 
   private emit(): void {
     this.lastPublishedStep = this.step;
-    this.publish({ ...this.current, sessionId: this.sessionId, step: this.step });
+    this.outputs.state({ ...this.current, sessionId: this.sessionId, step: this.step });
+  }
+
+  private flush(): void {
+    if (this.pending.length === 0) {
+      return;
+    }
+    const samples = this.pending;
+    this.pending = [];
+    this.outputs.batch({ sessionId: this.sessionId, samples });
   }
 }
