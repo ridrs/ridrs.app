@@ -170,7 +170,7 @@ module.exports = {
       name: 'physics-widgets-know-contracts-sdk-and-react',
       comment: 'The physics HUD widgets import packages/contracts, packages/ui-sdk and React only.',
       severity: 'error',
-      from: { path: '^plugins/ui-widget-virtual-(speed|distance)/' },
+      from: { path: '^plugins/ui-widget-(virtual-speed|virtual-distance|gradient)/' },
       to: { path: '^(packages/(?!contracts/|ui-sdk/)|apps/|tests/)' },
     },
     {

@@ -26,6 +26,7 @@ dependency-cruiser cannot see calls on `ctx`. For every change to a physics plug
 - Only `physics-engine` calls `ctx.events.subscribe` (`activity.state-changed`) or `ctx.events.publish` (`physics.state`), and only it owns a timer. (Unit test: contributors neither subscribe nor publish in `initialize`/`start`.)
 - Only `physics-powertrain` calls `ctx.temporal.reader`; no physics plugin calls `ctx.temporal.writer`.
 - Resistance providers report `source = ctx.manifest.id` and never add masses themselves.
+- Resistance providers take speed, mass and road from `ResistanceInput` and never query `physics.road` themselves (ADR 0027). `physics-road` and `physics-environment` compute no forces; `physics-gravity-resistance` reads no provider. (Unit test.)
 
 The import rules (contracts only, rxjs only in the engine, no plugin imports) are enforced by dependency-cruiser.
 

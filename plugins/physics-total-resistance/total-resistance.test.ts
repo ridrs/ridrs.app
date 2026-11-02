@@ -4,7 +4,7 @@ import { PhysicsStepError, type ResistanceProvider } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
 import { totalResistance } from './total-resistance.ts';
 
-const input = { at: 0, speed: 10, mass: 85 };
+const input = { at: 0, speed: 10, mass: 85, road: { gradient: 0, origin: 'default' as const } };
 
 function constant(source: string, force: number): ResistanceProvider {
   return { source, force: () => force };

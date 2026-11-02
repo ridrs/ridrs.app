@@ -1,0 +1,9 @@
+{
+  "id": "physics-environment",
+  "name": "Environment",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": ["physics.environment"],
+  "requires": [],
+  "entry": "index.ts"
+}

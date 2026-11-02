@@ -1,0 +1,9 @@
+{
+  "id": "physics-road",
+  "name": "Road",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": ["physics.road"],
+  "requires": [],
+  "entry": "index.ts"
+}

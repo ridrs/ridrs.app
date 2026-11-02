@@ -3,15 +3,16 @@
 import {
   definePlugin,
   PhysicsStepError,
+  physicsEnvironmentCapability,
   physicsResistanceCapability,
   physicsRiderCapability,
 } from '@ridrs/contracts';
 import { aerodynamicDragForce } from './aerodynamics.ts';
 
-/** Still air at sea level and 15 °C, until an environment provides air density and wind. */
-export const AERODYNAMICS_DEFAULTS = Object.freeze({ airDensity: 1.225 });
-
-/** Drag of rider and bicycle together (one CdA), so their interaction is never counted twice. */
+/**
+ * Drag of rider and bicycle together (one CdA), so their interaction is never counted twice.
+ * Air density comes from the environment; there is no fallback of its own.
+ */
 export default definePlugin({
   initialize(ctx) {
     const source = ctx.manifest.id;
@@ -22,7 +23,13 @@ export default definePlugin({
         if (!Number.isFinite(cdA) || cdA <= 0) {
           throw new PhysicsStepError(`Invalid CdA ${cdA}`, { pluginId: source });
         }
-        return aerodynamicDragForce(AERODYNAMICS_DEFAULTS.airDensity, cdA, speed);
+        const airDensity = ctx.capabilities.get(physicsEnvironmentCapability).parameters()
+          .airDensity.value;
+        if (!Number.isFinite(airDensity) || airDensity <= 0) {
+          throw new PhysicsStepError(`Invalid air density ${airDensity}`, { pluginId: source });
+        }
+        // Still air: the relative airflow is the speed.
+        return aerodynamicDragForce(airDensity, cdA, speed);
       },
     });
   },

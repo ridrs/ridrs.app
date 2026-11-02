@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { driveForce, integrate } from './integrator.ts';
+import { driveForce, integrate, isValidGradient } from './integrator.ts';
 
 const dt = 0.01;
 
@@ -54,5 +54,38 @@ describe('integrate (semi-implicit Euler)', () => {
       state = { speed: next.speed, distance: next.distance };
     }
     expect(state).toEqual({ speed: 0, distance: 0 });
+  });
+});
+
+describe('isValidGradient', () => {
+  it('accepts finite gradients within ±30 %', () => {
+    for (const gradient of [0, 0.05, -0.05, 0.3, -0.3]) {
+      expect(isValidGradient(gradient)).toBe(true);
+    }
+  });
+
+  it('rejects steeper and non-finite gradients', () => {
+    for (const gradient of [0.30001, -0.30001, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(isValidGradient(gradient)).toBe(false);
+    }
+  });
+});
+
+describe('integrate on a climb', () => {
+  it('keeps a rider without power at rest on 5 % for 10 000 steps ("brakes held")', () => {
+    // Gravity of 85 kg on 5 %; rolling resistance is 0 at standstill.
+    const gravity = 85 * 9.81 * Math.sin(Math.atan(0.05));
+    let state = { speed: 0, distance: 0 };
+    for (let i = 0; i < 10_000; i += 1) {
+      const next = integrate({ ...state, mass: 85, wheelPower: 0, resistance: gravity, dt });
+      state = { speed: next.speed, distance: next.distance };
+    }
+    expect(state).toEqual({ speed: 0, distance: 0 });
+  });
+
+  it('lets a rider without power start rolling downhill', () => {
+    const gravity = 85 * 9.81 * Math.sin(Math.atan(-0.05));
+    const next = integrate({ speed: 0, distance: 0, mass: 85, wheelPower: 0, resistance: gravity, dt });
+    expect(next.speed).toBeGreaterThan(0);
   });
 });

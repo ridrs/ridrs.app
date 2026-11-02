@@ -8,13 +8,13 @@ import {
 } from '@ridrs/contracts';
 import { rollingResistanceForce } from './rolling-resistance.ts';
 
-/** Rolling resistance of the bicycle's tyres on a flat road. */
+/** Rolling resistance of the bicycle's tyres; the road comes in the input, never queried. */
 export default definePlugin({
   initialize(ctx) {
     const source = ctx.manifest.id;
     ctx.capabilities.provide(physicsResistanceCapability, {
       source,
-      force: ({ speed, mass }) => {
+      force: ({ speed, mass, road }) => {
         const crr = ctx.capabilities.get(physicsBicycleCapability).parameters()
           .rollingResistanceCoefficient.value;
         if (!Number.isFinite(crr) || crr < 0) {
@@ -22,7 +22,7 @@ export default definePlugin({
             pluginId: source,
           });
         }
-        return rollingResistanceForce(crr, mass, speed);
+        return rollingResistanceForce(crr, mass, speed, road.gradient);
       },
     });
   },

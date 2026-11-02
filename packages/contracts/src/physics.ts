@@ -14,7 +14,7 @@ import type { TemporalValue } from './temporal.ts';
 /** m/s². Shared so that every resistance plugin uses the same value. */
 export const STANDARD_GRAVITY = 9.81;
 
-/** Where a parameter value comes from. Phase 5 has no configuration, so everything is a default. */
+/** Where a parameter value comes from. There is no configuration yet, so everything is a default. */
 export type PhysicsParameterOrigin = 'default';
 
 export interface PhysicsParameter {
@@ -44,12 +44,41 @@ export interface RiderCapability {
   parameters(): RiderParameters;
 }
 
+export interface EnvironmentParameters {
+  /** kg/m³ */
+  readonly airDensity: PhysicsParameter;
+}
+
+export interface EnvironmentCapability {
+  parameters(): EnvironmentParameters;
+}
+
+/** The road under the rider at one position. */
+export interface RoadSample {
+  /** Rise over run, dimensionless: 0.05 is 5 % uphill, -0.05 is 5 % downhill. */
+  readonly gradient: number;
+  readonly origin: PhysicsParameterOrigin;
+}
+
+export interface RoadCapability {
+  /** The providing plugin's manifest id, so that an invalid sample can name it. */
+  readonly source: string;
+  /** The road at `distance` m along the ride, distance ≥ 0. */
+  at(distance: number): RoadSample;
+}
+
+/**
+ * State-dependent inputs of one step, computed once by the integrator so that every force uses
+ * the same values. Constant model parameters (Crr, CdA, ρ) come from their providers instead.
+ */
 export interface ResistanceInput {
   readonly at: number;
   /** m/s, forward only. */
   readonly speed: number;
   /** Total moving mass in kg, computed once by the integrator; providers never add masses. */
   readonly mass: number;
+  /** The road at the rider's position; providers never query the road themselves. */
+  readonly road: RoadSample;
 }
 
 export interface ResistanceProvider {
@@ -106,6 +135,8 @@ export interface MotionResult extends MotionState {
   /** N */
   readonly driveForce: number;
   readonly resistance: ResistanceBreakdown;
+  /** The road sample this state's forces used. */
+  readonly road: RoadSample;
 }
 
 export interface MotionCapability {
@@ -137,6 +168,17 @@ export const physicsBicycleCapability = defineCapability<
 
 export const physicsRiderCapability = defineCapability<RiderCapability, 'single', 'physics.rider'>(
   'physics.rider',
+  { cardinality: 'single' },
+);
+
+export const physicsEnvironmentCapability = defineCapability<
+  EnvironmentCapability,
+  'single',
+  'physics.environment'
+>('physics.environment', { cardinality: 'single' });
+
+export const physicsRoadCapability = defineCapability<RoadCapability, 'single', 'physics.road'>(
+  'physics.road',
   { cardinality: 'single' },
 );
 
@@ -206,6 +248,7 @@ export const physicsStateSchema: z.ZodType<PhysicsState> = z.object({
     total: finite,
     contributions: z.array(z.object({ source: z.string().min(1), force: finite })),
   }),
+  road: z.object({ gradient: finite, origin: z.literal('default') }),
 });
 
 /** Interim publication of the simulation state at about 4 Hz of simulation time. */

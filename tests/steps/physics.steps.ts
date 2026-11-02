@@ -7,13 +7,18 @@ import {
   activityStateChangedEvent,
   type BicycleCapability,
   type CapabilityContract,
+  type EnvironmentCapability,
   type PhysicsState,
   physicsBicycleCapability,
+  physicsEnvironmentCapability,
   physicsRiderCapability,
+  physicsRoadCapability,
   physicsStateEvent,
   physicsTotalResistanceCapability,
   type ResistanceProvider,
   type RiderCapability,
+  type RoadCapability,
+  type RoadSample,
   type TotalResistanceCapability,
 } from '@ridrs/contracts';
 import { DEFAULT_FAKE_START } from '../support/hooks.ts';
@@ -32,6 +37,9 @@ const PHYSICS_PLUGINS = [
   'physics-rider',
   'physics-rolling-resistance',
   'physics-aerodynamics',
+  'physics-gravity-resistance',
+  'physics-environment',
+  'physics-road',
   'physics-total-resistance',
   'physics-powertrain',
   'physics-virtual-speed',
@@ -162,6 +170,14 @@ Given(
 );
 
 Given(
+  'the ridrs physics plugins without {string} together with a probe plugin {string} that requires {string}',
+  async function (this: RidrsWorld, without: string, probeId: string, capabilitiesCsv: string) {
+    await usePhysicsPlugins(this, splitCsv(without));
+    await addProbe(this, probeId, { requires: splitCsv(capabilitiesCsv) });
+  },
+);
+
+Given(
   'a probe plugin {string} provides {string} with a mass of {float} kg and a CdA of {float} m²',
   async function (
     this: RidrsWorld,
@@ -180,6 +196,58 @@ Given(
     await addProbe(this, probeId, { provides: [capability] });
   },
 );
+
+Given(
+  'a probe plugin {string} provides {string} with an air density of {float} kg\\/m³',
+  async function (this: RidrsWorld, probeId: string, capability: string, airDensity: number) {
+    const environment: EnvironmentCapability = {
+      parameters: () => ({ airDensity: { value: airDensity, origin: 'default' } }),
+    };
+    this.getBehavior(probeId).providedImplementations.set(capability, environment);
+    await addProbe(this, probeId, { provides: [capability] });
+  },
+);
+
+async function addRoadProbe(
+  world: RidrsWorld,
+  probeId: string,
+  capability: string,
+  gradientAt: (distance: number) => number,
+): Promise<void> {
+  const road: RoadCapability = {
+    source: probeId,
+    at: (distance) => ({ gradient: gradientAt(distance), origin: 'default' }),
+  };
+  world.getBehavior(probeId).providedImplementations.set(capability, road);
+  await addProbe(world, probeId, { provides: [capability] });
+}
+
+Given(
+  'a probe plugin {string} provides {string} with a constant gradient of {float} %',
+  async function (this: RidrsWorld, probeId: string, capability: string, percent: number) {
+    await addRoadProbe(this, probeId, capability, () => percent / 100);
+  },
+);
+
+Given(
+  'a probe plugin {string} provides {string} that is flat for the first {float} m and then climbs at {float} %',
+  async function (
+    this: RidrsWorld,
+    probeId: string,
+    capability: string,
+    flat: number,
+    percent: number,
+  ) {
+    await addRoadProbe(this, probeId, capability, (distance) =>
+      distance < flat ? 0 : percent / 100,
+    );
+  },
+);
+
+Given('the plugin {string} is loaded as well', function (this: RidrsWorld, pluginId: string) {
+  assert.ok(!this.realPluginIds.includes(pluginId), `"${pluginId}" is already loaded`);
+  this.realPluginIds = [...this.realPluginIds, pluginId];
+});
 
 Given(
   'a probe plugin {string} provides {string} and throws when evaluated',
@@ -309,6 +377,13 @@ Then(
 );
 
 Then(
+  'the gradient at {string} is {float} %',
+  function (this: RidrsWorld, time: string, percent: number) {
+    assertClose(stateAt(this, time).road.gradient * 100, percent, 'gradient (%)');
+  },
+);
+
+Then(
   'the acceleration at {string} is {float} m\\/s²',
   function (this: RidrsWorld, time: string, acceleration: number) {
     assertClose(stateAt(this, time).acceleration, acceleration, 'acceleration (m/s²)');
@@ -359,15 +434,35 @@ Then(
 
 // ---- Forces and parameters -----------------------------------------------------------------
 
+function evaluateTotalResistance(
+  world: RidrsWorld,
+  probeId: string,
+  speed: number,
+  mass: number,
+  road: RoadSample,
+): void {
+  const total = capabilityOf<TotalResistanceCapability>(
+    world,
+    probeId,
+    physicsTotalResistanceCapability,
+  );
+  world.lastResistance = total.evaluate({ at: world.clock.now(), speed, mass, road });
+}
+
 When(
   '{string} evaluates the total resistance at {float} m\\/s with a mass of {float} kg',
   function (this: RidrsWorld, probeId: string, speed: number, mass: number) {
-    const total = capabilityOf<TotalResistanceCapability>(
-      this,
-      probeId,
-      physicsTotalResistanceCapability,
-    );
-    this.lastResistance = total.evaluate({ at: this.clock.now(), speed, mass });
+    evaluateTotalResistance(this, probeId, speed, mass, { gradient: 0, origin: 'default' });
+  },
+);
+
+When(
+  '{string} evaluates the total resistance at {float} m\\/s with a mass of {float} kg on a gradient of {float} %',
+  function (this: RidrsWorld, probeId: string, speed: number, mass: number, percent: number) {
+    evaluateTotalResistance(this, probeId, speed, mass, {
+      gradient: percent / 100,
+      origin: 'default',
+    });
   },
 );
 
@@ -426,6 +521,30 @@ Then(
       physicsRiderCapability,
     ).parameters();
     assert.deepEqual(parameters, { mass: { value: mass, origin }, cdA: { value: cdA, origin } });
+  },
+);
+
+Then(
+  'the environment parameters are an air density of {float} kg\\/m³, all with the origin {string}',
+  function (this: RidrsWorld, airDensity: number, origin: string) {
+    const parameters = capabilityOf<EnvironmentCapability>(
+      this,
+      PARAMETER_PROBE,
+      physicsEnvironmentCapability,
+    ).parameters();
+    assert.deepEqual(parameters, { airDensity: { value: airDensity, origin } });
+  },
+);
+
+Then(
+  'the road gradient at {float} m is {float} % with the origin {string}',
+  function (this: RidrsWorld, distance: number, percent: number, origin: string) {
+    // The one probe that requires "physics.road" asks the real road plugin.
+    const sample = capabilityOf<RoadCapability>(this, 'test-road-reader', physicsRoadCapability).at(
+      distance,
+    );
+    assertClose(sample.gradient * 100, percent, `gradient at ${distance} m (%)`);
+    assert.equal(sample.origin, origin);
   },
 );
 
