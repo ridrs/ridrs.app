@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>ridrs bridge spike</title>
+    <style>
+      body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 12px; padding-top: max(12px, env(safe-area-inset-top)); }
+      button { font: inherit; margin: 2px; padding: 8px 12px; }
+      input { font: inherit; padding: 6px; width: 16em; }
+      section { border: 1px solid #ccc; border-radius: 6px; padding: 8px; margin-bottom: 10px; }
+      h2 { font-size: 15px; margin: 0 0 6px; }
+      .big { font-size: 28px; font-weight: 700; letter-spacing: 0.1em; }
+      .muted { color: #666; font-size: 12px; word-break: break-all; }
+      pre { max-height: 320px; overflow: auto; font-size: 11px; background: #f5f5f5; padding: 6px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h2>ridrs bridge spike</h2>
+      <div class="muted" id="env"></div>
+      <button id="role-companion">Companion</button>
+      <button id="role-host">Host (auto test)</button>
+      <button id="role-both">Both (loopback)</button>
+    </section>
+    <section id="companion" hidden>
+      <h2>Companion</h2>
+      <div class="big" id="c-address">–</div>
+      <div class="muted" id="c-info"></div>
+      <div id="c-clients"></div>
+    </section>
+    <section id="host" hidden>
+      <h2>Host</h2>
+      <div id="h-found" class="muted">browsing…</div>
+      <input id="h-url" placeholder="ws://192.168.1.20:52000" />
+      <button id="h-manual">Test this URL</button>
+      <div id="h-status"></div>
+    </section>
+    <pre id="log"></pre>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

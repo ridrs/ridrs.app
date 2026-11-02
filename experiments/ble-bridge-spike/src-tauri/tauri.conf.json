@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ridrs bridge spike",
+  "version": "0.0.1",
+  "identifier": "org.ridrs.spike.bridge",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1430",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [{ "title": "ridrs bridge spike", "width": 900, "height": 800 }],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "license": "AGPL-3.0-or-later",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "macOS": { "minimumSystemVersion": "11.0" },
+    "iOS": { "minimumSystemVersion": "15.0", "developmentTeam": "Q89G28YBFK" },
+    "android": { "minSdkVersion": 26 }
+  }
+}

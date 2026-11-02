@@ -1,0 +1,23 @@
+{
+  "name": "ridrs-ble-bridge-spike",
+  "version": "0.0.1",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "description": "Time-boxed spike: companion WebSocket bridge + mDNS discovery between Tauri apps (Phase 3b step 0).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.4"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "typescript": "6.0.3",
+    "vite": "8.3.5",
+    "ws": "8.22.1"
+  }
+}
