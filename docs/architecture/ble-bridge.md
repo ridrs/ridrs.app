@@ -1,0 +1,69 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+
+# The Companion Bridge (Phase 3b)
+
+A phone next to the bike holds the Bluetooth link; ridrs on another device in the same network receives the trainer's data. **The network is just another transport**: the companion is a remote `ble.central`. It forwards raw GATT traffic and never decodes payloads. `device-ftms-trainer`, the metrics, the activity and the UI widgets are unchanged.
+
+```text
+ Companion (phone, apps/companion)                        ridrs (apps/native)
+ ──────────────────────────────────                       ─────────────────────────────────────────
+ trainer ◄─BLE─► ridrs-ble (Rust, blec)                    device-ftms-trainer ◄─ble.central─┐
+                     │ IPC                                                                    │
+                 TauriBleCentral (+ dummy devices, dev)    transport-ble-bridge (BridgeLink) ─┘
+                     │                                          │ BridgeSession (packages/ble-bridge)
+                 BridgeServer + PairingAuthority                │ ble-bridge.connector
+                 (packages/ble-bridge)                          │
+                     │ IPC                                 bridge-connector-tauri
+                 ridrs-bridge::server ─── WebSocket, mDNS ─── ridrs-bridge::client (Rust)
+```
+
+## Protocol (`packages/contracts/src/ble-bridge.ts`)
+
+WebSocket. Text messages are JSON (validated with zod); binary messages are notification frames (`u32 LE subscription id | f64 LE companion time | payload`). The companion time is diagnostics only. ridrs stamps `receivedAt` with its own clock; the spike measured a phone clock 0.6 s off.
+
+| ridrs → companion | companion → ridrs |
+|---|---|
+| `hello` (protocol, client name, pairing secret, pairing code or token) | `welcome` (companion id and name, token) or `rejected` (`bad-code`, `bad-token`, `locked`, `incompatible`, `busy`, `unknown-secret`) |
+| `ping` every 1 s | `pong` |
+| `scan`, `stop-scan` | `discovered` |
+| `connect`, `disconnect` | `connected`, `disconnected`, `failed`, `connection-lost` |
+| `subscribe`, `unsubscribe` | `subscribed`, binary frames |
+
+- **Pairing**: either the phone scans the QR code ridrs shows (`hello.pairingSecret`, ADR 0021), or the rider types the 6-digit code the phone shows into ridrs (`hello.pairingCode`). Both earn a token, which ridrs stores for later connects. A scanned secret is good for one pairing within ten minutes, and misses never lock. Five wrong codes lock code pairing for a minute, and the phone shows a fresh code after a successful one. "Forget paired ridrs" revokes all tokens.
+- **One ridrs at a time**: a second client is rejected with `busy`.
+- **Liveness**: any inbound message counts. After 5 s of silence either side closes the link; shorter Wi-Fi stalls (up to 0.8 s seen with the Wi-Fi locks) are no connection loss. When the link closes, the companion releases every scan, subscription and Bluetooth connection of that client.
+- **Versions**: a companion accepts clients of the same major protocol version.
+
+## Connection states: both devices agree, and there is always a way out
+
+| ridrs (`bridge.state-changed`) | Companion (per paired ridrs) | Buttons in ridrs | Buttons on the phone |
+|---|---|---|---|
+| `unpaired` (QR code, code fields) | no pairing | pair | scan QR / show code |
+| `connecting`, `reconnecting` | `waiting` | Forget | Forget |
+| `unreachable` (after 30 s, with a reason and a hint) | `waiting` | Try again, Forget | Forget |
+| `connected` | `connected` | Disconnect, Forget | Disconnect, Forget |
+| `disconnected` (`by-ridrs` / `by-companion`) | `disconnected` | Connect, Forget | Connect, Forget |
+
+- **Deliberate ends are announced**: `bye` (`disconnect` or `forget`) goes out before the socket closes, so the other side shows the same at once. Only an unexpected loss can differ, for up to the 5 s link timeout.
+- **A disconnect stays until someone connects.** The companion holds the pause, which survives restarts of either app. ridrs keeps asking every 3 s with `intent: reconnect`, which a paused pairing refuses (`paused`, `pausedBy`). Connect on the phone lifts the pause, and ridrs's next attempt succeeds. Connect in ridrs sends `intent: resume`, which lifts it too.
+- **Forget reaches both sides.** If the companion is away when the rider forgets in ridrs, ridrs is unpaired at once and delivers `intent: forget` once the companion is back. If the phone forgets while ridrs is away, ridrs learns it from `bad-token` on its next attempt.
+- **Connecting never hangs**: the Rust connect gives up after 5 s, and ridrs reports `unreachable` after 30 s with `refused`, `network`, `timeout` or `error`, while it keeps trying (every 1, 2, 4 and then 5 s).
+- A ridrs that connects again while the companion still holds its old session (not yet timed out) replaces that session instead of getting `busy`.
+- The `@consistent` scenarios (`tests/features/bridge/bridge-control.feature`) check after every step that "connected" on one side means "connected" on the other.
+
+## ridrs side
+
+- `transport-ble-bridge` provides `ble.central` and requires `ble-bridge.connector`. Its `BridgeLink` keeps one session to the paired companion: scans wait for a session, connects wait for the attempt in flight. A lost session ends every open BLE connection, so the device plugin reconnects by id as usual; the bridge reconnects with backoff (1 s, doubling, max 30 s) and reports `bridge-unreachable` once per outage. A refused token clears the pairing.
+- Events: `bridge.companions-changed` (listed companions, paired flag), `bridge.pairing-offer` (the QR code URI while nothing is paired, `null` otherwise), `bridge.pair-requested` (address of a listed companion + code, from the UI), `bridge.state-changed` (`unpaired`, `connecting`, `connected`, `reconnecting`, `rejected`).
+- Discovery is mDNS only: there is no field for typing an address.
+- `bridge-connector-tauri` provides the connector: mDNS browse and sockets in Rust (`crates/ridrs-bridge`), pairing in the WebView's local storage. A companion that moved to another address is found again by its id in the announcements.
+- `ui-bridge-pairing` contributes to the main screen's new extension point `main/panel`. While nothing is paired it shows the pairing QR code and, for each companion found, a field for the phone's code. It also switches the transport with `ble.transport-requested`.
+- **Transport choice**: `ble.central` has one provider. `apps/native` starts with `local` (this device's Bluetooth) or `bridge` and disables the other transport's plugins. The choice lives in a file the Rust side writes atomically and durably (`ble_transport_set`). The WebView restarts only after the choice reads back, so a crash during a switch cannot leave the app in the other transport. Unknown or unreadable values mean `local`. A damaged stored pairing is discarded, and the rider pairs again.
+
+## Companion side
+
+`apps/companion` composes `PairingAuthority` and `BridgeServer` on the Rust listener (`serveOverIpc`). The UI offers **Scan ridrs QR code** (native camera scanner), shows the code as the alternative, the connected ridrs and the forwarding rate. It listens on port 42229 when that port is free. On Android the activity keeps the screen on and holds a multicast lock and a low-latency Wi-Fi lock while in the foreground; it also needs `ACCESS_LOCAL_NETWORK` (see the spike findings). The developer build (`--mode dummy`) merges dummy devices from `packages/ble-simulator` into the forwarded central.
+
+## Tests
+
+The scenarios in `tests/features/bridge/`, `tests/features/devices/trainer-connection-bridge.feature` and `tests/features/apps/ride-over-bridge.feature` run the real protocol and plugins on a simulated network (`SimulatedNetwork`, `SimulatedCompanion` in `@ridrs/testing`; ADR 0020). Vitest covers the IPC adapters and that release bundles leave the dummy devices out; `cargo test` covers address filtering and event framing.

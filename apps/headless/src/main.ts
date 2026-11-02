@@ -17,7 +17,12 @@ import pretty from 'pino-pretty';
  * Plugins that need a runtime this host does not have (the Tauri WebView). Excluded like `--disable`,
  * mirroring how `apps/native` leaves Node-only plugins out of its bundle.
  */
-const PLUGINS_FOR_OTHER_RUNTIMES = ['transport-ble-tauri'];
+const PLUGINS_FOR_OTHER_RUNTIMES = [
+  'transport-ble-tauri',
+  'bridge-connector-tauri',
+  // The bridge transport needs a connector; this host has none (the companion bridge is native-only).
+  'transport-ble-bridge',
+];
 
 function resolvePluginDir(requestedDir: string): string {
   const baseDir = process.env.INIT_CWD ?? process.cwd();

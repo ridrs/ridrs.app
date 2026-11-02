@@ -1,0 +1,11 @@
+{
+  "name": "@ridrs/plugin-transport-ble-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "dependencies": {
+    "@ridrs/ble-bridge": "workspace:*",
+    "@ridrs/contracts": "workspace:*"
+  }
+}

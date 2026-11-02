@@ -24,6 +24,12 @@ importers:
       '@happy-dom/global-registrator':
         specifier: 21.0.4
         version: 21.0.4
+      '@ridrs/ble-bridge':
+        specifier: workspace:*
+        version: link:packages/ble-bridge
+      '@ridrs/ble-simulator':
+        specifier: workspace:*
+        version: link:packages/ble-simulator
       '@ridrs/testing':
         specifier: workspace:*
         version: link:packages/testing
@@ -82,6 +88,43 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  apps/companion:
+    dependencies:
+      '@ridrs/ble-bridge':
+        specifier: workspace:*
+        version: link:../../packages/ble-bridge
+      '@ridrs/ble-simulator':
+        specifier: workspace:*
+        version: link:../../packages/ble-simulator
+      '@ridrs/ble-tauri':
+        specifier: workspace:*
+        version: link:../../packages/ble-tauri
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
+      '@tauri-apps/plugin-barcode-scanner':
+        specifier: 2.5.3
+        version: 2.5.3
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@tauri-apps/cli':
+        specifier: 2.12.4
+        version: 2.12.4
+      '@vitejs/plugin-react':
+        specifier: 6.1.2
+        version: 6.1.2(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1)
+
   apps/headless:
     dependencies:
       '@ridrs/contracts':
@@ -128,6 +171,34 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1)
 
+  packages/ble-bridge:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
+    devDependencies:
+      '@types/semver':
+        specifier: 7.8.0
+        version: 7.8.0
+
+  packages/ble-simulator:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
+  packages/ble-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
+
   packages/contracts:
     dependencies:
       semver:
@@ -168,6 +239,12 @@ importers:
 
   packages/testing:
     dependencies:
+      '@ridrs/ble-bridge':
+        specifier: workspace:*
+        version: link:../ble-bridge
+      '@ridrs/ble-simulator':
+        specifier: workspace:*
+        version: link:../ble-simulator
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -208,6 +285,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contracts
 
+  plugins/bridge-connector-tauri:
+    dependencies:
+      '@ridrs/ble-tauri':
+        specifier: workspace:*
+        version: link:../../packages/ble-tauri
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
   plugins/device-ftms-trainer:
     dependencies:
       '@ridrs/contracts':
@@ -244,6 +330,15 @@ importers:
         specifier: 7.8.2
         version: 7.8.2
 
+  plugins/transport-ble-bridge:
+    dependencies:
+      '@ridrs/ble-bridge':
+        specifier: workspace:*
+        version: link:../../packages/ble-bridge
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
   plugins/transport-ble-noble:
     dependencies:
       '@ridrs/contracts':
@@ -256,12 +351,12 @@ importers:
 
   plugins/transport-ble-tauri:
     dependencies:
+      '@ridrs/ble-tauri':
+        specifier: workspace:*
+        version: link:../../packages/ble-tauri
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@tauri-apps/api':
-        specifier: 2.12.4
-        version: 2.12.4
 
   plugins/ui-activity-screen:
     dependencies:
@@ -277,6 +372,24 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+
+  plugins/ui-bridge-pairing:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      uqr:
+        specifier: 0.1.3
+        version: 0.1.3
 
   plugins/ui-hud:
     dependencies:
@@ -893,6 +1006,9 @@ packages:
     resolution: {integrity: sha512-JI9bHfudSRJikGOrjbXEm6RjzzvmKuLc+JixB1NE8hNzQkNlCCIC3pTES3uypkR9lxHrsbxzcnSwhI2IxBQphw==}
     engines: {node: '>= 10'}
     hasBin: true
+
+  '@tauri-apps/plugin-barcode-scanner@2.5.3':
+    resolution: {integrity: sha512-Ienqx/XkIcxkf6oM7CCy5FnWNUtiuWC5mkLtM7GughgrYvd5EIGPGxuISboFhvtgiNSJZF8hSan8+dSznlsdBQ==}
 
   '@teppeis/multimaps@3.0.0':
     resolution: {integrity: sha512-ID7fosbc50TbT0MK0EG12O+gAP3W3Aa/Pz4DaTtQtEvlc9Odaqi0de+xuZ7Li2GtK4HzEX7IuRWS/JmZLksR3Q==}
@@ -2098,6 +2214,9 @@ packages:
     resolution: {integrity: sha512-WrcA6AyEfqDX5bWige/4NQfPZMtASNVxdmWR76WESYQVAACSgWcR6e9i0mofqqBxYFtL4oAxPIptY73/0YE1DQ==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
+
   usb@2.19.1:
     resolution: {integrity: sha512-fjVddzu00GFc1Z5fd5+zuZrqylsfuBbmKKygx3rbIS9w5Nh3ddGVWDHkPBQ/BbB3PVEp6kdsZfX9WXhlsRdPDQ==}
     engines: {node: '>=12.22.0 <13.0 || >=14.17.0'}
@@ -2707,6 +2826,10 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.12.4
       '@tauri-apps/cli-win32-ia32-msvc': 2.12.4
       '@tauri-apps/cli-win32-x64-msvc': 2.12.4
+
+  '@tauri-apps/plugin-barcode-scanner@2.5.3':
+    dependencies:
+      '@tauri-apps/api': 2.12.4
 
   '@teppeis/multimaps@3.0.0': {}
 
@@ -3955,6 +4078,8 @@ snapshots:
     dependencies:
       imurmurhash: 0.1.4
     optional: true
+
+  uqr@0.1.3: {}
 
   usb@2.19.1:
     dependencies:

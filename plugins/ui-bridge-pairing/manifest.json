@@ -1,0 +1,36 @@
+{
+  "id": "ui-bridge-pairing",
+  "name": "Companion Pairing",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "bridge-pairing",
+        "extensionPoint": "main/panel",
+        "export": "BridgePairing",
+        "order": 0
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "bridge.companions-changed",
+        "bridge.state-changed",
+        "bridge.pairing-offer"
+      ],
+      "publish": [
+        "bridge.pair-requested",
+        "bridge.connect-requested",
+        "bridge.disconnect-requested",
+        "bridge.forget-requested",
+        "ble.transport-requested"
+      ]
+    }
+  }
+}

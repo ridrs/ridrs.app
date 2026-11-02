@@ -5,11 +5,21 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setWorldConstructor, World } from '@cucumber/cucumber';
+import type { BridgeSession } from '@ridrs/ble-bridge';
 import {
   activityFinishRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  type BleCentral,
+  bleBridgeConnectorCapability,
   bleCentralCapability,
+  bridgeCompanionsChangedEvent,
+  bridgeConnectRequestedEvent,
+  bridgeDisconnectRequestedEvent,
+  bridgeForgetRequestedEvent,
+  bridgePairingOfferEvent,
+  bridgePairRequestedEvent,
+  bridgeStateChangedEvent,
   type CapabilityCardinality,
   type CapabilityContract,
   type Clock,
@@ -29,7 +39,14 @@ import {
 } from '@ridrs/contracts';
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
-import type { BleSimulator, SimulatedPeripheral, SimulatedTauriBridge } from '@ridrs/testing';
+import type {
+  BleSimulator,
+  SimulatedBridgeConnector,
+  SimulatedCompanion,
+  SimulatedNetwork,
+  SimulatedPeripheral,
+  SimulatedTauriBridge,
+} from '@ridrs/testing';
 import { createInProcessUiBridge, type InProcessUiBridge } from '@ridrs/ui-bridge';
 import type FakeTimers from '@sinonjs/fake-timers';
 import type { ResultPromise } from 'execa';
@@ -70,12 +87,22 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   measurementCadenceEvent,
   deviceConnectionChangedEvent,
   uiRegistryChangedEvent,
+  bridgeCompanionsChangedEvent,
+  bridgeConnectRequestedEvent,
+  bridgeDisconnectRequestedEvent,
+  bridgeForgetRequestedEvent,
+  bridgePairingOfferEvent,
+  bridgePairRequestedEvent,
+  bridgeStateChangedEvent,
 ];
 
 /** Events the World records from the bus directly (host-level), independent of any plugin. */
 const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   uiRegistryChangedEvent,
   activityStateChangedEvent,
+  bridgeCompanionsChangedEvent,
+  bridgePairingOfferEvent,
+  bridgeStateChangedEvent,
 ];
 
 const ACTIVE_WORLD_SYMBOL = Symbol.for('ridrs.test.activeWorld');
@@ -106,6 +133,12 @@ export class RidrsWorld extends World {
   realPluginIds: string[] = [];
   bleSimulator?: BleSimulator;
   tauriBridge?: SimulatedTauriBridge;
+  // Phase 3b state: the simulated network, the companion on it and ridrs' side of it.
+  bridgeNetwork?: SimulatedNetwork;
+  bridgeConnector?: SimulatedBridgeConnector;
+  companion?: SimulatedCompanion;
+  companionCentral?: BleCentral;
+  readonly bridgeSessions: BridgeSession[] = [];
   trainer?: SimulatedPeripheral;
   readonly observed: EventEnvelope[] = [];
   /** Events recorded by the World's own host-level subscriptions (see HOST_OBSERVED_EVENTS). */
@@ -119,6 +152,8 @@ export class RidrsWorld extends World {
   /** The native app's composition root, when a scenario starts it instead of a bare host. */
   nativeApp?: { readonly host: PluginHost; close(): Promise<void> };
   readonly keepAwakeRequests: boolean[] = [];
+  nativeBleTransport?: 'local' | 'bridge';
+  readonly bleTransportRequests: string[] = [];
   readonly uiViews: Array<{ readonly root: HTMLElement; dispose: () => void }> = [];
   packetMark = 0;
   readonly stopMarks = new Map<
@@ -156,7 +191,12 @@ export class RidrsWorld extends World {
 
   async initTempDir(): Promise<void> {
     this.tempPluginDir = await mkdtemp(join(tmpdir(), 'ridrs-phase1-'));
-    for (const contract of [bleCentralCapability, metricPowerCapability, metricCadenceCapability]) {
+    for (const contract of [
+      bleCentralCapability,
+      bleBridgeConnectorCapability,
+      metricPowerCapability,
+      metricCadenceCapability,
+    ]) {
       this.capabilityContracts.set(contract.id, contract);
     }
     for (const event of PHASE_3_EVENTS) {
@@ -183,6 +223,10 @@ export class RidrsWorld extends World {
       this.headlessProcess.kill('SIGKILL');
     }
     await this.disposeHost();
+    for (const session of this.bridgeSessions.splice(0)) {
+      session.close();
+    }
+    this.companion?.server.close();
     this.tauriBridge?.uninstall();
     this.tauriBridge = undefined;
     if (this.tempPluginDir) {

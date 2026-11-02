@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type { BleSimulator } from '@ridrs/ble-simulator';
 import type { BleConnection, Clock } from '@ridrs/contracts';
 import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
-import type { BleSimulator } from './ble-simulator.ts';
 
 /** The part of a Tauri `Channel` the bridge uses to push messages to the WebView side. */
 interface ChannelLike {

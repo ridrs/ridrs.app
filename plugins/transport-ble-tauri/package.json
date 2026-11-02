@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "dependencies": {
-    "@ridrs/contracts": "workspace:*",
-    "@tauri-apps/api": "2.12.4"
+    "@ridrs/ble-tauri": "workspace:*",
+    "@ridrs/contracts": "workspace:*"
   }
 }

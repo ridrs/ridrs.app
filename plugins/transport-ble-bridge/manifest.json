@@ -1,0 +1,9 @@
+{
+  "id": "transport-ble-bridge",
+  "name": "BLE Transport (Companion Bridge)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["ble.central"],
+  "requires": ["ble-bridge.connector"],
+  "entry": "index.ts"
+}

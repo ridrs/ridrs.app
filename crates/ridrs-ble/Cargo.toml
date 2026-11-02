@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+[package]
+name = "ridrs-ble"
+version = "0.1.0"
+description = "ridrs: native BLE commands behind ble.central (scan, connect, subscribe) on tauri-plugin-blec"
+license = "AGPL-3.0-or-later"
+edition = "2021"
+rust-version = "1.80"
+publish = false
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+tauri-plugin-blec = "0.18.0"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["sync"] }
+uuid = "1"

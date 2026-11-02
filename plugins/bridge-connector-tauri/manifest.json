@@ -1,0 +1,9 @@
+{
+  "id": "bridge-connector-tauri",
+  "name": "Companion Bridge Connector (Tauri)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["ble-bridge.connector"],
+  "requires": [],
+  "entry": "index.ts"
+}

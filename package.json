@@ -21,6 +21,8 @@
     "@biomejs/biome": "2.6.4",
     "@cucumber/cucumber": "13.3.0",
     "@happy-dom/global-registrator": "21.0.4",
+    "@ridrs/ble-bridge": "workspace:*",
+    "@ridrs/ble-simulator": "workspace:*",
     "@ridrs/testing": "workspace:*",
     "@sinonjs/fake-timers": "15.4.0",
     "@testing-library/dom": "10.4.2",

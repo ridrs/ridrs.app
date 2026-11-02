@@ -22,7 +22,7 @@ const METRIC_PLUGIN_CAPABILITIES: Record<string, string> = {
   'metric-cadence': 'metric.cadence',
 };
 
-function splitCsv(value: string): string[] {
+export function splitCsv(value: string): string[] {
   return value
     .split(',')
     .map((item) => item.trim())
@@ -30,7 +30,7 @@ function splitCsv(value: string): string[] {
 }
 
 /** "10:00:00.250" means that time on 2026-11-01 UTC. */
-function parseTime(text: string): number {
+export function parseTime(text: string): number {
   const match = /^(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/.exec(text);
   assert.ok(match, `Unrecognized time "${text}"`);
   const [, h, m, s, ms] = match.map(Number);
@@ -42,7 +42,7 @@ function simulator(world: RidrsWorld): BleSimulator {
   return world.bleSimulator;
 }
 
-function peripheral(world: RidrsWorld, name: string): SimulatedPeripheral {
+export function peripheral(world: RidrsWorld, name: string): SimulatedPeripheral {
   const found = simulator(world).getPeripheralByName(name);
   assert.ok(found, `Unknown simulated peripheral "${name}"`);
   return found;
@@ -53,7 +53,7 @@ function currentTrainer(world: RidrsWorld): SimulatedPeripheral {
   return world.trainer;
 }
 
-async function useRealPlugins(world: RidrsWorld, ids: string[]): Promise<void> {
+export async function useRealPlugins(world: RidrsWorld, ids: string[]): Promise<void> {
   world.realPluginIds = [...ids];
   await world.writeProbePluginFolder({
     folder: 'test-observer',
@@ -115,7 +115,7 @@ function lastMeasurement(
   return eventsOf<MeasurementPayload>(world, event, from).at(-1);
 }
 
-function latestMetric(world: RidrsWorld, capabilityId: string): MetricReading {
+export function latestMetric(world: RidrsWorld, capabilityId: string): MetricReading {
   const ctx = world.ensureHost().getPluginContext('test-reader');
   assert.ok(ctx, 'Expected the test reader plugin to be running');
   const capability: MetricCapability =

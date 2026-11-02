@@ -10,6 +10,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
+    "@ridrs/ble-bridge": "workspace:*",
+    "@ridrs/ble-simulator": "workspace:*",
     "@ridrs/contracts": "workspace:*",
     "@tauri-apps/api": "2.12.4"
   }

@@ -7,12 +7,15 @@ Open-source, modular, headless-first indoor cycling platform.
 ## Repository Structure
 
 - `apps/native/`: Native app (Tauri 2) for macOS, Android, iOS and Windows: core, plugins and GUI in one WebView process (`@ridrs/native`).
+- `apps/companion/`: Companion app (Tauri 2, Android/iOS) that forwards a phone's Bluetooth to ridrs over the local network (`@ridrs/companion`).
 - `apps/headless/`: Headless CLI composition root (`@ridrs/headless`).
 - `packages/contracts/`: Public plugin, manifest, event, and capability contracts (`@ridrs/contracts`, `Apache-2.0`).
 - `packages/core/`: Runtime-neutral application core: discovery ports, capability resolution, lifecycle, diagnostics, UI registry and typed event bus (`@ridrs/core`, `AGPL-3.0-or-later`; Node-only adapters in `@ridrs/core/node`).
 - `packages/ui-sdk/`: Client contract for UI plugins (`@ridrs/ui-sdk`, `Apache-2.0`); `packages/ui-shell/`: the shell that composes screens and slots; `packages/ui-bridge/`: in-process bridge between shell and host.
 - `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, power/cadence metrics, console output, activity session, UI screens, HUD and widgets).
-- `packages/testing/`: In-process BLE simulator and simulated Tauri bridge for tests (`@ridrs/testing`).
+- `packages/ble-bridge/`: The companion bridge protocol: pairing, GATT forwarding, heartbeat; companion and ridrs side (`@ridrs/ble-bridge`). `packages/ble-tauri/`: `BleCentral` on the native BLE commands (`@ridrs/ble-tauri`). `packages/ble-simulator/`: in-process BLE simulator and dummy devices (`@ridrs/ble-simulator`).
+- `crates/`: Rust crates hosted by both Tauri apps: `ridrs-ble` (native BLE commands) and `ridrs-bridge` (mDNS and WebSocket of the companion bridge).
+- `packages/testing/`: Test harness: simulated Tauri bridge, simulated companion network (`@ridrs/testing`).
 - `tests/`: Executable Gherkin specifications (`tests/features/`), step definitions, test harness, and fixture plugins.
 - `docs/`: Architecture documentation (`docs/architecture/`) and Architecture Decision Records (`docs/decisions/`).
 - `web/`: Cloudflare Worker application serving the project web page ([ridrs.app](https://ridrs.app)).
@@ -68,10 +71,32 @@ Manual check with a real FTMS trainer: press **Start ride**, pedal: power and ca
 
 Without hardware the same composition runs in the tests with the simulated trainer (`tests/features/apps/ride-in-native-app.feature`). The frontend alone also runs in a browser (`pnpm --filter @ridrs/native build`, then `pnpm --filter @ridrs/native exec vite preview`): without Tauri there is no BLE, so the widgets show dashes.
 
+## The companion bridge: a phone holds the Bluetooth link
+
+When the device running ridrs cannot reach the trainer (a Mac or TV far from the bike, flaky Bluetooth), a phone next to the bike runs the **ridrs companion** (`apps/companion`). It connects to the trainer and forwards raw Bluetooth traffic to ridrs over the local network. Device plugins in ridrs decode the bytes as usual. See `docs/architecture/ble-bridge.md`.
+
+```bash
+pnpm --filter @ridrs/companion tauri android dev          # companion on a phone or emulator
+pnpm --filter @ridrs/companion tauri android build --apk --debug --target aarch64
+```
+
+In ridrs, press **Use a companion phone** on the main screen; the app restarts with the bridge transport and shows a QR code. On the phone, press **Scan ridrs QR code** in the companion and point it at that code: ridrs finds the phone in the same Wi-Fi and pairs by itself. Alternatively, enter the 6-digit code shown on the phone next to the companion that ridrs lists, and press **Pair**. The pairing is kept; later starts connect without either. **Use this device's Bluetooth** switches back.
+
+On Android the companion keeps the screen on and must stay open: with the screen off, Android cuts the app off the network. It asks for "Nearby devices" (Bluetooth) and for local network access.
+
+**Developer companion with dummy devices**: the developer build adds simulated FTMS trainers next to real Bluetooth, for manual tests of ridrs without hardware. Profiles: `steady` (220 W, 92 rpm), `ramp` (100 W, +10 W every 3 s), `dropout` (link lost after 20 s for 5 s), `malformed` (every 10th packet truncated). Release builds contain none of this code.
+
+```bash
+pnpm --filter @ridrs/companion tauri android build --apk --debug --target aarch64 \
+  --config '{"build":{"beforeBuildCommand":"pnpm build:dummy"}}'
+```
+
+On the Android emulator, mDNS does not cross the emulator's NAT to a ridrs on the host. Run ridrs in the same emulator instead, or check a companion from the host with the probe through a forwarded port (`adb forward tcp:47000 tcp:42229`): `pnpm --filter @ridrs/companion probe <host:port> <code>` pairs like ridrs does and prints the trainer's notifications.
+
 ## Tests
 
 - `pnpm test` runs Vitest and Cucumber. Cucumber runs twice: Node-only scenarios, then the `@ui` scenarios (profile `ui`), which render the real shell and UI plugins into a headless DOM (happy-dom). No browser and no Rust toolchain are needed.
-- `cargo test` in `apps/native/src-tauri` runs the Rust unit tests of the native BLE layer.
+- `cargo test` in `crates/ridrs-ble` and `crates/ridrs-bridge` runs the Rust unit tests of the native BLE layer and the bridge network.
 
 ## Web Application
 

@@ -13,6 +13,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@ridrs/ble-bridge': workspace('packages/ble-bridge/src/index.ts'),
+      '@ridrs/ble-tauri': workspace('packages/ble-tauri/src/index.ts'),
       '@ridrs/contracts': workspace('packages/contracts/src/index.ts'),
       '@ridrs/core': workspace('packages/core/src/index.ts'),
       '@ridrs/ui-bridge': workspace('packages/ui-bridge/src/index.ts'),

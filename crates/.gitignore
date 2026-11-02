@@ -1,0 +1,3 @@
+target/
+# Library crates: the apps that host them (apps/*/src-tauri) lock the versions.
+Cargo.lock

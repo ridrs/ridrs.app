@@ -6,6 +6,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
+      '@ridrs/ble-bridge': resolve(import.meta.dirname, 'packages/ble-bridge/src/index.ts'),
+      '@ridrs/ble-simulator': resolve(import.meta.dirname, 'packages/ble-simulator/src/index.ts'),
+      '@ridrs/ble-tauri': resolve(import.meta.dirname, 'packages/ble-tauri/src/index.ts'),
       '@ridrs/contracts': resolve(import.meta.dirname, 'packages/contracts/src/index.ts'),
       '@ridrs/core/node': resolve(import.meta.dirname, 'packages/core/src/node/index.ts'),
       '@ridrs/core': resolve(import.meta.dirname, 'packages/core/src/index.ts'),
@@ -14,7 +17,13 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/**/*.test.ts', 'plugins/**/*.test.ts', 'tests/**/*.test.ts'],
+    include: [
+      'apps/**/*.test.ts',
+      'packages/**/*.test.ts',
+      'plugins/**/*.test.ts',
+      'tests/**/*.test.ts',
+    ],
+    exclude: ['**/node_modules/**', '**/src-tauri/**'],
     environment: 'node',
   },
 });
