@@ -1,0 +1,9 @@
+{
+  "id": "physics-engine",
+  "name": "Physics Engine",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": [],
+  "requires": ["physics.motion"],
+  "entry": "index.ts"
+}

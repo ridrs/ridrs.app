@@ -1,0 +1,9 @@
+{
+  "id": "physics-bicycle",
+  "name": "Bicycle",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": ["physics.bicycle"],
+  "requires": [],
+  "entry": "index.ts"
+}

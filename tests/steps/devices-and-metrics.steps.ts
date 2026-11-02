@@ -418,7 +418,7 @@ Then(
 
 // ---- Test device and metrics -------------------------------------------------------------
 
-function publishMeasurement(
+export function publishMeasurement(
   world: RidrsWorld,
   pluginId: string,
   kind: string,
@@ -605,7 +605,7 @@ interface Delivery {
  * rate at equal times, ending with the clock at the last delivery. A "more" delivery continues
  * one interval after each series' previous delivery, so nothing is delivered twice.
  */
-async function deliver(
+export async function deliver(
   world: RidrsWorld,
   plugin: string,
   deliveries: readonly Delivery[],
@@ -663,6 +663,27 @@ for (const verb of ['delivers', 'delivered']) {
       },
     );
   }
+}
+
+for (const verb of ['delivers', 'delivered']) {
+  When(
+    `{string} ${verb} only power {float} W every {float} s for {float} second(s)`,
+    async function (
+      this: RidrsWorld,
+      plugin: string,
+      power: number,
+      every: number,
+      seconds: number,
+    ) {
+      await deliver(
+        this,
+        plugin,
+        [{ kind: 'power', device: 'trainer-1', value: power, everyMs: every * 1000 }],
+        seconds,
+        false,
+      );
+    },
+  );
 }
 
 When(

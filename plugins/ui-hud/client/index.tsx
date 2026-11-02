@@ -29,6 +29,9 @@ function HudView({ ctx }: { readonly ctx: UiContext }) {
           right: 16,
           bottom: 16,
           display: 'flex',
+          // Widgets that do not fit wrap upwards, keeping the first ones in the bottom row.
+          flexWrap: 'wrap-reverse',
+          gap: 8,
           justifyContent: 'space-between',
           alignItems: 'flex-end',
           pointerEvents: 'none',

@@ -1,0 +1,9 @@
+{
+  "id": "physics-rider",
+  "name": "Rider",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": ["physics.rider"],
+  "requires": [],
+  "entry": "index.ts"
+}

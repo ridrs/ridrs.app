@@ -1,0 +1,29 @@
+{
+  "id": "ui-widget-virtual-distance",
+  "name": "Virtual Distance Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui",
+    "physics-widget"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "virtual-distance",
+        "extensionPoint": "hud/widget",
+        "export": "VirtualDistanceWidget",
+        "order": 5
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "physics.state"
+      ],
+      "publish": []
+    }
+  }
+}

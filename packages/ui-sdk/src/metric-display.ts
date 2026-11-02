@@ -27,9 +27,14 @@ const PRECISION: Record<MetricUnit, number> = {
   'W/bpm': 2,
 };
 
-/** Rounds half up in decimal (exponent notation avoids binary artifacts such as 1.005 -> 1.00). */
-function formatHalfUp(value: number, decimals: number): string {
-  const rounded = Math.round(Number(`${value}e${decimals}`));
+/**
+ * Formats a number with `decimals` decimals, rounded half up in decimal: shifting by exponent
+ * notation avoids binary artifacts such as 1.005 -> 1.00. The one rounding rule for every widget.
+ */
+export function formatDecimal(value: number, decimals: number): string {
+  // Values such as 1.5e-7 already print in exponent notation: shift their exponent instead.
+  const [mantissa, exponent = '0'] = String(value).split('e');
+  const rounded = Math.round(Number(`${mantissa}e${Number(exponent) + decimals}`));
   // `+ 0` turns -0 into 0.
   return (Number(`${rounded}e-${decimals}`) + 0).toFixed(decimals);
 }
@@ -43,5 +48,5 @@ export function describeMetricReading(reading: MetricReading | undefined): Metri
     return { status: 'unavailable', text: EN_DASH, reason: REASON_LABELS[reading.reason] };
   }
   // Math.round rounds half up for the non-negative values metrics carry.
-  return { status: 'available', text: formatHalfUp(reading.value, PRECISION[reading.unit]) };
+  return { status: 'available', text: formatDecimal(reading.value, PRECISION[reading.unit]) };
 }
