@@ -36,3 +36,18 @@ Discovery goes through the `PluginSource` port, so the core stays runtime-neutra
 - Every published event is validated synchronously against its Zod schema (`invalid-event-payload` on failure) and wrapped in an immutable `EventEnvelope` (`id`, `type`, `payload`, `source`, `timestamp` from the injected `Clock`).
 - Delivery uses RxJS `Subject` and `queueScheduler` to guarantee synchronous run-to-completion FIFO semantics: an event is delivered to all subscribers before any event published *during* a subscriber handler is dispatched.
 - Subscriber exceptions are isolated and reported as `event-handler-failure` diagnostics without affecting the publisher or other subscribers.
+
+## Host Observation and Description (Phase 9)
+
+- **Permissions.** A manifest may declare `permissions`; the only value is `observe-host` (anything else: `invalid-manifest`). It grants `ctx.host`; without it every call throws `RidrsError('permission-denied')` ([ADR 0030](../decisions/0030-host-observation-permission.md)).
+- **`ctx.host.observe({ onEvent, onDiagnostic })`.** `onEvent` gets every envelope synchronously at publish time, after validation and before queued delivery: the one global publish order, nested publishes included. Observers are read-only (publishing from one throws), a throwing observer becomes one `event-handler-failure`, observations end when the plugin stops. Composition roots use the same tap as `PluginHost.observe(owner, observer)`.
+- **`ctx.host.describe()`.** The platform (from `PluginHostOptions.platform`), the plugin set (`id`, `version`, `types`, `provides`, `requires`, `state`), the disabled plugins, the capability resolution and `TEMPORAL_DEFAULTS`. `PluginHost.getProviders(contract)` lists the providers of a `multiple` capability for composition roots (the replay's configuration snapshot).
+- The core still knows no concrete event, plugin or file: recording lives in `recording-session` ([recording-and-replay.md](recording-and-replay.md)).
+
+## Logical Time, Turns and the Input Queue
+
+- **Clock.** `ctx.clock` is the host's logical clock: `now()`, `scheduleAt`, `scheduleEvery`, `cancel`. `LiveClock` runs on a monotonic time source (`PluginHostOptions.timeSource`, `timers`), `ReplayClock` on the replay (`PluginHostOptions.replay`). A plugin's tasks are cancelled when it stops.
+- **Turns.** Every task and every external input is one synchronous turn with one logical time; items run in `(logical time, tasks before inputs, sequence number)` order.
+- **Inputs.** `ctx.inputs.accept` and `PluginHost.publishEvent` queue external inputs (`input: true`, `receivedAt`); `PluginHost.input(run)` runs a composition root's action as an input turn; `injectInput` and `advanceTo` drive a replay host. Publishing or writing a series outside a turn throws `outside-turn`, except publications of input-side plugins, which are accepted as inputs.
+- **Envelopes** carry a global `seq`; ids and `ctx.ids` derive from the host's `runId` (in `describe()`).
+- Details and the ordering rules: [time-and-scheduling.md](time-and-scheduling.md).

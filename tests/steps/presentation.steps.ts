@@ -82,6 +82,7 @@ function fedPresentation(world: RidrsWorld) {
             type: def.id,
             source: 'physics-engine',
             timestamp: batch.samples.at(-1)?.at ?? 0,
+            seq: 0,
             payload: def.schema.parse(batch),
           });
         return () => {

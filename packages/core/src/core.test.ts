@@ -4,11 +4,17 @@ import { defineCapability, defineEvent, RidrsError } from '@ridrs/contracts';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { CapabilityRegistry, createSystemClock, DiagnosticCollector, EventBus } from './index.ts';
+import {
+  CapabilityRegistry,
+  createSystemTimeSource,
+  DiagnosticCollector,
+  EventBus,
+  ReplayClock,
+} from './index.ts';
 
-describe('createSystemClock', () => {
+describe('createSystemTimeSource', () => {
   it('returns an integer epoch timestamp in milliseconds', () => {
-    const clock = createSystemClock();
+    const clock = createSystemTimeSource();
     const now = clock.now();
     expect(Number.isInteger(now)).toBe(true);
     expect(now).toBeGreaterThan(1_700_000_000_000);
@@ -55,7 +61,7 @@ describe('EventBus', () => {
   it('delivers system events and tracks subscription counts accurately', () => {
     const diagnostics = new DiagnosticCollector(pino({ level: 'silent' }));
     const bus = new EventBus({
-      clock: { now: () => 42 },
+      clock: new ReplayClock(42),
       diagnostics,
       canPluginPublish: () => true,
     });

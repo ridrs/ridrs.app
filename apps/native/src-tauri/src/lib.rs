@@ -13,6 +13,8 @@ pub fn run() {
         // Registers the platform backends (incl. the Android Kotlin module) and initializes the
         // shared BLE handler that `ble.rs` drives. blec's own JS commands are not used.
         .plugin(tauri_plugin_blec::init())
+        // Scoped to $APPDATA/recordings/** by capabilities/default.json.
+        .plugin(tauri_plugin_fs::init())
         .manage(keep_awake::KeepAwakeState::default())
         .manage(bridge::ClientState::default())
         .invoke_handler(tauri::generate_handler![

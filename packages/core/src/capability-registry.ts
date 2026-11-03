@@ -95,6 +95,25 @@ export class CapabilityRegistry {
     };
   }
 
+  /** The providers of a capability with their plugin ids, sorted by plugin id. */
+  providersOf(
+    capabilityId: string,
+  ): readonly { readonly pluginId: string; readonly implementation: unknown }[] {
+    return (this.providers.get(capabilityId) ?? []).map((entry) => ({
+      pluginId: entry.providerPluginId,
+      implementation: entry.implementation,
+    }));
+  }
+
+  /** Capability id -> provider plugin ids, both sorted. */
+  resolution(): Record<string, string[]> {
+    const result: Record<string, string[]> = {};
+    for (const capabilityId of [...this.providers.keys()].sort()) {
+      result[capabilityId] = this.providersOf(capabilityId).map((entry) => entry.pluginId);
+    }
+    return result;
+  }
+
   hasProvided(pluginId: string, capabilityId: string): boolean {
     const entries = this.providers.get(capabilityId) ?? [];
     return entries.some((entry) => entry.providerPluginId === pluginId);

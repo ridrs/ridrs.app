@@ -6,7 +6,7 @@ import {
   type BridgeMessage,
   type BridgeSocket,
   bridgeMessageSchema,
-  type Clock,
+  type TimeSource,
 } from '@ridrs/contracts';
 
 export function sendMessage(socket: BridgeSocket, message: BridgeMessage): void {
@@ -35,7 +35,7 @@ export class Liveness {
   private readonly timer: ReturnType<typeof setInterval>;
 
   constructor(
-    private readonly clock: Clock,
+    private readonly clock: TimeSource,
     onTick: () => void,
     onDead: () => void,
   ) {

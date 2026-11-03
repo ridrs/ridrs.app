@@ -4,6 +4,7 @@
     "includes": [
       "apps/**",
       "packages/**",
+      "plugins/**",
       "tests/**",
       "*.ts",
       "*.mjs",
@@ -31,5 +32,78 @@
       "quoteStyle": "single",
       "semicolons": "always"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["plugins/**"],
+      "formatter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
+      },
+      "linter": {
+        "rules": {
+          "recommended": false,
+          "style": {
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "Date": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "performance": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "setTimeout": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "setInterval": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "setImmediate": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "queueMicrotask": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "requestAnimationFrame": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md)."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "plugins/transport-*/**",
+        "plugins/bridge-connector-*/**",
+        "plugins/storage-*/**",
+        "plugins/recording-*/**",
+        "plugins/export-*/**",
+        "plugins/ui-*/**",
+        "plugins/**/*.test.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/metric-source/src/**", "packages/temporal/src/**", "!**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "Date": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "performance": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "setTimeout": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "setInterval": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "setImmediate": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "queueMicrotask": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md).",
+                  "requestAnimationFrame": "Simulation code reads time and schedules work only through ctx.clock; external results enter through ctx.inputs (docs/architecture/time-and-scheduling.md)."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

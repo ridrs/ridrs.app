@@ -14,6 +14,14 @@ import { uiManifestSectionSchema } from './ui.ts';
 
 export { capabilityIdSchema, dottedIdPattern, eventIdSchema, pluginIdPattern, pluginIdSchema };
 
+/**
+ * What a plugin may do beyond its own events and capabilities. `observe-host` grants
+ * `ctx.host`: every event and diagnostic of the host, and a description of the host.
+ */
+export const hostPermissionSchema = z.enum(['observe-host']);
+
+export type HostPermission = z.infer<typeof hostPermissionSchema>;
+
 export const manifestSchema = z
   .object({
     id: pluginIdSchema,
@@ -26,6 +34,7 @@ export const manifestSchema = z
     requires: z.array(capabilityIdSchema),
     entry: z.string().min(1, 'Must be a non-empty relative path'),
     ui: uiManifestSectionSchema.optional(),
+    permissions: z.array(hostPermissionSchema).optional(),
   })
   .strict();
 

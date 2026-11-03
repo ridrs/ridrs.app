@@ -6,9 +6,9 @@ import {
   type BleConnection,
   type BridgeMessage,
   type BridgeSocket,
-  type Clock,
   encodeBridgeFrame,
   normalizeBleUuid,
+  type TimeSource,
 } from '@ridrs/contracts';
 import semver from 'semver';
 import { Liveness, parseMessage, sendMessage } from './link.ts';
@@ -18,7 +18,7 @@ export interface BridgeServerOptions {
   /** The BLE central the companion forwards: native Bluetooth, dummy devices, or both. */
   readonly central: BleCentral;
   readonly authority: PairingAuthority;
-  readonly clock: Clock;
+  readonly clock: TimeSource;
   readonly companionName: string;
 }
 

@@ -38,7 +38,7 @@ export default definePlugin({
       }
       transition(ctx, {
         state: 'running',
-        sessionId: globalThis.crypto.randomUUID(),
+        sessionId: ctx.ids.next(),
         startedAt: ctx.clock.now(),
       });
     });

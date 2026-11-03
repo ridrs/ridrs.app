@@ -4,6 +4,7 @@ import { activityStartRequestedEvent, activityStateChangedEvent } from '@ridrs/c
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { RideSaved } from './ride-saved.tsx';
 
 function MainScreenView({ ctx }: { readonly ctx: UiContext }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -43,6 +44,7 @@ function MainScreenView({ ctx }: { readonly ctx: UiContext }) {
       >
         Start ride
       </button>
+      <RideSaved ctx={ctx} />
       <div data-testid="slot-main-panel" ref={panel} />
     </main>
   );

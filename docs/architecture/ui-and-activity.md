@@ -30,7 +30,7 @@ activity-session  (headless)   activity.start-requested / finish-requested → a
 |---|---|---|
 | `PluginSource` (discovery + module loading) | `createFileSystemPluginSource(dir)` | `createBundledPluginSource({ manifests, modules })` fed by `import.meta.glob` |
 | `PluginLogger` (structural, in contracts) | pino | `createConsoleLogger()` |
-| ids | `globalThis.crypto.randomUUID()` | same |
+| ids | `ctx.ids` from the host's `runId` ([time-and-scheduling.md](time-and-scheduling.md)) | same |
 
 Each host leaves out plugins its runtime cannot run: the app bundle excludes `transport-ble-noble` at build time, the headless app disables `transport-ble-tauri` at runtime.
 
@@ -68,7 +68,7 @@ A remote bridge (the deferred `ui-gateway-web`, WebSocket) would implement the s
 
 ## Activity session
 
-`activity-session` publishes `{ state: 'idle' }` on start, moves to `running` (new `sessionId` from `globalThis.crypto.randomUUID()`, `startedAt` from the injected clock) on `activity.start-requested` and to `finished` on `activity.finish-requested`. Any other transition is an `invalid-transition` diagnostic with no event. A ride never needs a trainer.
+`activity-session` publishes `{ state: 'idle' }` on start, moves to `running` (new `sessionId` from `ctx.ids.next()`, `startedAt` from the injected clock) on `activity.start-requested` and to `finished` on `activity.finish-requested`. Any other transition is an `invalid-transition` diagnostic with no event. A ride never needs a trainer.
 
 ## Tests
 

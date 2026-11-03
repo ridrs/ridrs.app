@@ -21,6 +21,9 @@ importers:
       '@cucumber/cucumber':
         specifier: 13.3.0
         version: 13.3.0
+      '@garmin/fitsdk':
+        specifier: 21.218.0
+        version: 21.218.0
       '@happy-dom/global-registrator':
         specifier: 21.0.4
         version: 21.0.4
@@ -30,6 +33,15 @@ importers:
       '@ridrs/ble-simulator':
         specifier: workspace:*
         version: link:packages/ble-simulator
+      '@ridrs/fit':
+        specifier: workspace:*
+        version: link:packages/fit
+      '@ridrs/recording':
+        specifier: workspace:*
+        version: link:packages/recording
+      '@ridrs/replay':
+        specifier: workspace:*
+        version: link:packages/replay
       '@ridrs/testing':
         specifier: workspace:*
         version: link:packages/testing
@@ -133,6 +145,15 @@ importers:
       '@ridrs/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@ridrs/fit':
+        specifier: workspace:*
+        version: link:../../packages/fit
+      '@ridrs/recording':
+        specifier: workspace:*
+        version: link:../../packages/recording
+      '@ridrs/replay':
+        specifier: workspace:*
+        version: link:../../packages/replay
       pino:
         specifier: 10.4.0
         version: 10.4.0
@@ -255,6 +276,12 @@ importers:
         specifier: 7.8.0
         version: 7.8.0
 
+  packages/fit:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   packages/metric-source:
     dependencies:
       '@ridrs/contracts':
@@ -269,6 +296,30 @@ importers:
       '@ridrs/ui-sdk':
         specifier: workspace:*
         version: link:../ui-sdk
+
+  packages/recording:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
+  packages/replay:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ridrs/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ridrs/recording':
+        specifier: workspace:*
+        version: link:../recording
+      microdiff:
+        specifier: 1.6.0
+        version: 1.6.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/temporal:
     dependencies:
@@ -357,6 +408,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contracts
 
+  plugins/export-fit:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/fit':
+        specifier: workspace:*
+        version: link:../../packages/fit
+      '@ridrs/recording':
+        specifier: workspace:*
+        version: link:../../packages/recording
+
   plugins/metric-cadence:
     dependencies:
       '@ridrs/contracts':
@@ -416,9 +479,6 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
 
   plugins/physics-environment:
     dependencies:
@@ -467,6 +527,33 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+
+  plugins/recording-session:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/recording':
+        specifier: workspace:*
+        version: link:../../packages/recording
+
+  plugins/storage-files-node:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      env-paths:
+        specifier: 4.0.0
+        version: 4.0.0
+
+  plugins/storage-files-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/plugin-fs':
+        specifier: 2.7.1
+        version: 2.7.1
 
   plugins/transport-ble-bridge:
     dependencies:
@@ -995,6 +1082,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@garmin/fitsdk@21.218.0':
+    resolution: {integrity: sha512-Jbhedp3AJ/xJBSuiPBlPpwH5QISXd+GYtfnAUZ3u68hUqkzHiRWUhla8xj4tW/05w6gKsErEt+7GQCFap+a2kQ==}
+
   '@happy-dom/global-registrator@21.0.4':
     resolution: {integrity: sha512-Bbr0hW9hhDhBf3Jp0EyDlkCbFgbr0z2jd3BMKYOYW+fOkPM4Nx195GMXyCtRCGEgoNn6i09FabXrSkNFm2ONzg==}
     engines: {node: '>=20.0.0'}
@@ -1228,6 +1318,9 @@ packages:
 
   '@tauri-apps/plugin-barcode-scanner@2.5.3':
     resolution: {integrity: sha512-Ienqx/XkIcxkf6oM7CCy5FnWNUtiuWC5mkLtM7GughgrYvd5EIGPGxuISboFhvtgiNSJZF8hSan8+dSznlsdBQ==}
+
+  '@tauri-apps/plugin-fs@2.7.1':
+    resolution: {integrity: sha512-4TBVjpi/q8PuNzjpkAc2iBGXMTLjOrAyfTiiOL8ORaJCZJRG3tjzmQ4sqs2CMG75FvLyRkOkERfP7AyY4iBNwQ==}
 
   '@teppeis/multimaps@3.0.0':
     resolution: {integrity: sha512-ID7fosbc50TbT0MK0EG12O+gAP3W3Aa/Pz4DaTtQtEvlc9Odaqi0de+xuZ7Li2GtK4HzEX7IuRWS/JmZLksR3Q==}
@@ -1525,6 +1618,10 @@ packages:
     resolution: {integrity: sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==}
     engines: {node: '>=6'}
 
+  env-paths@4.0.0:
+    resolution: {integrity: sha512-pxP8eL2SwwaTRi/KHYwLYXinDs7gL3jxFcBYmEdYfZmZXbaVDvdppd0XBU8qVz03rDfKZMXg1omHCbsJjZrMsw==}
+    engines: {node: '>=20'}
+
   err-code@2.0.3:
     resolution: {integrity: sha512-2bmlRpNKBxT/CRmPOlyISQpNj+qSeYvcym/uT0Jx2bMOlKLtSy1ZmLuVxSEKKyor/N5yhvp/ZiG1oE3DEYMSFA==}
 
@@ -1743,6 +1840,10 @@ packages:
     resolution: {integrity: sha512-+Pgi+vMuUNkJyExiMBt5IlFoMyKnr5zhJ4Uspz58WOhBF5QoIZkFyNHIbBAtHwzVAgk5RtndVNsDRN61/mmDqg==}
     engines: {node: '>=12'}
 
+  is-safe-filename@0.1.1:
+    resolution: {integrity: sha512-4SrR7AdnY11LHfDKTZY1u6Ga3RuxZdl3YKWWShO5iyuG5h8QS4GD2tOb04peBJ5I7pXbR+CGBNEhTcwK+FzN3g==}
+    engines: {node: '>=20'}
+
   is-stream@4.0.1:
     resolution: {integrity: sha512-Dnz92NInDqYckGEUJv689RbRiTSEHCQ7wOVeALbkOz999YpqT46yMRIGtSNl2iCL1waAZSx40+h59NV/EwzV/A==}
     engines: {node: '>=18'}
@@ -1888,6 +1989,9 @@ packages:
   make-fetch-happen@13.0.1:
     resolution: {integrity: sha512-cKTUFc/rbKUd/9meOvgrpJ2WrNzymt6jfRDdwg5UCnVzv9dTpEj9JS5m3wtziXVCjluIXyL8pcaukYqezIzZQA==}
     engines: {node: ^16.14.0 || >=18.0.0}
+
+  microdiff@1.6.0:
+    resolution: {integrity: sha512-w7JWt8Bno6I8h0rEqlxr4lNG4UbT1FVtWo42wWosIiaJ+rP3pXh7shCYDnyqBrYx36LJ1CZ64p8A62aVp0sJpQ==}
 
   mime@4.1.2:
     resolution: {integrity: sha512-ikRzZ2RwbUVDyL9SsU0f2Phcmav4yq5r8faH5ZZKHtOZrMBLnrQOrj0uvqZ5R1uQnj+RO7Wcklw/lAf81mP9LQ==}
@@ -2875,6 +2979,8 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
+  '@garmin/fitsdk@21.218.0': {}
+
   '@happy-dom/global-registrator@21.0.4':
     dependencies:
       '@types/node': 26.6.6
@@ -3050,6 +3156,10 @@ snapshots:
       '@tauri-apps/cli-win32-x64-msvc': 2.12.4
 
   '@tauri-apps/plugin-barcode-scanner@2.5.3':
+    dependencies:
+      '@tauri-apps/api': 2.12.4
+
+  '@tauri-apps/plugin-fs@2.7.1':
     dependencies:
       '@tauri-apps/api': 2.12.4
 
@@ -3344,6 +3454,10 @@ snapshots:
   env-paths@2.2.1:
     optional: true
 
+  env-paths@4.0.0:
+    dependencies:
+      is-safe-filename: 0.1.1
+
   err-code@2.0.3:
     optional: true
 
@@ -3604,6 +3718,8 @@ snapshots:
 
   is-plain-obj@4.1.0: {}
 
+  is-safe-filename@0.1.1: {}
+
   is-stream@4.0.1: {}
 
   is-unicode-supported@2.1.0: {}
@@ -3723,6 +3839,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
     optional: true
+
+  microdiff@1.6.0: {}
 
   mime@4.1.2: {}
 

@@ -1,14 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  activityFinishRequestedEvent,
+  activityStartRequestedEvent,
+  activityStateChangedEvent,
   bleCentralCapability,
+  type CapabilityContract,
+  configSnapshotCapability,
+  deviceConnectionChangedEvent,
+  deviceRawNotificationEvent,
+  type EventDefinition,
+  exportFitWrittenEvent,
+  measurementCadenceEvent,
+  measurementHeartRateEvent,
+  measurementPowerEvent,
   metricCadenceCapability,
+  metricCadenceEvent,
   metricHeartRateCapability,
+  metricHeartRateEvent,
   metricPowerCapability,
+  metricPowerEvent,
   metricPowerHeartRateRatioCapability,
+  metricPowerHeartRateRatioEvent,
   physicsBicycleCapability,
   physicsEnvironmentCapability,
   physicsMotionCapability,
@@ -16,12 +32,18 @@ import {
   physicsResistanceCapability,
   physicsRiderCapability,
   physicsRoadCapability,
+  physicsStateBatchEvent,
+  physicsStateEvent,
   physicsTotalResistanceCapability,
+  recordingCompletedEvent,
+  recordingFailedEvent,
+  storageAppFilesCapability,
 } from '@ridrs/contracts';
-import { createSystemClock, PluginHost } from '@ridrs/core';
+import { PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
 import pino from 'pino';
 import pretty from 'pino-pretty';
+import { runRecordingCommand } from './recording-cli.ts';
 
 /**
  * Plugins that need a runtime this host does not have (the Tauri WebView). Excluded like `--disable`,
@@ -32,7 +54,51 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   'bridge-connector-tauri',
   // The bridge transport needs a connector; this host has none (the companion bridge is native-only).
   'transport-ble-bridge',
+  'storage-files-tauri',
 ];
+
+const CAPABILITIES: readonly CapabilityContract[] = [
+  bleCentralCapability,
+  metricPowerCapability,
+  metricCadenceCapability,
+  metricHeartRateCapability,
+  metricPowerHeartRateRatioCapability,
+  physicsBicycleCapability,
+  physicsRiderCapability,
+  physicsEnvironmentCapability,
+  physicsRoadCapability,
+  physicsResistanceCapability,
+  physicsTotalResistanceCapability,
+  physicsPowertrainCapability,
+  physicsMotionCapability,
+  configSnapshotCapability,
+  storageAppFilesCapability,
+];
+
+/** Events the host resolves by id: what a replay republishes and validates. */
+const EVENTS: readonly EventDefinition[] = [
+  activityStartRequestedEvent,
+  activityFinishRequestedEvent,
+  activityStateChangedEvent,
+  deviceConnectionChangedEvent,
+  deviceRawNotificationEvent,
+  measurementPowerEvent,
+  measurementCadenceEvent,
+  measurementHeartRateEvent,
+  metricPowerEvent,
+  metricCadenceEvent,
+  metricHeartRateEvent,
+  metricPowerHeartRateRatioEvent,
+  physicsStateEvent,
+  physicsStateBatchEvent,
+  recordingCompletedEvent,
+  recordingFailedEvent,
+  exportFitWrittenEvent,
+];
+
+function versionOf(packageJson: URL): string {
+  return (JSON.parse(readFileSync(packageJson, 'utf8')) as { version: string }).version;
+}
 
 function resolvePluginDir(requestedDir: string): string {
   const baseDir = process.env.INIT_CWD ?? process.cwd();
@@ -42,6 +108,16 @@ function resolvePluginDir(requestedDir: string): string {
 
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2).filter((arg) => arg !== '--');
+  if (rawArgs[0] === 'recording') {
+    const code = await runRecordingCommand(rawArgs.slice(1), {
+      capabilities: CAPABILITIES,
+      events: EVENTS,
+      resolvePluginDir,
+      resolveFile: (file) => resolve(process.env.INIT_CWD ?? process.cwd(), file),
+      out: (line) => process.stdout.write(`${line}\n`),
+    });
+    process.exit(code);
+  }
   const { values } = parseArgs({
     args: rawArgs,
     options: {
@@ -69,23 +145,15 @@ async function main(): Promise<void> {
   const host = new PluginHost({
     sources: pluginsDirs.map(createFileSystemPluginSource),
     disabledPlugins,
-    clock: createSystemClock(),
     logger,
-    capabilities: [
-      bleCentralCapability,
-      metricPowerCapability,
-      metricCadenceCapability,
-      metricHeartRateCapability,
-      metricPowerHeartRateRatioCapability,
-      physicsBicycleCapability,
-      physicsRiderCapability,
-      physicsEnvironmentCapability,
-      physicsRoadCapability,
-      physicsResistanceCapability,
-      physicsTotalResistanceCapability,
-      physicsPowertrainCapability,
-      physicsMotionCapability,
-    ],
+    capabilities: CAPABILITIES,
+    events: EVENTS,
+    platform: {
+      ridrsVersion: versionOf(new URL('../../../package.json', import.meta.url)),
+      runtime: 'node',
+      os: process.platform,
+      appVersion: versionOf(new URL('../package.json', import.meta.url)),
+    },
   });
 
   const keepAlive = setInterval(() => {}, 60_000);

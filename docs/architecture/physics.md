@@ -46,7 +46,7 @@ The boundary between event time and simulation time: the physics **asks** the te
 | `ui-widget-virtual-distance` | – | – | HUD widget `widget-virtual-distance`: `distance / 1000`, two decimals, km, order 5. |
 | `ui-widget-gradient` | – | – | HUD widget `widget-gradient`: `road.gradient · 100`, one decimal, %, order 6; downhill with an ASCII minus ("-5.0"). |
 
-All are `AGPL-3.0-or-later`; the physics plugins import only `@ridrs/contracts` (and rxjs in the engine), the widgets only contracts, `@ridrs/ui-sdk` and React. The widgets subscribe to `physics.state`, round with `formatDecimal` from `@ridrs/ui-sdk` and show an en dash before the first state.
+All are `AGPL-3.0-or-later`; the physics plugins import only `@ridrs/contracts` , the widgets only contracts, `@ridrs/ui-sdk` and React. The widgets subscribe to `physics.state`, round with `formatDecimal` from `@ridrs/ui-sdk` and show an en dash before the first state.
 
 ## Contracts (`packages/contracts/src/physics.ts`)
 
@@ -67,7 +67,7 @@ SI units everywhere. Resistance forces are signed along the direction of travel:
 |---|---|---|
 | Step | 10 ms (100 Hz), `dt = 0.01 s` | `physics-engine` (`ENGINE_DEFAULTS`) |
 | Publish `physics.state` | step 0, every 25 steps (250 ms), final state at finish | `physics-engine` |
-| Steps per wake | at most 1000 | `physics-engine` |
+| Catch-up chunk | 1000 turns, then yield | host clock ([time-and-scheduling.md](time-and-scheduling.md)) |
 | Gravity `g` | 9.81 m/s² | contracts |
 | Rider mass, CdA | 75 kg, 0.32 m² (hoods) | `physics-rider` (`RIDER_DEFAULTS`) |
 | Bicycle mass, Crr | 10 kg, 0.004 | `physics-bicycle` (`BICYCLE_DEFAULTS`) |
@@ -82,7 +82,7 @@ There is no configuration, persistence or settings UI.
 ## The step
 
 - **Lifecycle.** On `running`: `t₀ = startedAt`, step 0 = `initial(t₀)` (standstill), published at once, timer armed. On `finished` (same session): remaining due steps with `t ≤ endedAt`, the final state unless already published, timer released. Idle: no timer, no states. Plugin stop releases the timer.
-- **Clock.** Step `n` advances from `tₙ` to `tₙ₊₁ = t₀ + 10·(n+1)`, computed from the index, only when `now ≥ tₙ₊₁`. One rxjs `timer` is re-armed to the next due time; each wake computes every due step in order (at most 1000), then re-arms with delay 0. A late host computes the same steps later.
+- **Clock.** Step `n` advances from `tₙ` to `tₙ₊₁ = t₀ + 10·(n+1)`, computed from the index, only when `now ≥ tₙ₊₁`. Each step is a task on `ctx.clock` at its planned time `tₙ₊₁`; it observes that time however late it runs. A late host runs the overdue steps in order, in chunks ([time-and-scheduling.md](time-and-scheduling.md)).
 - **Integrator** (semi-implicit Euler, state `n` → `n+1` at `t = tₙ₊₁`):
 
   ```text

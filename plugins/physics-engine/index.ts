@@ -2,20 +2,21 @@
 
 import {
   activityStateChangedEvent,
+  configSnapshotCapability,
   definePlugin,
   type PluginContext,
   PhysicsStepError,
   physicsMotionCapability,
   physicsStateBatchEvent,
   physicsStateEvent,
+  type TaskId,
 } from '@ridrs/contracts';
-import { type Subscription, timer } from 'rxjs';
 import { ENGINE_DEFAULTS, RideSimulation } from './simulation.ts';
 
 interface Engine {
   ride?: RideSimulation;
-  /** The one step timer, armed only while a ride runs. */
-  wake?: Subscription;
+  /** The one scheduled step, only while a ride runs. */
+  wake?: TaskId;
 }
 
 const engines = new WeakMap<PluginContext, Engine>();
@@ -28,15 +29,17 @@ function engineOf(ctx: PluginContext): Engine {
   return engine;
 }
 
-function stopRide(engine: Engine): void {
-  engine.wake?.unsubscribe();
+function stopRide(ctx: PluginContext, engine: Engine): void {
+  if (engine.wake !== undefined) {
+    ctx.clock.cancel(engine.wake);
+  }
   engine.wake = undefined;
   engine.ride = undefined;
 }
 
 /** A failing contributor stops this ride's simulation - not the host, the metrics or the UI. */
 function fail(ctx: PluginContext, sessionId: string, step: number, error: unknown): void {
-  stopRide(engineOf(ctx));
+  stopRide(ctx, engineOf(ctx));
   const plugin = error instanceof PhysicsStepError ? error.pluginId : undefined;
   const reason = error instanceof Error ? error.message : String(error);
   ctx.reportDiagnostic(
@@ -57,18 +60,20 @@ function guarded(ctx: PluginContext, ride: RideSimulation, compute: () => void):
   }
 }
 
-/** Re-arms the one timer to the next due step; a late wake catches up in order, in chunks. */
-function arm(ctx: PluginContext, ride: RideSimulation, delay?: number): void {
+/**
+ * Schedules the next step at its planned time `startedAt + 10·n` on the host clock. The task
+ * observes that time however late it runs, so it computes exactly that step; a late host runs the
+ * overdue steps one by one, each at its own time (the clock catches up in order, in chunks).
+ */
+function arm(ctx: PluginContext, ride: RideSimulation): void {
   const engine = engineOf(ctx);
-  engine.wake?.unsubscribe();
-  engine.wake = timer(delay ?? Math.max(0, ride.nextDueAt() - ctx.clock.now())).subscribe(() => {
+  engine.wake = ctx.clock.scheduleAt(ride.nextDueAt(), () => {
     engine.wake = undefined;
-    let more = false;
     const ok = guarded(ctx, ride, () => {
-      more = ride.advanceUntil(ctx.clock.now(), ENGINE_DEFAULTS.maxStepsPerWake);
+      ride.advanceUntil(ctx.clock.now(), ENGINE_DEFAULTS.maxStepsPerWake);
     });
     if (ok && engine.ride === ride) {
-      arm(ctx, ride, more ? 0 : undefined);
+      arm(ctx, ride);
     }
   });
 }
@@ -79,6 +84,13 @@ function arm(ctx: PluginContext, ride: RideSimulation, delay?: number): void {
  * only physics plugin with a timer and with events; it knows nothing but `physics.motion`.
  */
 export default definePlugin({
+  initialize(ctx) {
+    ctx.capabilities.provide(configSnapshotCapability, {
+      section: ctx.manifest.id,
+      snapshot: () => ({ ...ENGINE_DEFAULTS }),
+    });
+  },
+
   start(ctx) {
     const engine: Engine = {};
     engines.set(ctx, engine);
@@ -86,7 +98,7 @@ export default definePlugin({
 
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
       if (payload.state === 'running') {
-        stopRide(engine);
+        stopRide(ctx, engine);
         try {
           engine.ride = new RideSimulation(payload.sessionId, payload.startedAt, motion, {
             state: (state) => ctx.events.publish(physicsStateEvent, state),
@@ -102,7 +114,7 @@ export default definePlugin({
       const ride = engine.ride;
       if (payload.state === 'finished' && ride?.sessionId === payload.sessionId) {
         guarded(ctx, ride, () => ride.finish(payload.endedAt));
-        stopRide(engine);
+        stopRide(ctx, engine);
       }
     });
   },
@@ -110,7 +122,7 @@ export default definePlugin({
   stop(ctx) {
     const engine = engines.get(ctx);
     if (engine) {
-      stopRide(engine);
+      stopRide(ctx, engine);
     }
     engines.delete(ctx);
   },

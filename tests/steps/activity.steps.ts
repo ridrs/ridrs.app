@@ -33,7 +33,8 @@ function withSession(state: ActivityState): Exclude<ActivityState, { state: 'idl
 async function publishFrom(world: RidrsWorld, pluginId: string, eventId: string): Promise<void> {
   const ctx = world.ensureHost().getPluginContext(pluginId);
   assert.ok(ctx, `Expected plugin "${pluginId}" to be running`);
-  ctx.events.publish(world.getEventDefinition(eventId), {});
+  // The probe acts from outside the host, like the UI: an external input.
+  ctx.inputs.accept(world.getEventDefinition(eventId), {});
   await world.settle();
 }
 

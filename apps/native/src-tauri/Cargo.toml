@@ -21,6 +21,9 @@ tauri-build = { version = "2.7.4", features = [] }
 tauri = { version = "2.12.5", features = [] }
 # Direct dependency on purpose: Tauri finds a plugin's Android part only via direct dependencies.
 tauri-plugin-blec = "0.18.0"
+# Recordings and FIT exports in the app container (plugins/storage-files-tauri); the JS side
+# is @tauri-apps/plugin-fs of the same version.
+tauri-plugin-fs = "2.7.1"
 ridrs-ble = { path = "../../../crates/ridrs-ble" }
 ridrs-bridge = { path = "../../../crates/ridrs-bridge" }
 serde = { version = "1", features = ["derive"] }

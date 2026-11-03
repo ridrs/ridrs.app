@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { createBundledPluginSource, createConsoleLogger } from '@ridrs/core';
+import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { bundledPlugins } from './bundled-plugins.ts';
 import { startRidrsApp } from './compose.ts';
@@ -35,11 +36,18 @@ async function main(): Promise<void> {
     logger.warn('Bluetooth permission not granted; no trainer can be found');
   }
 
+  const appVersion = await getVersion().catch(() => '0.0.0');
   const app = await startRidrsApp({
     sources: [createBundledPluginSource(bundledPlugins)],
     root,
     logger,
     disabledPlugins: DISABLED_IN_APP,
+    platform: {
+      ridrsVersion: __RIDRS_VERSION__,
+      runtime: 'tauri',
+      os: navigator.platform || navigator.userAgent,
+      appVersion,
+    },
     keepAwake: createKeepAwake(),
     bleTransport: await loadTransport(transportStore),
     // The transport decides which plugins run, so a switch restarts the app's WebView, but only

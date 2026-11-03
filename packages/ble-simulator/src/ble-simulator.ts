@@ -6,12 +6,12 @@ import {
   type BleConnection,
   type BleDiscoveredPeripheral,
   type BleScanOptions,
-  type Clock,
   FTMS_SERVICE_UUID,
   HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID,
   HEART_RATE_SERVICE_UUID,
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
   normalizeBleUuid,
+  type TimeSource,
 } from '@ridrs/contracts';
 
 export interface SimulatedPeripheralOptions {
@@ -55,12 +55,12 @@ export class SimulatedPeripheral {
   private readonly connectAttemptTimes: number[] = [];
   private lastDisconnectTime?: number;
   private readonly reconnectAttemptTimes: number[] = [];
-  private readonly clock: Clock;
+  private readonly clock: TimeSource;
   private readonly onBroadcastChanged: (peripheral: SimulatedPeripheral) => void;
 
   constructor(
     options: SimulatedPeripheralOptions,
-    clock: Clock,
+    clock: TimeSource,
     onBroadcastChanged: (peripheral: SimulatedPeripheral) => void,
   ) {
     this.name = options.name;
@@ -280,13 +280,13 @@ interface ActiveScanSession {
 }
 
 export class BleSimulator implements BleCentral {
-  private readonly clock: Clock;
+  private readonly clock: TimeSource;
   private readonly peripheralsById = new Map<string, SimulatedPeripheral>();
   private readonly peripheralsByName = new Map<string, SimulatedPeripheral>();
   private readonly activeScans = new Set<ActiveScanSession>();
   private readonly scanStartListeners = new Set<(signal?: AbortSignal) => void>();
 
-  constructor(options?: { readonly clock?: Clock }) {
+  constructor(options?: { readonly clock?: TimeSource }) {
     this.clock = options?.clock ?? { now: () => Date.now() };
   }
 

@@ -10,9 +10,9 @@ import {
   type BridgeMessage,
   type BridgeRejectReason,
   type BridgeSocket,
-  type Clock,
   decodeBridgeFrame,
   normalizeBleUuid,
+  type TimeSource,
 } from '@ridrs/contracts';
 import { Liveness, parseMessage, sendMessage } from './link.ts';
 
@@ -36,7 +36,7 @@ export class BridgeGoodbyeError extends Error {
 }
 
 export interface BridgeSessionOptions {
-  readonly clock: Clock;
+  readonly clock: TimeSource;
   readonly clientName: string;
   readonly pairingCode?: string;
   /** Secret of the pairing QR code ridrs shows. */
@@ -122,7 +122,7 @@ export class BridgeSession implements BleCentral {
 
   private constructor(
     private readonly socket: BridgeSocket,
-    private readonly clock: Clock,
+    private readonly clock: TimeSource,
     readonly welcome: Welcome,
   ) {}
 

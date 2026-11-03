@@ -94,7 +94,7 @@ export async function useRealPlugins(world: RidrsWorld, ids: string[]): Promise<
   }
 }
 
-async function useSimulatedCentral(world: RidrsWorld): Promise<void> {
+export async function useSimulatedCentral(world: RidrsWorld): Promise<void> {
   world.getBehavior('ble-simulator').providedImplementations.set('ble.central', simulator(world));
   await world.writeProbePluginFolder({
     folder: 'ble-simulator',
@@ -428,7 +428,8 @@ export function publishMeasurement(
   const ctx = world.ensureHost().getPluginContext(pluginId);
   assert.ok(ctx, `Expected context for plugin "${pluginId}"`);
   const now = world.clock.now();
-  ctx.events.publish(measurementEvent(kind), {
+  // A test device delivers from outside the host: an external input.
+  ctx.inputs.accept(measurementEvent(kind), {
     deviceId: device,
     value,
     measuredAt: now,
@@ -440,7 +441,7 @@ export function publishMeasurement(
 function reportConnection(world: RidrsWorld, pluginId: string, device: string, state: string) {
   const ctx = world.ensureHost().getPluginContext(pluginId);
   assert.ok(ctx, `Expected context for plugin "${pluginId}"`);
-  ctx.events.publish(deviceConnectionChangedEvent, {
+  ctx.inputs.accept(deviceConnectionChangedEvent, {
     deviceId: device,
     deviceName: device,
     state: state as DeviceConnectionChangedPayload['state'],

@@ -156,7 +156,7 @@ async function runOverNetwork(world: RidrsWorld, pluginsCsv: string): Promise<vo
 async function requestPairing(world: RidrsWorld, address: string, code: string): Promise<void> {
   const ctx = world.ensureHost().getPluginContext('test-bridge-ui');
   assert.ok(ctx, 'Expected the test UI plugin to be running');
-  ctx.events.publish(bridgePairRequestedEvent, { address, code });
+  ctx.inputs.accept(bridgePairRequestedEvent, { address, code });
   await world.settle();
 }
 
@@ -555,7 +555,7 @@ async function requestInRidrs<TId extends string>(
 ) {
   const ctx = world.ensureHost().getPluginContext('test-bridge-ui');
   assert.ok(ctx, 'Expected the test UI plugin to be running');
-  ctx.events.publish(event, {});
+  ctx.inputs.accept(event, {});
   await world.settle();
 }
 

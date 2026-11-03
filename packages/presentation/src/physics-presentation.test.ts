@@ -35,6 +35,7 @@ function presentation() {
       type: 'physics.state-batch',
       source: 'physics-engine',
       timestamp: 0,
+      seq: 1,
       payload: { sessionId, samples },
     });
   return { subject, receive, subscriptions: () => subscriptions };

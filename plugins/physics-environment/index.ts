@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  configSnapshotCapability,
   definePlugin,
   type EnvironmentParameters,
   physicsEnvironmentCapability,
@@ -16,6 +17,10 @@ export default definePlugin({
   initialize(ctx) {
     ctx.capabilities.provide(physicsEnvironmentCapability, {
       parameters: () => ENVIRONMENT_DEFAULTS,
+    });
+    ctx.capabilities.provide(configSnapshotCapability, {
+      section: ctx.manifest.id,
+      snapshot: () => ({ airDensity: { ...ENVIRONMENT_DEFAULTS.airDensity } }),
     });
   },
 });

@@ -22,14 +22,16 @@ import {
   bridgeStateChangedEvent,
   type CapabilityCardinality,
   type CapabilityContract,
-  type Clock,
+  configSnapshotCapability,
   defineCapability,
   defineEvent,
   deviceConnectionChangedEvent,
+  deviceRawNotificationEvent,
   type EstimationStrategy,
   type EventDefinition,
   type EventEnvelope,
   type EventSubscription,
+  exportFitWrittenEvent,
   type Freshness,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -53,21 +55,27 @@ import {
   physicsStateEvent,
   physicsTotalResistanceCapability,
   type ResistanceBreakdown,
+  recordingCompletedEvent,
+  recordingFailedEvent,
+  storageAppFilesCapability,
   type TemporalRecordResult,
   type TemporalSeriesWriter,
   type TemporalSnapshot,
+  type TimeSource,
   uiRegistryChangedEvent,
 } from '@ridrs/contracts';
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
 import type { FrameSource } from '@ridrs/presentation';
-import type {
-  BleSimulator,
-  SimulatedBridgeConnector,
-  SimulatedCompanion,
-  SimulatedNetwork,
-  SimulatedPeripheral,
-  SimulatedTauriBridge,
+import type { ReplayResult } from '@ridrs/replay';
+import {
+  type BleSimulator,
+  MemoryAppFiles,
+  type SimulatedBridgeConnector,
+  type SimulatedCompanion,
+  type SimulatedNetwork,
+  type SimulatedPeripheral,
+  type SimulatedTauriBridge,
 } from '@ridrs/testing';
 import { createInProcessUiBridge, type InProcessUiBridge } from '@ridrs/ui-bridge';
 import type FakeTimers from '@sinonjs/fake-timers';
@@ -127,6 +135,10 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   bridgePairingOfferEvent,
   bridgePairRequestedEvent,
   bridgeStateChangedEvent,
+  deviceRawNotificationEvent,
+  recordingCompletedEvent,
+  recordingFailedEvent,
+  exportFitWrittenEvent,
 ];
 
 /** Events the World records from the bus directly (host-level), independent of any plugin. */
@@ -141,6 +153,8 @@ const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
 ];
 
 const ACTIVE_WORLD_SYMBOL = Symbol.for('ridrs.test.activeWorld');
+const MEMORY_STORAGE_SYMBOL = Symbol.for('ridrs.fixture.memory-storage');
+const MEMORY_STORAGE_DIR = resolve(import.meta.dirname, '../fixtures/plugins/memory-storage');
 
 export function setActiveWorld(world: RidrsWorld | undefined): void {
   (globalThis as Record<symbol, unknown>)[ACTIVE_WORLD_SYMBOL] = world;
@@ -160,7 +174,7 @@ export class RidrsWorld extends World {
   tempPluginDir = '';
   fixedTime = 1_700_000_000_000;
   fakeClock?: ReturnType<typeof FakeTimers.install>;
-  readonly clock: Clock = {
+  readonly clock: TimeSource = {
     now: () => (this.fakeClock ? Date.now() : this.fixedTime),
   };
 
@@ -179,6 +193,26 @@ export class RidrsWorld extends World {
   readonly observed: EventEnvelope[] = [];
   /** Events recorded by the World's own host-level subscriptions (see HOST_OBSERVED_EVENTS). */
   readonly hostObserved: EventEnvelope[] = [];
+  /** Phase 9: every envelope of every host, in global publish order (the recorder's tap). */
+  readonly tapped: EventEnvelope[] = [];
+  /** Phase 9: the files of `fixture-storage-memory`; they survive host restarts. */
+  memoryFiles?: MemoryAppFiles;
+  /** Phase 9: the file a step named last ("that file"). */
+  lastRecordingFile?: string;
+  /** Phase 9: the recording's lines as replay steps changed them. */
+  replayLines?: string[];
+  readonly replayResults: ReplayResult[] = [];
+  replayError?: unknown;
+  /** Phase 9: the event a step looked at last ("its source"). */
+  lastEnvelope?: EventEnvelope;
+  /** Phase 9: the app's data directory (RIDRS_DATA_DIR) in the e2e. */
+  dataDir?: string;
+  /** Phase 9: the last `ridrs-headless` command a step ran. */
+  cliResult?: { readonly exitCode: number; readonly stdout: string; readonly stderr: string };
+  /** Phase 9: the FIT file the CLI exported. */
+  cliFitBytes?: Uint8Array;
+  /** Phase 9: what a probe's call to `ctx.host` threw. */
+  lastHostCallError?: unknown;
   readonly pendingUi = new Map<string, Record<string, unknown>>();
   extraPluginDirs: string[] = [];
 
@@ -259,6 +293,8 @@ export class RidrsWorld extends World {
       physicsTotalResistanceCapability,
       physicsPowertrainCapability,
       physicsMotionCapability,
+      configSnapshotCapability,
+      storageAppFilesCapability,
     ]) {
       this.capabilityContracts.set(contract.id, contract);
     }
@@ -296,6 +332,10 @@ export class RidrsWorld extends World {
       await rm(this.tempPluginDir, { recursive: true, force: true });
       this.tempPluginDir = '';
     }
+    if (this.dataDir) {
+      await rm(this.dataDir, { recursive: true, force: true });
+      this.dataDir = undefined;
+    }
     this.fakeClock?.uninstall();
     this.fakeClock = undefined;
     for (const [name, value] of this.envOverrides) {
@@ -306,6 +346,32 @@ export class RidrsWorld extends World {
       }
     }
     this.envOverrides.clear();
+    delete (globalThis as Record<symbol, unknown>)[MEMORY_STORAGE_SYMBOL];
+  }
+
+  /** Phase 9: the plugins use `fixture-storage-memory`, whose files the World owns. */
+  useMemoryStorage(): MemoryAppFiles {
+    if (!this.memoryFiles) {
+      this.memoryFiles = new MemoryAppFiles();
+      (globalThis as Record<symbol, unknown>)[MEMORY_STORAGE_SYMBOL] = this.memoryFiles;
+      this.extraPluginDirs.push(MEMORY_STORAGE_DIR);
+    }
+    return this.memoryFiles;
+  }
+
+  /**
+   * Lets storage, compression and promise chains run without moving the clock: compression
+   * streams finish on real I/O turns. Resolves once `done()` holds.
+   */
+  async waitForIo(done: () => boolean, what: string): Promise<void> {
+    for (let turn = 0; turn < 2000; turn += 1) {
+      if (done()) {
+        return;
+      }
+      await this.settle();
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    throw new Error(`Timed out waiting for ${what}`);
   }
 
   /** Sets an environment variable for this scenario only. */
@@ -359,7 +425,7 @@ export class RidrsWorld extends World {
           ? [createBundledPluginSource(this.bundled satisfies BundledPluginSet)]
           : dirs.map(createFileSystemPluginSource),
         disabledPlugins: this.realPluginIds.length > 0 ? this.unusedRealPlugins() : [],
-        clock: this.clock,
+        timeSource: this.clock,
         capabilities: this.capabilityContracts.values(),
         events: this.eventDefinitions.values(),
       });
@@ -371,6 +437,7 @@ export class RidrsWorld extends World {
           this.hostObserved.push(envelope);
         });
       }
+      this.host.observe('test-world', { onEvent: (envelope) => this.tapped.push(envelope) });
     }
     return this.host;
   }

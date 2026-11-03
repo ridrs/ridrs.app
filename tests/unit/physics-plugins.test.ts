@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import {
   activityStartRequestedEvent,
   type CapabilityContract,
+  configSnapshotCapability,
   measurementPowerEvent,
   metricPowerCapability,
   type PhysicsState,
@@ -57,7 +58,7 @@ function recordingContext(id: string) {
   const ctx = {
     manifest: JSON.parse(readFileSync(resolve(PLUGINS_DIR, id, 'manifest.json'), 'utf8')),
     logger: createSilentLogger(),
-    clock: { now: () => T0 },
+    timeSource: { now: () => T0 },
     events: {
       publish: (event: { id: string }) => used.push(`publish ${event.id}`),
       subscribe: (event: { id: string }) => {
@@ -112,7 +113,8 @@ describe('physics inputs and forces stay apart', () => {
   ])('%s provides only its parameters and computes no forces', async (id, capability) => {
     const { ctx, capabilities } = recordingContext(id);
     await (await definitionOf(id)).initialize?.(ctx);
-    expect(capabilities).toEqual([`provide ${capability}`]);
+    // The parameters, and the same parameters as the plugin's configuration snapshot.
+    expect(capabilities).toEqual([`provide ${capability}`, 'provide config.snapshot']);
   });
 
   it('physics-gravity-resistance reads no provider: mass and road come in the input', async () => {
@@ -149,7 +151,7 @@ describe('physics engine on the real host', () => {
     }
     const host = new PluginHost({
       sources: [createBundledPluginSource({ manifests, modules })],
-      clock: { now: () => Date.now() },
+      timeSource: { now: () => Date.now() },
       logger: createSilentLogger(),
       capabilities: [
         metricPowerCapability,
@@ -161,6 +163,7 @@ describe('physics engine on the real host', () => {
         physicsTotalResistanceCapability,
         physicsPowertrainCapability,
         physicsMotionCapability,
+        configSnapshotCapability,
       ],
     });
     const states: PhysicsState[] = [];
@@ -172,10 +175,10 @@ describe('physics engine on the real host', () => {
     if (!driver) {
       throw new Error('activity-session did not start');
     }
-    driver.events.publish(activityStartRequestedEvent, {});
+    driver.inputs.accept(activityStartRequestedEvent, {});
     for (let at = T0; at <= T0 + 5000; at += 250) {
       await clock.tickAsync(at - Date.now());
-      driver.events.publish(measurementPowerEvent, {
+      driver.inputs.accept(measurementPowerEvent, {
         deviceId: 'trainer-1',
         value: 200,
         measuredAt: at,
@@ -183,18 +186,21 @@ describe('physics engine on the real host', () => {
         timestampOrigin: 'receive',
       });
     }
-    // A blocked host: the step timer fires once, 30 s late, and computes one chunk of steps.
+    // A blocked host: the clock wakes once, 30 s late, and runs one chunk of 1000 overdue turns
+    // (steps and other due tasks), each at its planned time.
     clock.jump(30_000);
     const afterLateWake = states.at(-1)?.step ?? -1;
-    // The rest follows in further chunks, each re-armed with delay 0 (1 ms in fake time).
+    // The rest follows in further chunks after yielding to the event loop.
     await clock.tickAsync(5);
     await host.stop();
     return { states, afterLateWake };
   }
 
-  it('catches up after a late wake in chunks of 1000 steps, without losing a step', async () => {
+  it('catches up after a late wake in chunks, each step at its planned time, none lost', async () => {
     const { states, afterLateWake } = await ride();
-    expect(afterLateWake).toBe(500 + 1000);
+    // One chunk is at most 1000 turns: the catch-up yields long before step 3500.
+    expect(afterLateWake).toBeGreaterThan(500);
+    expect(afterLateWake).toBeLessThanOrEqual(500 + 1000);
     const steps = states.map((s) => s.step);
     expect(steps).toEqual(Array.from({ length: 35_000 / 250 + 1 }, (_, i) => i * 25));
     expect(states.every((s) => s.at === T0 + 10 * s.step)).toBe(true);

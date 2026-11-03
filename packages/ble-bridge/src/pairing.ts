@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { Clock } from '@ridrs/contracts';
+import type { TimeSource } from '@ridrs/contracts';
 
 const MAX_WRONG_CODES = 5;
 const LOCK_MS = 60_000;
@@ -29,7 +29,7 @@ export interface PairingStore {
 }
 
 export interface PairingAuthorityOptions {
-  readonly clock: Clock;
+  readonly clock: TimeSource;
   readonly store?: PairingStore;
   /** Random bytes; Web Crypto by default (available in Node and every WebView). */
   readonly randomBytes?: (length: number) => Uint8Array;
@@ -61,7 +61,7 @@ function memoryStore(): PairingStore {
  */
 export class PairingAuthority {
   readonly companionId: string;
-  private readonly clock: Clock;
+  private readonly clock: TimeSource;
   private readonly store: PairingStore;
   private readonly randomBytes: (length: number) => Uint8Array;
   private readonly generateCode: () => string;

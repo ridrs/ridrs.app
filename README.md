@@ -14,12 +14,13 @@ Open-source, modular, headless-first indoor cycling platform.
 - `packages/temporal/`: Pure, deterministic math of the temporal data layer: sampling intervals, freshness, values at a time, damped trend, time-weighted averages, snapshots (`@ridrs/temporal`).
 - `packages/metric-source/` and `packages/ble-peripheral/`: Shared logic of the metric plugins and of the BLE device plugins (`@ridrs/metric-source`, `@ridrs/ble-peripheral`).
 - `packages/ui-sdk/`: Client contract for UI plugins (`@ridrs/ui-sdk`, `Apache-2.0`); `packages/ui-shell/`: the shell that composes screens and slots; `packages/ui-bridge/`: in-process bridge between shell and host; `packages/presentation/`: interpolated physics states and the frame clock for frame-driven UI plugins (`@ridrs/presentation`).
-- `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, heart-rate sensor, power/cadence/heart-rate metrics, power-to-heart-rate ratio, console output, activity session, physics engine and models, UI screens, HUD and widgets).
+- `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, heart-rate sensor, power/cadence/heart-rate metrics, power-to-heart-rate ratio, console output, activity session, physics engine and models, recording session, FIT export, app file storage for Node and Tauri, UI screens, HUD and widgets).
+- `packages/recording/`, `packages/fit/`, `packages/replay/`: The ridrs recording format (writer, reader, recovery), the own FIT encoder, and the headless deterministic replay (`@ridrs/recording`, `@ridrs/fit`, `@ridrs/replay`).
 - `packages/ble-bridge/`: The companion bridge protocol: pairing, GATT forwarding, heartbeat; companion and ridrs side (`@ridrs/ble-bridge`). `packages/ble-tauri/`: `BleCentral` on the native BLE commands (`@ridrs/ble-tauri`). `packages/ble-simulator/`: in-process BLE simulator and dummy devices (`@ridrs/ble-simulator`).
 - `crates/`: Rust crates hosted by both Tauri apps: `ridrs-ble` (native BLE commands) and `ridrs-bridge` (mDNS and WebSocket of the companion bridge).
 - `packages/testing/`: Test harness: simulated Tauri bridge, simulated companion network (`@ridrs/testing`).
 - `tests/`: Executable Gherkin specifications (`tests/features/`), step definitions, test harness, and fixture plugins.
-- `docs/`: Architecture documentation (`docs/architecture/`) and Architecture Decision Records (`docs/decisions/`).
+- `docs/`: Architecture documentation (`docs/architecture/`), file formats (`docs/formats/`) and Architecture Decision Records (`docs/decisions/`).
 - `web/`: Cloudflare Worker application serving the project web page ([ridrs.app](https://ridrs.app)).
 
 ## Running ridrs headless
@@ -143,6 +144,48 @@ pnpm --filter @ridrs/companion tauri android build --apk --debug --target aarch6
 ```
 
 On the Android emulator, mDNS does not cross the emulator's NAT to a ridrs on the host. Run ridrs in the same emulator instead, or check a companion from the host with the probe through a forwarded port (`adb forward tcp:47000 tcp:42229`): `pnpm --filter @ridrs/companion probe <host:port> <code>` pairs like ridrs does and prints the trainer's notifications.
+
+## Recording, replay and FIT export
+
+Every ride is recorded from "Start ride" to "Finish ride": every event, every diagnostic and the raw device bytes, with a minute of pre-roll and a configuration snapshot. After "Finish ride" the main screen shows **Ride saved** with the distance, the duration and the file names. Each ride is also exported as a FIT activity file. Recording is always on.
+
+**Where the files are:** `recordings/` in the app data directory. `ride-<UTC start>-<session>.ridrs` is the recording (gzip JSON Lines, [format](docs/formats/ridrs-recording-v1.md)), `….fit` the FIT export, and `….ridrs.jsonl` a recording while it is open (recovered at the next start after a crash).
+
+| Host | Data directory |
+|---|---|
+| headless (macOS) | `~/Library/Application Support/ridrs` |
+| headless (Linux) | `~/.local/share/ridrs` |
+| headless, any OS | `$RIDRS_DATA_DIR` if set |
+| native app | the app container's app data directory (`$APPDATA/recordings`, Tauri) |
+
+Inspect, replay and export a recording headless:
+
+```bash
+pnpm --filter @ridrs/headless start recording inspect ~/Library/Application\ Support/ridrs/recordings/ride-20261101T100000Z-3f2a9c1d.ridrs
+```
+
+```bash
+pnpm --filter @ridrs/headless start recording replay <file.ridrs> --json
+```
+
+```bash
+pnpm --filter @ridrs/headless start recording export-fit <file.ridrs> -o ride.fit
+```
+
+`replay` runs the recorded bytes and rider input through the **current** plugins on a virtual clock and reports configuration and version differences, the compared streams and "identical" or the first difference (exit 0 identical, 1 different, 2 error). `-p <dir>` chooses the plugin directories (default `plugins`). See [recording-and-replay.md](docs/architecture/recording-and-replay.md) and [fit-export.md](docs/architecture/fit-export.md).
+
+**Deterministic:** the host runs on logical time with one queue for external inputs, so a recording made on real timers (a real ride) replays identically ([time and scheduling](docs/architecture/time-and-scheduling.md)).
+
+**Manual check (with hardware).** On the Mac (and Android, pulling the files with `adb`):
+
+1. Ride about 10 minutes with a trainer (or the Phase 3b developer companion's simulated trainer) and a heart-rate sensor.
+2. Finish; note the "Ride saved" panel.
+3. Run `recording inspect` and `recording replay` on the file. Record whether the replay is identical (see the known limit above) and how long it took.
+4. Upload the FIT file to at least one platform (Garmin Connect, Strava or intervals.icu) and compare power, heart rate, distance and duration with ridrs.
+
+Record the file sizes (`.ridrs`, `.fit`) per 10 minutes, the replay duration, the platform that accepted the FIT file and any warnings.
+
+The FIT files are written by ridrs' own encoder. The official Garmin FIT SDK (`@garmin/fitsdk`) is a test-only devDependency that validates every exported file; it is never bundled or distributed ([ADR 0034](docs/decisions/0034-fit-own-encoder-sdk-validation-only.md)). `pnpm check:native-bundle` builds the native app and checks that its bundle contains neither the SDK nor the Node storage provider.
 
 ## Tests
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -7,6 +8,9 @@ import { defineConfig } from 'vite';
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const host = process.env.TAURI_DEV_HOST;
 const workspace = (path: string) => `${repoRoot}${path}`;
+const ridrsVersion = (
+  JSON.parse(readFileSync(workspace('package.json'), 'utf8')) as { version: string }
+).version;
 
 export default defineConfig({
   clearScreen: false,
@@ -17,7 +21,9 @@ export default defineConfig({
       '@ridrs/ble-tauri': workspace('packages/ble-tauri/src/index.ts'),
       '@ridrs/contracts': workspace('packages/contracts/src/index.ts'),
       '@ridrs/core': workspace('packages/core/src/index.ts'),
+      '@ridrs/fit': workspace('packages/fit/src/index.ts'),
       '@ridrs/presentation': workspace('packages/presentation/src/index.ts'),
+      '@ridrs/recording': workspace('packages/recording/src/index.ts'),
       '@ridrs/ui-bridge': workspace('packages/ui-bridge/src/index.ts'),
       '@ridrs/ui-sdk': workspace('packages/ui-sdk/src/index.ts'),
       '@ridrs/ui-shell': workspace('packages/ui-shell/src/index.ts'),
@@ -34,6 +40,7 @@ export default defineConfig({
     watch: { ignored: ['**/src-tauri/**'] },
   },
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
+  define: { __RIDRS_VERSION__: JSON.stringify(ridrsVersion) },
   build: {
     target: 'es2022',
     sourcemap: true,

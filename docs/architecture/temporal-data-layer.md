@@ -28,7 +28,7 @@ Measurements are the source of truth. Estimates improve temporal alignment but a
 | Part | Responsibility |
 |---|---|
 | `@ridrs/temporal` (`packages/temporal`) | Pure, deterministic math on explicit timestamps: `TemporalSeries` (history, interval learning, freshness, `valueAt`, `average`), `IntervalEstimator`, the damped-trend formulas, `buildSnapshot`, and `TEMPORAL_DEFAULTS`. No clock, no timers, no I/O; imports only `simple-statistics` and contract types. |
-| `ctx.temporal` (`packages/core/src/temporal-service.ts`) | Series registry and ownership, the one freshness deadline per series (rxjs `timer`), run-to-completion delivery of snapshots and freshness changes, `late-measurement` diagnostics, release on plugin stop. |
+| `ctx.temporal` (`packages/core/src/temporal-service.ts`) | Series registry and ownership, the one freshness deadline per series (a task on the host clock), run-to-completion delivery of snapshots and freshness changes, `late-measurement` diagnostics, release on plugin stop. |
 | Contracts (`packages/contracts/src/temporal.ts`) | `TemporalValue`, `TemporalAverage`, `TemporalSnapshot`, `Freshness`, `EstimationStrategy`, the writer/reader interfaces and `PluginTemporalContext`. |
 
 Plugins never import `@ridrs/temporal` (enforced by `dependency-cruiser`): there is exactly one estimator, and no plugin can bypass series ownership.
@@ -152,4 +152,4 @@ The Phase 4 open questions are answered:
 
 - **Strategy and horizon:** `metric-power` keeps `damped-trend` with its defaults. At 4 Hz the trend is extrapolated up to 3 T ≈ 750 ms and then held; the series becomes stale 2 s after the last packet.
 - **Stale threshold:** the physics needs no strategy, horizon or threshold of its own. Two seconds of held power before coasting is acceptable for a rider who stops pedalling and rides through short BLE gaps. To be revisited with real rides.
-- A step computed late may see a measurement that arrived meanwhile and get `interpolated` instead of `extrapolated`: the better estimate, intended. The physics never writes into a series.
+- A step observes its planned time and knows the inputs accepted before it, however late it runs ([time-and-scheduling.md](time-and-scheduling.md)): wake timing never changes its value. The physics never writes into a series. Writes into a series happen only inside a turn (`outside-turn` otherwise).

@@ -1,0 +1,9 @@
+{
+  "id": "export-fit",
+  "name": "FIT Export",
+  "version": "0.1.0",
+  "types": ["export"],
+  "provides": [],
+  "requires": ["storage.app-files"],
+  "entry": "index.ts"
+}

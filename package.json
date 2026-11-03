@@ -11,7 +11,8 @@
     "depcruise": "depcruise --config .dependency-cruiser.cjs apps packages plugins tests",
     "test:unit": "vitest run",
     "test:bdd": "NODE_OPTIONS=\"--import tsx\" cucumber-js && NODE_OPTIONS=\"--import tsx\" cucumber-js --profile ui",
-    "test": "pnpm test:unit && pnpm test:bdd"
+    "test": "pnpm test:unit && pnpm test:bdd",
+    "check:native-bundle": "pnpm --filter @ridrs/native build && node scripts/check-native-bundle.mjs"
   },
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
@@ -20,9 +21,13 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "@cucumber/cucumber": "13.3.0",
+    "@garmin/fitsdk": "21.218.0",
     "@happy-dom/global-registrator": "21.0.4",
     "@ridrs/ble-bridge": "workspace:*",
     "@ridrs/ble-simulator": "workspace:*",
+    "@ridrs/fit": "workspace:*",
+    "@ridrs/recording": "workspace:*",
+    "@ridrs/replay": "workspace:*",
     "@ridrs/testing": "workspace:*",
     "@sinonjs/fake-timers": "15.4.0",
     "@testing-library/dom": "10.4.2",

@@ -96,7 +96,8 @@ When(
     const def = this.getEventDefinition(eventId);
     this.lastPublishError = undefined;
     try {
-      ctx.events.publish(def, { text });
+      // From the scenario, outside any turn: an external input.
+      ctx.inputs.accept(def, { text });
     } catch (error) {
       this.lastPublishError = error;
     }
@@ -113,7 +114,7 @@ When(
     const parsedPayload: unknown = JSON.parse(rawPayload);
     this.lastPublishError = undefined;
     try {
-      ctx.events.publish(def, parsedPayload);
+      ctx.inputs.accept(def, parsedPayload);
     } catch (error) {
       this.lastPublishError = error;
     }

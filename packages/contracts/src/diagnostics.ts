@@ -25,14 +25,23 @@ export type DiagnosticCode =
   | 'bridge-unreachable'
   | 'bridge-rejected'
   | 'bridge-protocol-error'
-  | 'physics-step-failed';
+  | 'physics-step-failed'
+  | 'recording-failed'
+  | 'recording-recovered'
+  | 'fit-export-failed'
+  | 'config-snapshot-failed';
 
 export type RidrsErrorCode =
   | DiagnosticCode
   | 'invalid-event-payload'
   | 'plugin-not-active'
   | 'event-not-allowed'
-  | 'undeclared-event';
+  | 'undeclared-event'
+  | 'permission-denied'
+  | 'outside-turn'
+  | 'invalid-path'
+  | 'invalid-recording'
+  | 'recording-unsupported-version';
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;

@@ -3,7 +3,8 @@
 import type { PluginCapabilitiesContext } from './capabilities.ts';
 import type { Clock } from './clock.ts';
 import type { DiagnosticCode } from './diagnostics.ts';
-import type { PluginEventsContext } from './events.ts';
+import type { PluginEventsContext, PluginIdsContext, PluginInputsContext } from './events.ts';
+import type { PluginHostAccess } from './host.ts';
 import type { PluginManifest } from './manifest.ts';
 import type { PluginTemporalContext } from './temporal.ts';
 import type { UiRegistry } from './ui.ts';
@@ -39,12 +40,17 @@ export interface PluginContext {
   readonly logger: PluginLogger;
   readonly clock: Clock;
   readonly events: PluginEventsContext;
+  /** External inputs and results of asynchronous work enter here, never through `events`. */
+  readonly inputs: PluginInputsContext;
+  readonly ids: PluginIdsContext;
   readonly capabilities: PluginCapabilitiesContext;
   /** The temporal data layer: series history, freshness, values at a time, aligned snapshots. */
   readonly temporal: PluginTemporalContext;
   readonly signal: AbortSignal;
   /** Read-only view of the UI registry; `core.ui-registry.changed` announces new revisions. */
   readonly ui: { registry(): UiRegistry };
+  /** The whole host; usable only with the manifest permission `observe-host`. */
+  readonly host: PluginHostAccess;
   reportDiagnostic(
     code: DiagnosticCode,
     message: string,
