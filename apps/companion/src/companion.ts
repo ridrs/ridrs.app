@@ -9,8 +9,8 @@ import {
 import {
   BLE_BRIDGE_PROTOCOL_VERSION,
   type BleCentral,
-  type Clock,
   parsePairingUri,
+  type TimeSource,
 } from '@ridrs/contracts';
 import { type CompanionIpc, type ServeInfo, serveOverIpc } from './ipc-server.ts';
 
@@ -24,7 +24,7 @@ export interface CompanionOptions {
   readonly name: string;
   readonly pairingStore: PairingStore;
   readonly port?: number;
-  readonly clock?: Clock;
+  readonly clock?: TimeSource;
 }
 
 export interface CompanionView {

@@ -3,7 +3,7 @@
   "name": "Virtual Speed",
   "version": "0.1.0",
   "types": ["physics"],
-  "provides": ["physics.motion"],
+  "provides": ["physics.motion", "config.snapshot"],
   "requires": [
     "physics.bicycle",
     "physics.powertrain", "physics.rider",

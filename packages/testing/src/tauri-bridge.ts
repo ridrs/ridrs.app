@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { BleSimulator } from '@ridrs/ble-simulator';
-import type { BleConnection, Clock } from '@ridrs/contracts';
+import type { BleConnection, TimeSource } from '@ridrs/contracts';
 import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
 
 /** The part of a Tauri `Channel` the bridge uses to push messages to the WebView side. */
@@ -38,7 +38,7 @@ export class SimulatedTauriBridge {
 
   constructor(
     private readonly simulator: BleSimulator,
-    private readonly clock: Clock,
+    private readonly clock: TimeSource,
   ) {}
 
   install(): void {

@@ -2,7 +2,14 @@
 
 export { type BundledPluginSet, createBundledPluginSource } from './bundled-source.ts';
 export { CapabilityRegistry } from './capability-registry.ts';
-export { createSystemClock } from './clock.ts';
+export {
+  createSystemTimeSource,
+  LiveClock,
+  type LiveClockOptions,
+  ReplayClock,
+  type TimerPort,
+  TurnClock,
+} from './clock.ts';
 export { DiagnosticCollector } from './diagnostics.ts';
 export {
   type DiscoveredPlugin,

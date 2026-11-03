@@ -20,11 +20,19 @@ export function defineEvent<TPayload, TType extends string>(
 }
 
 export interface EventEnvelope<TPayload = unknown, TType extends string = string> {
+  /** Unique within the host run and reproducible on replay (see `PluginIdsContext`). */
   readonly id: string;
   readonly type: TType;
   readonly payload: TPayload;
   readonly source: string;
+  /** Logical time of the turn that published it, epoch ms. */
   readonly timestamp: number;
+  /** Global publish order of the host run, from 1. */
+  readonly seq: number;
+  /** Set on external inputs: they entered through the input queue (`ctx.inputs.accept`). */
+  readonly input?: true;
+  /** When the host received an input; equals `timestamp` live and is kept on replay. */
+  readonly receivedAt?: number;
 }
 
 export type EventHandler<TPayload = unknown, TType extends string = string> = (
@@ -44,6 +52,23 @@ export interface PluginEventsContext {
     event: EventDefinition<TPayload, TType>,
     handler: EventHandler<TPayload, TType>,
   ): EventSubscription;
+}
+
+/**
+ * External inputs: device data, connection results, rider input, results of asynchronous work.
+ * `accept` validates at once (throwing like `publish`) and queues the event; it is published in a
+ * turn of its own, after the scheduled tasks due by then. Works inside and outside turns.
+ */
+export interface PluginInputsContext {
+  accept<TPayload, TType extends string>(
+    event: EventDefinition<TPayload, TType>,
+    payload: TPayload,
+  ): void;
+}
+
+/** Ids that are unique within the host run and the same on replay: no randomness of their own. */
+export interface PluginIdsContext {
+  next(): string;
 }
 
 export const hostStartedEvent = defineEvent(
@@ -99,3 +124,23 @@ export const measurementHeartRateEvent = defineEvent(
   'measurement.heart-rate',
   measurementPayloadSchema,
 );
+
+/**
+ * One BLE notification exactly as it arrived, published by the device plugin whose link received
+ * it, before decoding. Malformed packets are published too: the bytes are the root of every
+ * derived value, so a replay can feed them through the current decoders.
+ */
+export const deviceRawNotificationEvent = defineEvent(
+  'device.raw-notification',
+  z.object({
+    deviceId: z.string(),
+    deviceName: z.string(),
+    serviceUuid: z.string().min(1),
+    characteristicUuid: z.string().min(1),
+    /** Lowercase hex, see `bytesToHex`. */
+    data: z.string().regex(/^(?:[0-9a-f]{2})*$/),
+    receivedAt: z.number(),
+  }),
+);
+
+export type DeviceRawNotificationPayload = z.infer<typeof deviceRawNotificationEvent.schema>;

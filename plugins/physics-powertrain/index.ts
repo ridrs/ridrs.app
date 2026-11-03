@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  configSnapshotCapability,
   definePlugin,
   metricPowerCapability,
   type PowertrainOutput,
@@ -29,6 +30,10 @@ export default definePlugin({
     const power = ctx.temporal.reader(metricPowerCapability);
     ctx.capabilities.provide(physicsPowertrainCapability, {
       wheelPower: (at) => wheelPowerOf(power.valueAt(at), POWERTRAIN_DEFAULTS.efficiency),
+    });
+    ctx.capabilities.provide(configSnapshotCapability, {
+      section: ctx.manifest.id,
+      snapshot: () => ({ ...POWERTRAIN_DEFAULTS }),
     });
   },
 });

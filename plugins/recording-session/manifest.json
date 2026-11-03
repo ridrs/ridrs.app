@@ -1,0 +1,10 @@
+{
+  "id": "recording-session",
+  "name": "Recording Session",
+  "version": "0.1.0",
+  "types": ["recording"],
+  "provides": [],
+  "requires": ["storage.app-files", "config.snapshot"],
+  "permissions": ["observe-host"],
+  "entry": "index.ts"
+}

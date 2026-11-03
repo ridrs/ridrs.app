@@ -1,0 +1,9 @@
+{
+  "id": "storage-files-node",
+  "name": "App Files (Node)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["storage.app-files"],
+  "requires": [],
+  "entry": "index.ts"
+}

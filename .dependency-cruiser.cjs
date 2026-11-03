@@ -32,7 +32,7 @@ module.exports = {
         'packages/core and packages/contracts run in Node and in a WebView: no node:* builtins and no Node-only libraries. Only packages/core/src/node/ (the Node-only entry) may use them.',
       severity: 'error',
       from: {
-        path: '^packages/(core|contracts|ble-bridge|ble-simulator|temporal|metric-source|ble-peripheral)/',
+        path: '^packages/(core|contracts|ble-bridge|ble-simulator|temporal|metric-source|ble-peripheral|recording|fit)/',
         pathNot: '(^packages/core/src/node/|\\.test\\.ts$)',
       },
       to: {
@@ -53,7 +53,9 @@ module.exports = {
       comment:
         'Dummy devices are for tests and the developer companion only: packages/ble-simulator may be imported by packages/testing, tests/** and the companion app (behind VITE_DUMMY_DEVICES).',
       severity: 'error',
-      from: { path: '^(packages/(?!testing/|ble-simulator/)|plugins/|apps/(?!companion/))' },
+      from: {
+        path: '^(packages/(?!testing/|ble-simulator/|replay/)|plugins/|apps/(?!companion/))',
+      },
       to: { path: '^packages/ble-simulator/' },
     },
     {
@@ -255,11 +257,11 @@ module.exports = {
     {
       name: 'tauri-only-in-transport-native-and-testing',
       comment:
-        '@tauri-apps/* may only be imported by the Tauri BLE package, the Tauri plugins (transport, bridge connector), the Tauri apps and the simulated bridge in packages/testing.',
+        '@tauri-apps/* may only be imported by the Tauri BLE package, the Tauri plugins (transport, bridge connector, app files), the Tauri apps and the simulated bridge in packages/testing.',
       severity: 'error',
       from: {
         pathNot:
-          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri)/|apps/(native|companion)/|packages/testing/)',
+          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri|storage-files-tauri)/|apps/(native|companion)/|packages/testing/)',
       },
       to: { path: '@tauri-apps' },
     },
@@ -353,6 +355,68 @@ module.exports = {
       },
       to: {
         path: '@abandonware/noble',
+      },
+    },
+    {
+      name: 'fit-sdk-only-in-tests',
+      comment:
+        'The official Garmin FIT SDK validates exported files in tests and CI only; it is never bundled or distributed (ADR 0034).',
+      severity: 'error',
+      from: { pathNot: '(^tests/|\\.test\\.ts$)' },
+      to: { path: '@garmin/fitsdk' },
+    },
+    {
+      name: 'fit-imports-contracts-only',
+      comment:
+        'packages/fit is runtime-neutral domain code: it imports packages/contracts only - no Node builtins, no I/O, no other library.',
+      severity: 'error',
+      from: { path: '^packages/fit/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^(packages/(?!contracts/|fit/)|plugins/|apps/|tests/|node:)|(^|/)node_modules/(?!\\.pnpm/(zod|semver)@|zod/|semver/)',
+      },
+    },
+    {
+      name: 'recording-imports-contracts-only',
+      comment:
+        'packages/recording (format, writer, reader, recovery) imports packages/contracts only and compresses with Web streams.',
+      severity: 'error',
+      from: { path: '^packages/recording/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^(packages/(?!contracts/|recording/)|plugins/|apps/|tests/|node:)|(^|/)node_modules/(?!\\.pnpm/(zod|semver)@|zod/|semver/)',
+      },
+    },
+    {
+      name: 'fit-and-recording-no-builtins',
+      comment: 'packages/fit and packages/recording run in a WebView too: no Node builtins.',
+      severity: 'error',
+      from: { path: '^packages/(fit|recording)/', pathNot: '\\.test\\.ts$' },
+      to: { dependencyTypes: ['core'] },
+    },
+    {
+      name: 'replay-imports',
+      comment:
+        'packages/replay composes a host on a replay clock: it may import the core, recording, contracts and its libraries (microdiff, zod).',
+      severity: 'error',
+      from: { path: '^packages/replay/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^(packages/(?!contracts/|core/|recording/|replay/)|plugins/|apps/|tests/)|(^|/)node_modules/(?!\\.pnpm/(microdiff|zod|semver|rxjs|dependency-graph|tinyglobby|simple-statistics)@|microdiff/|zod/)',
+      },
+    },
+    {
+      name: 'no-plugin-imports-replay',
+      comment: 'Replay is a headless tool: no plugin imports it.',
+      severity: 'error',
+      from: { path: '^(plugins/|tests/fixtures/plugins/)' },
+      to: { path: '^packages/replay/' },
+    },
+    {
+      name: 'recording-and-export-know-only-events',
+      comment:
+        'recording-session and export-fit work on events, config.snapshot and storage.app-files only: contracts, recording and fit - no device, metric, physics or UI code.',
+      severity: 'error',
+      from: { path: '^plugins/(recording-session|export-fit)/' },
+      to: {
+        path: '^(packages/(?!contracts/|recording/|fit/)|plugins/(?!recording-session/|export-fit/))',
       },
     },
     {

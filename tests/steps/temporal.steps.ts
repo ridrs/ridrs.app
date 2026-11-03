@@ -78,12 +78,23 @@ async function record(
   receivedAt = measuredAt,
 ): Promise<void> {
   await advanceTo(world, receivedAt);
-  world.lastRecordResult = writer.writer.record({
-    value,
-    measuredAt,
-    receivedAt,
-    sourceId: writer.pluginId,
+  // A write is simulation state: it runs in a turn of its own, like the input that causes it.
+  let failure: unknown;
+  world.ensureHost().input(() => {
+    try {
+      world.lastRecordResult = writer.writer.record({
+        value,
+        measuredAt,
+        receivedAt,
+        sourceId: writer.pluginId,
+      });
+    } catch (error) {
+      failure = error;
+    }
   });
+  if (failure !== undefined) {
+    throw failure;
+  }
   await world.settle();
 }
 
@@ -188,7 +199,9 @@ When(
   async function (this: RidrsWorld, _pluginId: string, series: string, time: string) {
     const at = parseOffset(time);
     await advanceTo(this, at);
-    writerOf(this, series).writer.markUnavailable('disconnected', at);
+    this.ensureHost().input(() =>
+      writerOf(this, series).writer.markUnavailable('disconnected', at),
+    );
     await this.settle();
   },
 );

@@ -21,7 +21,10 @@
     ],
     "events": {
       "subscribe": [
-        "activity.state-changed"
+        "activity.state-changed",
+        "recording.completed",
+        "recording.failed",
+        "export.fit-written"
       ],
       "publish": [
         "activity.start-requested"

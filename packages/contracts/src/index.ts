@@ -61,7 +61,13 @@ export {
   defineCapability,
   type PluginCapabilitiesContext,
 } from './capabilities.ts';
-export type { Clock } from './clock.ts';
+export type { Clock, TaskId, TimeSource } from './clock.ts';
+export {
+  type ConfigSnapshotProvider,
+  configSnapshotCapability,
+  type JsonValue,
+  jsonValueSchema,
+} from './config.ts';
 export {
   type Diagnostic,
   type DiagnosticCode,
@@ -71,9 +77,11 @@ export {
 export {
   type DeviceConnectionChangedPayload,
   type DeviceConnectionState,
+  type DeviceRawNotificationPayload,
   defineEvent,
   deviceConnectionChangedEvent,
   deviceConnectionStateSchema,
+  deviceRawNotificationEvent,
   type EventDefinition,
   type EventEnvelope,
   type EventHandler,
@@ -86,13 +94,25 @@ export {
   measurementPayloadSchema,
   measurementPowerEvent,
   type PluginEventsContext,
+  type PluginIdsContext,
+  type PluginInputsContext,
   type TimestampOrigin,
   timestampOriginSchema,
 } from './events.ts';
+export { bytesToHex, hexToBytes } from './hex.ts';
+export type {
+  HostDescription,
+  HostObserver,
+  HostPlatform,
+  HostPluginDescription,
+  PluginHostAccess,
+} from './host.ts';
 export {
   capabilityIdSchema,
   dottedIdPattern,
   eventIdSchema,
+  type HostPermission,
+  hostPermissionSchema,
   type ManifestValidationResult,
   manifestSchema,
   type PluginManifest,
@@ -168,6 +188,34 @@ export {
   type PluginLogger,
   type PluginState,
 } from './plugin.ts';
+export {
+  exportFitWrittenEvent,
+  RECORDING_FORMAT,
+  RECORDING_FORMAT_VERSION,
+  RECORDING_MEDIA_TYPE,
+  type RecordedEnvelope,
+  type RecordingDiagnostic,
+  type RecordingEvent,
+  type RecordingFooter,
+  type RecordingHeader,
+  type RecordingRecord,
+  type RecordingSnapshot,
+  recordedEnvelopeSchema,
+  recordingCompletedEvent,
+  recordingDiagnosticSchema,
+  recordingEventSchema,
+  recordingFailedEvent,
+  recordingFooterSchema,
+  recordingHeaderSchema,
+  recordingRecordSchema,
+  recordingSnapshotSchema,
+} from './recording.ts';
+export {
+  type AppFileEntry,
+  type AppFiles,
+  assertAppFilePath,
+  storageAppFilesCapability,
+} from './storage.ts';
 export type {
   EstimationStrategy,
   Freshness,

@@ -9,6 +9,7 @@ import {
   type PluginManifest,
   type PluginTemporalContext,
   RidrsError,
+  type TaskId,
   type TemporalMeasurement,
   type TemporalRecordResult,
   type TemporalSeriesReader,
@@ -16,7 +17,7 @@ import {
   type TemporalSnapshot,
 } from '@ridrs/contracts';
 import { buildSnapshot, type FreshnessTransition, TemporalSeries } from '@ridrs/temporal';
-import { queueScheduler, type Subscription, timer } from 'rxjs';
+import { queueScheduler } from 'rxjs';
 import type { DiagnosticCollector } from './diagnostics.ts';
 
 /** A late measurement is reported at most once per series in this period. */
@@ -33,7 +34,7 @@ interface ManagedSeries {
   readonly series: TemporalSeries;
   freshness: Freshness;
   /** The one deadline of this series: its next freshness transition. */
-  deadline?: Subscription;
+  deadline?: TaskId;
   readonly handlers: Set<FreshnessHandler>;
   lastLateReportAt?: number;
 }
@@ -50,6 +51,8 @@ export interface TemporalServiceOptions {
   readonly diagnostics: DiagnosticCollector;
   /** Whether a plugin is started: only started writers record. */
   readonly isPluginActive: (pluginId: string) => boolean;
+  /** Writes are simulation state: only inside a turn (or a lifecycle hook). */
+  readonly mayWrite: () => boolean;
 }
 
 /**
@@ -61,6 +64,7 @@ export class TemporalService {
   private readonly clock: Clock;
   private readonly diagnostics: DiagnosticCollector;
   private readonly isPluginActive: (pluginId: string) => boolean;
+  private readonly mayWrite: () => boolean;
   private readonly series = new Map<string, ManagedSeries>();
   private readonly combinations: Combination[] = [];
 
@@ -68,6 +72,7 @@ export class TemporalService {
     this.clock = options.clock;
     this.diagnostics = options.diagnostics;
     this.isPluginActive = options.isPluginActive;
+    this.mayWrite = options.mayWrite;
   }
 
   createPluginTemporalContext(
@@ -167,8 +172,7 @@ export class TemporalService {
         }
       }
       if (managed.owner === pluginId) {
-        managed.deadline?.unsubscribe();
-        managed.deadline = undefined;
+        this.cancelDeadline(managed);
         managed.series.reset();
         managed.freshness = 'none';
         managed.lastLateReportAt = undefined;
@@ -178,6 +182,13 @@ export class TemporalService {
 
   private createWriter(managed: ManagedSeries): TemporalSeriesWriter {
     const ensureActive = (action: string): void => {
+      if (!this.mayWrite()) {
+        throw new RidrsError(
+          'outside-turn',
+          `Plugin "${managed.owner}" cannot ${action} the series "${managed.id}" outside a turn: results of asynchronous work enter through ctx.inputs`,
+          { pluginId: managed.owner },
+        );
+      }
       if (!this.isPluginActive(managed.owner)) {
         throw new RidrsError(
           'plugin-not-active',
@@ -279,15 +290,19 @@ export class TemporalService {
   }
 
   private armDeadline(managed: ManagedSeries, from: number): void {
-    managed.deadline?.unsubscribe();
-    managed.deadline = undefined;
+    this.cancelDeadline(managed);
     const next = managed.series.nextTransition(from);
     if (!next) {
       return;
     }
-    managed.deadline = timer(Math.max(0, next.at - this.clock.now())).subscribe(() =>
-      this.onDeadline(managed, next),
-    );
+    managed.deadline = this.clock.scheduleAt(next.at, () => this.onDeadline(managed, next));
+  }
+
+  private cancelDeadline(managed: ManagedSeries): void {
+    if (managed.deadline !== undefined) {
+      this.clock.cancel(managed.deadline);
+      managed.deadline = undefined;
+    }
   }
 
   private onDeadline(managed: ManagedSeries, due: FreshnessTransition): void {

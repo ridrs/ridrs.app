@@ -5,8 +5,11 @@ import {
   type BleCharacteristicTarget,
   type BleConnection,
   type BleDiscoveredPeripheral,
+  bytesToHex,
   type DeviceConnectionState,
   deviceConnectionChangedEvent,
+  deviceRawNotificationEvent,
+  hexToBytes,
   normalizeBleUuid,
   type PluginContext,
 } from '@ridrs/contracts';
@@ -27,7 +30,10 @@ export interface BlePeripheralLinkOptions {
   readonly characteristic: BleCharacteristicTarget;
   /** Kind of device for log messages, e.g. "trainer". */
   readonly label: string;
-  /** Raw notification bytes; decoding stays with the device plugin. */
+  /**
+   * Raw notification bytes; decoding stays with the device plugin. Every packet is published as
+   * `device.raw-notification` first, malformed ones too.
+   */
   readonly onNotification: (peripheral: BleDiscoveredPeripheral, packet: Uint8Array) => void;
 }
 
@@ -50,6 +56,7 @@ interface LinkSession {
 export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePeripheralLink {
   const { ctx, central, characteristic, label } = options;
   const serviceUuid = normalizeBleUuid(characteristic.serviceUuid);
+  const characteristicUuid = normalizeBleUuid(characteristic.characteristicUuid);
   const session: LinkSession = {};
 
   const publishState = (
@@ -59,7 +66,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     const deviceId = peripheral?.peripheralId ?? '';
     const deviceName = peripheral?.name ?? '';
     ctx.logger.info({ deviceId, deviceName, state }, `${label} connection state: ${state}`);
-    ctx.events.publish(deviceConnectionChangedEvent, { deviceId, deviceName, state });
+    // Connection results come from BLE I/O: they enter the simulation as inputs.
+    ctx.inputs.accept(deviceConnectionChangedEvent, { deviceId, deviceName, state });
   };
 
   const findPeripheral = async (): Promise<BleDiscoveredPeripheral | undefined> => {
@@ -81,7 +89,15 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     try {
       const unsubscribe = await connection.subscribe(characteristic, (packet) => {
         if (!ctx.signal.aborted) {
-          options.onNotification(peripheral, packet);
+          // The bytes are an input; they are decoded in the input's turn (below).
+          ctx.inputs.accept(deviceRawNotificationEvent, {
+            deviceId: peripheral.peripheralId,
+            deviceName: peripheral.name,
+            serviceUuid,
+            characteristicUuid,
+            data: bytesToHex(packet),
+            receivedAt: ctx.clock.now(),
+          });
         }
       });
       const stopListening = connection.onDisconnected(() => {
@@ -152,6 +168,22 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       }
     }
   };
+
+  // Decoding runs in the turn of the raw input, live and on replay alike: a replay injects the
+  // recorded raw inputs with this plugin as their source.
+  ctx.events.subscribe(deviceRawNotificationEvent, ({ source, payload }) => {
+    if (source !== ctx.manifest.id || payload.characteristicUuid !== characteristicUuid) {
+      return;
+    }
+    options.onNotification(
+      {
+        peripheralId: payload.deviceId,
+        name: payload.deviceName,
+        serviceUuids: [payload.serviceUuid],
+      },
+      hexToBytes(payload.data),
+    );
+  });
 
   void run().catch((error: unknown) => {
     if (!ctx.signal.aborted) {

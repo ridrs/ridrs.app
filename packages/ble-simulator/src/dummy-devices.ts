@@ -5,7 +5,7 @@ import type {
   BleConnection,
   BleDiscoveredPeripheral,
   BleScanOptions,
-  Clock,
+  TimeSource,
 } from '@ridrs/contracts';
 import { BleSimulator } from './ble-simulator.ts';
 
@@ -45,11 +45,11 @@ interface Running {
  */
 export class DummyDevices {
   readonly central: BleSimulator;
-  private readonly clock: Clock;
+  private readonly clock: TimeSource;
   private readonly running = new Map<string, Running>();
   private readonly listeners = new Set<(devices: readonly DummyDevice[]) => void>();
 
-  constructor(options: { readonly clock?: Clock } = {}) {
+  constructor(options: { readonly clock?: TimeSource } = {}) {
     this.clock = options.clock ?? { now: () => Date.now() };
     this.central = new BleSimulator({ clock: this.clock });
   }

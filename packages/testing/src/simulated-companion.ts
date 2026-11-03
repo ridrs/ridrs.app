@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { BridgeServer, PairingAuthority, type PairingState } from '@ridrs/ble-bridge';
-import type { BleCentral, Clock } from '@ridrs/contracts';
+import type { BleCentral, TimeSource } from '@ridrs/contracts';
 import type { SimulatedNetwork } from './bridge-network.ts';
 
 export interface SimulatedCompanionOptions {
@@ -10,7 +10,7 @@ export interface SimulatedCompanionOptions {
   readonly address: string;
   /** What the companion forwards: a simulator, dummy devices, or both. */
   readonly central: BleCentral;
-  readonly clock: Clock;
+  readonly clock: TimeSource;
   /** The pairing code the phone shows (every fresh code too). */
   readonly code: string;
   readonly announced?: boolean;
@@ -46,7 +46,7 @@ export class SimulatedCompanion {
   }
 
   private boot(): [PairingAuthority, BridgeServer] {
-    const clock: Clock = { now: () => this.options.clock.now() + this.clockOffsetMs };
+    const clock: TimeSource = { now: () => this.options.clock.now() + this.clockOffsetMs };
     const authority = new PairingAuthority({
       clock,
       generateCode: () => this.options.code,

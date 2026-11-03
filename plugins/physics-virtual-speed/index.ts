@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  configSnapshotCapability,
   definePlugin,
   type MotionResult,
   type MotionState,
@@ -15,7 +16,7 @@ import {
   physicsTotalResistanceCapability,
   type RoadSample,
 } from '@ridrs/contracts';
-import { driveForce, integrate, isValidGradient } from './integrator.ts';
+import { driveForce, integrate, isValidGradient, VIRTUAL_SPEED_DEFAULTS } from './integrator.ts';
 
 function assertFinite(ctx: PluginContext, what: string, value: number): number {
   if (!Number.isFinite(value)) {
@@ -70,6 +71,11 @@ function forcesAt(ctx: PluginContext, at: number, speed: number, distance: numbe
  */
 export default definePlugin({
   initialize(ctx) {
+    // `minimumDriveSpeed` is v_min of docs/architecture/physics.md.
+    ctx.capabilities.provide(configSnapshotCapability, {
+      section: ctx.manifest.id,
+      snapshot: () => ({ ...VIRTUAL_SPEED_DEFAULTS }),
+    });
     ctx.capabilities.provide(physicsMotionCapability, {
       initial(at): MotionResult {
         const { mass, power, road, resistance } = forcesAt(ctx, at, 0, 0);

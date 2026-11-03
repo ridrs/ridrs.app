@@ -1,0 +1,9 @@
+{
+  "id": "fixture-storage-memory",
+  "name": "Memory Storage (fixture)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["storage.app-files", "config.snapshot"],
+  "requires": [],
+  "entry": "index.ts"
+}

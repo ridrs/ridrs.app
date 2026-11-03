@@ -15,9 +15,12 @@ import {
   bridgePairingOfferEvent,
   bridgePairRequestedEvent,
   bridgeStateChangedEvent,
-  type Clock,
+  configSnapshotCapability,
   deviceConnectionChangedEvent,
+  deviceRawNotificationEvent,
   type EventDefinition,
+  exportFitWrittenEvent,
+  type HostPlatform,
   measurementCadenceEvent,
   measurementHeartRateEvent,
   measurementPowerEvent,
@@ -40,6 +43,10 @@ import {
   physicsStateBatchEvent,
   physicsStateEvent,
   physicsTotalResistanceCapability,
+  recordingCompletedEvent,
+  recordingFailedEvent,
+  storageAppFilesCapability,
+  type TimeSource,
 } from '@ridrs/contracts';
 import { PluginHost, type PluginSource } from '@ridrs/core';
 import type { FrameSource } from '@ridrs/presentation';
@@ -70,6 +77,10 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   bridgeForgetRequestedEvent,
   bridgeStateChangedEvent,
   bleTransportRequestedEvent,
+  deviceRawNotificationEvent,
+  recordingCompletedEvent,
+  recordingFailedEvent,
+  exportFitWrittenEvent,
 ];
 
 /**
@@ -91,7 +102,8 @@ export interface RidrsAppOptions {
   readonly root: HTMLElement;
   readonly logger: PluginLogger;
   readonly uiLogger?: UiLogger;
-  readonly clock?: Clock;
+  /** The live clock's time source; the OS's monotonic clock by default. */
+  readonly timeSource?: TimeSource;
   readonly disabledPlugins?: Iterable<string>;
   /** Keeps the display on while a ride runs: nobody touches the screen while pedalling. */
   readonly keepAwake?: KeepAwakePort;
@@ -101,6 +113,8 @@ export interface RidrsAppOptions {
   readonly onBleTransportRequested?: (transport: BleTransport) => void;
   /** Paces the UI's render clock; requestAnimationFrame by default (tests pass a timer source). */
   readonly frameSource?: FrameSource;
+  /** Who runs the host; recordings name it. */
+  readonly platform?: HostPlatform;
 }
 
 export interface RidrsApp {
@@ -119,7 +133,7 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
   const host = new PluginHost({
     sources: options.sources,
     disabledPlugins: [...(options.disabledPlugins ?? []), ...TRANSPORT_PLUGINS[otherTransport]],
-    clock: options.clock,
+    timeSource: options.timeSource,
     logger: options.logger,
     capabilities: [
       bleCentralCapability,
@@ -136,8 +150,11 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
       physicsTotalResistanceCapability,
       physicsPowertrainCapability,
       physicsMotionCapability,
+      configSnapshotCapability,
+      storageAppFilesCapability,
     ],
     events: RIDRS_EVENTS,
+    platform: options.platform,
   });
   // Before start, so values published while plugins start (the initial activity state) are cached.
   const bridge = createInProcessUiBridge(host, RIDRS_EVENTS);
