@@ -183,7 +183,6 @@ export {
   physicsPowertrainCapability,
   physicsResistanceCapability,
   physicsRiderCapability,
-  physicsRoadCapability,
   physicsStateBatchEvent,
   physicsStateBatchSchema,
   physicsStateEvent,
@@ -195,7 +194,6 @@ export {
   type ResistanceProvider,
   type RiderCapability,
   type RiderParameters,
-  type RoadCapability,
   type RoadSample,
   STANDARD_GRAVITY,
   type TotalResistanceCapability,
@@ -231,6 +229,22 @@ export {
   recordingSnapshotSchema,
 } from './recording.ts';
 export {
+  type PluginSpatialContext,
+  type SpatialChannels,
+  type SpatialInterpolation,
+  type SpatialPoint,
+  type SpatialQuality,
+  type SpatialSeriesCapability,
+  type SpatialSeriesReader,
+  type SpatialSeriesWriter,
+  type SpatialUnavailableReason,
+  type SpatialValue,
+  type SpatialWindow,
+  type SpatialWriteResult,
+  spatialTerrainCapability,
+  type TerrainPoint,
+} from './spatial.ts';
+export {
   type AppFileEntry,
   type AppFiles,
   assertAppFilePath,
@@ -264,3 +278,12 @@ export {
   uiRegistryChangedEvent,
   uiScreenSchema,
 } from './ui.ts';
+export {
+  TERRAIN_SURFACES,
+  type TerrainPreview,
+  type TerrainSample,
+  type TerrainSurface,
+  terrainPreviewSchema,
+  uiTerrainObservedEvent,
+  worldTerrainPreviewEvent,
+} from './world.ts';

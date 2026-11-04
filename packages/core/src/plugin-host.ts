@@ -33,6 +33,7 @@ import { type DiscoveredPlugin, discoverPlugins, type PluginSource } from './dis
 import { EventBus } from './event-bus.ts';
 import { createSilentLogger } from './logger.ts';
 import { resolveCapabilities } from './resolution.ts';
+import { SpatialService } from './spatial-service.ts';
 import { TemporalService } from './temporal-service.ts';
 import { computeUiRegistry } from './ui-registry.ts';
 
@@ -113,6 +114,7 @@ export class PluginHost {
   private readonly capabilityRegistry: CapabilityRegistry;
   private readonly eventBus: EventBus;
   private readonly temporal: TemporalService;
+  private readonly spatial: SpatialService;
   private readonly plugins = new Map<string, ManagedPlugin>();
   private dependencyGraph?: DepGraph<string>;
   private startOrder: string[] = [];
@@ -173,6 +175,10 @@ export class PluginHost {
     this.temporal = new TemporalService({
       clock: this.clock,
       diagnostics: this.diagnostics,
+      isPluginActive: (pluginId) => this.plugins.get(pluginId)?.state === 'started',
+      mayWrite: () => this.inTurn(),
+    });
+    this.spatial = new SpatialService({
       isPluginActive: (pluginId) => this.plugins.get(pluginId)?.state === 'started',
       mayWrite: () => this.inTurn(),
     });
@@ -484,6 +490,7 @@ export class PluginHost {
         this.releaseHostObservations(pluginId);
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
+        this.spatial.releasePlugin(pluginId);
         this.failPluginAndBlockDependents(pluginId);
         continue;
       }
@@ -505,6 +512,7 @@ export class PluginHost {
         this.releaseHostObservations(pluginId);
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
+        this.spatial.releasePlugin(pluginId);
         this.failPluginAndBlockDependents(pluginId);
         continue;
       }
@@ -542,6 +550,7 @@ export class PluginHost {
         this.releaseHostObservations(pluginId);
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
+        this.spatial.releasePlugin(pluginId);
         this.failPluginAndBlockDependents(pluginId);
       }
     }
@@ -607,6 +616,7 @@ export class PluginHost {
       this.releaseHostObservations(pluginId);
       this.releasePluginTasks(pluginId);
       this.temporal.releasePlugin(pluginId);
+      this.spatial.releasePlugin(pluginId);
       this.failPluginAndBlockDependents(pluginId);
     }
     this.refreshUiRegistry();
@@ -662,6 +672,7 @@ export class PluginHost {
         this.releaseHostObservations(pluginId);
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
+        this.spatial.releasePlugin(pluginId);
       }
     }
     if (this.clock instanceof LiveClock) {
@@ -736,6 +747,7 @@ export class PluginHost {
       this.releaseHostObservations(pluginId);
       this.releasePluginTasks(pluginId);
       this.temporal.releasePlugin(pluginId);
+      this.spatial.releasePlugin(pluginId);
     }
   }
 
@@ -765,6 +777,10 @@ export class PluginHost {
       capabilities: this.capabilityRegistry.createPluginCapabilitiesContext(manifest),
       // Writers are handed out while the plugin initializes; its state is still 'discovered'.
       temporal: this.temporal.createPluginTemporalContext(
+        manifest,
+        () => managed.state === 'discovered',
+      ),
+      spatial: this.spatial.createPluginSpatialContext(
         manifest,
         () => managed.state === 'discovered',
       ),
@@ -912,6 +928,7 @@ export class PluginHost {
         this.releaseHostObservations(depId);
         this.releasePluginTasks(depId);
         this.temporal.releasePlugin(depId);
+        this.spatial.releasePlugin(depId);
         this.logger.warn({ pluginId: depId, state: 'blocked' }, `Plugin "${depId}" is blocked`);
       }
     }

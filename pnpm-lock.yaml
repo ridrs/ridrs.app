@@ -253,6 +253,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ridrs/spatial':
+        specifier: workspace:*
+        version: link:../spatial
       '@ridrs/temporal':
         specifier: workspace:*
         version: link:../temporal
@@ -320,6 +323,12 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/spatial:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/temporal:
     dependencies:
@@ -522,12 +531,6 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contracts
 
-  plugins/physics-road:
-    dependencies:
-      '@ridrs/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-
   plugins/physics-rolling-resistance:
     dependencies:
       '@ridrs/contracts':
@@ -554,6 +557,12 @@ importers:
       '@ridrs/recording':
         specifier: workspace:*
         version: link:../../packages/recording
+
+  plugins/spatial-terrain:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
 
   plugins/storage-files-node:
     dependencies:
@@ -667,7 +676,7 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
 
-  plugins/ui-landscape-flat:
+  plugins/ui-landscape-demo:
     dependencies:
       '@ridrs/contracts':
         specifier: workspace:*
@@ -804,6 +813,12 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+
+  plugins/world-driver-ui:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
 
 packages:
 

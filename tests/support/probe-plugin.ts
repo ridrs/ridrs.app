@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { defineCapability, definePlugin, type PluginContext } from '@ridrs/contracts';
+import {
+  defineCapability,
+  definePlugin,
+  type PluginContext,
+  spatialTerrainCapability,
+} from '@ridrs/contracts';
 import { getActiveWorld, type LifecycleHookName } from './world.ts';
 
 async function runLifecycleHook(ctx: PluginContext, hook: LifecycleHookName): Promise<void> {
@@ -44,9 +49,19 @@ async function runLifecycleHook(ctx: PluginContext, hook: LifecycleHookName): Pr
       const writer = ctx.temporal.writer(contract, { strategy: write.strategy });
       world.temporalWriters.set(write.series, { pluginId, writer });
     }
+
+    if (behavior.spatialWrite === spatialTerrainCapability.id) {
+      const writer = ctx.spatial.writer(spatialTerrainCapability, {
+        channels: { gradient: 'linear', surface: 'step' },
+      });
+      world.spatialWriters.set(spatialTerrainCapability.id, { pluginId, writer });
+    }
   }
 
   if (hook === 'start') {
+    for (const onStart of behavior.onStart) {
+      onStart(ctx);
+    }
     for (const series of behavior.temporalReads) {
       const reader = ctx.temporal.reader(world.getOrRegisterCapability(series));
       reader.onFreshnessChange((freshness, at) => {

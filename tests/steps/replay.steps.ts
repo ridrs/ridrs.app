@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Given, Then, When } from '@cucumber/cucumber';
 import {
@@ -382,6 +383,71 @@ Then(
     assert.ok(
       result(this).inputs.some((input) => input.type === type && input.count === 1),
       JSON.stringify(result(this).inputs),
+    );
+  },
+);
+
+// ---- Older recordings ----------------------------------------------------------------------
+
+const RECORDING_FIXTURES = resolve(import.meta.dirname, '../fixtures/recordings');
+
+Given(
+  'the recording fixture {string}, made before the terrain preview existed',
+  async function (this: RidrsWorld, name: string) {
+    const text = new TextDecoder().decode(
+      await gunzip(new Uint8Array(await readFile(resolve(RECORDING_FIXTURES, name)))),
+    );
+    this.replayLines = text.split('\n').filter((line) => line.length > 0);
+    assert.ok(
+      this.replayLines.every((line) => !line.includes('"world.terrain-preview"')),
+      'The fixture must predate the terrain preview',
+    );
+  },
+);
+
+function assertAllCompared(world: RidrsWorld, type: string): void {
+  const of = result(world).streams.filter((s) => s.type === type);
+  assert.ok(of.length > 0 && of.every((s) => s.recorded > 0), `No "${type}" events compared`);
+  for (const stream of of) {
+    assert.equal(stream.matched, stream.recorded, `${type} from ${stream.source}`);
+    assert.equal(stream.replayed, stream.recorded, `${type} from ${stream.source}`);
+  }
+}
+
+Then(
+  'the replay compared every {string} and {string} event of the recording',
+  function (this: RidrsWorld, first: string, second: string) {
+    assertAllCompared(this, first);
+    assertAllCompared(this, second);
+  },
+);
+
+Then(
+  'the replay compared every {string} event of the ride, and there was at least one',
+  function (this: RidrsWorld, type: string) {
+    assertAllCompared(this, type);
+  },
+);
+
+Then('the replay left out no event type', function (this: RidrsWorld) {
+  assert.deepEqual(result(this).notCompared, []);
+});
+
+// ---- Phase 10: the terrain as an input -------------------------------------------------------
+
+Then(
+  'the replay injected every recorded {string} as an input, and there was more than one',
+  async function (this: RidrsWorld, type: string) {
+    const recorded = (await lastRecording(this)).events.filter((e) => e.envelope.type === type);
+    assert.ok(recorded.length > 1, `${recorded.length} "${type}" recorded`);
+    assert.ok(
+      recorded.every((e) => e.envelope.input === true),
+      `"${type}" is not an input`,
+    );
+    const injected = result(this).inputs.filter((input) => input.type === type);
+    assert.equal(
+      injected.reduce((sum, input) => sum + input.count, 0),
+      recorded.length,
     );
   },
 );

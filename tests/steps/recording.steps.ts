@@ -9,7 +9,9 @@ import {
   activityStateChangedEvent,
   type EventEnvelope,
   type HostDescription,
+  type PhysicsState,
   type PluginManifest,
+  physicsStateEvent,
   type RecordingEvent,
   RidrsError,
   recordingCompletedEvent,
@@ -17,7 +19,6 @@ import {
 import { type Recording, readRecording } from '@ridrs/recording';
 import { TEMPORAL_DEFAULTS } from '@ridrs/temporal';
 import { BleSimulator, type SimulatedPeripheral } from '@ridrs/testing';
-import { DEMO_COURSE } from '../../plugins/physics-road/course.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import {
   useSimulatedCentral as addSimulatedCentral,
@@ -420,12 +421,19 @@ Then(
 );
 
 Then(
-  'the event records are numbered 1, 2, 3 … without gaps, in publish order',
+  'the event and diagnostic records are numbered 1, 2, 3 … without gaps, in publish order',
   async function (this: RidrsWorld) {
-    const events = eventsOf(await lastRecording(this));
+    const recording = await lastRecording(this);
+    const events = eventsOf(recording);
+    // Events and diagnostics share one sequence.
+    const numbered = recording.records
+      .flatMap((record) =>
+        record.kind === 'event' || record.kind === 'diagnostic' ? [record.seq] : [],
+      )
+      .sort((a, b) => a - b);
     assert.deepEqual(
-      events.map((e) => e.seq),
-      events.map((_, i) => i + 1),
+      numbered,
+      numbered.map((_, i) => i + 1),
     );
     // The same order as the World's own tap on the bus.
     const recorded = new Set(events.map((e) => e.envelope.id));
@@ -506,10 +514,16 @@ Then(
 );
 
 Then(
-  'the snapshot section {string} contains the course segments',
-  async function (this: RidrsWorld, section: string) {
+  'the snapshot section {string} contains the surface factors {string}',
+  async function (this: RidrsWorld, section: string, factorsCsv: string) {
     const value = sectionOf(await lastRecording(this), section);
-    assert.deepEqual(value.course, DEMO_COURSE);
+    const expected = Object.fromEntries(
+      splitCsv(factorsCsv).map((pair) => {
+        const [surface, factor] = pair.split(' ');
+        return [surface, Number(factor)];
+      }),
+    );
+    assert.deepEqual(value.surfaceFactors, expected);
   },
 );
 
@@ -598,3 +612,37 @@ export function rideState(world: RidrsWorld): Extract<ActivityState, { state: 'r
   assert.ok(running?.state === 'running', 'Expected a ride');
   return running;
 }
+
+// ---- Phase 10: the terrain as an input -------------------------------------------------------
+
+Then(
+  'every recorded {string} of the ride is not pre-roll',
+  async function (this: RidrsWorld, type: string) {
+    const recorded = eventsOf(await lastRecording(this)).filter((e) => e.envelope.type === type);
+    assert.ok(recorded.length > 0, `No "${type}" recorded`);
+    assert.ok(
+      recorded.every((e) => !e.preroll && e.envelope.timestamp >= rideState(this).startedAt),
+    );
+  },
+);
+
+function recordedStatesOfRide(recording: Recording, world: RidrsWorld): PhysicsState[] {
+  const { sessionId } = rideState(world);
+  const states = eventsOf(recording)
+    .filter((e) => e.envelope.type === physicsStateEvent.id)
+    .map((e) => e.envelope.payload as PhysicsState)
+    .filter((state) => state.sessionId === sessionId);
+  assert.ok(states.length > 10, `Only ${states.length} physics states recorded`);
+  return states;
+}
+
+Then(
+  'every recorded {string} of the ride is on {string}',
+  async function (this: RidrsWorld, type: string, surface: string) {
+    assert.equal(type, physicsStateEvent.id);
+    const surfaces = new Set(
+      recordedStatesOfRide(await lastRecording(this), this).map((state) => state.road.surface),
+    );
+    assert.deepEqual([...surfaces], [surface]);
+  },
+);

@@ -9,7 +9,7 @@ Feature: Composing the activity screen from independent plugins
   visual result is part of the manual check of apps/native.
 
   Background:
-    Given the ridrs plugins "activity-session, metric-power, metric-cadence, ui-main-screen, ui-activity-screen, ui-landscape-flat, ui-hud, ui-widget-power, ui-widget-cadence" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, metric-power, metric-cadence, ui-main-screen, ui-activity-screen, ui-landscape-demo, ui-hud, ui-widget-power, ui-widget-cadence" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 
@@ -23,7 +23,7 @@ Feature: Composing the activity screen from independent plugins
 
   Scenario: The activity screen is assembled from contributions
     When I press "Start ride"
-    Then the slot "activity/landscape" contains the contribution "ui-landscape-flat/landscape"
+    Then the slot "activity/landscape" contains the contribution "ui-landscape-demo/landscape"
     And the slot "activity/hud" contains the contribution "ui-hud/hud"
     And the slot "hud/widget" contains the contributions "ui-widget-power/power, ui-widget-cadence/cadence" in this order
 
@@ -35,7 +35,7 @@ Feature: Composing the activity screen from independent plugins
     And the "Finish ride" button is stacked above the HUD layer
 
   Scenario: The screen does not know its contributors
-    Then the manifest and the client of "ui-activity-screen" mention none of "ui-hud, ui-landscape-flat, ui-widget-power, ui-widget-cadence"
+    Then the manifest and the client of "ui-activity-screen" mention none of "ui-hud, ui-landscape-demo, ui-widget-power, ui-widget-cadence"
 
   Scenario: Power and cadence are shown during a ride
     Given I press "Start ride"

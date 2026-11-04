@@ -8,6 +8,7 @@ export {
   compare,
   type Difference,
   type StreamComparison,
+  type UncomparedStream,
 } from './compare.ts';
 export {
   type ConfigurationDifferences,

@@ -11,11 +11,16 @@ Feature: Physics as replaceable plugins
     Examples:
       | plugin                     | requires                                                                       |
       | physics-engine             | physics.motion                                                                 |
-      | physics-virtual-speed      | physics.bicycle, physics.powertrain, physics.rider, physics.road, physics.total-resistance |
+      | physics-virtual-speed      | physics.bicycle, physics.powertrain, physics.rider, physics.total-resistance, spatial.terrain |
       | physics-total-resistance   | physics.resistance                                                             |
       | physics-rolling-resistance | physics.bicycle                                                                |
       | physics-aerodynamics       | physics.environment, physics.rider                                             |
       | physics-powertrain         | metric.power                                                                   |
+
+  Scenario: The environment needs nothing
+    Given the ridrs physics plugins together with a probe plugin "test-ui"
+    And the host has started
+    Then the manifest of "physics-environment" requires nothing
 
   Scenario: A different rider changes the speed, not the code
     Given the ridrs physics plugins without "physics-rider" together with a test device plugin "test-device" and a probe plugin "test-ui"

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { defineCapability } from './capabilities.ts';
 import { defineEvent } from './events.ts';
 import type { TemporalValue } from './temporal.ts';
+import type { TerrainSurface } from './world.ts';
 
 /*
  * The physics is one-dimensional and uses SI units throughout: kg, m, s, m/s, m/s², N, W, m²,
@@ -53,18 +54,16 @@ export interface EnvironmentCapability {
   parameters(): EnvironmentParameters;
 }
 
-/** The road under the rider at one position. */
+/**
+ * The road under the rider at one position, as the physics read it from the spatial layer
+ * (`spatial.terrain`).
+ */
 export interface RoadSample {
   /** Rise over run, dimensionless: 0.05 is 5 % uphill, -0.05 is 5 % downhill. */
   readonly gradient: number;
+  /** What the road is made of; scales the rolling resistance. */
+  readonly surface: TerrainSurface;
   readonly origin: PhysicsParameterOrigin;
-}
-
-export interface RoadCapability {
-  /** The providing plugin's manifest id, so that an invalid sample can name it. */
-  readonly source: string;
-  /** The road at `distance` m along the ride, distance ≥ 0. */
-  at(distance: number): RoadSample;
 }
 
 /**
@@ -177,11 +176,6 @@ export const physicsEnvironmentCapability = defineCapability<
   'physics.environment'
 >('physics.environment', { cardinality: 'single' });
 
-export const physicsRoadCapability = defineCapability<RoadCapability, 'single', 'physics.road'>(
-  'physics.road',
-  { cardinality: 'single' },
-);
-
 export const physicsResistanceCapability = defineCapability<
   ResistanceProvider,
   'multiple',
@@ -248,7 +242,11 @@ export const physicsStateSchema: z.ZodType<PhysicsState> = z.object({
     total: finite,
     contributions: z.array(z.object({ source: z.string().min(1), force: finite })),
   }),
-  road: z.object({ gradient: finite, origin: z.literal('default') }),
+  road: z.object({
+    gradient: finite,
+    surface: z.enum(['asphalt', 'gravel']),
+    origin: z.literal('default'),
+  }),
 });
 
 /** Interim publication of the simulation state at about 4 Hz of simulation time. */

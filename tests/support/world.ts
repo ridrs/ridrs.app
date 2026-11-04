@@ -51,25 +51,31 @@ import {
   metricPowerEvent,
   metricPowerHeartRateRatioCapability,
   metricPowerHeartRateRatioEvent,
+  type PluginContext,
   physicsBicycleCapability,
   physicsEnvironmentCapability,
   physicsMotionCapability,
   physicsPowertrainCapability,
   physicsResistanceCapability,
   physicsRiderCapability,
-  physicsRoadCapability,
   physicsStateBatchEvent,
   physicsStateEvent,
   physicsTotalResistanceCapability,
   type ResistanceBreakdown,
   recordingCompletedEvent,
   recordingFailedEvent,
+  type SpatialSeriesWriter,
+  type SpatialWriteResult,
+  spatialTerrainCapability,
   storageAppFilesCapability,
   type TemporalRecordResult,
   type TemporalSeriesWriter,
   type TemporalSnapshot,
+  type TerrainPoint,
   type TimeSource,
   uiRegistryChangedEvent,
+  uiTerrainObservedEvent,
+  worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
 import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
@@ -104,6 +110,11 @@ export interface ProbeBehavior {
   temporalWrite?: { readonly series: string; readonly strategy: EstimationStrategy };
   readonly temporalReads: string[];
   readonly temporalCombines: string[][];
+  /** Phase 10: the spatial series this probe writes and reads. */
+  spatialWrite?: string;
+  readonly spatialReads: string[];
+  /** Run when the probe starts, e.g. to subscribe like a real plugin. */
+  readonly onStart: ((ctx: PluginContext) => void)[];
 }
 
 export function createDefaultProbeBehavior(): ProbeBehavior {
@@ -116,6 +127,8 @@ export function createDefaultProbeBehavior(): ProbeBehavior {
     missingEntry: false,
     temporalReads: [],
     temporalCombines: [],
+    spatialReads: [],
+    onStart: [],
   };
 }
 
@@ -130,6 +143,8 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   metricPowerHeartRateRatioEvent,
   physicsStateEvent,
   physicsStateBatchEvent,
+  worldTerrainPreviewEvent,
+  uiTerrainObservedEvent,
   measurementPowerEvent,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -163,6 +178,8 @@ const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   activityStateChangedEvent,
   physicsStateEvent,
   physicsStateBatchEvent,
+  worldTerrainPreviewEvent,
+  uiTerrainObservedEvent,
   bridgeCompanionsChangedEvent,
   bridgePairingOfferEvent,
   bridgeStateChangedEvent,
@@ -277,6 +294,12 @@ export class RidrsWorld extends World {
   readonly freshnessChanges = new Map<string, Array<{ freshness: Freshness; at: number }>>();
   readonly snapshots = new Map<string, TemporalSnapshot[]>();
   lastRecordResult?: TemporalRecordResult;
+  // Phase 10 state: spatial probes, keyed by series id.
+  readonly spatialWriters = new Map<
+    string,
+    { readonly pluginId: string; readonly writer: SpatialSeriesWriter<TerrainPoint> }
+  >();
+  lastSpatialWriteResult?: SpatialWriteResult;
   requestedSnapshot?: TemporalSnapshot;
   /** Last delivery per series of the "delivers ... every ..." steps. */
   readonly lastDeliveries = new Map<string, number>();
@@ -310,13 +333,13 @@ export class RidrsWorld extends World {
       physicsBicycleCapability,
       physicsRiderCapability,
       physicsEnvironmentCapability,
-      physicsRoadCapability,
       physicsResistanceCapability,
       physicsTotalResistanceCapability,
       physicsPowertrainCapability,
       physicsMotionCapability,
       configSnapshotCapability,
       storageAppFilesCapability,
+      spatialTerrainCapability,
     ]) {
       this.capabilityContracts.set(contract.id, contract);
     }
@@ -407,14 +430,18 @@ export class RidrsWorld extends World {
   /** (Re)writes a probe plugin folder from its temporal behavior: writes provide, reads require. */
   async writeTemporalProbe(pluginId: string): Promise<void> {
     const behavior = this.getBehavior(pluginId);
-    const write = behavior.temporalWrite;
+    const write = behavior.temporalWrite?.series ?? behavior.spatialWrite;
     await this.writeProbePluginFolder({
       folder: pluginId,
       id: pluginId,
-      provides: write ? [write.series] : [],
+      provides: write ? [write] : [],
       requires: [
-        ...new Set([...behavior.temporalReads, ...behavior.temporalCombines.flat()]),
-      ].filter((series) => series !== write?.series),
+        ...new Set([
+          ...behavior.temporalReads,
+          ...behavior.temporalCombines.flat(),
+          ...behavior.spatialReads,
+        ]),
+      ].filter((series) => series !== write),
     });
   }
 

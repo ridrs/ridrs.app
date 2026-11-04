@@ -4,7 +4,7 @@ Feature: The GUI renders on its own clock
   physics 60 ms in the past; the frame rate never changes the physics.
 
   Background:
-    Given the ridrs physics plugins and "ui-landscape-flat" together with a test device plugin "test-device" and a probe plugin "test-ui"
+    Given the ridrs physics plugins and "ui-landscape-demo" together with a test device plugin "test-device" and a probe plugin "test-ui"
     And the host has started
 
   Scenario: Sixty frames and one hundred steps per second
@@ -50,9 +50,9 @@ Feature: The GUI renders on its own clock
 
   Scenario: A failing frame handler does not stop the frames or the physics
     Given a presentation client renders at 60 frames per second
-    And a second frame handler of "ui-landscape-flat" throws on every frame
+    And a second frame handler of "ui-landscape-demo" throws on every frame
     And "test-ui" published "activity.start-requested"
     When "test-device" delivers only power 200 W every 0.25 s for 1 second
     Then 60 frames were rendered
-    And a client failure of "ui-landscape-flat" was reported once
+    And a client failure of "ui-landscape-demo" was reported once
     And the state at "+1000 ms" is step 100

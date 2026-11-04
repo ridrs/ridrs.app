@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   activityStartRequestedEvent,
@@ -17,10 +17,10 @@ import {
   physicsPowertrainCapability,
   physicsResistanceCapability,
   physicsRiderCapability,
-  physicsRoadCapability,
   physicsStateEvent,
   physicsTotalResistanceCapability,
   type ResistanceProvider,
+  spatialTerrainCapability,
 } from '@ridrs/contracts';
 import { createBundledPluginSource, createSilentLogger, PluginHost } from '@ridrs/core';
 import FakeTimers from '@sinonjs/fake-timers';
@@ -37,13 +37,21 @@ const CONTRIBUTORS = [
   'physics-aerodynamics',
   'physics-gravity-resistance',
   'physics-environment',
-  'physics-road',
   'physics-total-resistance',
   'physics-powertrain',
   'physics-virtual-speed',
 ];
 
-const RIDE_PLUGINS = ['activity-session', 'metric-power', 'physics-engine', ...CONTRIBUTORS];
+/** Every plugin under plugins/physics-*, read from the folder: new ones are covered too. */
+const PHYSICS_PLUGINS = readdirSync(PLUGINS_DIR).filter((id) => id.startsWith('physics-'));
+
+const RIDE_PLUGINS = [
+  'activity-session',
+  'metric-power',
+  'physics-engine',
+  'spatial-terrain',
+  ...CONTRIBUTORS,
+];
 
 async function definitionOf(id: string): Promise<PluginDefinition> {
   const module = (await import(`../../plugins/${id}/index.ts`)) as { default: PluginDefinition };
@@ -80,6 +88,16 @@ function recordingContext(id: string) {
         return [];
       },
     },
+    spatial: {
+      reader: (capability: CapabilityContract) => {
+        capabilities.push(`spatial reader ${capability.id}`);
+        return { series: capability.id };
+      },
+      writer: () => {
+        used.push('spatial writer');
+        throw new Error('physics plugins never write a series');
+      },
+    },
     temporal: {
       reader: (capability: CapabilityContract) => ({ series: capability.id }),
       writer: () => {
@@ -97,7 +115,7 @@ function recordingContext(id: string) {
 }
 
 describe('physics contributors', () => {
-  it.each(CONTRIBUTORS)('%s neither subscribes nor publishes', async (id) => {
+  it.each(CONTRIBUTORS)('%s publishes nothing and listens to nothing', async (id) => {
     const definition = await definitionOf(id);
     const { ctx, used } = recordingContext(id);
     await definition.initialize?.(ctx);
@@ -106,22 +124,42 @@ describe('physics contributors', () => {
   });
 });
 
-describe('physics inputs and forces stay apart', () => {
-  it.each([
-    ['physics-road', 'physics.road'],
-    ['physics-environment', 'physics.environment'],
-  ])('%s provides only its parameters and computes no forces', async (id, capability) => {
-    const { ctx, capabilities } = recordingContext(id);
-    await (await definitionOf(id)).initialize?.(ctx);
-    // The parameters, and the same parameters as the plugin's configuration snapshot.
-    expect(capabilities).toEqual([`provide ${capability}`, 'provide config.snapshot']);
+describe('data never reaches the physics by event', () => {
+  it('finds the physics plugins', () => {
+    expect(PHYSICS_PLUGINS).toEqual(expect.arrayContaining(['physics-engine', ...CONTRIBUTORS]));
   });
+
+  it.each(PHYSICS_PLUGINS)('%s subscribes to lifecycle events (activity.*) only', async (id) => {
+    const definition = await definitionOf(id);
+    const { ctx, used } = recordingContext(id);
+    await definition.initialize?.(ctx);
+    await definition.start?.(ctx);
+    const subscriptions = used.filter((use) => use.startsWith('subscribe '));
+    expect(subscriptions.filter((use) => !use.startsWith('subscribe activity.'))).toEqual([]);
+  });
+});
+
+describe('physics inputs and forces stay apart', () => {
+  it.each([['physics-environment', 'physics.environment']])(
+    '%s provides only its parameters and computes no forces',
+    async (id, capability) => {
+      const { ctx, capabilities } = recordingContext(id);
+      await (await definitionOf(id)).initialize?.(ctx);
+      // The parameters, and the same parameters as the plugin's configuration snapshot.
+      expect(capabilities).toEqual([`provide ${capability}`, 'provide config.snapshot']);
+    },
+  );
 
   it('physics-gravity-resistance reads no provider: mass and road come in the input', async () => {
     const { ctx, capabilities, provided } = recordingContext('physics-gravity-resistance');
     await (await definitionOf('physics-gravity-resistance')).initialize?.(ctx);
     const [resistance] = provided as ResistanceProvider[];
-    resistance?.force({ at: T0, speed: 0, mass: 85, road: { gradient: 0.05, origin: 'default' } });
+    resistance?.force({
+      at: T0,
+      speed: 0,
+      mass: 85,
+      road: { gradient: 0.05, surface: 'asphalt', origin: 'default' },
+    });
     expect(capabilities).toEqual(['provide physics.resistance']);
   });
 });
@@ -158,12 +196,12 @@ describe('physics engine on the real host', () => {
         physicsBicycleCapability,
         physicsRiderCapability,
         physicsEnvironmentCapability,
-        physicsRoadCapability,
         physicsResistanceCapability,
         physicsTotalResistanceCapability,
         physicsPowertrainCapability,
         physicsMotionCapability,
         configSnapshotCapability,
+        spatialTerrainCapability,
       ],
     });
     const states: PhysicsState[] = [];

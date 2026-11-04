@@ -25,6 +25,17 @@ Feature: Resistance forces
     Then the contribution of "physics-rolling-resistance" is 4.12 N
     And the contribution of "physics-aerodynamics" is 19.60 N
 
+  @phase-10
+  Scenario Outline: Gravel doubles the rolling resistance (<surface>)
+    When "test-physics" evaluates the total resistance at 10 m/s with a mass of 85 kg on "<surface>"
+    Then the contribution of "physics-rolling-resistance" is <rolling> N
+    And the contribution of "physics-aerodynamics" is 19.60 N
+
+    Examples:
+      | surface | rolling |
+      | asphalt | 3.34    |
+      | gravel  | 6.67    |
+
   Scenario: Contributions are listed in a stable order
     When "test-physics" evaluates the total resistance at 10 m/s with a mass of 85 kg
     Then the contributions are "physics-aerodynamics, physics-gravity-resistance, physics-rolling-resistance" in this order

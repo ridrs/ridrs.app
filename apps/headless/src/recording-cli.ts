@@ -95,6 +95,11 @@ function report(result: ReplayResult, out: (line: string) => void): void {
       `stream     ${stream.type} (${stream.source}) ${stream.matched}/${stream.recorded} matched, ${stream.replayed} replayed`,
     );
   }
+  for (const stream of result.notCompared) {
+    out(
+      `uncompared ${stream.type} (${stream.source}) ${stream.replayed} replayed: the recording contains no such event`,
+    );
+  }
   const difference = result.firstDifference;
   if (difference) {
     out(

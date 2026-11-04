@@ -25,10 +25,24 @@ export interface Difference {
   readonly replayed: unknown;
 }
 
+/**
+ * A replayed stream whose event type the recording never contained: a recording made before the
+ * type existed cannot say what it should have been, so it is reported, not compared.
+ */
+export interface UncomparedStream {
+  readonly type: string;
+  readonly source: string;
+  readonly replayed: number;
+  readonly reason: 'not-in-recording';
+}
+
 export interface Comparison {
+  /** Whether every compared stream is equal; `notCompared` lists what was left out. */
   readonly identical: boolean;
   /** Sorted by type, then source. */
   readonly streams: readonly StreamComparison[];
+  /** Sorted by type, then source. */
+  readonly notCompared: readonly UncomparedStream[];
   /** The difference with the earliest timestamp. */
   readonly firstDifference?: Difference;
 }
@@ -145,7 +159,8 @@ function streamsOf(
 
 /**
  * Compares the ride's derived events per `(type, source)` stream, in order, with exact equality
- * of timestamp and payload. Envelope ids are not compared.
+ * of timestamp and payload (and envelope ids with `ids`). Streams of an event type that occurs
+ * nowhere in the recording are listed in `notCompared` instead.
  */
 export function compare(
   recorded: readonly RecordedEnvelope[],
@@ -155,12 +170,18 @@ export function compare(
   const left = streamsOf(recorded, options);
   const right = streamsOf(replayed, options);
   const keys = [...new Set([...left.keys(), ...right.keys()])].sort();
+  const recordedTypes = new Set(recorded.map((envelope) => envelope.type));
   const streams: StreamComparison[] = [];
+  const notCompared: UncomparedStream[] = [];
   let firstDifference: Difference | undefined;
   for (const key of keys) {
     const [type, source] = JSON.parse(key) as [string, string];
     const a = left.get(key) ?? [];
     const b = right.get(key) ?? [];
+    if (!recordedTypes.has(type)) {
+      notCompared.push({ type, source, replayed: b.length, reason: 'not-in-recording' });
+      continue;
+    }
     let matched = Math.max(a.length, b.length);
     for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
       const difference = differenceOf(
@@ -181,5 +202,5 @@ export function compare(
     }
     streams.push({ type, source, recorded: a.length, replayed: b.length, matched });
   }
-  return { identical: firstDifference === undefined, streams, firstDifference };
+  return { identical: firstDifference === undefined, streams, notCompared, firstDifference };
 }

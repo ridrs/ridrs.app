@@ -30,7 +30,7 @@ import {
   usePhysicsPlugins,
 } from './physics.steps.ts';
 
-const LANDSCAPE = 'ui-landscape-flat';
+const LANDSCAPE = 'ui-landscape-demo';
 
 /** Per-scenario state of these steps; the World stays free of Phase 7 details. */
 interface PresentationState {
@@ -401,7 +401,7 @@ Given('the app renders with a {int} FPS frame source', function (this: RidrsWorl
 async function landscape(world: RidrsWorld): Promise<HTMLElement> {
   const roots = world.uiViews.map((view) => view.root);
   assert.ok(roots[0], 'Expected the app to be shown');
-  return within(roots[0]).findByTestId('landscape-flat');
+  return within(roots[0]).findByTestId('landscape');
 }
 
 /** The distance the landscape presents, or undefined while it presents nothing. */

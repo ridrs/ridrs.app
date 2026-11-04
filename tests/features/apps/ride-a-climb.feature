@@ -7,7 +7,7 @@ Feature: Ride onto a climb
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
-    And the plugin "physics-road" is disabled
+    And the plugin "ui-landscape-demo" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
     Then the gradient widget shows "0.0" "%"
