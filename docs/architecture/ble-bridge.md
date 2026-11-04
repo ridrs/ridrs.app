@@ -28,6 +28,7 @@ WebSocket. Text messages are JSON (validated with zod); binary messages are noti
 | `scan`, `stop-scan` | `discovered` |
 | `connect`, `disconnect` | `connected`, `disconnected`, `failed`, `connection-lost` |
 | `subscribe`, `unsubscribe` | `subscribed`, binary frames |
+| `write` (hex bytes, Write Without Response; protocol 1.1) | `written` or `failed` |
 
 - **Pairing**: either the phone scans the QR code ridrs shows (`hello.pairingSecret`, ADR 0021), or the rider types the 6-digit code the phone shows into ridrs (`hello.pairingCode`). Both earn a token, which ridrs stores for later connects. A scanned secret is good for one pairing within ten minutes, and misses never lock. Five wrong codes lock code pairing for a minute, and the phone shows a fresh code after a successful one. "Forget paired ridrs" revokes all tokens.
 - **One ridrs at a time**: a second client is rejected with `busy`.

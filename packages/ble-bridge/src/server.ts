@@ -7,6 +7,7 @@ import {
   type BridgeMessage,
   type BridgeSocket,
   encodeBridgeFrame,
+  hexToBytes,
   normalizeBleUuid,
   type TimeSource,
 } from '@ridrs/contracts';
@@ -95,6 +96,9 @@ class ClientSession {
         return;
       case 'subscribe':
         void this.subscribe(message);
+        return;
+      case 'write':
+        void this.write(message);
         return;
       case 'bye':
         this.server.byeFromClient(this, message.reason);
@@ -221,6 +225,27 @@ class ClientSession {
       this.subscriptions.set(subscriptionId, { peripheralId, stop });
       sendMessage(this.socket, { type: 'subscribed', requestId, subscriptionId });
       this.server.changed();
+    } catch (error) {
+      if (!this.closed) {
+        sendMessage(this.socket, { type: 'failed', requestId, message: errorMessage(error) });
+      }
+    }
+  }
+
+  private async write(message: Extract<BridgeMessage, { type: 'write' }>): Promise<void> {
+    const { requestId, peripheralId } = message;
+    const connection = this.connections.get(peripheralId);
+    try {
+      if (!connection) {
+        throw new Error(`Peripheral "${peripheralId}" is not connected`);
+      }
+      await connection.write(
+        { serviceUuid: message.serviceUuid, characteristicUuid: message.characteristicUuid },
+        hexToBytes(message.data),
+      );
+      if (!this.closed) {
+        sendMessage(this.socket, { type: 'written', requestId });
+      }
     } catch (error) {
       if (!this.closed) {
         sendMessage(this.socket, { type: 'failed', requestId, message: errorMessage(error) });

@@ -55,6 +55,14 @@ export interface BlePeripheralLinkOptions {
    */
   readonly accept?: (peripheral: BleDiscoveredPeripheral) => boolean;
   /**
+   * Written once on every connection, after subscribing, for devices that only start notifying
+   * when greeted. The connection counts as `connected` only once it is written.
+   */
+  readonly handshake?: {
+    readonly characteristic: BleCharacteristicTarget;
+    readonly data: Uint8Array;
+  };
+  /**
    * Raw notification bytes; decoding stays with the device plugin. Every packet is published as
    * `device.raw-notification` first, malformed ones too.
    */
@@ -338,6 +346,9 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         stopListening();
         unsubscribe();
       };
+      if (options.handshake) {
+        await connection.write(options.handshake.characteristic, options.handshake.data);
+      }
     } catch (error) {
       teardown?.();
       await connection.disconnect().catch(() => undefined);

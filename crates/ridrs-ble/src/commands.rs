@@ -5,7 +5,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::ipc::{Channel, InvokeResponseBody};
-use tauri_plugin_blec::models::{BleDevice, ScanFilter};
+use tauri_plugin_blec::models::{BleDevice, ScanFilter, WriteType};
 use tauri_plugin_blec::{get_handler, OnDisconnectHandler};
 use uuid::Uuid;
 
@@ -183,6 +183,27 @@ pub async fn ble_subscribe(
     };
     handler
         .subscribe_to(&peripheral_id, characteristic, Some(service), callback)
+        .await
+        .map_err(err)
+}
+
+/// Write Without Response (a command); `data` arrives as a JSON number array.
+#[tauri::command]
+pub async fn ble_write(
+    peripheral_id: String,
+    service_uuid: String,
+    characteristic_uuid: String,
+    data: Vec<u8>,
+) -> Result<(), String> {
+    let handler = get_handler().map_err(err)?;
+    handler
+        .send_data_to(
+            &peripheral_id,
+            parse_uuid(&characteristic_uuid)?,
+            Some(parse_uuid(&service_uuid)?),
+            &data,
+            WriteType::WithoutResponse,
+        )
         .await
         .map_err(err)
 }

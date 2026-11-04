@@ -30,6 +30,7 @@ This project incorporates third-party open-source dependencies under the followi
 | `@testing-library/dom` | 10.4.2 | MIT | Auto-retrying DOM queries in UI scenarios |
 | `@types/react` / `@types/react-dom` | 19.3.0 | MIT | React TypeScript definitions |
 | `simple-statistics` | 7.12.1 | ISC | Median and least-squares slope in the temporal data layer (`@ridrs/temporal`) |
+| `@bufbuild/protobuf` | 2.16.0 | Apache-2.0 AND BSD-3-Clause | Protobuf wire reader for Zwift Ride keypad packets (`device-zwift-ride`) |
 
 Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/src-tauri/Cargo.lock`):
 

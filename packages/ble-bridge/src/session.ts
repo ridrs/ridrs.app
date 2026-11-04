@@ -10,6 +10,7 @@ import {
   type BridgeMessage,
   type BridgeRejectReason,
   type BridgeSocket,
+  bytesToHex,
   decodeBridgeFrame,
   normalizeBleUuid,
   type TimeSource,
@@ -69,6 +70,10 @@ class RemoteConnection implements BleConnection {
     onNotification: (data: Uint8Array) => void,
   ): Promise<() => void> {
     return this.session.subscribe(this.peripheralId, target, onNotification);
+  }
+
+  write(target: BleCharacteristicTarget, data: Uint8Array): Promise<void> {
+    return this.session.write(this.peripheralId, target, data);
   }
 
   onDisconnected(listener: () => void): () => void {
@@ -283,6 +288,25 @@ export class BridgeSession implements BleCentral {
   }
 
   /** @internal */
+  async write(
+    peripheralId: string,
+    target: BleCharacteristicTarget,
+    data: Uint8Array,
+  ): Promise<void> {
+    const reply = await this.request({
+      type: 'write',
+      requestId: this.nextRequestId++,
+      peripheralId,
+      serviceUuid: normalizeBleUuid(target.serviceUuid),
+      characteristicUuid: normalizeBleUuid(target.characteristicUuid),
+      data: bytesToHex(data),
+    });
+    if (reply.type !== 'written') {
+      throw new Error(`Unexpected reply "${reply.type}" to write`);
+    }
+  }
+
+  /** @internal */
   async disconnect(peripheralId: string): Promise<void> {
     this.connections.delete(peripheralId);
     if (this.closed) {
@@ -354,6 +378,7 @@ export class BridgeSession implements BleCentral {
       case 'connected':
       case 'disconnected':
       case 'subscribed':
+      case 'written':
       case 'failed': {
         const scan = this.scans.get(message.requestId);
         if (scan && message.type === 'failed') {

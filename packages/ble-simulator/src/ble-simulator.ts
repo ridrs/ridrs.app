@@ -12,6 +12,8 @@ import {
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
   normalizeBleUuid,
   type TimeSource,
+  ZWIFT_RIDE_NOTIFY_CHARACTERISTIC_UUID,
+  ZWIFT_RIDE_SERVICE_UUID,
 } from '@ridrs/contracts';
 
 export interface SimulatedPeripheralOptions {
@@ -20,6 +22,13 @@ export interface SimulatedPeripheralOptions {
   readonly serviceUuids: readonly string[];
   readonly poweredOn?: boolean;
   readonly acceptingConnections?: boolean;
+}
+
+/** One write a central made, with what it listened to at that moment. */
+export interface SimulatedWrite {
+  readonly data: Uint8Array;
+  /** `service:characteristic` keys with an active subscription when the write arrived. */
+  readonly subscribed: readonly string[];
 }
 
 function characteristicKey(serviceUuid: string, characteristicUuid: string): string {
@@ -52,6 +61,7 @@ export class SimulatedPeripheral {
   private readonly disconnectListeners = new Set<() => void>();
   private readonly connectedListeners = new Set<() => void>();
   private readonly notificationListeners = new Map<string, Set<(data: Uint8Array) => void>>();
+  private readonly writeLog = new Map<string, SimulatedWrite[]>();
   private readonly connectAttemptTimes: number[] = [];
   private lastDisconnectTime?: number;
   private readonly reconnectAttemptTimes: number[] = [];
@@ -176,6 +186,19 @@ export class SimulatedPeripheral {
     );
   }
 
+  notifyZwiftRide(bytesOrHex: Uint8Array | string): void {
+    this.notify(
+      ZWIFT_RIDE_SERVICE_UUID,
+      ZWIFT_RIDE_NOTIFY_CHARACTERISTIC_UUID,
+      toBytes(bytesOrHex),
+    );
+  }
+
+  /** Every write to this characteristic, over all connections, oldest first. */
+  getWrites(serviceUuid: string, characteristicUuid: string): readonly SimulatedWrite[] {
+    return [...(this.writeLog.get(characteristicKey(serviceUuid, characteristicUuid)) ?? [])];
+  }
+
   /** Registers a callback for every connection the central establishes with this peripheral. */
   onCentralConnected(listener: () => void): () => void {
     this.connectedListeners.add(listener);
@@ -248,6 +271,21 @@ export class SimulatedPeripheral {
         return () => {
           set?.delete(onNotification);
         };
+      },
+      write: async (characteristic: BleCharacteristicTarget, data: Uint8Array): Promise<void> => {
+        if (!this.connected) {
+          throw new Error(`Peripheral "${this.name}" is disconnected`);
+        }
+        const key = characteristicKey(
+          characteristic.serviceUuid,
+          characteristic.characteristicUuid,
+        );
+        const subscribed = [...this.notificationListeners]
+          .filter(([, listeners]) => listeners.size > 0)
+          .map(([k]) => k);
+        const log = this.writeLog.get(key) ?? [];
+        log.push({ data: data.slice(), subscribed });
+        this.writeLog.set(key, log);
       },
       onDisconnected: (listener: () => void): (() => void) => {
         this.disconnectListeners.add(listener);
@@ -327,6 +365,15 @@ export class BleSimulator implements BleCentral {
       peripheralId: options?.peripheralId,
       name,
       serviceUuids: [HEART_RATE_SERVICE_UUID],
+    });
+  }
+
+  /** A Zwift Ride: the left controller advertises and holds the link for the pair. */
+  addZwiftRide(name: string, options?: { readonly peripheralId?: string }): SimulatedPeripheral {
+    return this.addPeripheral({
+      peripheralId: options?.peripheralId,
+      name,
+      serviceUuids: [ZWIFT_RIDE_SERVICE_UUID],
     });
   }
 

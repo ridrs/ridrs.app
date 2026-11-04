@@ -1,0 +1,20 @@
+{
+  "name": "@ridrs-experiments/hr-monitor-osx",
+  "version": "0.1.0",
+  "private": true,
+  "description": "macOS desktop heart rate monitor experiment using Electron, TypeScript, and Web Bluetooth (0x180D)",
+  "license": "AGPL-3.0-or-later",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "ensure-electron": "node scripts/ensure-electron.cjs",
+    "build": "npm run ensure-electron && tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json",
+    "typecheck": "npm run ensure-electron && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "start": "npm run build && electron .",
+    "test": "npm run build && node --test dist/main/hr-parser.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^35.0.0",
+    "typescript": "^5.8.2"
+  }
+}
