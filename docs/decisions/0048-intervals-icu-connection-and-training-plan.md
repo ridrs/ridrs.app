@@ -8,7 +8,7 @@ Status: accepted by the maintainer on 2026-11-04 and implemented the same day. T
 
 The rider plans workouts on [intervals.icu](https://intervals.icu). The first use case: connect the account, load the athlete profile and the planned workouts, show the next workout on the main screen as a small widget, and its details on Enter. Uploading finished rides comes later and is out of scope.
 
-intervals.icu offers OAuth 2 (authorization code) with PKCE (S256) and "public" clients, which exchange the code without a client secret. There are no refresh tokens; signing in again replaces the token, and `DELETE /api/v1/disconnect-app` revokes it. Redirect URIs must be registered exactly, and the port counts too: a loopback redirect on another port fails with "Invalid redirect_uri" (found on the first real sign-in, 2026-11-05). Paths with an athlete id accept `0` for the token's athlete. Rate limits are at least 5 000 calls a day per app and 10 per second per IP.
+intervals.icu offers OAuth 2 (authorization code) with PKCE (S256) and "public" clients, which exchange the code without a client secret. There are no refresh tokens; signing in again replaces the token, and `DELETE /api/v1/disconnect-app` revokes it. Redirect URIs must be registered exactly; for `http://127.0.0.1` the port is ignored. The app is registered with `http://127.0.0.1/oauth/callback`, without a port; on 2026-11-05 a sign-in from the macOS app on port 47261 worked against it, so the port is not compared. Without a registered redirect URI, intervals.icu answers "Invalid redirect_uri". Paths with an athlete id accept `0` for the token's athlete. Rate limits are at least 5 000 calls a day per app and 10 per second per IP.
 
 ## Decision
 
@@ -16,7 +16,7 @@ intervals.icu offers OAuth 2 (authorization code) with PKCE (S256) and "public" 
 
 - **Public OAuth client "Ridrs.APP", client id `1697`**, with "PKCE required". The client id is configuration, not a secret: a constant in `planner-intervals-icu`. No client secret exists anywhere in ridrs.
 - **Scopes `SETTINGS:READ,CALENDAR:READ`**: the profile (sport settings) and the calendar. Nothing else.
-- **Redirect `http://127.0.0.1:47261/oauth/callback`** (loopback) on every platform: one mechanism for macOS and Android. The app listens on the fixed port 47261 only while a sign-in runs; this exact URI is registered for the app. The planner passes the port to `auth.browser-sign-in`. If another program holds the port, the sign-in fails (`sign-in-rejected`) and the rider can try again. Android may pause the app while the browser is in front; this is checked on the phone first (vertical use case). If it fails, a deep link replaces the loopback on Android only, in a follow-up ADR.
+- **Redirect `http://127.0.0.1:<port>/oauth/callback`** (loopback) on every platform: one mechanism for macOS and Android. The app listens on a free port only while a sign-in runs. Android may pause the app while the browser is in front; this is checked on the phone first (vertical use case). If it fails, a deep link replaces the loopback on Android only, in a follow-up ADR.
 - **PKCE with Web Crypto** (`crypto.getRandomValues`, `crypto.subtle.digest('SHA-256')`, built into Node and every webview): a 64-character verifier from the unreserved alphabet, the challenge base64url without padding, a random `state` of 32 characters. No library: three lines over a built-in API.
 - **The token is a secret.** It lives only in the capability `storage.secrets` (OS keychain, [ADR 0050](0050-secrets-in-the-os-keychain.md)), never in an event, a log, a recording or app files.
 
@@ -27,7 +27,7 @@ Each has exactly one consumer today (rule 3) and a simulated provider for the te
 | Capability | Cardinality | Shape | Native provider |
 | --- | --- | --- | --- |
 | `net.http` | single | `request({ method, url, headers?, body? }) → { status, headers, body: string }` | `net-http-tauri` ([ADR 0049](0049-http-and-loopback-sign-in-in-the-native-app.md)) |
-| `auth.browser-sign-in` | single | `signIn({ authorizationUrl(redirectUri), callbackPath, callbackPort }) → { redirectUri, callbackUrl }`; rejects with `sign-in-cancelled` when the browser flow is abandoned | `auth-sign-in-tauri` (ADR 0049) |
+| `auth.browser-sign-in` | single | `signIn({ authorizationUrl(redirectUri), callbackPath }) → { redirectUri, callbackUrl }`; rejects with `sign-in-cancelled` when the browser flow is abandoned | `auth-sign-in-tauri` (ADR 0049) |
 | `storage.secrets` | single | `get(key) → string \| undefined`, `set(key, value)`, `remove(key)` | `storage-secrets-tauri` (ADR 0050) |
 
 `net.http` returns the body as text so that a provider can cross any process boundary; the caller parses JSON.

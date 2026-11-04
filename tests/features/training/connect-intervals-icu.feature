@@ -5,8 +5,8 @@ Feature: Connecting intervals.icu
   with PKCE, it sends no client secret, only the verifier of its challenge. The token goes to the
   OS keychain and nowhere else, so a restart stays connected. Disconnecting revokes it.
 
-  intervals.icu accepts only the exact redirect URI registered for the app, port included, so ridrs
-  always listens on port 47261. Here intervals.icu, the browser and the keychain are simulated.
+  Here intervals.icu, the browser and the keychain are simulated; the simulated sign-in listens on
+  port 53682.
 
   Background:
     Given the ridrs plugins "activity-session, ui-main-screen, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
@@ -27,7 +27,7 @@ Feature: Connecting intervals.icu
       | client_id             | 1697                                  |
       | scope                 | SETTINGS:READ,CALENDAR:READ           |
       | code_challenge_method | S256                                  |
-      | redirect_uri          | http://127.0.0.1:47261/oauth/callback |
+      | redirect_uri          | http://127.0.0.1:53682/oauth/callback |
     And the sign-in asked for a code challenge and a state
     And the main panel shows "Connecting to intervals.icu…"
     When the athlete approves the sign-in
