@@ -1,0 +1,43 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Activity</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="ok:Riding,lost:HR lost,failover:Route failover,compoff:Companion offline,trainer:Trainer lost">
+  <p class="note" id="note"></p>
+  <div class="stage"><div class="device flat land"><div class="ride">
+    <svg class="road" viewBox="0 0 860 420" preserveAspectRatio="none" aria-hidden="true"><polygon points="300,176 560,176 860,420 0,420" fill="#141c26"/><g stroke="#cfe3f7" stroke-width="5" opacity=".8"><line x1="430" y1="182" x2="430" y2="200"/><line x1="430" y1="222" x2="430" y2="260"/><line x1="430" y1="290" x2="430" y2="360"/></g><polyline points="0,176 860,176" stroke="#27c8ff" opacity=".3"/></svg>
+    <div class="banner" role="status" data-show="lost"><span class="spin"></span>Heart rate lost. Reconnecting…</div>
+    <div class="banner info" role="status" data-show="failover">${phone} Heart rate now via Pixel 8</div>
+    <div class="banner" role="status" data-show="compoff"><span class="spin"></span>Pixel 8 offline. Heart rate waits for it.</div>
+    <div class="banner" role="status" data-show="trainer"><span class="spin"></span>Trainer lost. Reconnecting… keep pedalling</div>
+    <a class="btn finish" href="ride-saved.html" data-hold="1000">Finish ride<small>hold 1 s</small></a>
+    <div class="hud">
+      <div class="w" data-hide="trainer"><b>212</b><small>W</small></div>
+      <div class="w lost" data-show="trainer"><b>–</b><small>W · no signal</small></div>
+      <div class="w"><b>88</b><small>rpm</small></div>
+      <div class="w" data-hide="lost compoff"><b>148</b><small>bpm</small></div>
+      <div class="w lost" data-show="lost compoff"><b>–</b><small>bpm · no signal</small></div>
+      <div class="w"><b>34.2</b><small>km/h</small></div>
+      <div class="w"><b>12.4</b><small>km</small></div>
+    </div>
+  </div></div></div>
+</main>
+<script src="proto.js"></script>
+<script>
+document.querySelectorAll('.banner').forEach((el) => { el.innerHTML = el.innerHTML.replace('${phone}', ICON.phone); });
+const NOTES = {
+  ok: '<b>Activity.</b> No menu, no device UI during a ride. <b>Finish ride needs a 1 s hold</b>: a sweaty tap or a towel must not end the ride.',
+  lost: '<b>Device lost.</b> Small banner, grey widget ("no signal"); the ride never stops. Banner disappears on reconnect.',
+  failover: '<b>Route failover.</b> This Mac lost the strap, Pixel 8 still sees it: ridrs switches the route by itself. A cyan info banner for 5 s, then gone. No gap longer than a reconnect.',
+  compoff: '<b>Companion offline mid-ride</b> and this Mac cannot see the strap: it waits. Devices on this Mac are unaffected.',
+  trainer: '<b>Trainer lost.</b> Power shows "no signal", the ride keeps running, the trainer reconnects as usual (over the other route if one sees it).',
+};
+window.renderState = (s) => { document.getElementById('note').innerHTML = NOTES[s]; };
+</script>
+</body>
+</html>

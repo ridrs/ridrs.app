@@ -1,0 +1,49 @@
+{
+  "id": "ui-devices",
+  "name": "Devices",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "setup",
+        "export": "DeviceSetup",
+        "extensionPoints": [
+          "setup/companion"
+        ]
+      }
+    ],
+    "contributions": [
+      {
+        "id": "device-indicator",
+        "extensionPoint": "main/status",
+        "export": "DeviceIndicator",
+        "order": 0
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "device.status-changed",
+        "activity.state-changed",
+        "measurement.power",
+        "measurement.heart-rate",
+        "controller.buttons-changed",
+        "bridge.state-changed"
+      ],
+      "publish": [
+        "device.connect-requested",
+        "device.disconnect-requested",
+        "device.route-requested",
+        "device.discovery-requested",
+        "bridge.connect-requested",
+        "bridge.forget-requested"
+      ]
+    }
+  }
+}

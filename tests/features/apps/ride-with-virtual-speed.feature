@@ -5,6 +5,7 @@ Feature: Pedal and see the virtual speed
 
   Scenario: Riding with a simulated trainer
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-trainer"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
@@ -20,6 +21,7 @@ Feature: Pedal and see the virtual speed
 
   Scenario: Without a trainer the rider stands still
     Given the plugin directories "plugins"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
@@ -31,6 +33,7 @@ Feature: Pedal and see the virtual speed
 
   Scenario: The HUD shows speed and distance after the metric widgets
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-trainer"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options

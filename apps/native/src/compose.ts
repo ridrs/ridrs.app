@@ -4,10 +4,8 @@ import {
   activityFinishRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
-  type BleTransport,
   bleBridgeConnectorCapability,
   bleCentralCapability,
-  bleTransportRequestedEvent,
   bridgeCompanionsChangedEvent,
   bridgeConnectRequestedEvent,
   bridgeDisconnectRequestedEvent,
@@ -16,8 +14,15 @@ import {
   bridgePairRequestedEvent,
   bridgeStateChangedEvent,
   configSnapshotCapability,
+  controllerButtonsChangedEvent,
+  deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
+  deviceConnectRequestedEvent,
+  deviceDisconnectRequestedEvent,
+  deviceDiscoveryRequestedEvent,
   deviceRawNotificationEvent,
+  deviceRouteRequestedEvent,
+  deviceStatusChangedEvent,
   type EventDefinition,
   exportFitWrittenEvent,
   type HostPlatform,
@@ -60,6 +65,13 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   activityFinishRequestedEvent,
   activityStateChangedEvent,
   deviceConnectionChangedEvent,
+  deviceCandidatesChangedEvent,
+  deviceConnectRequestedEvent,
+  deviceDisconnectRequestedEvent,
+  deviceDiscoveryRequestedEvent,
+  deviceRouteRequestedEvent,
+  deviceStatusChangedEvent,
+  controllerButtonsChangedEvent,
   measurementPowerEvent,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -76,21 +88,11 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   bridgeDisconnectRequestedEvent,
   bridgeForgetRequestedEvent,
   bridgeStateChangedEvent,
-  bleTransportRequestedEvent,
   deviceRawNotificationEvent,
   recordingCompletedEvent,
   recordingFailedEvent,
   exportFitWrittenEvent,
 ];
-
-/**
- * `ble.central` has exactly one provider: the plugins of the transport not chosen are disabled.
- * The connector plugin is the platform half of the bridge (mDNS + sockets in Rust).
- */
-const TRANSPORT_PLUGINS: Record<BleTransport, readonly string[]> = {
-  local: ['transport-ble-tauri', 'transport-ble-noble'],
-  bridge: ['transport-ble-bridge', 'bridge-connector-tauri'],
-};
 
 /** Port to the platform's "keep the display on" facility. */
 export interface KeepAwakePort {
@@ -107,10 +109,6 @@ export interface RidrsAppOptions {
   readonly disabledPlugins?: Iterable<string>;
   /** Keeps the display on while a ride runs: nobody touches the screen while pedalling. */
   readonly keepAwake?: KeepAwakePort;
-  /** Bluetooth of this device (default) or a companion phone in the same network. */
-  readonly bleTransport?: BleTransport;
-  /** The rider asked for the other transport; the app persists it and restarts. */
-  readonly onBleTransportRequested?: (transport: BleTransport) => void;
   /** Paces the UI's render clock; requestAnimationFrame by default (tests pass a timer source). */
   readonly frameSource?: FrameSource;
   /** Who runs the host; recordings name it. */
@@ -125,14 +123,13 @@ export interface RidrsApp {
 
 /**
  * Composition root of the native app: host, in-process UI bridge and shell in one process. Shared
- * by the Tauri WebView (bundled plugins) and the Cucumber e2e scenarios (plugin folders).
+ * by the Tauri WebView (bundled plugins) and the Cucumber e2e scenarios (plugin folders). This
+ * device's Bluetooth and the companion bridge both provide `ble.central`: they run at once.
  */
 export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp> {
-  const transport = options.bleTransport ?? 'local';
-  const otherTransport: BleTransport = transport === 'local' ? 'bridge' : 'local';
   const host = new PluginHost({
     sources: options.sources,
-    disabledPlugins: [...(options.disabledPlugins ?? []), ...TRANSPORT_PLUGINS[otherTransport]],
+    disabledPlugins: options.disabledPlugins,
     timeSource: options.timeSource,
     logger: options.logger,
     capabilities: [
@@ -164,14 +161,6 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
         keepAwake.setKeepAwake(payload.state === 'running'),
       )
     : undefined;
-  const onTransport = options.onBleTransportRequested;
-  const transportWatch = onTransport
-    ? host.subscribeEvent('ridrs-app', bleTransportRequestedEvent, ({ payload }) => {
-        if (payload.transport !== transport) {
-          onTransport(payload.transport);
-        }
-      })
-    : undefined;
   await host.start();
   const unmount = mountShell(options.root, bridge, {
     logger: options.uiLogger ?? console,
@@ -186,7 +175,6 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
       closing ??= (async () => {
         unmount();
         rideWatch?.unsubscribe();
-        transportWatch?.unsubscribe();
         keepAwake?.setKeepAwake(false);
         bridge.dispose();
         await host.dispose();

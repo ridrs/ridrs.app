@@ -13,12 +13,14 @@ export interface NativeScan {
 
 /**
  * Starts the platform's single scan for the given services (empty: all) and reports every
- * advertisement to `onDiscovered`. `signal` aborts a start that is still pending.
+ * advertisement to `onDiscovered`. `signal` aborts a start that is still pending. Platforms whose
+ * scan can end by itself (a timeout, a connect that cancels it) call `onEnded` then.
  */
 export type StartNativeScan = (
   serviceUuids: readonly string[],
   onDiscovered: (peripheral: BleDiscoveredPeripheral) => void,
   signal: AbortSignal,
+  onEnded: () => void,
 ) => Promise<NativeScan>;
 
 interface ScanSession {
@@ -126,6 +128,15 @@ export class SharedBleScan {
     return [...union].sort();
   }
 
+  /** The native scan ended without being asked: start it again while anyone is still searching. */
+  private ended(scan: RunningScan): void {
+    if (this.running !== scan) {
+      return;
+    }
+    this.running = undefined;
+    void this.reconcile().catch(() => undefined);
+  }
+
   /** Makes the native scan cover what the sessions need, restarting it wider, or stops it. */
   private reconcile(): Promise<void> {
     const step = this.queue.then(async () => {
@@ -145,7 +156,12 @@ export class SharedBleScan {
       const next: RunningScan = { services: wanted, abort: new AbortController() };
       this.running = next;
       try {
-        next.handle = await this.startNative(wanted, (p) => this.dispatch(p), next.abort.signal);
+        next.handle = await this.startNative(
+          wanted,
+          (p) => this.dispatch(p),
+          next.abort.signal,
+          () => this.ended(next),
+        );
       } catch (error) {
         if (this.running === next) {
           this.running = undefined;

@@ -1,0 +1,63 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Connection</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="paired:Companion paired,none:No companion,offline:Companion offline">
+  <p class="note" id="note"></p>
+  <div class="stage"><div class="device">
+    <div class="topbar"><a class="back" href="menu.html">‹ Menu</a><b>Connection</b><span style="width:40px"></span></div>
+
+    <div class="sect">Bluetooth</div>
+    <div class="card">
+      <div class="switch" style="padding:0"><span><b style="font-style:italic">This Mac</b><small>On · 2 devices in range</small></span><span class="st ok"><span class="tick">✓</span></span></div>
+    </div>
+
+    <div class="sect">Companion phones</div>
+    <div class="card" data-hide="none">
+      <div class="switch" style="padding:0 0 8px"><span><b style="font-style:italic">Pixel 8</b><small id="compState"></small></span><span id="compSt"></span></div>
+      <div class="btnrow" style="justify-content:flex-start;margin-top:4px"><a class="btn ghost" href="#" data-show="paired">Disconnect</a><a class="btn" href="#" data-show="offline">Try again</a><a class="btn ghost" href="#">Forget</a></div>
+    </div>
+    <div class="card" data-show="none"><p>No companion yet. A phone near the bike can lend its Bluetooth when this Mac is too far away or has none.</p></div>
+    <a class="btn" href="companion-add.html" style="width:100%">+ Add companion phone</a>
+
+    <div class="sect">Which link carries a device</div>
+    <div class="card">
+      <div class="seg wide" role="radiogroup" aria-label="Default route"><button type="button" class="on" role="radio" aria-checked="true">This Mac first<small>recommended</small></button><button type="button" role="radio" aria-checked="false">Companion first</button></div>
+      <p>Applies to every device without its own choice. A device seen by both is used once, over the preferred link.</p>
+      <div class="switch"><span>Switch to the other link if one is lost<small>Same device only. Also during a ride.</small></span><button type="button" class="tg" role="switch" aria-checked="true" aria-label="Automatic fallback"></button></div>
+    </div>
+
+    <div class="sect">Known devices</div>
+    <div class="rows" id="known"></div>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>
+const NOTES = {
+  paired: '<b>Connection settings.</b> The old "Bluetooth via: this device | companion" switch (and the app restart) is gone. A companion is added next to this Mac; a global default decides the preferred link, each device can override it.',
+  none: '<b>No companion.</b> Everything runs on this Mac, exactly like today\'s "local" transport.',
+  offline: '<b>Companion offline.</b> ridrs keeps trying in the background (bridge backoff), devices that this Mac also sees fall back to it.',
+};
+window.renderState = (s) => {
+  document.getElementById('note').innerHTML = NOTES[s];
+  document.getElementById('compState').textContent = s === 'offline' ? 'Offline since 18:40 · retrying' : 'Connected · 3 devices seen';
+  document.getElementById('compSt').innerHTML = s === 'offline' ? STATUS.warn('Offline') : STATUS.ok('');
+  const comp = s !== 'none';
+  document.getElementById('known').innerHTML =
+    row('trainer', '', { sub: 'Wahoo KICKR 1234', via: 'here', also: comp ? 'comp' : undefined, href: 'device.html?state=trainer' }) +
+    row('hr', '', { sub: 'Polar H10 A1B2', via: comp ? 'comp' : 'here', pinned: comp, href: 'device.html?state=companionfirst' });
+};
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.seg button');
+  if (b) b.parentElement.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); });
+  const t = e.target.closest('.tg');
+  if (t) t.setAttribute('aria-checked', String(t.getAttribute('aria-checked') !== 'true'));
+});
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
-import { Given, Then, When } from '@cucumber/cucumber';
+import { Then, When } from '@cucumber/cucumber';
 import { parsePairingUri } from '@ridrs/contracts';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
@@ -11,10 +11,6 @@ function appRoot(world: RidrsWorld): HTMLElement {
   assert.ok(view, 'Expected the ridrs app UI to be shown');
   return view.root;
 }
-
-Given('the ridrs app uses the companion bridge', function (this: RidrsWorld) {
-  this.nativeBleTransport = 'bridge';
-});
 
 Then(
   'the companion {string} is offered for pairing',
@@ -35,22 +31,40 @@ When(
   },
 );
 
+/** The header of the companion's details in the device setup: its name and its status. */
 Then(
   'the companion is shown as connected to {string}',
   async function (this: RidrsWorld, name: string) {
-    await waitFor(() =>
-      assert.equal(
-        within(appRoot(this)).getByTestId('bridge-status').textContent,
-        `Connected to ${name}`,
-      ),
-    );
+    await waitFor(() => {
+      const card = within(appRoot(this)).getByTestId('details-card');
+      assert.deepEqual(
+        [
+          within(card).getByTestId('details-subtitle').textContent,
+          within(card).getByTestId('details-status').textContent,
+        ],
+        [name, 'Connected'],
+      );
+    });
   },
 );
 
 Then(
-  'the app was asked to use the {string} transport',
-  async function (this: RidrsWorld, transport: string) {
-    await waitFor(() => assert.equal(this.bleTransportRequests.at(-1), transport));
+  'the pairing offers {string} or {string}',
+  async function (this: RidrsWorld, first: string, second: string) {
+    const pairing = await within(appRoot(this)).findByTestId('bridge-pairing');
+    const ways = within(pairing)
+      .getAllByRole('group')
+      .map((group) => group.getAttribute('aria-label'));
+    assert.deepEqual(ways, [first, second]);
+  },
+);
+
+Then(
+  'the code field of {string} takes {int} digits',
+  async function (this: RidrsWorld, name: string, digits: number) {
+    const input = await within(appRoot(this)).findByLabelText(`Pairing code for ${name}`);
+    assert.equal(input.getAttribute('maxlength'), String(digits));
+    assert.equal(input.getAttribute('inputmode'), 'numeric');
   },
 );
 
@@ -62,10 +76,4 @@ Then('a pairing QR code is shown', async function (this: RidrsWorld) {
 
 Then('there is no field for a companion address', function (this: RidrsWorld) {
   assert.equal(within(appRoot(this)).queryByLabelText(/address/i), null);
-});
-
-Then('the companion status reads {string}', async function (this: RidrsWorld, text: string) {
-  await waitFor(() =>
-    assert.equal(within(appRoot(this)).getByTestId('bridge-status').textContent, text),
-  );
 });

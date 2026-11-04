@@ -1,0 +1,25 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Welcome</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p class="note"><b>Onboarding 1 of 4, first start only.</b> One sentence, one button. Everything after this is skippable.</p>
+  <div class="stage"><div class="device">
+    <div class="brand"><span class="dot"></span>RIDRS <i>//</i> APP</div>
+    <div class="steps"><i class="on"></i><i></i><i></i><i></i></div>
+    <div class="icon-hero" style="margin-top:50px"><span id="hero"></span></div>
+    <h1 class="title">Welcome to <em>ridrs</em></h1>
+    <p class="sub">Ride your trainer in a virtual world. We set up in under a minute.</p>
+    <a class="cta" href="onboarding-2-bluetooth.html">Get started <span class="arr">»</span></a>
+    <a class="skip" href="main.html">Skip setup</a>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>document.getElementById('hero').innerHTML = ICON.bike;</script>
+</body>
+</html>

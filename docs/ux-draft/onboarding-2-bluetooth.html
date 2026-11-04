@@ -1,0 +1,27 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Bluetooth</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="before:Before dialog,denied:Denied">
+  <p class="note"><b>Onboarding 2 of 4.</b> Explain <b>why</b> before the OS dialog appears. If denied: open system settings, use a companion phone instead, or continue without devices.</p>
+  <div class="stage"><div class="device">
+    <div class="brand"><span class="dot"></span>RIDRS <i>//</i> APP</div>
+    <div class="steps"><i class="on"></i><i class="on"></i><i></i><i></i></div>
+    <div class="icon-hero" style="margin-top:30px" id="hero"></div>
+    <h1 class="title">Allow <em>Bluetooth</em></h1>
+    <p class="sub">ridrs uses Bluetooth to find your trainer and heart rate strap. Nothing leaves your device.</p>
+    <div class="card warn" data-show="denied"><h3>Bluetooth was denied</h3><p>Without it ridrs cannot find devices. You can change this in system settings, or ride without devices.</p></div>
+    <a class="cta" href="onboarding-3-rider.html" data-show="before">Allow Bluetooth <span class="arr">»</span></a>
+    <div data-show="denied"><a class="cta" href="#">Open system settings <span class="arr">»</span></a><div class="btnrow"><a class="btn ghost" href="companion-add.html">Use a companion phone instead</a></div><a class="skip" href="onboarding-3-rider.html">Continue without devices</a></div>
+    <a class="skip" href="onboarding-3-rider.html" data-show="before">Not now</a>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>document.getElementById('hero').innerHTML = ICON.bt;</script>
+</body>
+</html>

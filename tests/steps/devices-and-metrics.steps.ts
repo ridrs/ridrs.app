@@ -218,16 +218,18 @@ Given('the trainer {string} is connected', function (this: RidrsWorld, name: str
   assert.ok(peripheral(this, name).isConnected(), `Expected "${name}" to be connected`);
 });
 
-Given('the trainer {string} is switched off', function (this: RidrsWorld, name: string) {
-  peripheral(this, name).switchOff();
-});
+for (const device of ['trainer', 'heart-rate sensor', 'controller']) {
+  Given(`the ${device} {string} is switched off`, function (this: RidrsWorld, name: string) {
+    peripheral(this, name).switchOff();
+  });
 
-When('the trainer {string} is switched on', async function (this: RidrsWorld, name: string) {
-  peripheral(this, name).switchOn();
-  await this.settle();
-});
+  When(`the ${device} {string} is switched on`, async function (this: RidrsWorld, name: string) {
+    peripheral(this, name).switchOn();
+    await this.settle();
+  });
+}
 
-for (const device of ['trainer', 'heart-rate sensor']) {
+for (const device of ['trainer', 'heart-rate sensor', 'controller']) {
   When(
     `the ${device} {string} drops the connection and refuses new connections`,
     async function (this: RidrsWorld, name: string) {
@@ -306,7 +308,7 @@ Then('the trainer {string} is no longer connected', function (this: RidrsWorld, 
   assert.equal(peripheral(this, name).isConnected(), false);
 });
 
-for (const device of ['trainer', 'heart-rate sensor']) {
+for (const device of ['trainer', 'heart-rate sensor', 'controller']) {
   Then(`the ${device} {string} is still connected`, function (this: RidrsWorld, name: string) {
     assert.ok(peripheral(this, name).isConnected());
   });
@@ -725,6 +727,13 @@ Given(
   function (this: RidrsWorld, name: string) {
     this.bleSimulator = new BleSimulator({ clock: this.clock });
     this.heartRateSensor = this.bleSimulator.addHeartRateSensor(name);
+  },
+);
+
+Given(
+  'the simulated BLE environment also contains a switched-off heart-rate sensor {string}',
+  function (this: RidrsWorld, name: string) {
+    simulator(this).addHeartRateSensor(name).switchOff();
   },
 );
 

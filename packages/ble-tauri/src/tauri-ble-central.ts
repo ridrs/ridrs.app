@@ -94,7 +94,7 @@ export class TauriBleCentral implements BleCentral {
   private readonly scans: SharedBleScan;
 
   constructor(private readonly ipc: BleIpc) {
-    this.scans = new SharedBleScan(async (serviceUuids, onDiscovered) => {
+    this.scans = new SharedBleScan(async (serviceUuids, onDiscovered, _signal, onEnded) => {
       const channel = this.ipc.createChannel<ScanEvent>();
       channel.onmessage = (event) =>
         onDiscovered({
@@ -102,10 +102,14 @@ export class TauriBleCentral implements BleCentral {
           name: event.name,
           serviceUuids: event.serviceUuids,
         });
-      await this.ipc.invoke('ble_scan', { serviceUuids, onEvent: channel });
+      // blec ends the scan after its timeout and whenever it connects a device.
+      const ended = this.ipc.createChannel<Record<string, never>>();
+      ended.onmessage = () => onEnded();
+      await this.ipc.invoke('ble_scan', { serviceUuids, onEvent: channel, onEnded: ended });
       return {
         stop: async () => {
           channel.onmessage = () => undefined;
+          ended.onmessage = () => undefined;
           await this.ipc.invoke('ble_stop_scan').catch(() => undefined);
         },
       };

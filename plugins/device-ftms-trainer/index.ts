@@ -54,12 +54,13 @@ export default definePlugin({
       ctx,
       startBlePeripheralLink({
         ctx,
-        central: ctx.capabilities.get(bleCentralCapability),
+        centrals: ctx.capabilities.getAll(bleCentralCapability),
         characteristic: {
           serviceUuid: FTMS_SERVICE_UUID,
           characteristicUuid: INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
         },
         label: 'trainer',
+        kind: 'trainer',
         onNotification: (peripheral, packet) => handleIndoorBikeData(ctx, peripheral, packet),
       }),
     );

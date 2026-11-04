@@ -23,10 +23,17 @@ import {
   type CapabilityCardinality,
   type CapabilityContract,
   configSnapshotCapability,
+  controllerButtonsChangedEvent,
   defineCapability,
   defineEvent,
+  deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
+  deviceConnectRequestedEvent,
+  deviceDisconnectRequestedEvent,
+  deviceDiscoveryRequestedEvent,
   deviceRawNotificationEvent,
+  deviceRouteRequestedEvent,
+  deviceStatusChangedEvent,
   type EstimationStrategy,
   type EventDefinition,
   type EventEnvelope,
@@ -127,6 +134,13 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   measurementCadenceEvent,
   measurementHeartRateEvent,
   deviceConnectionChangedEvent,
+  deviceCandidatesChangedEvent,
+  deviceConnectRequestedEvent,
+  deviceDisconnectRequestedEvent,
+  deviceDiscoveryRequestedEvent,
+  deviceRouteRequestedEvent,
+  deviceStatusChangedEvent,
+  controllerButtonsChangedEvent,
   uiRegistryChangedEvent,
   bridgeCompanionsChangedEvent,
   bridgeConnectRequestedEvent,
@@ -144,12 +158,20 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
 /** Events the World records from the bus directly (host-level), independent of any plugin. */
 const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   uiRegistryChangedEvent,
+  deviceStatusChangedEvent,
+  controllerButtonsChangedEvent,
   activityStateChangedEvent,
   physicsStateEvent,
   physicsStateBatchEvent,
   bridgeCompanionsChangedEvent,
   bridgePairingOfferEvent,
   bridgeStateChangedEvent,
+  // What the rider asks for in the device setup.
+  deviceConnectRequestedEvent,
+  deviceDisconnectRequestedEvent,
+  deviceRouteRequestedEvent,
+  bridgeConnectRequestedEvent,
+  bridgeDisconnectRequestedEvent,
 ];
 
 const ACTIVE_WORLD_SYMBOL = Symbol.for('ridrs.test.activeWorld');
@@ -187,6 +209,8 @@ export class RidrsWorld extends World {
   bridgeConnector?: SimulatedBridgeConnector;
   companion?: SimulatedCompanion;
   companionCentral?: BleCentral;
+  /** The companion's own simulated devices, when this device's Bluetooth sees others. */
+  companionSimulator?: BleSimulator;
   readonly bridgeSessions: BridgeSession[] = [];
   trainer?: SimulatedPeripheral;
   heartRateSensor?: SimulatedPeripheral;
@@ -222,10 +246,8 @@ export class RidrsWorld extends World {
   /** The native app's composition root, when a scenario starts it instead of a bare host. */
   nativeApp?: { readonly host: PluginHost; close(): Promise<void> };
   readonly keepAwakeRequests: boolean[] = [];
-  nativeBleTransport?: 'local' | 'bridge';
   /** Phase 7: paces the native app's render clock instead of requestAnimationFrame. */
   nativeFrameSource?: FrameSource;
-  readonly bleTransportRequests: string[] = [];
   readonly uiViews: Array<{ readonly root: HTMLElement; dispose: () => void }> = [];
   packetMark = 0;
   readonly stopMarks = new Map<

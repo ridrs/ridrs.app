@@ -7,7 +7,11 @@ import { createRoot } from 'react-dom/client';
 import { RideSaved } from './ride-saved.tsx';
 
 function MainScreenView({ ctx }: { readonly ctx: UiContext }) {
+  const status = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+
+  // What the rider should know before starting (the devices and the like), above the start button.
+  useEffect(() => (status.current ? ctx.slot('main/status', status.current) : undefined), [ctx]);
 
   // Panels below the start button (device pairing and the like); the screen does not know them.
   useEffect(() => (panel.current ? ctx.slot('main/panel', panel.current) : undefined), [ctx]);
@@ -36,6 +40,7 @@ function MainScreenView({ ctx }: { readonly ctx: UiContext }) {
       }}
     >
       <h1 style={{ margin: 0, fontSize: 48 }}>ridrs</h1>
+      <div data-testid="slot-main-status" ref={status} />
       <button
         type="button"
         data-testid="start-ride"

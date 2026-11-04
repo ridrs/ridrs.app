@@ -65,6 +65,10 @@ pub struct ScanEvent {
     service_uuids: Vec<String>,
 }
 
+/// The scan ended: stopped, replaced, timed out, or cancelled by a connect.
+#[derive(Clone, Serialize)]
+pub struct ScanEndedEvent {}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionLostEvent {
@@ -88,7 +92,11 @@ pub async fn ble_adapter_state() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn ble_scan(service_uuids: Vec<String>, on_event: Channel<ScanEvent>) -> Result<(), String> {
+pub async fn ble_scan(
+    service_uuids: Vec<String>,
+    on_event: Channel<ScanEvent>,
+    on_ended: Channel<ScanEndedEvent>,
+) -> Result<(), String> {
     let handler = get_handler().map_err(err)?;
     let services = service_uuids
         .iter()
@@ -113,6 +121,9 @@ pub async fn ble_scan(service_uuids: Vec<String>, on_event: Channel<ScanEvent>) 
                 });
             }
         }
+        // blec drops the sender when its scan task ends, also after its timeout and when
+        // `connect` cancels the scan; the TS side starts a new one if devices are still searched.
+        let _ = on_ended.send(ScanEndedEvent {});
     });
     handler
         .discover(Some(tx), SCAN_TIMEOUT_MS, filter, false)

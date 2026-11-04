@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod keep_awake;
-mod settings;
 
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
@@ -32,8 +31,6 @@ pub fn run() {
             bridge::bridge_send_text,
             bridge::bridge_close,
             keep_awake::keep_awake,
-            settings::ble_transport_get,
-            settings::ble_transport_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

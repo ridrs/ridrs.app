@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { z } from 'zod';
 import { defineCapability } from './capabilities.ts';
 
 /**
@@ -63,7 +64,17 @@ export interface BleConnection {
   disconnect(): Promise<void>;
 }
 
+/**
+ * The link a central reaches devices over: this device's Bluetooth (`local`, the direct link) or
+ * a companion phone in the same network. Both run at once; the direct link is preferred.
+ */
+export const bleRouteSchema = z.enum(['local', 'companion']);
+
+export type BleRoute = z.infer<typeof bleRouteSchema>;
+
 export interface BleCentral {
+  /** The link this central stands for; `local` when absent. */
+  readonly route?: BleRoute;
   scan(options: BleScanOptions): AsyncIterable<BleDiscoveredPeripheral>;
   connect(
     peripheralId: string,
@@ -71,7 +82,8 @@ export interface BleCentral {
   ): Promise<BleConnection>;
 }
 
-export const bleCentralCapability = defineCapability<BleCentral, 'single', 'ble.central'>(
+/** One provider per link: this device's Bluetooth and the companion bridge run side by side. */
+export const bleCentralCapability = defineCapability<BleCentral, 'multiple', 'ble.central'>(
   'ble.central',
-  { cardinality: 'single' },
+  { cardinality: 'multiple' },
 );

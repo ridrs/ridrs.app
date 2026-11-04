@@ -1,0 +1,116 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Setup</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="first:First start,reconnect:Later start,companion:With companion,conflict:HR conflict,power:Power conflict,notfound:Not found,permission:No Bluetooth,settled:All connected">
+  <p class="note" id="note"></p>
+  <div class="stage"><div class="device">
+    <div class="brand"><span class="dot"></span>RIDRS <i>//</i> APP</div>
+    <div class="steps" data-show="first"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+    <div class="icon-hero" data-hide="permission companion conflict power"><span id="hero"></span></div>
+    <h1 class="title">Connect Your <em>Devices</em></h1>
+    <p class="sub" id="sub" aria-live="polite"></p>
+    <div id="strip"></div>
+    <div class="card warn" data-show="permission">
+      <h3>This Mac's Bluetooth is off for ridrs</h3>
+      <p>ridrs needs Bluetooth to find your trainer and heart rate strap, or a companion phone that lends its Bluetooth.</p>
+      <div class="btnrow" style="justify-content:flex-start"><a class="btn" href="#">Open system settings</a><a class="btn ghost" href="companion-add.html">Use a companion phone</a></div>
+    </div>
+    <div class="rows" id="rows"></div>
+    <div id="hint" aria-live="polite"></div>
+    <div class="btnrow" data-show="notfound"><a class="btn" href="#" onclick="setState('reconnect');return false">Retry</a><a class="btn ghost" href="companion-add.html">Add a companion phone</a></div>
+    <div class="countdown" data-show="settled">Continuing in 3 s <button type="button" onclick="setState('reconnect')">Stay here</button></div>
+    <a class="cta" id="cta" href="main.html"></a>
+    <a class="skip" href="main.html" data-show="first">Skip, I'll set up devices later</a>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>
+document.getElementById('hero').innerHTML = ICON.bike;
+const FROM_TRAINER = ['power', STATUS.none('From trainer'), { sub: 'Your trainer measures power' }];
+const KICKR = ['trainer', STATUS.ok(), { sub: 'Wahoo KICKR 1234', via: 'here' }];
+const HR_PICK = [
+  { name: 'Polar H10 A1B2', note: 'last used', bars: 4, routes: ['here', 'comp'] },
+  { name: 'Garmin HRM-Pro 77C0', note: 'new · only the phone sees it', bars: 2, routes: ['comp'] },
+];
+const POWER_PICK = [
+  { name: 'Favero Assioma Duo', note: 'power meter on the bike · new', bars: 3, routes: ['here'] },
+  { name: 'Wahoo KICKR 1234', note: 'power measured by the trainer', bars: 4, routes: ['here'] },
+];
+let pick = { conflict: 0, power: 0 };
+const S = {
+  first: {
+    note: '<b>First start (onboarding step 4).</b> Nothing is remembered yet. ridrs searches for every kind at once and connects each kind that has exactly one candidate.',
+    sub: 'Searching for everything ridrs can use.', strip: 'none',
+    rows: () => [row('power', STATUS.busy('Searching…')), row('trainer', STATUS.busy('Searching…')), row('hr', STATUS.busy('Searching…'))],
+    cta: ['Searching…', false] },
+  reconnect: {
+    note: '<b>Later start.</b> Remembered devices reconnect by themselves. Continue is open as soon as nothing needs a choice; a device still reconnecting keeps trying in the background.',
+    sub: 'Welcome back. Reconnecting your devices.', strip: 'none',
+    rows: () => [row(...FROM_TRAINER), row(...KICKR), row('hr', STATUS.busy('Reconnecting…'), { sub: 'Polar H10 A1B2', via: 'here' })],
+    hint: ['Heart rate keeps reconnecting in the background.', 'hint ok'], cta: ['Continue', true] },
+  companion: {
+    note: '<b>With a companion phone.</b> Its Bluetooth is <b>added</b>, not swapped in. The trainer is seen by both and is shown once (merged); this Mac carries it because local is preferred. The heart rate strap is only in the phone\'s range, so it goes via Pixel 8.',
+    sub: 'Using this Mac and your companion phone.', strip: 'online',
+    rows: () => [row(...FROM_TRAINER), row('trainer', STATUS.ok(), { sub: 'Wahoo KICKR 1234', via: 'here', also: 'comp' }), row('hr', STATUS.ok(), { sub: 'Polar H10 A1B2', via: 'comp' })],
+    hint: ['Ready to ride.', 'hint ok'], cta: ['Continue', true] },
+  conflict: {
+    note: '<b>Conflict, resolved inline.</b> Two heart rate straps: the Polar is seen by this Mac <b>and</b> the phone, so it is one entry with two routes, not two candidates. Nothing for heart rate connects until the rider chooses; the other rows keep going.',
+    sub: 'One more thing: pick your heart rate monitor.', strip: 'online',
+    rows: () => [row(...FROM_TRAINER), row(...KICKR), row('hr', STATUS.choose('Choose'), { focus: true, sub: '2 devices found' }) + candidates('Two heart rate monitors found. Which one should ridrs use?', HR_PICK, pick.conflict)],
+    cta: ['Choose heart rate first', false], pickText: (i) => `Using ${HR_PICK[i].name}. Connecting via ${HR_PICK[i].routes[0] === 'here' ? HERE : COMPANION}…` },
+  power: {
+    note: '<b>Power source conflict.</b> A power meter and the trainer both measure power. Same inline pick. The choice decides which device feeds metric.power; the trainer still gets resistance commands.',
+    sub: 'Two power sources found.', strip: 'none',
+    rows: () => [row('power', STATUS.choose('Choose'), { focus: true, sub: '2 sources found' }) + candidates('Which power should ridrs use?', POWER_PICK, pick.power, 'Pedal-based meters are usually closer to what you push. You can change this later.'), row(...KICKR), row('hr', STATUS.ok(), { sub: 'Polar H10 A1B2', via: 'here' })],
+    cta: ['Choose power source first', false], pickText: (i) => `Power from ${POWER_PICK[i].name}.` },
+  notfound: {
+    note: '<b>Not found after 15 s.</b> Never a dead end: Retry, add a companion phone (maybe the strap is out of this Mac\'s range), or just continue. Searching continues in the background.',
+    sub: 'Could not find everything. You can still ride.', strip: 'none',
+    rows: () => [row(...FROM_TRAINER), row(...KICKR), row('hr', STATUS.warn('Not found'), { sub: 'Polar H10 A1B2 · is it on and awake?' })],
+    cta: ['Continue', true] },
+  permission: {
+    note: '<b>No Bluetooth on this Mac.</b> A companion phone is a full alternative now, not a mode switch.',
+    sub: '', strip: 'none',
+    rows: () => [row('power', STATUS.none('Needs Bluetooth')), row('trainer', STATUS.none('Needs Bluetooth')), row('hr', STATUS.none('Needs Bluetooth'))],
+    cta: ['Continue without devices', true] },
+  settled: {
+    note: '<b>All connected: Setup collapses by itself</b> after 3 s into the device indicator on Main. A tap on "Stay here" keeps it open. On later starts where everything reconnects at once, the rider barely sees Setup.',
+    sub: 'Everything is connected.', strip: 'none',
+    rows: () => [row(...FROM_TRAINER), row(...KICKR), row('hr', STATUS.ok(), { sub: 'Polar H10 A1B2', via: 'here' })],
+    cta: ['Done', true], auto: true },
+};
+let current;
+let autoTimer;
+window.onPick = (i) => {
+  pick[current] = i;
+  const c = document.getElementById('cta');
+  c.classList.remove('dis'); c.removeAttribute('aria-disabled'); c.setAttribute('href', 'main.html');
+  c.innerHTML = 'Continue <span class="arr">»</span>';
+  document.getElementById('sub').textContent = S[current].pickText(i);
+};
+window.renderState = (id) => {
+  current = id;
+  clearTimeout(autoTimer);
+  const s = S[id];
+  document.getElementById('note').innerHTML = s.note;
+  document.getElementById('sub').textContent = s.sub;
+  document.getElementById('strip').innerHTML = companionStrip(s.strip);
+  document.getElementById('rows').innerHTML = s.rows().join('');
+  document.getElementById('hint').innerHTML = s.hint ? `<p class="${s.hint[1]}" style="text-align:center">${s.hint[0]}</p>` : '';
+  const c = document.getElementById('cta');
+  c.innerHTML = `${s.cta[0]} <span class="arr">»</span>`;
+  c.classList.toggle('dis', !s.cta[1]);
+  c.classList.toggle('auto', Boolean(s.auto));
+  if (s.cta[1]) { c.setAttribute('href', 'main.html'); c.removeAttribute('aria-disabled'); }
+  else { c.removeAttribute('href'); c.setAttribute('aria-disabled', 'true'); }
+  if (s.auto) autoTimer = setTimeout(() => { location.href = 'main.html?state=collapsed'; }, 3000);
+};
+</script>
+</body>
+</html>

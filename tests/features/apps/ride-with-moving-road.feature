@@ -5,6 +5,7 @@ Feature: The road moves smoothly while I ride
 
   Scenario: Riding with a simulated trainer at 60 FPS
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-trainer"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     And the app renders with a 60 FPS frame source

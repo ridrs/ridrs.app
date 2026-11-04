@@ -29,8 +29,6 @@ When('I start the ridrs app with these options', async function (this: RidrsWorl
     uiLogger: quietUiLogger,
     disabledPlugins: this.headlessDisabled,
     keepAwake: { setKeepAwake: (on) => this.keepAwakeRequests.push(on) },
-    bleTransport: this.nativeBleTransport,
-    onBleTransportRequested: (transport) => this.bleTransportRequests.push(transport),
     frameSource: this.nativeFrameSource,
   });
   this.uiViews.push({ root, dispose: () => undefined });
