@@ -18,9 +18,9 @@ describe('roadSections', () => {
   });
 
   it('splits the road where the surface changes, nearest first', () => {
-    expect(spans(DEMO_LANDSCAPE, 2900)).toEqual([
-      ['asphalt', 2904, 3000],
-      ['gravel', 3000, 3060],
+    expect(spans(DEMO_LANDSCAPE, 400)).toEqual([
+      ['asphalt', 404, 500],
+      ['gravel', 500, 560],
     ]);
     expect(spans(SHORT, 0)).toEqual([
       ['asphalt', 4, 20],
@@ -35,7 +35,7 @@ describe('roadSections', () => {
   });
 
   it('shows gravel under the rider on gravel', () => {
-    expect(spans(DEMO_LANDSCAPE, 3500)[0]).toEqual(['gravel', 3504, 3660]);
+    expect(spans(DEMO_LANDSCAPE, 600)[0]).toEqual(['gravel', 604, 760]);
   });
 
   it('projects each section onto the road: nearer sections lower in the view', () => {

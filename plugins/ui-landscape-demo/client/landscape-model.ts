@@ -33,8 +33,8 @@ export interface SurfacePattern {
   readonly gravelFrom: number;
 }
 
-/** 3 km asphalt, 1 km gravel, from 0 m, repeating (ADR 0044). */
-export const DEMO_SURFACE: SurfacePattern = Object.freeze({ period: 4000, gravelFrom: 3000 });
+/** 500 m asphalt, 500 m gravel, from 0 m, repeating (maintainer, 2026-11-04; ADR 0044 had 3 km / 1 km). */
+export const DEMO_SURFACE: SurfacePattern = Object.freeze({ period: 1000, gravelFrom: 500 });
 
 export interface LandscapeModel {
   readonly course: readonly CourseSegment[];
