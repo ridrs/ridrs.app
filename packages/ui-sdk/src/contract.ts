@@ -33,6 +33,11 @@ export interface UiContext {
   };
   /** Mounts every contribution of the extension point into `container` and keeps it in sync. */
   slot(extensionPoint: string, container: HTMLElement): Unsubscribe;
+  /**
+   * Handles Back (Escape, Backspace, the platform's back button) while the component is mounted.
+   * The handler registered last wins; without one, Back does nothing.
+   */
+  onBack(handler: () => void): Unsubscribe;
   /** Switches the active screen; unknown paths are logged and ignored. */
   navigate(path: string): void;
   /** The shell's one render clock, at the display's refresh rate. Read-only: frames drive nothing. */

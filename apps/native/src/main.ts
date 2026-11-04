@@ -2,9 +2,10 @@
 
 import { createBundledPluginSource, createConsoleLogger } from '@ridrs/core';
 import { getVersion } from '@tauri-apps/api/app';
+import { suppressBrowserChrome } from './browser-chrome.ts';
 import { bundledPlugins } from './bundled-plugins.ts';
 import { startRidrsApp } from './compose.ts';
-import { createKeepAwake, ensureBluetoothPermission } from './platform.ts';
+import { androidBackButton, createKeepAwake, ensureBluetoothPermission } from './platform.ts';
 
 /** Plugins that are bundled but not started in the app (the console output is for headless use). */
 const DISABLED_IN_APP = ['output-console'];
@@ -15,6 +16,7 @@ async function main(): Promise<void> {
   if (!root) {
     throw new Error('Missing #ridrs root element');
   }
+  suppressBrowserChrome(document.documentElement, { allowInspect: import.meta.env.DEV });
 
   // Before any plugin scans: without the grant Android finds no trainer.
   const granted = await ensureBluetoothPermission().catch((error: unknown) => {
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
       appVersion,
     },
     keepAwake: createKeepAwake(),
+    backButton: androidBackButton,
   });
   window.addEventListener('pagehide', () => {
     void app.close();

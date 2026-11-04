@@ -2,8 +2,10 @@
 
 import { createTauriIpc, TauriBleCentral } from '@ridrs/ble-tauri';
 import type { BleCentral } from '@ridrs/contracts';
+import { keyboardNavigation } from '@ridrs/ui-shell';
 import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { suppressBrowserChrome } from './browser-chrome.ts';
 import { startCompanion } from './companion.ts';
 import { CompanionScreen } from './companion-screen.tsx';
 import {
@@ -19,6 +21,9 @@ async function main(): Promise<void> {
   if (!root) {
     throw new Error('Missing #companion root element');
   }
+  suppressBrowserChrome(document.documentElement, { allowInspect: import.meta.env.DEV });
+  // One screen, so nothing to go back to: the arrow keys and Enter only (AGENTS.md rule 12).
+  keyboardNavigation(root);
   keepScreenOn();
   const granted = await ensureBluetoothPermission().catch(() => false);
   if (!granted) {

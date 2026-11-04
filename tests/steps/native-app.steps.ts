@@ -6,6 +6,7 @@ import { createSilentLogger } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
 import { waitFor } from '@testing-library/dom';
 import { startRidrsApp } from '../../apps/native/src/compose.ts';
+import { untilQuiet } from '../support/dom-quiet.ts';
 import type { RidrsWorld } from '../support/world.ts';
 
 const quietUiLogger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
@@ -29,6 +30,12 @@ When('I start the ridrs app with these options', async function (this: RidrsWorl
     uiLogger: quietUiLogger,
     disabledPlugins: this.headlessDisabled,
     keepAwake: { setKeepAwake: (on) => this.keepAwakeRequests.push(on) },
+    backButton: (press) => {
+      this.backButtonPress = press;
+      return () => {
+        this.backButtonPress = undefined;
+      };
+    },
     frameSource: this.nativeFrameSource,
   });
   this.uiViews.push({ root, dispose: () => undefined });
@@ -53,4 +60,18 @@ Then('the app keeps the screen awake', async function (this: RidrsWorld) {
 
 Then('the app lets the screen sleep', async function (this: RidrsWorld) {
   await waitFor(() => assert.notEqual(this.keepAwakeRequests.at(-1), true));
+});
+
+When("I press the platform's back button", async function (this: RidrsWorld) {
+  assert.ok(this.backButtonPress, "The app does not listen to the platform's back button");
+  const view = this.uiViews[0];
+  assert.ok(view, 'Expected the ridrs app to be running');
+  // The rider presses Back on the screen they see, not on one still being assembled.
+  await untilQuiet(view.root);
+  this.backButtonPress();
+  await this.settle();
+});
+
+Then("the platform's back button is released", function (this: RidrsWorld) {
+  assert.equal(this.backButtonPress, undefined);
 });

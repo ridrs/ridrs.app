@@ -8,7 +8,11 @@ use ridrs_bridge::client as bridge;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     ble::process_start();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Restores the main window's size and position from the last run; saves them on exit.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    builder
         // Registers the platform backends (incl. the Android Kotlin module) and initializes the
         // shared BLE handler that `ble.rs` drives. blec's own JS commands are not used.
         .plugin(tauri_plugin_blec::init())

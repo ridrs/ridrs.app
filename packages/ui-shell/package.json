@@ -11,6 +11,7 @@
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
     "@ridrs/presentation": "workspace:*",
-    "@ridrs/ui-sdk": "workspace:*"
+    "@ridrs/ui-sdk": "workspace:*",
+    "tabbable": "6.5.0"
   }
 }

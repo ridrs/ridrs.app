@@ -30,6 +30,8 @@ serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 keepawake = "0.6.1"
+# Window size and position survive a restart (desktop only).
+tauri-plugin-window-state = "2.5.0"
 
 [profile.release]
 codegen-units = 1

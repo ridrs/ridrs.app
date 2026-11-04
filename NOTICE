@@ -31,6 +31,7 @@ This project incorporates third-party open-source dependencies under the followi
 | `@types/react` / `@types/react-dom` | 19.3.0 | MIT | React TypeScript definitions |
 | `simple-statistics` | 7.12.1 | ISC | Median and least-squares slope in the temporal data layer (`@ridrs/temporal`) |
 | `@bufbuild/protobuf` | 2.16.0 | Apache-2.0 AND BSD-3-Clause | Protobuf wire reader for Zwift Ride keypad packets (`device-zwift-ride`) |
+| `tabbable` | 6.5.0 | MIT | The focusable elements of a screen, in reading order, for arrow-key navigation (`@ridrs/ui-shell`) |
 
 Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/src-tauri/Cargo.lock`):
 
@@ -40,5 +41,6 @@ Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/
 | `tauri-plugin-blec` / `blec` | 0.18.0 | MIT OR Apache-2.0 | BLE platform backends (incl. Android) |
 | `btleplug` | 0.13.5 | MIT/Apache-2.0/BSD-3-Clause | BLE on Windows, macOS, iOS (via blec) |
 | `keepawake` | 0.6.1 | MIT | Keeping the display on during a ride (desktop) |
+| `tauri-plugin-window-state` | 2.5.0 | Apache-2.0 OR MIT | Window size and position across restarts (desktop) |
 
 MPL-2.0 components (approved by the maintainer, decision D9 in `experiments/tauri-ble-spike/HANDOVER-PHASE-3.md`; MPL-2.0 §3.3 permits combination with AGPL-3.0-or-later): the Rust crates `cssparser`, `cssparser-macros`, `selectors`, `dtoa-short` and `option-ext`, pulled in by Tauri, and `lightningcss`, used by Vite at build time only. Their source code is available from crates.io and npm under MPL-2.0.
