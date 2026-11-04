@@ -35,6 +35,7 @@ import {
   peripheral,
   splitCsv,
   useRealPlugins as withRealPlugins,
+  useSimulatedCentral as withSimulatedCentral,
 } from './devices-and-metrics.steps.ts';
 
 const COMPANION_ADDRESS = '192.168.178.110:42229';
@@ -133,8 +134,16 @@ function listedCompanions(world: RidrsWorld) {
   return payload.companions;
 }
 
-async function runOverNetwork(world: RidrsWorld, pluginsCsv: string): Promise<void> {
+async function runOverNetwork(
+  world: RidrsWorld,
+  pluginsCsv: string,
+  options: { readonly local?: boolean } = {},
+): Promise<void> {
   await withRealPlugins(world, splitCsv(pluginsCsv));
+  if (options.local) {
+    // This device's Bluetooth as well: both links run at once.
+    await withSimulatedCentral(world);
+  }
   world
     .getBehavior('bridge-network')
     .providedImplementations.set('ble-bridge.connector', connector(world));
@@ -171,6 +180,32 @@ Given(
     pendingCompanion.set(this, { name });
   },
 );
+
+Given(
+  'a companion {string} that sees an FTMS trainer {string}',
+  function (this: RidrsWorld, name: string, trainerName: string) {
+    // Its own devices: the phone gives the trainer another id than this device does.
+    this.companionSimulator = new BleSimulator({ clock: this.clock });
+    this.companionSimulator.addFtmsTrainer(trainerName, {
+      peripheralId: `phone-${trainerName.toLowerCase().replaceAll(' ', '-')}`,
+    });
+    this.companionCentral = this.companionSimulator;
+    pendingCompanion.set(this, { name });
+  },
+);
+
+Given('a simulated BLE environment without devices', function (this: RidrsWorld) {
+  this.bleSimulator = new BleSimulator({ clock: this.clock });
+});
+
+for (const verb of ['run', 'running']) {
+  Given(
+    `the ridrs plugins {string} ${verb} with the simulated BLE central and over the simulated network`,
+    async function (this: RidrsWorld, pluginsCsv: string) {
+      await runOverNetwork(this, pluginsCsv, { local: true });
+    },
+  );
+}
 
 Given('the companion shows the pairing code {string}', function (this: RidrsWorld, code: string) {
   const pending = pendingCompanion.get(this);

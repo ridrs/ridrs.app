@@ -1,0 +1,29 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Rider</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p class="note"><b>Onboarding 3 of 4.</b> The physics engine needs the rider's weight. Defaults are used if skipped, editable later in Settings, Rider.</p>
+  <div class="stage"><div class="device">
+    <div class="brand"><span class="dot"></span>RIDRS <i>//</i> APP</div>
+    <div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+    <div class="icon-hero" style="margin-top:20px" id="hero"></div>
+    <h1 class="title">About <em>You</em></h1>
+    <p class="sub">Weight changes how fast you climb.</p>
+    <div class="card" style="padding-top:0;padding-bottom:0">
+      <div class="field">Rider weight <span><input type="number" value="75"> kg</span></div>
+      <div class="field" style="border:0">Bike weight <span><input type="number" value="9"> kg</span></div>
+    </div>
+    <a class="cta" href="setup.html?state=first">Next <span class="arr">»</span></a>
+    <a class="skip" href="setup.html?state=first">Use defaults</a>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>document.getElementById('hero').innerHTML = ICON.person;</script>
+</body>
+</html>

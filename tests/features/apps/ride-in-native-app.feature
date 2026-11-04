@@ -6,6 +6,7 @@ Feature: Start a ride and see power and cadence
 
   Scenario: Riding with a simulated trainer
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-trainer"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
@@ -19,6 +20,7 @@ Feature: Start a ride and see power and cadence
 
   Scenario: Riding without any trainer shows honest dashes
     Given the plugin directories "plugins"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
@@ -29,6 +31,7 @@ Feature: Start a ride and see power and cadence
 
   Scenario: The screen stays awake only while a ride runs
     Given the plugin directories "plugins"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     Then the app lets the screen sleep

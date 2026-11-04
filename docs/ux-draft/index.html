@@ -1,0 +1,48 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Map</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="map">
+  <h1>ridrs UX draft</h1>
+  <p class="small">Clickable prototype, static HTML, no build. Every page has a state switcher (top) and a note explaining the state. Not app code. Concepts, rules and roadmap: <a href="README.md" style="color:var(--cyan)">README.md</a>.</p>
+  <h2>Flow</h2>
+<pre>
+ first start:  Welcome ─► Bluetooth ─► Rider ─► Setup (first) ─► Main
+ later starts: Setup (reconnect) ─ all settled, 3 s ─► Main        Setup collapses into the device indicator
+ Setup:        connects every kind with one candidate; a conflict is picked inline, no popup
+ Main:         [● Trainer ● Power ● HR ● Pixel 8 ▾]   [Start ride] ─► Activity ─► Ride saved ─► Main
+               tap indicator ─► rows ─► Device page (choose device, "connect via")
+               new device later ─► amber badge only ─► Device page (review)
+ Companion:    Connection ─► Add companion ─► paired ─► its devices are merged with this Mac's
+               duplicates shown once · this Mac first · per-device "Pixel 8 first" · automatic failover
+</pre>
+  <h2>Start</h2><div class="grid">
+    <a class="tile" href="setup.html"><b>Setup</b><span>8 states: first, later, with companion, HR conflict, power conflict, not found, no Bluetooth, all connected (auto-collapse)</span></a></div>
+  <h2>Onboarding (first start)</h2><div class="grid">
+    <a class="tile" href="onboarding-1-welcome.html"><b>1 Welcome</b><span>One sentence, one button</span></a>
+    <a class="tile" href="onboarding-2-bluetooth.html"><b>2 Bluetooth</b><span>Why before the OS dialog; denied → companion</span></a>
+    <a class="tile" href="onboarding-3-rider.html"><b>3 Rider</b><span>Weight, skippable</span></a>
+    <a class="tile" href="setup.html?state=first"><b>4 Devices</b><span>Setup in first-start mode</span></a></div>
+  <h2>Home</h2><div class="grid">
+    <a class="tile" href="main.html"><b>Main</b><span>Start ride + device indicator: arrival, badge, open, companion, offline, none</span></a>
+    <a class="tile" href="menu.html"><b>Menu</b><span>Five entries</span></a>
+    <a class="tile" href="device.html"><b>Device</b><span>Connect via, merged duplicate, new device, search</span></a></div>
+  <h2>Companion</h2><div class="grid">
+    <a class="tile" href="companion-add.html"><b>Add companion</b><span>QR or code, then what was merged and what is new</span></a>
+    <a class="tile" href="settings-connection.html"><b>Connection settings</b><span>Companions, default link, fallback, known devices</span></a></div>
+  <h2>Ride</h2><div class="grid">
+    <a class="tile" href="activity.html"><b>Activity</b><span>Lost device, route failover, companion offline, hold to finish</span></a>
+    <a class="tile" href="ride-saved.html"><b>Ride saved</b><span>Summary and files</span></a></div>
+  <h2>Settings</h2><div class="grid">
+    <a class="tile" href="settings-rider.html"><b>Rider</b><span>Weight, units</span></a>
+    <a class="tile" href="rides.html"><b>Rides</b><span>List (later)</span></a>
+    <a class="tile" href="about.html"><b>About</b><span>Version, licenses</span></a></div>
+</div>
+<script src="proto.js"></script>
+</body>
+</html>

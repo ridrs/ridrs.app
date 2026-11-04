@@ -13,7 +13,7 @@
     "contributions": [
       {
         "id": "bridge-pairing",
-        "extensionPoint": "main/panel",
+        "extensionPoint": "setup/companion",
         "export": "BridgePairing",
         "order": 0
       }
@@ -21,15 +21,10 @@
     "events": {
       "subscribe": [
         "bridge.companions-changed",
-        "bridge.state-changed",
         "bridge.pairing-offer"
       ],
       "publish": [
-        "bridge.pair-requested",
-        "bridge.connect-requested",
-        "bridge.disconnect-requested",
-        "bridge.forget-requested",
-        "ble.transport-requested"
+        "bridge.pair-requested"
       ]
     }
   }

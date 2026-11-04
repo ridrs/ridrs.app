@@ -292,13 +292,3 @@ export const bridgeStateChangedEvent = defineEvent(
     })
     .strict(),
 );
-
-/** Where `ble.central` comes from: this device's Bluetooth, or a companion over the network. */
-export const bleTransportSchema = z.enum(['local', 'bridge']);
-export type BleTransport = z.infer<typeof bleTransportSchema>;
-
-/** The rider asks the app to switch the BLE transport; the app applies it on its next start. */
-export const bleTransportRequestedEvent = defineEvent(
-  'ble.transport-requested',
-  z.object({ transport: bleTransportSchema }).strict(),
-);

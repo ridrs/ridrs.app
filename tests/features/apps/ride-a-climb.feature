@@ -4,6 +4,7 @@ Feature: Ride onto a climb
 
   Scenario: The speed drops when the road climbs
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-trainer, tests/fixtures/plugins/short-climb"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     And the plugin "physics-road" is disabled

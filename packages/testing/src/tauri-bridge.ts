@@ -11,6 +11,9 @@ interface ChannelLike {
 
 type Args = Record<string, unknown>;
 
+/** Mirrors `SCAN_TIMEOUT_MS` in `crates/ridrs-ble/src/commands.rs`: blec ends a scan after it. */
+const SCAN_TIMEOUT_MS = 120_000;
+
 /** Mirrors `encode_frame` in `apps/native/src-tauri/src/ble.rs`: u64 µs + f64 ms (LE) + payload. */
 function encodeFrame(monotonicUs: number, wallMs: number, payload: Uint8Array): ArrayBuffer {
   const buffer = new ArrayBuffer(16 + payload.byteLength);
@@ -70,8 +73,7 @@ export class SimulatedTauriBridge {
       case 'ble_scan':
         return this.scan(args);
       case 'ble_stop_scan':
-        this.scanAbort?.abort();
-        this.scanAbort = undefined;
+        this.stopScan();
         return undefined;
       case 'ble_connect':
         return this.connect(args);
@@ -91,11 +93,22 @@ export class SimulatedTauriBridge {
   private scan(args: Args): void {
     this.scanRequests += 1;
     // Like blec, a new scan replaces the running one.
-    this.scanAbort?.abort();
+    this.stopScan();
     const abort = new AbortController();
     this.scanAbort = abort;
     const channel = args.onEvent as ChannelLike;
+    const ended = args.onEnded as ChannelLike | undefined;
     const serviceUuids = (args.serviceUuids as string[]) ?? [];
+    const timeout = setTimeout(() => abort.abort(), SCAN_TIMEOUT_MS);
+    // However the scan ends (stopped, replaced, a connect, the timeout), Rust reports it once.
+    abort.signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout);
+        ended?.onmessage({});
+      },
+      { once: true },
+    );
     // The Rust command returns once the scan runs; results follow on the channel.
     void (async () => {
       for await (const peripheral of this.simulator.scan({ serviceUuids, signal: abort.signal })) {
@@ -104,8 +117,15 @@ export class SimulatedTauriBridge {
     })();
   }
 
+  private stopScan(): void {
+    this.scanAbort?.abort();
+    this.scanAbort = undefined;
+  }
+
   private async connect(args: Args): Promise<void> {
     const peripheralId = String(args.peripheralId);
+    // Like blec, connecting cancels the running scan.
+    this.stopScan();
     const connection = await this.simulator.connect(peripheralId);
     this.connections.set(peripheralId, connection);
     const lost = args.onConnectionLost as ChannelLike;

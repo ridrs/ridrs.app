@@ -111,6 +111,11 @@ Then('the page offers a {string} button', async function (this: RidrsWorld, labe
   await within(ui(this)).findByRole('button', { name: label });
 });
 
+Then('the page offers no {string} button', async function (this: RidrsWorld, label: string) {
+  await this.settle();
+  assert.equal(within(ui(this)).queryByRole('button', { name: label }), null);
+});
+
 Then(
   'the slot {string} contains the contribution {string}',
   async function (this: RidrsWorld, point: string, contribution: string) {

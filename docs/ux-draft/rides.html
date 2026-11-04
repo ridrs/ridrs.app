@@ -1,0 +1,21 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Rides</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="list:With rides,empty:Empty">
+  <p class="note"><b>Rides.</b> A later step: list of saved rides with their recording and FIT file.</p>
+  <div class="stage"><div class="device">
+    <div class="topbar"><a class="back" href="menu.html">‹ Menu</a><b>Rides</b><span style="width:40px"></span></div>
+    <div class="list" data-show="list"><a href="ride-saved.html"><span></span><span>Today, 18:42<small>24.3 km · 52:10</small></span><span>›</span></a><a href="ride-saved.html"><span></span><span>Yesterday, 07:15<small>18.0 km · 40:00</small></span><span>›</span></a></div>
+    <div class="card" data-show="empty"><h3>No rides yet</h3><p>Your first ride shows up here.</p></div>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+
+</body>
+</html>
