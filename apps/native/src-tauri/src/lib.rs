@@ -5,6 +5,8 @@ mod keep_awake;
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     ble::process_start();
@@ -18,6 +20,15 @@ pub fn run() {
         .plugin(tauri_plugin_blec::init())
         // Scoped to $APPDATA/recordings/** by capabilities/default.json.
         .plugin(tauri_plugin_fs::init())
+        // The arrow keys work from the start (AGENTS.md rule 12): without keyboard focus in the
+        // webview, macOS sends no key but Tab to the page until the rider clicks into it.
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let webview: &tauri::Webview<_> = window.as_ref();
+                webview.set_focus()?;
+            }
+            Ok(())
+        })
         .manage(keep_awake::KeepAwakeState::default())
         .manage(bridge::ClientState::default())
         .invoke_handler(tauri::generate_handler![
