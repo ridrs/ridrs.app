@@ -10,6 +10,7 @@ import {
   activityFinishRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  authBrowserSignInCapability,
   type BleCentral,
   bleBridgeConnectorCapability,
   bleCentralCapability,
@@ -51,6 +52,7 @@ import {
   metricPowerEvent,
   metricPowerHeartRateRatioCapability,
   metricPowerHeartRateRatioEvent,
+  netHttpCapability,
   type PluginContext,
   physicsBicycleCapability,
   physicsEnvironmentCapability,
@@ -68,11 +70,17 @@ import {
   type SpatialWriteResult,
   spatialTerrainCapability,
   storageAppFilesCapability,
+  storageSecretsCapability,
   type TemporalRecordResult,
   type TemporalSeriesWriter,
   type TemporalSnapshot,
   type TerrainPoint,
   type TimeSource,
+  trainingAccountChangedEvent,
+  trainingConnectRequestedEvent,
+  trainingDisconnectRequestedEvent,
+  trainingPlanChangedEvent,
+  trainingRefreshRequestedEvent,
   uiRegistryChangedEvent,
   uiTerrainObservedEvent,
   worldTerrainPreviewEvent,
@@ -168,6 +176,11 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   recordingCompletedEvent,
   recordingFailedEvent,
   exportFitWrittenEvent,
+  trainingConnectRequestedEvent,
+  trainingDisconnectRequestedEvent,
+  trainingRefreshRequestedEvent,
+  trainingAccountChangedEvent,
+  trainingPlanChangedEvent,
 ];
 
 /** Events the World records from the bus directly (host-level), independent of any plugin. */
@@ -342,6 +355,9 @@ export class RidrsWorld extends World {
       configSnapshotCapability,
       storageAppFilesCapability,
       spatialTerrainCapability,
+      netHttpCapability,
+      authBrowserSignInCapability,
+      storageSecretsCapability,
     ]) {
       this.capabilityContracts.set(contract.id, contract);
     }

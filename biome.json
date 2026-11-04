@@ -68,6 +68,9 @@
       "includes": [
         "plugins/transport-*/**",
         "plugins/bridge-connector-*/**",
+        "plugins/planner-*/**",
+        "plugins/auth-*/**",
+        "plugins/net-*/**",
         "plugins/storage-*/**",
         "plugins/recording-*/**",
         "plugins/export-*/**",

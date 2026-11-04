@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod keep_awake;
+mod secrets;
 
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
@@ -20,6 +21,11 @@ pub fn run() {
         .plugin(tauri_plugin_blec::init())
         // Scoped to $APPDATA/recordings/** by capabilities/default.json.
         .plugin(tauri_plugin_fs::init())
+        // intervals.icu (ADR 0049): HTTP from Rust, scoped to its API by capabilities/default.json;
+        // the system browser for the sign-in, and the one-shot loopback server for its redirect.
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_oauth::init())
         // The arrow keys work from the start (AGENTS.md rule 12): without keyboard focus in the
         // webview, macOS sends no key but Tab to the page until the rider clicks into it.
         .setup(|app| {
@@ -47,6 +53,9 @@ pub fn run() {
             bridge::bridge_send_text,
             bridge::bridge_close,
             keep_awake::keep_awake,
+            secrets::secret_get,
+            secrets::secret_set,
+            secrets::secret_remove,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

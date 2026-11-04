@@ -1,0 +1,9 @@
+{
+  "id": "storage-secrets-tauri",
+  "name": "Secrets (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["storage.secrets"],
+  "requires": [],
+  "entry": "index.ts"
+}
