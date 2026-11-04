@@ -1,9 +1,0 @@
-{
-  "id": "fixture-road-short-climb",
-  "name": "Short Climb Road (fixture)",
-  "version": "0.1.0",
-  "types": ["physics"],
-  "provides": ["physics.road"],
-  "requires": [],
-  "entry": "index.ts"
-}

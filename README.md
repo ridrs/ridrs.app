@@ -12,6 +12,7 @@ Open-source, modular, headless-first indoor cycling platform.
 - `packages/contracts/`: Public plugin, manifest, event, and capability contracts (`@ridrs/contracts`, `Apache-2.0`).
 - `packages/core/`: Runtime-neutral application core: discovery ports, capability resolution, lifecycle, diagnostics, UI registry, typed event bus and the temporal data layer service `ctx.temporal` (`@ridrs/core`, `AGPL-3.0-or-later`; Node-only adapters in `@ridrs/core/node`).
 - `packages/temporal/`: Pure, deterministic math of the temporal data layer: sampling intervals, freshness, values at a time, damped trend, time-weighted averages, snapshots (`@ridrs/temporal`).
+- `packages/spatial/`: Pure, deterministic sampling of the spatial data layer: windows of samples by distance, linear and stepwise interpolation, values ahead of the rider (`@ridrs/spatial`, `ctx.spatial`).
 - `packages/metric-source/` and `packages/ble-peripheral/`: Shared logic of the metric plugins and of the BLE device plugins (`@ridrs/metric-source`, `@ridrs/ble-peripheral`).
 - `packages/ui-sdk/`: Client contract for UI plugins (`@ridrs/ui-sdk`, `Apache-2.0`); `packages/ui-shell/`: the shell that composes screens and slots; `packages/ui-bridge/`: in-process bridge between shell and host; `packages/presentation/`: interpolated physics states and the frame clock for frame-driven UI plugins (`@ridrs/presentation`).
 - `plugins/`: Production plugins (BLE transports for Node and Tauri, FTMS trainer, heart-rate sensor, power/cadence/heart-rate metrics, power-to-heart-rate ratio, console output, activity session, physics engine and models, recording session, FIT export, app file storage for Node and Tauri, UI screens, HUD and widgets).
@@ -101,13 +102,14 @@ Record the platform, the power source, the time to reach 30 km/h at 200 W, and w
 
 ## Climbs and descents: extended physics
 
-Since Phase 6 the virtual rider rides a built-in demo course: 2 km flat, 1 km at 5 %, 500 m flat, 1 km at −5 %, then flat. Gravity opposes the rider uphill and pushes them downhill; air density comes from `physics-environment`. The HUD shows the current gradient after speed and distance. At a steady 200 W the speed settles near 34.2 km/h on the flat, about 14.9 km/h on the climb and about 57.9 km/h on the descent. Without pedalling the rider keeps rolling downhill but comes to rest on a climb and stays there (no rolling back). See `docs/architecture/physics.md` and ADR 0027.
+Since Phase 6 the virtual rider rides a built-in demo course: 2 km flat, 1 km at 5 %, 500 m flat, 1 km at −5 %, then flat. Since Phase 10 the landscape lives in the UI: `ui-landscape-demo` draws it and reports the terrain 20 m ahead of what it shows, sampled every metre; a driver (`world-driver-ui`) validates it and the spatial data layer (`@ridrs/spatial`) holds it for the physics, which keeps the distance itself (ADR 0044). The surface alternates: 3 km asphalt, then 1 km gravel, repeating, drawn in different colours. Gravel doubles the rolling resistance, so 200 W settle near 32.2 km/h there instead of 34.2 km/h. **Headless rides are always flat on asphalt:** without a UI no terrain arrives. Gravity opposes the rider uphill and pushes them downhill; air density comes from `physics-environment`. The HUD shows the current gradient after speed and distance. At a steady 200 W the speed settles near 34.2 km/h on the flat, about 14.9 km/h on the climb and about 57.9 km/h on the descent. Without pedalling the rider keeps rolling downhill but comes to rest on a climb and stays there (no rolling back). See `docs/architecture/physics.md` and ADR 0027.
 
 Manual check (`tauri dev` / `tauri android dev` as above) with a real smart trainer, or with the developer companion's simulated trainer, on the demo course:
 
 - At about 200 W the gradient shows 0.0 % for about 3.7 minutes, then **5.0 %**. Within a few seconds the speed drops from about 34 to about 15 km/h.
 - After the climb and 500 m of flat, the gradient shows **-5.0 %** and the speed rises towards about 58 km/h.
 - Stop pedalling on the descent: the rider keeps rolling. Stop on the climb: the rider comes to rest and stays there.
+- From 3 km the road turns to gravel (a lighter brown) and the speed on the flat drops by about 2 km/h; from 4 km it is asphalt again.
 
 Record the platform and the power source, the speed on each segment, and whether the jump at the segment boundaries feels acceptable. Without hardware a short climb runs in `tests/features/apps/ride-a-climb.feature` with the `simulated-trainer` and `short-climb` fixtures.
 

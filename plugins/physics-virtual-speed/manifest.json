@@ -2,13 +2,19 @@
   "id": "physics-virtual-speed",
   "name": "Virtual Speed",
   "version": "0.1.0",
-  "types": ["physics"],
-  "provides": ["physics.motion", "config.snapshot"],
+  "types": [
+    "physics"
+  ],
+  "provides": [
+    "physics.motion",
+    "config.snapshot"
+  ],
   "requires": [
     "physics.bicycle",
-    "physics.powertrain", "physics.rider",
-    "physics.road",
-    "physics.total-resistance"
+    "physics.powertrain",
+    "physics.rider",
+    "physics.total-resistance",
+    "spatial.terrain"
   ],
   "entry": "index.ts"
 }

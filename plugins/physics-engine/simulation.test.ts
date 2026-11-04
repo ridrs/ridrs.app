@@ -22,7 +22,7 @@ function result(at: number, speed = 0): MotionResult {
     wheelPower: 0,
     driveForce: 0,
     resistance: { total: 0, contributions: [] },
-    road: { gradient: 0, origin: 'default' },
+    road: { gradient: 0, surface: 'asphalt', origin: 'default' },
   };
 }
 
@@ -164,7 +164,7 @@ describe('RideSimulation batches', () => {
         ...result(at, (at - T0) / 100),
         distance: (at - T0) / 1000,
         acceleration: 0.5,
-        road: { gradient: 0.05, origin: 'default' },
+        road: { gradient: 0.05, surface: 'asphalt', origin: 'default' },
       }),
     };
     const batches: PhysicsStateBatch[] = [];

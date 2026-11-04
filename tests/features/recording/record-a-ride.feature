@@ -24,7 +24,7 @@ Feature: Every ride is recorded
     Then the first record of the recording is a "header" with the format "ridrs.recording" version 1
     And the second record is a "snapshot"
     And the last record is a "footer" with the status "complete"
-    And the event records are numbered 1, 2, 3 … without gaps, in publish order
+    And the event and diagnostic records are numbered 1, 2, 3 … without gaps, in publish order
     And the recording contains every "physics.state-batch" step from 0 to 1000 exactly once
     And every "physics.state", "metric.power", "metric.heart-rate" and "activity.state-changed" event of the ride is in the recording with its exact payload and timestamp
 
@@ -32,7 +32,7 @@ Feature: Every ride is recorded
     Given a ride from "+0 ms" to "+10 s" with power 200 W every 0.25 s and heart rate 150 bpm every 1 s was recorded
     Then the snapshot lists the plugin "physics-engine" with its version, types, provides and requires
     And the snapshot section "physics-rider" contains a mass of 75 and a CdA of 0.32
-    And the snapshot section "physics-road" contains the course segments
+    And the snapshot section "physics-rolling-resistance" contains the surface factors "asphalt 1, gravel 2"
     And the snapshot contains the core temporal defaults
 
   Scenario: The minute before the ride is recorded as pre-roll

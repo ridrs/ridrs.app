@@ -1,0 +1,9 @@
+{
+  "id": "fixture-terrain-observer",
+  "name": "Terrain Observer (fixture)",
+  "version": "0.1.0",
+  "types": ["test"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts"
+}

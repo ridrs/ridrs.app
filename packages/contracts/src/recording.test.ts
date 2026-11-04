@@ -43,7 +43,7 @@ const state = {
   wheelPower: 200,
   driveForce: 200,
   resistance: { total: 3.3, contributions: [{ source: 'physics-aerodynamics', force: 0.2 }] },
-  road: { gradient: 0.05, origin: 'default' },
+  road: { gradient: 0.05, surface: 'gravel', origin: 'default' },
 };
 
 /** A valid payload for every event of the contracts: the recording stores them all verbatim. */
@@ -145,6 +145,22 @@ const SAMPLES: Record<string, unknown> = {
     durationMs: 10_000,
   },
   'recording.failed': { sessionId: 's-1', reason: 'disk full' },
+  'ui.terrain-observed': {
+    revision: 2,
+    originDistance: 2999,
+    spacing: 1,
+    samples: [
+      { gradient: 0.05, surface: 'asphalt' },
+      { gradient: 0, surface: 'gravel' },
+    ],
+  },
+  'world.terrain-preview': {
+    revision: 3,
+    originDistance: 1999,
+    spacing: 1,
+    // Without a surface (absent = asphalt) and with one.
+    samples: [{ gradient: 0 }, { gradient: 0.05 }, { gradient: 0.05, surface: 'gravel' }],
+  },
 };
 
 const events = (Object.values(contracts) as unknown[]).filter(

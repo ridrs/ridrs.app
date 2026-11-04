@@ -2,6 +2,8 @@
 
 # ADR 0027: Road Gradient and Environment
 
+**Amended by [ADR 0043](0043-terrain-preview-by-event.md):** the road reaches the physics as the event `world.terrain-preview` from the world `physics-road`; the capability `physics.road` is removed. The demo course is unchanged. **Amended again by [ADR 0044](0044-ui-landscape-as-world-sensor-and-spatial-layer.md):** the demo course now lives in the UI landscape `ui-landscape-demo` (with a surface), `physics-road` is gone, and the physics reads the road from the spatial layer.
+
 ## Context
 
 Phase 6 use case: "The same power gives a different speed on a climb than on the flat." The Phase 5 rider rides a flat road in still air with an air-density fallback inside `physics-aerodynamics` (ADR 0026). A gradient needs a road under the rider, a gravity force and the normal force in rolling resistance. There are no routes yet (Phase 10), no trainer control (Phase 8) and no configuration. The physics must grow by adding plugins behind the existing capabilities: the engine and the total-resistance aggregator do not change.

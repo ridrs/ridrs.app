@@ -1,0 +1,23 @@
+{
+  "id": "fixture-landscape-short-climb",
+  "name": "Short Climb Landscape (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "landscape",
+        "extensionPoint": "activity/landscape",
+        "export": "ShortClimbLandscape"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": ["ui.terrain-observed"]
+    }
+  }
+}

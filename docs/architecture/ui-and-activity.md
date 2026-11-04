@@ -14,7 +14,7 @@ apps/native  (one process: the Tauri WebView)
                                                     last-value replay       synced slots
    ├─ screen "main"      ui-main-screen          [Start ride]
    └─ screen "activity"  ui-activity-screen      declares: activity/landscape, activity/hud   [Finish ride]
-         ├─ activity/landscape  ◄─ ui-landscape-flat
+         ├─ activity/landscape  ◄─ ui-landscape-demo     (Phase 10: the world's sensor, publishes ui.terrain-observed)
          └─ activity/hud        ◄─ ui-hud                declares: hud/widget
                └─ hud/widget    ◄─ ui-widget-power, ui-widget-cadence,
                                    ui-widget-heart-rate, ui-widget-power-heart-rate-ratio (Phase 4)
@@ -86,7 +86,16 @@ A remote bridge (the deferred `ui-gateway-web`, WebSocket) would implement the s
 
 ## Phase 7: a frame-driven landscape
 
-`ui-landscape-flat` subscribes to `physics.state-batch` (and `activity.state-changed`, to log presentation stats at ride finish) instead of `physics.state`. It creates one presentation from `@ridrs/presentation` and moves its lane markings every frame of `ctx.frames` by the presented distance (dash period 8 m). Its SVG exposes `data-distance` and `data-basis`; the lane markings keep `data-position`. The HUD widgets stay on `physics.state` at 4 Hz. `ride-with-moving-road.feature` runs `startRidrsApp` with the `simulated-trainer` fixture and a 60 FPS timer frame source. See [presentation.md](presentation.md).
+`ui-landscape-flat` (replaced by `ui-landscape-demo` in Phase 10) subscribes to `physics.state-batch` (and `activity.state-changed`, to log presentation stats at ride finish) instead of `physics.state`. It creates one presentation from `@ridrs/presentation` and moves its lane markings every frame of `ctx.frames` by the presented distance (dash period 8 m). Its SVG exposes `data-distance` and `data-basis`; the lane markings keep `data-position`. The HUD widgets stay on `physics.state` at 4 Hz. `ride-with-moving-road.feature` runs `startRidrsApp` with the `simulated-trainer` fixture and a 60 FPS timer frame source. See [presentation.md](presentation.md).
+
+## Phase 10: the landscape as the world's sensor
+
+The demo landscape lives in the UI: `ui-landscape-demo` owns its model (the course of ADR 0027 and the surface, 3 km asphalt then 1 km gravel, repeating), draws it and tells the host what it shows ahead, so what the rider sees is what the physics rides ([ADR 0044](../decisions/0044-ui-landscape-as-world-sensor-and-spatial-layer.md), amended 2026-11-04).
+
+- **Drawing.** Every frame, at the presented distance, the road from 4 m to 160 m ahead in sections split where the surface changes, asphalt and gravel in different colours (the farthest section reaches the horizon); the lane markings on top, unchanged, with `data-position`. Without a state it draws at 0 m. For tests the SVG (`landscape`) carries `data-surface` (the surface under the rider) besides `data-distance` and `data-basis`, and each section in the `road` group `data-surface`, `data-from`, `data-to`.
+- **Reporting.** The raw event `ui.terrain-observed` (declared in `ui.events.publish`, carried by the UI bridge as an input): `{ revision, originDistance, spacing, samples: [{ gradient, surface }] }`, 20 m from the whole metre at or before the presented odometer, 1 m apart. The landscape is mounted only on the activity screen, after the ride runs: on mount it publishes the window from 0 m at once (every ride starts there), then a new one whenever less than 10 m are left ahead of the presented position of the running ride; at standstill nothing. Frames of another session (the bridge replays the last batch of the previous ride) are ignored. `TerrainPublisher` holds the rules, `road-sections.ts` the drawing geometry, `landscape-model.ts` the model; all three are pure and unit-tested.
+- **Path.** `world-driver-ui` validates the window and accepts it as `world.terrain-preview`; `spatial-terrain` writes it into `@ridrs/spatial`; the physics reads it there ([spatial.md](spatial.md)). The landscape never writes simulation state (AGENTS.md rule 10): frame timing reaches the physics only through input timing. When frames stop for long (window hidden, app in the background), no window arrives, the physics holds the last sample and reports one `terrain-preview-missing`.
+- **Tests.** `ui/demo-landscape.feature` (`@ui`, in-process shell): asphalt to the horizon at the start, gravel after 3 km and asphalt after 4 km with a probe standing in for the odometer, and the window reaching the physics' reader. `apps/ride-on-the-demo-landscape.feature` (`@ui` e2e): one window from 0 m at the ride start and none at standstill, new windows while riding below half left, all accepted. The `terrain-observer` fixture records what the landscape published in the e2e app.
 
 ## Device indicator and setup
 

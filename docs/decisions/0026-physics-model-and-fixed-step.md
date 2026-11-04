@@ -2,6 +2,8 @@
 
 # ADR 0026: Physics Model and Fixed Step
 
+**Amended by [ADR 0043](0043-terrain-preview-by-event.md):** step 0 runs as a task at `startedAt`, after the turn that started the ride; `physics-virtual-speed` subscribes to `world.terrain-preview`.
+
 ## Context
 
 Phase 5 turns measured rider power into a virtual speed: "I pedal 200 W and ridrs shows my virtual speed." The physics must be deterministic, replaceable plugin by plugin, and must not depend on how often sensors deliver or when the host gets to run it. Sensors are event-driven; a simulation needs a clock. The temporal data layer (ADR 0023) already answers "what was the power at time t".

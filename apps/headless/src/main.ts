@@ -33,13 +33,15 @@ import {
   physicsPowertrainCapability,
   physicsResistanceCapability,
   physicsRiderCapability,
-  physicsRoadCapability,
   physicsStateBatchEvent,
   physicsStateEvent,
   physicsTotalResistanceCapability,
   recordingCompletedEvent,
   recordingFailedEvent,
+  spatialTerrainCapability,
   storageAppFilesCapability,
+  uiTerrainObservedEvent,
+  worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
 import { PluginHost } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
@@ -68,13 +70,13 @@ const CAPABILITIES: readonly CapabilityContract[] = [
   physicsBicycleCapability,
   physicsRiderCapability,
   physicsEnvironmentCapability,
-  physicsRoadCapability,
   physicsResistanceCapability,
   physicsTotalResistanceCapability,
   physicsPowertrainCapability,
   physicsMotionCapability,
   configSnapshotCapability,
   storageAppFilesCapability,
+  spatialTerrainCapability,
 ];
 
 /** Events the host resolves by id: what a replay republishes and validates. */
@@ -95,6 +97,8 @@ const EVENTS: readonly EventDefinition[] = [
   metricPowerHeartRateRatioEvent,
   physicsStateEvent,
   physicsStateBatchEvent,
+  uiTerrainObservedEvent,
+  worldTerrainPreviewEvent,
   recordingCompletedEvent,
   recordingFailedEvent,
   exportFitWrittenEvent,

@@ -1,0 +1,9 @@
+{
+  "id": "spatial-terrain",
+  "name": "Terrain Series",
+  "version": "0.1.0",
+  "types": ["spatial"],
+  "provides": ["spatial.terrain"],
+  "requires": [],
+  "entry": "index.ts"
+}

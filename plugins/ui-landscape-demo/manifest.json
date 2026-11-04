@@ -1,0 +1,30 @@
+{
+  "id": "ui-landscape-demo",
+  "name": "Demo Landscape",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "landscape",
+        "extensionPoint": "activity/landscape",
+        "export": "DemoLandscape"
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "activity.state-changed",
+        "physics.state-batch"
+      ],
+      "publish": [
+        "ui.terrain-observed"
+      ]
+    }
+  }
+}

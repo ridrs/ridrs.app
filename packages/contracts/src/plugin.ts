@@ -6,6 +6,7 @@ import type { DiagnosticCode } from './diagnostics.ts';
 import type { PluginEventsContext, PluginIdsContext, PluginInputsContext } from './events.ts';
 import type { PluginHostAccess } from './host.ts';
 import type { PluginManifest } from './manifest.ts';
+import type { PluginSpatialContext } from './spatial.ts';
 import type { PluginTemporalContext } from './temporal.ts';
 import type { UiRegistry } from './ui.ts';
 
@@ -46,6 +47,8 @@ export interface PluginContext {
   readonly capabilities: PluginCapabilitiesContext;
   /** The temporal data layer: series history, freshness, values at a time, aligned snapshots. */
   readonly temporal: PluginTemporalContext;
+  /** The spatial data layer: windows of samples by distance, values at a distance. */
+  readonly spatial: PluginSpatialContext;
   readonly signal: AbortSignal;
   /** Read-only view of the UI registry; `core.ui-registry.changed` announces new revisions. */
   readonly ui: { registry(): UiRegistry };
