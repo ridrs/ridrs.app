@@ -161,6 +161,43 @@ const SAMPLES: Record<string, unknown> = {
     // Without a surface (absent = asphalt) and with one.
     samples: [{ gradient: 0 }, { gradient: 0.05 }, { gradient: 0.05, surface: 'gravel' }],
   },
+  'training.connect-requested': {},
+  'training.disconnect-requested': {},
+  'training.refresh-requested': {},
+  'training.account-changed': { service: 'intervals.icu', state: 'connected', athleteName: 'Alex' },
+  'training.plan-changed': {
+    service: 'intervals.icu',
+    fetchedAt: T,
+    offline: false,
+    athlete: { name: 'Alex', ftp: 250, weight: 72.5 },
+    workouts: [
+      {
+        id: '90001',
+        date: '2026-11-04',
+        name: 'Sweet Spot',
+        sport: 'ride',
+        durationSeconds: 3600,
+        trainingLoad: 70,
+        // A ramp, and a repeat of two intervals.
+        steps: [
+          {
+            kind: 'interval',
+            durationSeconds: 600,
+            phase: 'warm-up',
+            power: { low: 50, high: 75, lowWatts: 125, highWatts: 188 },
+          },
+          {
+            kind: 'repeat',
+            reps: 3,
+            steps: [
+              { kind: 'interval', durationSeconds: 720, power: { low: 90, high: 90 } },
+              { kind: 'interval', durationSeconds: 240, cadence: { low: 85, high: 95 } },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 };
 
 const events = (Object.values(contracts) as unknown[]).filter(

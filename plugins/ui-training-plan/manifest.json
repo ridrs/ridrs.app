@@ -1,0 +1,41 @@
+{
+  "id": "ui-training-plan",
+  "name": "Training Plan",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "training-workout",
+        "export": "WorkoutDetails",
+        "extensionPoints": []
+      }
+    ],
+    "contributions": [
+      {
+        "id": "next-workout",
+        "extensionPoint": "main/panel",
+        "export": "NextWorkout",
+        "order": 10
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "training.account-changed",
+        "training.plan-changed",
+        "activity.state-changed"
+      ],
+      "publish": [
+        "training.connect-requested",
+        "training.disconnect-requested",
+        "training.refresh-requested"
+      ]
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "net-http-tauri",
+  "name": "HTTP (Tauri)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["net.http"],
+  "requires": [],
+  "entry": "index.ts"
+}

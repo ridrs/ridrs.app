@@ -42,6 +42,7 @@ export type RidrsErrorCode =
   | 'permission-denied'
   | 'outside-turn'
   | 'invalid-path'
+  | 'sign-in-cancelled'
   | 'invalid-recording'
   | 'recording-unsupported-version';
 

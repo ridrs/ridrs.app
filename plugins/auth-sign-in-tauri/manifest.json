@@ -1,0 +1,9 @@
+{
+  "id": "auth-sign-in-tauri",
+  "name": "Browser Sign-in (Tauri)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["auth.browser-sign-in"],
+  "requires": [],
+  "entry": "index.ts"
+}
