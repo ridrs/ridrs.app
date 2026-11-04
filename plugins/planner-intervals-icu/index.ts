@@ -30,6 +30,8 @@ const CLIENT_ID = '1697';
 const SCOPES = 'SETTINGS:READ,CALENDAR:READ';
 const SITE = 'https://intervals.icu';
 const CALLBACK_PATH = '/oauth/callback';
+/** Registered with the redirect URI: intervals.icu compares it exactly, port included. */
+const CALLBACK_PORT = 47261;
 /** The planned workouts of today and the next 13 days. */
 const PLAN_DAYS = 14;
 const TOKEN_KEY = 'intervals-icu.token';
@@ -95,6 +97,7 @@ export default definePlugin({
         try {
           const result = await signIn.signIn({
             callbackPath: CALLBACK_PATH,
+            callbackPort: CALLBACK_PORT,
             authorizationUrl: (redirectUri) => {
               const url = new URL('/oauth/authorize', SITE);
               url.search = new URLSearchParams({
