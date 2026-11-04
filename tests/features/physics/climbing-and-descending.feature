@@ -50,7 +50,7 @@ Feature: Same power, different speed on a gradient
     And the virtual speed at "+60 s" is 14.93 km/h
 
   Scenario: The demo course climbs after two kilometres
-    Given a mock world "test-landscape" feeds the demo landscape
+    Given a mock world "test-landscape" feeds the demo course on asphalt
     And the host has started
     And "test-ui" published "activity.start-requested"
     When "test-device" delivers only power 200 W every 0.25 s for 300 seconds
