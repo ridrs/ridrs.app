@@ -5,7 +5,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::ipc::{Channel, InvokeResponseBody};
-use tauri_plugin_blec::models::{BleDevice, ScanFilter};
+use tauri_plugin_blec::models::{BleDevice, ScanFilter, WriteType};
 use tauri_plugin_blec::{get_handler, OnDisconnectHandler};
 use uuid::Uuid;
 
@@ -65,6 +65,10 @@ pub struct ScanEvent {
     service_uuids: Vec<String>,
 }
 
+/// The scan ended: stopped, replaced, timed out, or cancelled by a connect.
+#[derive(Clone, Serialize)]
+pub struct ScanEndedEvent {}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionLostEvent {
@@ -88,7 +92,11 @@ pub async fn ble_adapter_state() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn ble_scan(service_uuids: Vec<String>, on_event: Channel<ScanEvent>) -> Result<(), String> {
+pub async fn ble_scan(
+    service_uuids: Vec<String>,
+    on_event: Channel<ScanEvent>,
+    on_ended: Channel<ScanEndedEvent>,
+) -> Result<(), String> {
     let handler = get_handler().map_err(err)?;
     let services = service_uuids
         .iter()
@@ -113,6 +121,9 @@ pub async fn ble_scan(service_uuids: Vec<String>, on_event: Channel<ScanEvent>) 
                 });
             }
         }
+        // blec drops the sender when its scan task ends, also after its timeout and when
+        // `connect` cancels the scan; the TS side starts a new one if devices are still searched.
+        let _ = on_ended.send(ScanEndedEvent {});
     });
     handler
         .discover(Some(tx), SCAN_TIMEOUT_MS, filter, false)
@@ -172,6 +183,27 @@ pub async fn ble_subscribe(
     };
     handler
         .subscribe_to(&peripheral_id, characteristic, Some(service), callback)
+        .await
+        .map_err(err)
+}
+
+/// Write Without Response (a command); `data` arrives as a JSON number array.
+#[tauri::command]
+pub async fn ble_write(
+    peripheral_id: String,
+    service_uuid: String,
+    characteristic_uuid: String,
+    data: Vec<u8>,
+) -> Result<(), String> {
+    let handler = get_handler().map_err(err)?;
+    handler
+        .send_data_to(
+            &peripheral_id,
+            parse_uuid(&characteristic_uuid)?,
+            Some(parse_uuid(&service_uuid)?),
+            &data,
+            WriteType::WithoutResponse,
+        )
         .await
         .map_err(err)
 }

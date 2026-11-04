@@ -15,6 +15,7 @@
         "id": "main",
         "export": "MainScreen",
         "extensionPoints": [
+          "main/status",
           "main/panel"
         ]
       }

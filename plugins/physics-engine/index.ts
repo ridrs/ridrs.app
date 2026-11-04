@@ -15,7 +15,7 @@ import { ENGINE_DEFAULTS, RideSimulation } from './simulation.ts';
 
 interface Engine {
   ride?: RideSimulation;
-  /** The one scheduled step, only while a ride runs. */
+  /** The one scheduled task (step 0 or the next step), only while a ride starts or runs. */
   wake?: TaskId;
 }
 
@@ -81,7 +81,7 @@ function arm(ctx: PluginContext, ride: RideSimulation): void {
 /**
  * The simulation clock: a fixed 10 ms step while a ride runs, publishing `physics.state` and
  * every step's sample in `physics.state-batch`. It knows nothing about frames or rendering. The
- * only physics plugin with a timer and with events; it knows nothing but `physics.motion`.
+ * only physics plugin with a timer; it knows nothing but `physics.motion`.
  */
 export default definePlugin({
   initialize(ctx) {
@@ -96,19 +96,32 @@ export default definePlugin({
     engines.set(ctx, engine);
     const motion = ctx.capabilities.get(physicsMotionCapability);
 
+    /**
+     * Step 0 runs as a task at the ride's start time, after the turn that started the ride: what
+     * other plugins publish in reaction to `running` (a world's first terrain window) is there
+     * before it, whatever the plugin order. Same logical time, so the states do not move.
+     */
+    const begin = (sessionId: string, startedAt: number) => {
+      engine.wake = undefined;
+      try {
+        engine.ride = new RideSimulation(sessionId, startedAt, motion, {
+          state: (state) => ctx.events.publish(physicsStateEvent, state),
+          batch: (batch) => ctx.events.publish(physicsStateBatchEvent, batch),
+        });
+      } catch (error) {
+        fail(ctx, sessionId, 0, error);
+        return;
+      }
+      arm(ctx, engine.ride);
+    };
+
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
       if (payload.state === 'running') {
         stopRide(ctx, engine);
-        try {
-          engine.ride = new RideSimulation(payload.sessionId, payload.startedAt, motion, {
-            state: (state) => ctx.events.publish(physicsStateEvent, state),
-            batch: (batch) => ctx.events.publish(physicsStateBatchEvent, batch),
-          });
-        } catch (error) {
-          fail(ctx, payload.sessionId, 0, error);
-          return;
-        }
-        arm(ctx, engine.ride);
+        const { sessionId, startedAt } = payload;
+        // A finish request is an input of its own, and inputs of the same time run after tasks:
+        // step 0 always runs before the ride can finish.
+        engine.wake = ctx.clock.scheduleAt(startedAt, () => begin(sessionId, startedAt));
         return;
       }
       const ride = engine.ride;

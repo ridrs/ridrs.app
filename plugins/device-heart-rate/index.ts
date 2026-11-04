@@ -50,12 +50,13 @@ export default definePlugin({
       ctx,
       startBlePeripheralLink({
         ctx,
-        central: ctx.capabilities.get(bleCentralCapability),
+        centrals: ctx.capabilities.getAll(bleCentralCapability),
         characteristic: {
           serviceUuid: HEART_RATE_SERVICE_UUID,
           characteristicUuid: HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID,
         },
         label: 'heart-rate sensor',
+        kind: 'heart-rate',
         onNotification: (peripheral, packet) =>
           handleHeartRateMeasurement(ctx, peripheral, packet),
       }),

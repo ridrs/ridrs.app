@@ -17,13 +17,13 @@ module.exports = {
     {
       name: 'core-only-imports-contracts',
       comment:
-        'packages/core may import contracts and the temporal math; it must never import testing, plugins/, apps/, or tests/.',
+        'packages/core may import contracts and the temporal and spatial math; it must never import testing, plugins/, apps/, or tests/.',
       severity: 'error',
       from: {
         path: '^packages/core/',
       },
       to: {
-        path: '^(packages/(?!contracts/|core/|temporal/)|plugins/|apps/|tests/)',
+        path: '^(packages/(?!contracts/|core/|temporal/|spatial/)|plugins/|apps/|tests/)',
       },
     },
     {
@@ -32,7 +32,7 @@ module.exports = {
         'packages/core and packages/contracts run in Node and in a WebView: no node:* builtins and no Node-only libraries. Only packages/core/src/node/ (the Node-only entry) may use them.',
       severity: 'error',
       from: {
-        path: '^packages/(core|contracts|ble-bridge|ble-simulator|temporal|metric-source|ble-peripheral|recording|fit)/',
+        path: '^packages/(core|contracts|ble-bridge|ble-simulator|temporal|spatial|metric-source|ble-peripheral|recording|fit)/',
         pathNot: '(^packages/core/src/node/|\\.test\\.ts$)',
       },
       to: {
@@ -129,6 +129,45 @@ module.exports = {
       severity: 'error',
       from: { path: '^(plugins/|tests/fixtures/plugins/)' },
       to: { path: '^packages/temporal/' },
+    },
+    {
+      name: 'spatial-is-pure-sampling',
+      comment:
+        'packages/spatial is deterministic sampling by distance: type-only contracts, no library, no clock, timers, rxjs or Node builtins.',
+      severity: 'error',
+      from: { path: '^packages/spatial/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^(packages/(?!spatial/|contracts/)|plugins/|apps/|tests/|node:)|node_modules/',
+      },
+    },
+    {
+      name: 'spatial-no-undeclared-modules',
+      comment: 'An import packages/spatial cannot resolve would bypass spatial-is-pure-sampling.',
+      severity: 'error',
+      from: { path: '^packages/spatial/' },
+      to: { couldNotResolve: true },
+    },
+    {
+      name: 'spatial-contracts-type-only',
+      comment: 'packages/spatial uses the contracts for types only.',
+      severity: 'error',
+      from: { path: '^packages/spatial/' },
+      to: { path: '^packages/contracts/', dependencyTypesNot: ['type-only'] },
+    },
+    {
+      name: 'spatial-no-builtins',
+      comment: 'packages/spatial has no I/O: no Node builtins.',
+      severity: 'error',
+      from: { path: '^packages/spatial/', pathNot: '\\.test\\.ts$' },
+      to: { dependencyTypes: ['core'] },
+    },
+    {
+      name: 'plugins-never-import-spatial',
+      comment:
+        'Plugins use ctx.spatial: one sampling implementation, and no plugin bypasses series ownership.',
+      severity: 'error',
+      from: { path: '^(plugins/|tests/fixtures/plugins/)' },
+      to: { path: '^packages/spatial/' },
     },
     {
       name: 'shared-plugin-packages-import-contracts-only',
@@ -251,7 +290,7 @@ module.exports = {
       comment:
         'Physics plugins and the core never import UI or presentation code: the engine has no frame, render or UI concept.',
       severity: 'error',
-      from: { path: '^(plugins/physics-|packages/(core|contracts|temporal)/)' },
+      from: { path: '^(plugins/physics-|packages/(core|contracts|temporal|spatial)/)' },
       to: { path: '^packages/(presentation|ui-)' },
     },
     {

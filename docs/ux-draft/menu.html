@@ -1,0 +1,26 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Menu</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <p class="note"><b>Menu</b> opens from the corner of Main. Only reachable outside a ride. No tab bar.</p>
+  <div class="stage"><div class="device">
+    <div class="topbar"><a class="back" href="main.html">‹ Back</a><b>Menu</b><span style="width:40px"></span></div>
+    <div class="list">
+      <a href="main.html?state=expanded"><span class="ico" id="i1"></span><span>Devices<small>Status, add or change a device</small></span><span>›</span></a>
+      <a href="settings-rider.html"><span class="ico" id="i2"></span><span>Rider<small>Weight, bike</small></span><span>›</span></a>
+      <a href="settings-connection.html"><span class="ico" id="i3"></span><span>Connection<small>Companion phones, which link carries a device</small></span><span>›</span></a>
+      <a href="rides.html"><span class="ico" id="i4"></span><span>Rides<small>Saved rides and files</small></span><span>›</span></a>
+      <a href="about.html"><span class="ico" id="i5"></span><span>About<small>Version, licenses</small></span><span>›</span></a>
+    </div>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>i1.innerHTML=ICON.trainer;i2.innerHTML=ICON.person.replace(/64/g,'28');i3.innerHTML=ICON.bt.replace(/64/g,'28');i4.innerHTML=ICON.rides;i5.innerHTML=ICON.info;</script>
+</body>
+</html>

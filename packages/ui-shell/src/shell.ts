@@ -10,6 +10,7 @@ import {
 } from '@ridrs/contracts';
 import { FrameClock, type FrameSource } from '@ridrs/presentation';
 import type { UiBridge, UiComponent, UiContext, UiLogger, Unsubscribe } from '@ridrs/ui-sdk';
+import { keyboardNavigation } from './keyboard.ts';
 
 export interface ShellOptions {
   readonly logger?: UiLogger;
@@ -17,6 +18,8 @@ export interface ShellOptions {
   readonly initialScreen?: string;
   /** Paces the render clock; requestAnimationFrame of the root's window by default. */
   readonly frameSource?: FrameSource;
+  /** The platform's back button (Android's), if it has one: calls `press` on every press. */
+  readonly backButton?: (press: () => void) => Unsubscribe;
 }
 
 /** Frames at the display's refresh rate; the WebView pauses them while it is hidden. */
@@ -77,6 +80,9 @@ export function mountShell(
   });
   const modules = new Map<string, Promise<Record<string, unknown>>>();
   const slots = new Set<Slot>();
+  // Back goes to the component that asked for it last: the innermost one still mounted.
+  const backHandlers: (() => void)[] = [];
+  const back = () => backHandlers.at(-1)?.();
   let registry = bridge.registry();
   let active: { readonly screen: UiRegistryScreen; readonly handle: Mounted } | undefined;
   let disposed = false;
@@ -145,6 +151,11 @@ export function mountShell(
       slot: (point, slotContainer) => own(openSlot(point, slotContainer)),
       frames: {
         onFrame: (handler) => own(frames.onFrame(handler, entry.pluginId)),
+      },
+      onBack: (handler) => {
+        const entryHandler = () => handler();
+        backHandlers.push(entryHandler);
+        return own(() => backHandlers.splice(backHandlers.lastIndexOf(entryHandler), 1));
       },
       navigate: (path) => {
         // Deferred so a component may navigate from inside its own render or event handler.
@@ -295,11 +306,15 @@ export function mountShell(
   };
 
   const stopListening = bridge.onRegistryChanged(onRegistry);
+  const stopKeyboard = keyboardNavigation(root, { back });
+  const stopBackButton = options.backButton?.(back);
   show(defaultScreen());
 
   return () => {
     disposed = true;
     stopListening();
+    stopKeyboard();
+    stopBackButton?.();
     show(undefined);
   };
 }

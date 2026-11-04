@@ -10,9 +10,11 @@ const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 function fakePlatform() {
   const log: string[] = [];
   let advertise: ((p: BleDiscoveredPeripheral) => void) | undefined;
-  const scans = new SharedBleScan(async (services, onDiscovered) => {
+  let end: (() => void) | undefined;
+  const scans = new SharedBleScan(async (services, onDiscovered, _signal, onEnded) => {
     log.push(`start ${services.join('+') || '*'}`);
     advertise = onDiscovered;
+    end = onEnded;
     return {
       stop: async () => {
         log.push('stop');
@@ -22,7 +24,13 @@ function fakePlatform() {
   });
   const device = (id: string, service: string) =>
     advertise?.({ peripheralId: id, name: id, serviceUuids: [service] });
-  return { scans, log, device };
+  /** The platform ends its scan by itself (a timeout, a connect). */
+  const endScan = () => {
+    log.push('ended');
+    advertise = undefined;
+    end?.();
+  };
+  return { scans, log, device, endScan };
 }
 
 function collect(scans: SharedBleScan, service: string, signal: AbortSignal) {
@@ -36,6 +44,34 @@ function collect(scans: SharedBleScan, service: string, signal: AbortSignal) {
 }
 
 describe('SharedBleScan', () => {
+  it('starts the native scan again when it ends while a consumer still searches', async () => {
+    const { scans, log, device, endScan } = fakePlatform();
+    const heartRate = new AbortController();
+    const b = collect(scans, '180d', heartRate.signal);
+    await flush();
+    endScan();
+    await flush();
+    expect(log).toEqual(['start 180d', 'ended', 'start 180d']);
+
+    device('hrm', '180d');
+    await flush();
+    expect(b.seen).toEqual(['hrm']);
+    heartRate.abort();
+    await b.done;
+  });
+
+  it('does not start again when nobody searches any more', async () => {
+    const { scans, log, endScan } = fakePlatform();
+    const trainer = new AbortController();
+    const a = collect(scans, '1826', trainer.signal);
+    await flush();
+    trainer.abort();
+    await a.done;
+    endScan();
+    await flush();
+    expect(log).toEqual(['start 1826', 'stop', 'ended']);
+  });
+
   it('serves two consumers from one native scan, each with its own services', async () => {
     const { scans, log, device } = fakePlatform();
     const trainer = new AbortController();

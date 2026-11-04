@@ -2,23 +2,13 @@
 
 import { createBundledPluginSource, createConsoleLogger } from '@ridrs/core';
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke } from '@tauri-apps/api/core';
+import { suppressBrowserChrome } from './browser-chrome.ts';
 import { bundledPlugins } from './bundled-plugins.ts';
 import { startRidrsApp } from './compose.ts';
-import { createKeepAwake, ensureBluetoothPermission } from './platform.ts';
-import { loadTransport, saveTransport, type TransportStore } from './transport-choice.ts';
+import { androidBackButton, createKeepAwake, ensureBluetoothPermission } from './platform.ts';
 
 /** Plugins that are bundled but not started in the app (the console output is for headless use). */
 const DISABLED_IN_APP = ['output-console'];
-
-/** The rider's choice of BLE transport, in a file the Rust side writes durably. */
-const transportStore: TransportStore = {
-  // Earlier builds kept the choice in WebView storage: read it until the file exists.
-  read: async () =>
-    (await invoke<string | null>('ble_transport_get')) ??
-    localStorage.getItem('ridrs.bleTransport'),
-  write: (transport) => invoke('ble_transport_set', { transport }),
-};
 
 async function main(): Promise<void> {
   const logger = createConsoleLogger({ app: 'ridrs-native' });
@@ -26,6 +16,7 @@ async function main(): Promise<void> {
   if (!root) {
     throw new Error('Missing #ridrs root element');
   }
+  suppressBrowserChrome(document.documentElement, { allowInspect: import.meta.env.DEV });
 
   // Before any plugin scans: without the grant Android finds no trainer.
   const granted = await ensureBluetoothPermission().catch((error: unknown) => {
@@ -49,15 +40,7 @@ async function main(): Promise<void> {
       appVersion,
     },
     keepAwake: createKeepAwake(),
-    bleTransport: await loadTransport(transportStore),
-    // The transport decides which plugins run, so a switch restarts the app's WebView, but only
-    // once the choice is safely on disk: a crash in between must not land in a half state.
-    onBleTransportRequested: (transport) => {
-      void saveTransport(transportStore, transport).then(
-        () => app.close().then(() => window.location.reload()),
-        (error: unknown) => logger.error({ err: String(error) }, 'BLE transport not switched'),
-      );
-    },
+    backButton: androidBackButton,
   });
   window.addEventListener('pagehide', () => {
     void app.close();

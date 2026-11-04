@@ -1,0 +1,81 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Device</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="current:Heart rate,companionfirst:Companion first,onlyphone:Only phone sees it,trainer:Trainer (merged),new:New device,search:Searching">
+  <p class="note" id="note"></p>
+  <div class="stage"><div class="device">
+    <div class="topbar"><a class="back" href="main.html?state=expanded">‹ Devices</a><b id="title"></b><span style="width:40px"></span></div>
+
+    <div class="card" data-hide="search new">
+      <div class="devhead"><span class="ico" id="icon"></span><span><b id="name"></b><span class="routes" id="routes"></span></span><span id="status"></span></div>
+    </div>
+
+    <div class="card" data-hide="search new">
+      <h3>Connect via</h3>
+      <div class="seg wide" id="via" role="radiogroup" aria-label="Connect via"></div>
+      <p id="viaText"></p>
+      <div class="switch"><span>Switch to the other route if the link is lost<small>Same device over this Mac or Pixel 8; never a different device.</small></span><button type="button" class="tg" role="switch" aria-checked="true" aria-label="Automatic fallback"></button></div>
+    </div>
+
+    <div class="card" data-show="trainer">
+      <h3>Seen twice, shown once</h3>
+      <p>This Mac and Pixel 8 both see a "Wahoo KICKR 1234" offering the same services, so ridrs treats them as one trainer.</p>
+      <div class="btnrow" style="justify-content:flex-start"><a class="btn ghost" href="#">These are two different trainers</a></div>
+    </div>
+
+    <div class="card warn" data-show="new"><h3>New device found</h3><p>Garmin HRM-Pro 77C0 appeared while ridrs was running, only in Pixel 8's range. Nothing was changed.</p></div>
+    <div class="card" data-show="search"><h3>Searching…</h3><p>Put the strap on so it wakes up. This Mac and Pixel 8 both search.</p><div class="spin" style="margin:8px 0"></div></div>
+
+    <div class="sect" data-hide="trainer">Heart rate monitors nearby</div>
+    <div id="pick" data-hide="trainer"></div>
+
+    <div class="btnrow"><a class="btn ghost" href="#" data-hide="search new">Forget this device</a><a class="btn" href="main.html?state=expanded">Done</a></div>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>
+const LIST = [
+  { name: 'Polar H10 A1B2', note: 'in use', bars: 4, routes: ['here', 'comp'] },
+  { name: 'Garmin HRM-Pro 77C0', note: 'new', bars: 2, routes: ['comp'] },
+];
+const D = {
+  current: { note: '<b>Device page</b> (from a row or the "new" badge). Default route: <b>this Mac first</b>; the companion carries a device only when this Mac cannot see it.', kind: 'hr', name: 'Polar H10 A1B2', via: 'here', also: 'comp', mode: 'auto', viaText: 'Now: this Mac. Pixel 8 also sees it and takes over if this Mac loses it.' },
+  companionfirst: { note: '<b>The rider prefers the companion</b> for this device (for example the Mac sits far from the bike). The choice is per device and remembered; the chip shows it as pinned.', kind: 'hr', name: 'Polar H10 A1B2', via: 'comp', also: 'here', mode: 'comp', pinned: true, viaText: 'Now: Pixel 8, as you chose. This Mac takes over only if Pixel 8 loses it.' },
+  onlyphone: { note: '<b>Only the phone sees it.</b> "This Mac first" stays selected (it is a preference, not a promise) but the text says why the phone carries it.', kind: 'hr', name: 'Polar H10 A1B2', via: 'comp', mode: 'auto', viaText: 'Now: Pixel 8. This Mac does not see the strap (out of range?). ridrs switches to this Mac on its own once it does, between rides.' },
+  trainer: { note: '<b>Merged duplicate.</b> The escape hatch for a wrong merge (two identical trainers in one room) lives here, not in Setup.', kind: 'trainer', name: 'Wahoo KICKR 1234', via: 'here', also: 'comp', mode: 'auto', viaText: 'Now: this Mac. Pixel 8 also sees it.' },
+  new: { note: '<b>Reviewing a new device</b> from the indicator badge. Picking it replaces the current strap; leaving the page keeps everything as it is and clears the badge.', kind: 'hr' },
+  search: { note: '<b>Search again</b>, both routes at once. Results appear merged.', kind: 'hr' },
+};
+window.renderState = (s) => {
+  const d = D[s];
+  document.getElementById('note').innerHTML = d.note;
+  document.getElementById('title').textContent = KIND[d.kind].title;
+  document.getElementById('icon').innerHTML = KIND[d.kind].icon;
+  if (d.name) {
+    document.getElementById('name').textContent = d.name;
+    document.getElementById('routes').innerHTML = route(d.via, { auto: !d.pinned, also: d.also });
+    document.getElementById('status').innerHTML = STATUS.ok();
+    document.getElementById('via').innerHTML =
+      `<button type="button" role="radio" class="${d.mode === 'auto' ? 'on' : ''}" aria-checked="${d.mode === 'auto'}">This Mac first<small>recommended</small></button>` +
+      `<button type="button" role="radio" class="${d.mode === 'comp' ? 'on' : ''}" aria-checked="${d.mode === 'comp'}">Pixel 8 first<small>companion</small></button>`;
+    document.getElementById('viaText').textContent = d.viaText;
+  }
+  document.getElementById('pick').innerHTML = s === 'search'
+    ? candidates('Found so far', LIST.slice(0, 1), -1, '')
+    : candidates('Tap to use another one', LIST, s === 'new' ? 1 : 0, '');
+};
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('#via button');
+  if (b) setState(b.textContent.startsWith('Pixel') ? 'companionfirst' : 'current');
+  const t = e.target.closest('.tg');
+  if (t) t.setAttribute('aria-checked', String(t.getAttribute('aria-checked') !== 'true'));
+});
+</script>
+</body>
+</html>

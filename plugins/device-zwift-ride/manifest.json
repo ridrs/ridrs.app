@@ -1,0 +1,9 @@
+{
+  "id": "device-zwift-ride",
+  "name": "Zwift Ride Controller",
+  "version": "0.1.0",
+  "types": ["device"],
+  "provides": [],
+  "requires": ["ble.central"],
+  "entry": "index.ts"
+}

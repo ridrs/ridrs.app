@@ -12,13 +12,12 @@ import {
   physicsBicycleCapability,
   physicsEnvironmentCapability,
   physicsRiderCapability,
-  physicsRoadCapability,
   physicsStateEvent,
   physicsTotalResistanceCapability,
   type ResistanceProvider,
   type RiderCapability,
-  type RoadCapability,
   type RoadSample,
+  type TerrainSurface,
   type TotalResistanceCapability,
 } from '@ridrs/contracts';
 import { DEFAULT_FAKE_START } from '../support/hooks.ts';
@@ -39,7 +38,7 @@ const PHYSICS_PLUGINS = [
   'physics-aerodynamics',
   'physics-gravity-resistance',
   'physics-environment',
-  'physics-road',
+  'spatial-terrain',
   'physics-total-resistance',
   'physics-powertrain',
   'physics-virtual-speed',
@@ -90,7 +89,7 @@ function currentStates(world: RidrsWorld): PhysicsState[] {
   return physicsStates(world).filter((state) => state.sessionId === sessionId);
 }
 
-function stateAt(world: RidrsWorld, time: string): PhysicsState {
+export function stateAt(world: RidrsWorld, time: string): PhysicsState {
   const at = parseOffset(time);
   const state = currentStates(world).find((s) => s.at === at);
   assert.ok(
@@ -205,42 +204,6 @@ Given(
     };
     this.getBehavior(probeId).providedImplementations.set(capability, environment);
     await addProbe(this, probeId, { provides: [capability] });
-  },
-);
-
-async function addRoadProbe(
-  world: RidrsWorld,
-  probeId: string,
-  capability: string,
-  gradientAt: (distance: number) => number,
-): Promise<void> {
-  const road: RoadCapability = {
-    source: probeId,
-    at: (distance) => ({ gradient: gradientAt(distance), origin: 'default' }),
-  };
-  world.getBehavior(probeId).providedImplementations.set(capability, road);
-  await addProbe(world, probeId, { provides: [capability] });
-}
-
-Given(
-  'a probe plugin {string} provides {string} with a constant gradient of {float} %',
-  async function (this: RidrsWorld, probeId: string, capability: string, percent: number) {
-    await addRoadProbe(this, probeId, capability, () => percent / 100);
-  },
-);
-
-Given(
-  'a probe plugin {string} provides {string} that is flat for the first {float} m and then climbs at {float} %',
-  async function (
-    this: RidrsWorld,
-    probeId: string,
-    capability: string,
-    flat: number,
-    percent: number,
-  ) {
-    await addRoadProbe(this, probeId, capability, (distance) =>
-      distance < flat ? 0 : percent / 100,
-    );
   },
 );
 
@@ -452,7 +415,22 @@ function evaluateTotalResistance(
 When(
   '{string} evaluates the total resistance at {float} m\\/s with a mass of {float} kg',
   function (this: RidrsWorld, probeId: string, speed: number, mass: number) {
-    evaluateTotalResistance(this, probeId, speed, mass, { gradient: 0, origin: 'default' });
+    evaluateTotalResistance(this, probeId, speed, mass, {
+      gradient: 0,
+      surface: 'asphalt',
+      origin: 'default',
+    });
+  },
+);
+
+When(
+  '{string} evaluates the total resistance at {float} m\\/s with a mass of {float} kg on {string}',
+  function (this: RidrsWorld, probeId: string, speed: number, mass: number, surface: string) {
+    evaluateTotalResistance(this, probeId, speed, mass, {
+      gradient: 0,
+      surface: surface as TerrainSurface,
+      origin: 'default',
+    });
   },
 );
 
@@ -461,6 +439,7 @@ When(
   function (this: RidrsWorld, probeId: string, speed: number, mass: number, percent: number) {
     evaluateTotalResistance(this, probeId, speed, mass, {
       gradient: percent / 100,
+      surface: 'asphalt',
       origin: 'default',
     });
   },
@@ -533,18 +512,6 @@ Then(
       physicsEnvironmentCapability,
     ).parameters();
     assert.deepEqual(parameters, { airDensity: { value: airDensity, origin } });
-  },
-);
-
-Then(
-  'the road gradient at {float} m is {float} % with the origin {string}',
-  function (this: RidrsWorld, distance: number, percent: number, origin: string) {
-    // The one probe that requires "physics.road" asks the real road plugin.
-    const sample = capabilityOf<RoadCapability>(this, 'test-road-reader', physicsRoadCapability).at(
-      distance,
-    );
-    assertClose(sample.gradient * 100, percent, `gradient at ${distance} m (%)`);
-    assert.equal(sample.origin, origin);
   },
 );
 

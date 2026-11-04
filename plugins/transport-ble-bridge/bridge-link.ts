@@ -106,6 +106,7 @@ export class BridgeLink {
 
   constructor(private readonly ctx: PluginContext) {
     this.central = {
+      route: 'companion',
       scan: (options) => this.scan(options),
       connect: (peripheralId, options) => this.connect(peripheralId, options),
     };

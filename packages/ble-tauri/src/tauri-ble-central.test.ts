@@ -147,6 +147,23 @@ describe('TauriBleConnection', () => {
     expect(ipc.callsOf('ble_unsubscribe')).toHaveLength(1);
   });
 
+  it('writes with normalized UUIDs and the bytes as a number array', async () => {
+    const ipc = new FakeIpc();
+    const connection = await new TauriBleCentral(ipc).connect('ride');
+
+    await connection.write(
+      { serviceUuid: '0xFC82', characteristicUuid: '00000003-19CA-4651-86E5-FA29DCDD09D1' },
+      new Uint8Array([0x52, 0x69]),
+    );
+
+    expect(ipc.callsOf('ble_write')[0]?.args).toEqual({
+      peripheralId: 'ride',
+      serviceUuid: 'fc82',
+      characteristicUuid: '00000003-19ca-4651-86e5-fa29dcdd09d1',
+      data: [0x52, 0x69],
+    });
+  });
+
   it('fires onDisconnected exactly once per connection loss', async () => {
     const ipc = new FakeIpc();
     const connection = await new TauriBleCentral(ipc).connect('trainer');

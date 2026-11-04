@@ -1,0 +1,25 @@
+{
+  "name": "@tabata-sync/root",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "description": "Tabata music analysis engine and synchronized workout player (experiment).",
+  "workspaces": [
+    "contracts",
+    "engine",
+    "player"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "tabata": "tsx engine/src/cli/main.ts",
+    "player": "tsx player/src/server/main.ts"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

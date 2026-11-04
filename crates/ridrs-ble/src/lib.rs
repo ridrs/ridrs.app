@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Native BLE surface behind `ble.central` (packages/ble-tauri; hosted by ridrs and the
-//! companion): scan, connect, subscribe, disconnect, connection-lost.
+//! companion): scan, connect, subscribe, write, disconnect, connection-lost.
 //!
 //! Platform backends come from `tauri-plugin-blec` (btleplug on Windows/macOS/iOS, its own Kotlin
 //! backend on Android). This module only adds what the ridrs `BleCentral` needs and blec's own

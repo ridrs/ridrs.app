@@ -7,16 +7,21 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as contracts from '@ridrs/contracts';
 import {
+  type ActivityState,
   activityFinishRequestedEvent,
   activityStartRequestedEvent,
+  activityStateChangedEvent,
   bleCentralCapability,
   type CapabilityContract,
   definePlugin,
   type EventDefinition,
   measurementHeartRateEvent,
+  type PhysicsStateBatch,
   type PluginContext,
+  physicsStateBatchEvent,
   recordingCompletedEvent,
   storageAppFilesCapability,
+  uiTerrainObservedEvent,
 } from '@ridrs/contracts';
 import {
   createBundledPluginSource,
@@ -28,6 +33,8 @@ import { readRecording } from '@ridrs/recording';
 import { replay } from '@ridrs/replay';
 import { BleSimulator, MemoryAppFiles } from '@ridrs/testing';
 import { describe, expect, it } from 'vitest';
+import { DEMO_LANDSCAPE } from '../../plugins/ui-landscape-demo/client/landscape-model.ts';
+import { TerrainPublisher } from '../../plugins/ui-landscape-demo/client/terrain-publisher.ts';
 
 const PLUGINS_DIR = resolve(import.meta.dirname, '../../plugins');
 const T0 = Date.UTC(2026, 10, 1, 10, 0, 0, 0);
@@ -46,7 +53,8 @@ const PLUGINS = [
   'physics-aerodynamics',
   'physics-gravity-resistance',
   'physics-environment',
-  'physics-road',
+  'spatial-terrain',
+  'world-driver-ui',
   'physics-total-resistance',
   'physics-powertrain',
   'physics-virtual-speed',
@@ -157,6 +165,21 @@ async function rideLive(seed: number): Promise<Uint8Array> {
       }
     },
   });
+  // The UI landscape as a sensor: its real publisher, fed with the odometer it would present
+  // (the latest batch), publishing through the bridge like the in-process UI bridge does.
+  const landscape = new TerrainPublisher(DEMO_LANDSCAPE, ({ samples, ...window }) =>
+    host.publishEvent('ui-bridge', uiTerrainObservedEvent, { ...window, samples: [...samples] }),
+  );
+  let presented: PhysicsStateBatch | undefined;
+  host.observe('landscape', {
+    onEvent: (e) => {
+      if (e.type === activityStateChangedEvent.id) {
+        landscape.rideState(e.payload as ActivityState);
+      } else if (e.type === physicsStateBatchEvent.id) {
+        presented = e.payload as PhysicsStateBatch;
+      }
+    },
+  });
   await host.start();
   const trainer = simulator.addFtmsTrainer('SIM KICKR');
   const hrm = host.getPluginContext('test-hrm') as PluginContext;
@@ -195,6 +218,25 @@ async function rideLive(seed: number): Promise<Uint8Array> {
     at: T0 + 10_003,
     deliver: () => host.publishEvent('ui-bridge', activityStartRequestedEvent, {}),
   });
+  // The landscape is mounted a frame after the ride started, then draws a frame every 17 ms.
+  arrivals.push({ at: T0 + 10_020, deliver: () => landscape.mount() });
+  for (let at = T0 + 10_037; at < T0 + 38_000; at += 17) {
+    arrivals.push({
+      at,
+      deliver: () => {
+        const sample = presented?.samples.at(-1);
+        if (presented && sample) {
+          landscape.frame({
+            status: 'available',
+            renderTime: at,
+            basis: 'held',
+            sessionId: presented.sessionId,
+            ...sample,
+          });
+        }
+      },
+    });
+  }
   arrivals.push({
     at: T0 + 38_000,
     deliver: () => host.publishEvent('ui-bridge', activityFinishRequestedEvent, {}),
@@ -253,6 +295,10 @@ describe('live recording and replay', () => {
       ]) {
         expect(compared, type).toContain(type);
       }
+      // The terrain the landscape observed came in as inputs and was injected on replay.
+      const terrain = first.inputs.filter((input) => input.type === 'world.terrain-preview');
+      expect(terrain.reduce((sum, input) => sum + input.count, 0)).toBeGreaterThan(1);
+      expect(recording.diagnostics.filter((d) => d.code.startsWith('terrain-preview'))).toEqual([]);
       // Late heart-rate measurements were rejected live, and the same way on replay.
       expect(recording.diagnostics.some((d) => d.code === 'late-measurement')).toBe(true);
       expect(await replay(recording, options)).toEqual(first);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { rollingResistanceForce } from './rolling-resistance.ts';
+import { ROLLING_DEFAULTS, rollingResistanceForce, surfaceCoefficient } from './rolling-resistance.ts';
 
 describe('rollingResistanceForce', () => {
   it('is Crr · m · g while moving, opposing motion', () => {
@@ -29,5 +29,16 @@ describe('rollingResistanceForce', () => {
 
   it('is 0 at standstill on a gradient too', () => {
     expect(rollingResistanceForce(0.004, 85, 0, 0.05)).toBe(0);
+  });
+});
+
+describe('surfaceCoefficient', () => {
+  it('keeps the tyre coefficient on asphalt and doubles it on gravel', () => {
+    expect(surfaceCoefficient(0.004, 'asphalt')).toBe(0.004);
+    expect(surfaceCoefficient(0.004, 'gravel')).toBe(0.008);
+  });
+
+  it('takes the factors from its defaults', () => {
+    expect(ROLLING_DEFAULTS.surfaceFactors).toEqual({ asphalt: 1, gravel: 2 });
   });
 });

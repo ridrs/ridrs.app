@@ -5,6 +5,7 @@ Feature: The road moves with the virtual speed
 
   Scenario: The lane markings move while riding
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-trainer"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
@@ -16,6 +17,7 @@ Feature: The road moves with the virtual speed
 
   Scenario: Without a trainer the lane markings stand still
     Given the plugin directories "plugins"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"

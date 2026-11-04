@@ -1,0 +1,709 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+  />
+  <title>RIDRS // BLE Device Hub &amp; Telemetry Tester</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- macOS Draggable Titlebar (No Page Tabs: Main or Detail View Only) -->
+  <header class="macos-titlebar">
+    <div class="titlebar-brand">
+      <span class="brand-tag">RIDRS // BLE TESTER</span>
+    </div>
+
+    <div class="titlebar-statuses">
+      <button id="toggle-autoconnect-btn" type="button" class="autoconnect-pill active" title="Automatically scan and connect available BLE devices in the background">
+        <span id="autoconnect-dot" class="status-dot connected"></span>
+        <span id="autoconnect-label">AUTO-CONNECT: ON</span>
+      </button>
+      <span id="status-dot" class="hidden"></span>
+      <span id="power-status-dot" class="hidden"></span>
+      <span id="zwift-status-dot" class="hidden"></span>
+      <span id="status-text" class="hidden">HR: Ready</span>
+      <span id="power-status-text" class="hidden">PWR: Ready</span>
+      <span id="zwift-status-text" class="hidden">Zwift L+R: Ready</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <!-- ========================================================================= -->
+    <!-- MAIN PAGE: MINIMAL 3-SLOT DEVICE HUB                                      -->
+    <!-- ========================================================================= -->
+    <section id="view-hub" class="view-section">
+      <div class="hub-slots-grid">
+        <!-- ==================== SLOT 1: HEART RATE SENSOR ==================== -->
+        <article id="slot-card-hr" class="slot-card slot-card-cyan" role="button" tabindex="0">
+          <div class="slot-card-header">
+            <div class="section-title-group">
+              <h2>HEART RATE</h2>
+            </div>
+            <div class="battery-widget" title="Heart Rate Sensor Battery Level">
+              <div class="battery-shell">
+                <div id="hub-hr-battery-fill" class="battery-fill unknown" style="width: 0%"></div>
+              </div>
+              <span id="hub-hr-battery-level" class="battery-pct">--%</span>
+            </div>
+          </div>
+
+          <div class="slot-status-row">
+            <span id="hub-hr-dot" class="status-dot idle"></span>
+            <span id="hub-hr-device" class="slot-status-label">Not connected</span>
+            <span id="hub-hr-status" class="hidden">Waiting...</span>
+          </div>
+
+          <div class="slot-metric-hero">
+            <div class="slot-metric-main">
+              <span id="hub-hr-bpm" class="slot-big-val">--</span>
+              <span class="slot-big-unit">BPM</span>
+            </div>
+            <span id="hub-hr-zone" class="hidden">STANDBY</span>
+            <span id="hub-hr-rr" class="hidden">RR: -- ms</span>
+          </div>
+
+          <div class="slot-card-footer">
+            <span>Click for details</span>
+            <span class="slot-arrow">→</span>
+          </div>
+        </article>
+
+        <!-- ==================== SLOT 2: POWER METER / SMART TRAINER ==================== -->
+        <article id="slot-card-power" class="slot-card slot-card-volt" role="button" tabindex="0">
+          <div class="slot-card-header">
+            <div class="section-title-group">
+              <h2>POWER / TRAINER</h2>
+            </div>
+            <div class="battery-widget" title="Power Meter / Trainer Battery Level">
+              <div class="battery-shell">
+                <div id="hub-power-battery-fill" class="battery-fill unknown" style="width: 0%"></div>
+              </div>
+              <span id="hub-power-battery-level" class="battery-pct">--%</span>
+            </div>
+          </div>
+
+          <div class="slot-status-row">
+            <span id="hub-power-dot" class="status-dot idle"></span>
+            <span id="hub-power-device" class="slot-status-label">Not connected</span>
+            <span id="hub-power-status" class="hidden">Waiting...</span>
+          </div>
+
+          <div class="slot-metric-hero">
+            <div class="slot-metric-main">
+              <span id="hub-power-watts" class="slot-big-val">--</span>
+              <span class="slot-big-unit">W</span>
+            </div>
+            <span id="hub-power-cadence" class="hidden">CAD: -- RPM</span>
+            <span id="hub-power-speed" class="hidden">SPD: -- km/h</span>
+          </div>
+
+          <div class="slot-card-footer">
+            <span>Click for details</span>
+            <span class="slot-arrow">→</span>
+          </div>
+        </article>
+
+        <!-- ==================== SLOT 3: ZWIFT CONTROLLERS (LEFT + RIGHT) ==================== -->
+        <article id="slot-card-zwift" class="slot-card slot-card-orange" role="button" tabindex="0">
+          <div class="slot-card-header">
+            <div class="section-title-group">
+              <h2>CONTROLLERS</h2>
+            </div>
+            <div class="dual-battery-group">
+              <div class="battery-widget" title="Left Controller Battery">
+                <span class="battery-widget-label">L</span>
+                <div class="battery-shell">
+                  <div id="hub-zwift-left-bat-fill" class="battery-fill unknown" style="width: 0%"></div>
+                </div>
+                <span id="hub-zwift-left-bat-pct" class="battery-pct">--%</span>
+              </div>
+              <div class="battery-widget" title="Right Controller Battery">
+                <span class="battery-widget-label">R</span>
+                <div class="battery-shell">
+                  <div id="hub-zwift-right-bat-fill" class="battery-fill unknown" style="width: 0%"></div>
+                </div>
+                <span id="hub-zwift-right-bat-pct" class="battery-pct">--%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dual-slot-strip">
+            <div class="slot-badge">
+              <span id="hub-zwift-left-dot" class="status-dot idle"></span>
+              <span class="slot-side-tag">L</span>
+              <span id="hub-zwift-left-name" class="slot-device-name">Not connected</span>
+            </div>
+            <div class="slot-badge">
+              <span id="hub-zwift-right-dot" class="status-dot idle"></span>
+              <span class="slot-side-tag">R</span>
+              <span id="hub-zwift-right-name" class="slot-device-name">Not connected</span>
+            </div>
+          </div>
+
+          <div class="slot-metric-hero">
+            <div id="hub-zwift-latest-event" class="slot-latest-event">
+              Ready for input
+            </div>
+            <span id="hub-left-paddle-readout" class="hidden">0%</span>
+            <span id="hub-right-paddle-readout" class="hidden">0%</span>
+          </div>
+
+          <div class="slot-card-footer">
+            <span>Click for details</span>
+            <span class="slot-arrow">→</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- VIEW 1: HEART RATE MONITOR DETAIL TESTING / DEBUG PAGE                    -->
+    <!-- ========================================================================= -->
+    <section id="view-hr" class="view-section hidden">
+      <div class="detail-top-bar">
+        <div class="section-title-group">
+          <span class="section-pill pill-cyan">BLE 0x180D // 0x2A37</span>
+          <h2>HEART RATE MONITOR // DETAIL</h2>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="battery-widget" title="Heart Rate Sensor Battery Level (0x2A19)">
+            <span class="battery-widget-label">HR BAT</span>
+            <div class="battery-shell">
+              <div id="hr-battery-fill" class="battery-fill unknown" style="width: 0%"></div>
+            </div>
+            <span id="battery-level" class="battery-pct">--%</span>
+          </div>
+          <button type="button" class="btn btn-secondary back-to-hub-btn">
+            ✕ Close
+          </button>
+        </div>
+      </div>
+
+      <div class="workspace-columns">
+        <div class="device-column">
+          <div class="toolbar">
+            <div class="toolbar-actions">
+              <button id="reconnect-ble-btn" type="button" class="btn btn-primary hidden">
+                Reconnect HR
+              </button>
+              <button id="connect-ble-btn" type="button" class="btn btn-primary">
+                Connect HR Sensor
+              </button>
+              <button id="toggle-sim-btn" type="button" class="btn btn-secondary">
+                Simulate HR
+              </button>
+              <button id="disconnect-btn" type="button" class="btn btn-danger" disabled>
+                Disconnect
+              </button>
+            </div>
+            <div class="max-hr-config">
+              <label for="max-hr-input">MAX HR</label>
+              <input id="max-hr-input" type="number" min="120" max="230" value="190" />
+            </div>
+          </div>
+
+          <div id="sim-controls" class="sim-banner hidden">
+            <div class="sim-banner-label">
+              <span class="sim-badge">HR SIM</span>
+              <span>Target: <strong id="sim-target-label">142 BPM</strong></span>
+            </div>
+            <input
+              id="sim-target-bpm"
+              type="range"
+              min="55"
+              max="195"
+              value="142"
+              class="sim-slider"
+            />
+          </div>
+
+          <article class="kachel kachel-hero">
+            <div class="kachel-header">
+              <span class="kachel-label">CURRENT HEART RATE</span>
+              <span id="zone-badge" class="zone-badge">STANDBY</span>
+            </div>
+
+            <div class="bpm-readout-row">
+              <div id="bpm-value" class="bpm-value">--</div>
+              <div class="bpm-unit-stack">
+                <span id="heart-icon" class="heart-icon" aria-hidden="true">♥</span>
+                <span class="bpm-unit">BPM</span>
+                <span id="zone-pct" class="zone-pct">--% MAX</span>
+              </div>
+            </div>
+
+            <div class="session-stats-row">
+              <div class="stat-pill">
+                <span class="stat-label">MIN</span>
+                <span id="min-bpm" class="stat-val">--</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-label">AVG</span>
+                <span id="avg-bpm" class="stat-val">--</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-label">MAX</span>
+                <span id="max-bpm" class="stat-val">--</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-label">RR (HRV)</span>
+                <span id="rr-interval" class="stat-val">-- ms</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="kachel kachel-compact">
+            <div class="diag-inline-grid">
+              <div class="diag-cell">
+                <span class="diag-cell-label">PERIPHERAL</span>
+                <span id="device-name" class="diag-cell-val">Not connected</span>
+              </div>
+              <div class="diag-cell">
+                <span class="diag-cell-label">SKIN CONTACT</span>
+                <span id="contact-status" class="diag-cell-val">--</span>
+              </div>
+              <div class="diag-cell">
+                <span class="diag-cell-label">LOCATION</span>
+                <span id="sensor-location" class="diag-cell-val">--</span>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="device-column">
+          <article class="kachel kachel-chart">
+            <div class="kachel-header">
+              <span class="kachel-label">HEART RATE TRACE (60S)</span>
+              <span class="kachel-sub">0x2A37</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="hr-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="kachel kachel-notifications">
+            <div class="kachel-header">
+              <span class="kachel-label">RAW 0x2A37 PACKET INSPECTOR &amp; DEBUG LOG</span>
+              <span id="hr-raw-hex" class="kachel-sub" style="color: var(--accent-cyan);">waiting...</span>
+            </div>
+            <div id="hr-debug-feed" class="notification-feed"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- VIEW 2: POWER METER / SMART TRAINER DETAIL TESTING / DEBUG PAGE           -->
+    <!-- ========================================================================= -->
+    <section id="view-power" class="view-section hidden">
+      <div class="detail-top-bar">
+        <div class="section-title-group">
+          <span class="section-pill pill-volt">BLE 0x1818 (CPS) &amp; 0x1826 (FTMS)</span>
+          <h2>POWER METER / SMART TRAINER // DETAIL</h2>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="battery-widget" title="Power Meter / Trainer Battery Level (0x2A19)">
+            <span class="battery-widget-label">PWR BAT</span>
+            <div class="battery-shell">
+              <div id="power-battery-fill" class="battery-fill unknown" style="width: 0%"></div>
+            </div>
+            <span id="power-battery-level" class="battery-pct">--%</span>
+          </div>
+          <button type="button" class="btn btn-secondary back-to-hub-btn">
+            ✕ Close
+          </button>
+        </div>
+      </div>
+
+      <div class="workspace-columns">
+        <div class="device-column">
+          <div class="toolbar">
+            <div class="toolbar-actions">
+              <button id="reconnect-power-btn" type="button" class="btn btn-volt hidden">
+                Reconnect Power
+              </button>
+              <button id="connect-power-btn" type="button" class="btn btn-volt">
+                Connect Power / Trainer
+              </button>
+              <button id="toggle-power-sim-btn" type="button" class="btn btn-secondary">
+                Simulate Trainer
+              </button>
+              <button id="disconnect-power-btn" type="button" class="btn btn-danger" disabled>
+                Disconnect
+              </button>
+            </div>
+          </div>
+
+          <div id="power-sim-controls" class="sim-banner hidden">
+            <div class="sim-banner-label">
+              <span class="sim-badge">PWR SIM</span>
+              <span>Target: <strong id="power-sim-target-label">215 W / 90 RPM</strong></span>
+            </div>
+            <input
+              id="power-sim-target-watts"
+              type="range"
+              min="50"
+              max="650"
+              value="215"
+              class="sim-slider"
+            />
+          </div>
+
+          <article class="kachel kachel-hero">
+            <div class="kachel-header">
+              <span class="kachel-label">INSTANTANEOUS POWER</span>
+              <span id="power-protocol-badge" class="zone-badge">STANDBY</span>
+            </div>
+
+            <div class="bpm-readout-row">
+              <div id="power-watts-value" class="bpm-value" style="color: var(--accent-volt);">--</div>
+              <div class="bpm-unit-stack">
+                <span class="bpm-unit">WATTS</span>
+                <span id="power-cadence-readout" class="zone-pct">-- RPM</span>
+              </div>
+            </div>
+
+            <div class="session-stats-row">
+              <div class="stat-pill">
+                <span class="stat-label">CADENCE</span>
+                <span id="power-cadence-stat" class="stat-val">-- RPM</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-label">SPEED</span>
+                <span id="power-speed-stat" class="stat-val">-- km/h</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-label">AVG WATTS</span>
+                <span id="power-avg-watts" class="stat-val">-- W</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-label">MAX WATTS</span>
+                <span id="power-max-watts" class="stat-val">-- W</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="kachel kachel-compact">
+            <div class="diag-inline-grid">
+              <div class="diag-cell">
+                <span class="diag-cell-label">PERIPHERAL</span>
+                <span id="power-device-name" class="diag-cell-val">Not connected</span>
+              </div>
+              <div class="diag-cell">
+                <span class="diag-cell-label">GATT SOURCE</span>
+                <span id="power-source-char" class="diag-cell-val">--</span>
+              </div>
+              <div class="diag-cell">
+                <span class="diag-cell-label">BALANCE / ENERGY</span>
+                <span id="power-extra-diag" class="diag-cell-val">--</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- FTMS Smart Trainer ERG Target Power Control Tester (0x2AD9) -->
+          <article class="kachel">
+            <div class="kachel-header">
+              <span class="kachel-label">FTMS SMART TRAINER CONTROL (0x2AD9 ERG TARGET POWER)</span>
+              <span class="kachel-sub">OpCode 0x00 + 0x05</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <input
+                  id="ftms-target-watts-input"
+                  type="number"
+                  min="50"
+                  max="1000"
+                  step="5"
+                  value="180"
+                  style="width: 72px; background: #07090e; color: #f8fafc; border: 1px solid #334155; padding: 6px 8px; font-family: var(--mono); font-weight: 700;"
+                />
+                <span class="kachel-sub">W</span>
+                <button id="ftms-set-power-btn" type="button" class="btn btn-volt">
+                  Set ERG Power
+                </button>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn btn-secondary ftms-preset-btn" data-watts="120">120W</button>
+                <button type="button" class="btn btn-secondary ftms-preset-btn" data-watts="180">180W</button>
+                <button type="button" class="btn btn-secondary ftms-preset-btn" data-watts="250">250W</button>
+                <button type="button" class="btn btn-secondary ftms-preset-btn" data-watts="320">320W</button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="device-column">
+          <article class="kachel kachel-chart">
+            <div class="kachel-header">
+              <span class="kachel-label">POWER TRACE (60S WATTS)</span>
+              <span class="kachel-sub">0x2A63 / 0x2AD2</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="power-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="kachel kachel-notifications">
+            <div class="kachel-header">
+              <span class="kachel-label">RAW POWER / FTMS PACKET INSPECTOR &amp; LOG</span>
+              <span id="power-raw-hex" class="kachel-sub" style="color: var(--accent-volt);">waiting...</span>
+            </div>
+            <div id="power-debug-feed" class="notification-feed"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- VIEW 3: ZWIFT CONTROLLERS (LEFT + RIGHT) DETAIL TESTING / DEBUG PAGE      -->
+    <!-- ========================================================================= -->
+    <section id="view-zwift" class="view-section hidden">
+      <div class="detail-top-bar">
+        <div class="section-title-group">
+          <span class="section-pill pill-orange">BLE 0xFC82 // 19CA...</span>
+          <h2>ZWIFT CONTROLLERS (LEFT + RIGHT) // DETAIL</h2>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="dual-battery-group">
+            <div class="battery-widget" title="Left Controller Battery Level">
+              <span class="battery-widget-label">L BAT</span>
+              <div class="battery-shell">
+                <div id="zwift-left-battery-fill" class="battery-fill unknown" style="width: 0%"></div>
+              </div>
+              <span id="zwift-left-battery-level" class="battery-pct">--%</span>
+            </div>
+            <div class="battery-widget" title="Right Controller Battery Level">
+              <span class="battery-widget-label">R BAT</span>
+              <div class="battery-shell">
+                <div id="zwift-right-battery-fill" class="battery-fill unknown" style="width: 0%"></div>
+              </div>
+              <span id="zwift-right-battery-level" class="battery-pct">--%</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary back-to-hub-btn">
+            ✕ Close
+          </button>
+        </div>
+      </div>
+
+      <div class="workspace-columns">
+        <div class="device-column">
+          <div class="toolbar">
+            <div class="toolbar-actions">
+              <button id="reconnect-both-zwift-btn" type="button" class="btn btn-orange hidden">
+                Reconnect L + R
+              </button>
+              <button id="connect-both-zwift-btn" type="button" class="btn btn-orange">
+                Connect Both (L + R)
+              </button>
+              <button id="connect-left-zwift-btn" type="button" class="btn btn-secondary">
+                + Left
+              </button>
+              <button id="connect-right-zwift-btn" type="button" class="btn btn-secondary">
+                + Right
+              </button>
+              <button id="toggle-zwift-sim-btn" type="button" class="btn btn-secondary">
+                Simulate L+R
+              </button>
+              <button id="disconnect-zwift-btn" type="button" class="btn btn-danger" disabled>
+                Disconnect
+              </button>
+            </div>
+          </div>
+
+          <div class="dual-slot-strip">
+            <div class="slot-badge">
+              <span id="zwift-left-dot" class="status-dot idle"></span>
+              <span class="slot-side-tag">LEFT</span>
+              <span id="zwift-left-name" class="slot-device-name">Not connected</span>
+            </div>
+            <div class="slot-badge">
+              <span id="zwift-right-dot" class="status-dot idle"></span>
+              <span class="slot-side-tag">RIGHT</span>
+              <span id="zwift-right-name" class="slot-device-name">Not connected</span>
+            </div>
+          </div>
+
+          <div id="zwift-sim-controls" class="sim-banner sim-banner-orange hidden">
+            <div class="sim-banner-label">
+              <span class="sim-badge sim-badge-orange">CTRL SIM</span>
+              <span>Click any button or drag Left / Right paddles:</span>
+            </div>
+            <div class="sim-paddles-row">
+              <label>
+                <span>Left Paddle (<strong id="zwift-sim-left-val">0%</strong>)</span>
+                <input id="zwift-sim-left-paddle" type="range" min="-100" max="100" value="0" />
+              </label>
+              <label>
+                <span>Right Paddle (<strong id="zwift-sim-right-val">0%</strong>)</span>
+                <input id="zwift-sim-right-paddle" type="range" min="-100" max="100" value="0" />
+              </label>
+            </div>
+          </div>
+
+          <article class="kachel kachel-steering">
+            <div class="kachel-header">
+              <span class="kachel-label">ORANGE ANALOG PADDLES // LEFT &amp; RIGHT CONTROLLERS</span>
+              <span class="kachel-sub">
+                L: <strong id="left-paddle-raw">0</strong> | R: <strong id="right-paddle-raw">0</strong>
+              </span>
+            </div>
+
+            <div id="packet-capture-banner" class="sim-banner sim-banner-orange" style="margin-bottom: 10px;">
+              <div class="sim-banner-label" style="justify-content: space-between; width: 100%;">
+                <span>
+                  <span class="sim-badge sim-badge-orange">🔴 REC ACTIVE</span>
+                  <strong id="packet-capture-prompt">Live BLE packet capture active</strong>
+                </span>
+                <span id="packet-capture-count" style="font-family: var(--mono); font-size: 11px; color: #f8fafc;">0 pkts</span>
+              </div>
+              <div style="font-family: var(--mono); font-size: 11px; color: #cbd5e1; margin-top: 6px; line-height: 1.45; word-break: break-all;">
+                <div>L RAW: <span id="left-raw-hex" style="color: #38bdf8;">waiting...</span></div>
+                <div>R RAW: <span id="right-raw-hex" style="color: #fb923c;">waiting...</span></div>
+              </div>
+            </div>
+
+            <!-- 1. Left Controller Paddle Bar (Default in middle, moves Left or Right) -->
+            <div class="gauge-block">
+              <div class="gauge-labels">
+                <span>◀ LEFT CONTROLLER: LEFT</span>
+                <span id="left-paddle-readout" class="gauge-value">0% CENTER</span>
+                <span>RIGHT ▶</span>
+              </div>
+              <div class="steer-track">
+                <div class="steer-center-mark"></div>
+                <div id="left-paddle-bar-left" class="steer-fill steer-fill-left" style="width: 0%"></div>
+                <div id="left-paddle-bar-right" class="steer-fill steer-fill-right" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- 2. Right Controller Paddle Bar (Default in middle, moves Left or Right) -->
+            <div class="gauge-block">
+              <div class="gauge-labels">
+                <span>◀ RIGHT CONTROLLER: LEFT</span>
+                <span id="right-paddle-readout" class="gauge-value">0% CENTER</span>
+                <span>RIGHT ▶</span>
+              </div>
+              <div class="steer-track">
+                <div class="steer-center-mark"></div>
+                <div id="right-paddle-bar-left" class="steer-fill steer-fill-left" style="width: 0%"></div>
+                <div id="right-paddle-bar-right" class="steer-fill steer-fill-right" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Haptic Vibration Test Controls (00000003-19ca-...) -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, 0.14);">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="kachel-label" style="font-size: 10px;">HAPTIC TEST:</span>
+                <select
+                  id="vibrate-pattern-select"
+                  style="background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 4px 6px; font-family: var(--mono); font-size: 11px;"
+                >
+                  <option value="32">0x20 Shift Tick</option>
+                  <option value="14">0x0E Double Pulse</option>
+                  <option value="1">0x01 Short Buzz</option>
+                  <option value="47">0x2F RideOn Buzz</option>
+                  <option value="64">0x40 Heavy Pulse</option>
+                </select>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button id="vibrate-left-btn" type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;">
+                  📳 Vibrate L
+                </button>
+                <button id="vibrate-right-btn" type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;">
+                  📳 Vibrate R
+                </button>
+                <button id="vibrate-both-btn" type="button" class="btn btn-orange" style="padding: 4px 8px; font-size: 11px;">
+                  📳 Vibrate L+R
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="device-column">
+          <article class="kachel kachel-buttons">
+            <div class="kachel-header">
+              <span class="kachel-label">HANDLEBAR BUTTON STATE MATRIX (LEFT + RIGHT)</span>
+              <span class="kachel-sub">16-Bit Varint / 0x07</span>
+            </div>
+
+            <div class="controllers-split">
+              <div class="controller-pod">
+                <span class="pod-title">LEFT HOOD (D-PAD &amp; SHIFT)</span>
+                <div class="button-grid">
+                  <button type="button" class="ctrl-key" data-btn-id="UP">▲ Up</button>
+                  <button type="button" class="ctrl-key" data-btn-id="LEFT">◀ Left</button>
+                  <button type="button" class="ctrl-key" data-btn-id="RIGHT">Right ▶</button>
+                  <button type="button" class="ctrl-key" data-btn-id="DOWN">▼ Down</button>
+                  <button type="button" class="ctrl-key" data-btn-id="SHIFT_UP_L">Shift + (L)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="SHIFT_DOWN_L">Shift - (L)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="POWERUP_L">PowerUp (L)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="ON_OFF_L">Z-Btn (L)</button>
+                </div>
+              </div>
+
+              <div class="controller-pod">
+                <span class="pod-title">RIGHT HOOD (ACTIONS &amp; SHIFT)</span>
+                <div class="button-grid">
+                  <button type="button" class="ctrl-key" data-btn-id="Y">Y (Top)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="Z">Z (Left)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="A">A (Right)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="B">B (Down)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="SHIFT_UP_R">Shift + (R)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="SHIFT_DOWN_R">Shift - (R)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="POWERUP_R">PowerUp (R)</button>
+                  <button type="button" class="ctrl-key" data-btn-id="ON_OFF_R">Z-Btn (R)</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="kachel kachel-notifications">
+            <div class="kachel-header">
+              <span class="kachel-label">INPUT NOTIFICATION BOX (BUTTONS &amp; PADDLES)</span>
+              <button id="clear-notifications-btn" type="button" class="btn-link">Clear</button>
+            </div>
+            <div id="latest-input-banner" class="latest-input-banner">
+              Waiting for Left / Right Zwift button press or paddle movement...
+            </div>
+            <div id="notification-feed" class="notification-feed"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- BLE Peripheral Picker Modal (Used when user clicks manual Scan) -->
+  <div id="scan-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="scanner-spinner"></div>
+        <div>
+          <h2 id="scan-modal-title">Select BLE Peripheral</h2>
+          <p id="scan-modal-subtitle">Scanning macOS CoreBluetooth...</p>
+        </div>
+      </div>
+      <div id="device-list" class="device-list"></div>
+      <div class="modal-footer">
+        <button id="cancel-scan-btn" type="button" class="btn btn-secondary">
+          Cancel Scan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./dist/renderer/renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "@tabata-sync/engine",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tabata-sync/contracts": "0.1.0",
+    "fft.js": "4.0.4",
+    "music-metadata": "12.2.3"
+  }
+}

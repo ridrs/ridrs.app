@@ -26,6 +26,8 @@ export type DiagnosticCode =
   | 'bridge-rejected'
   | 'bridge-protocol-error'
   | 'physics-step-failed'
+  | 'terrain-preview-missing'
+  | 'terrain-preview-rejected'
   | 'recording-failed'
   | 'recording-recovered'
   | 'fit-export-failed'

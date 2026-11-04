@@ -11,6 +11,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
+    "@ridrs/spatial": "workspace:*",
     "@ridrs/temporal": "workspace:*",
     "dependency-graph": "1.0.0",
     "rxjs": "7.8.2",

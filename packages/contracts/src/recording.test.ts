@@ -43,7 +43,7 @@ const state = {
   wheelPower: 200,
   driveForce: 200,
   resistance: { total: 3.3, contributions: [{ source: 'physics-aerodynamics', force: 0.2 }] },
-  road: { gradient: 0.05, origin: 'default' },
+  road: { gradient: 0.05, surface: 'gravel', origin: 'default' },
 };
 
 /** A valid payload for every event of the contracts: the recording stores them all verbatim. */
@@ -51,7 +51,6 @@ const SAMPLES: Record<string, unknown> = {
   'activity.start-requested': {},
   'activity.finish-requested': {},
   'activity.state-changed': { state: 'finished', sessionId: 's-1', startedAt: T, endedAt: T + 1 },
-  'ble.transport-requested': { transport: 'bridge' },
   'bridge.companions-changed': {
     companions: [{ companionId: 'c', name: 'Phone', address: '10.0.0.2:4711', paired: true }],
   },
@@ -66,8 +65,34 @@ const SAMPLES: Record<string, unknown> = {
   'device.connection-changed': {
     deviceId: 'sim-1',
     deviceName: 'SIM',
+    kind: 'trainer',
     state: 'reconnecting',
     reason: 'lost',
+    route: 'companion',
+    connectedRoutes: ['companion'],
+  },
+  'device.candidates-changed': {
+    kind: 'heart-rate',
+    devices: [{ deviceId: 'sim-hr', deviceName: 'HRM', routes: ['local', 'companion'] }],
+  },
+  'device.connect-requested': { kind: 'heart-rate', deviceId: 'sim-hr' },
+  'device.route-requested': { kind: 'heart-rate', route: 'companion' },
+  'device.disconnect-requested': { kind: 'heart-rate' },
+  'device.discovery-requested': { active: true },
+  'controller.buttons-changed': { deviceId: 'sim-ride', buttons: ['a', 'shift-up-right'] },
+  'device.status-changed': {
+    devices: [
+      {
+        kind: 'trainer',
+        deviceId: 'sim-1',
+        deviceName: 'SIM',
+        state: 'connected',
+        route: 'local',
+        connectedRoutes: ['local', 'companion'],
+        candidates: [{ deviceId: 'sim-1', deviceName: 'SIM', routes: ['local'] }],
+      },
+      { kind: 'heart-rate', deviceId: '', deviceName: '', state: 'searching' },
+    ],
   },
   'device.raw-notification': {
     deviceId: 'sim-1',
@@ -120,6 +145,22 @@ const SAMPLES: Record<string, unknown> = {
     durationMs: 10_000,
   },
   'recording.failed': { sessionId: 's-1', reason: 'disk full' },
+  'ui.terrain-observed': {
+    revision: 2,
+    originDistance: 2999,
+    spacing: 1,
+    samples: [
+      { gradient: 0.05, surface: 'asphalt' },
+      { gradient: 0, surface: 'gravel' },
+    ],
+  },
+  'world.terrain-preview': {
+    revision: 3,
+    originDistance: 1999,
+    spacing: 1,
+    // Without a surface (absent = asphalt) and with one.
+    samples: [{ gradient: 0 }, { gradient: 0.05 }, { gradient: 0.05, surface: 'gravel' }],
+  },
 };
 
 const events = (Object.values(contracts) as unknown[]).filter(

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod keep_awake;
-mod settings;
 
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
@@ -9,7 +8,11 @@ use ridrs_bridge::client as bridge;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     ble::process_start();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Restores the main window's size and position from the last run; saves them on exit.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    builder
         // Registers the platform backends (incl. the Android Kotlin module) and initializes the
         // shared BLE handler that `ble.rs` drives. blec's own JS commands are not used.
         .plugin(tauri_plugin_blec::init())
@@ -26,14 +29,13 @@ pub fn run() {
             ble::ble_disconnect,
             ble::ble_subscribe,
             ble::ble_unsubscribe,
+            ble::ble_write,
             bridge::bridge_browse,
             bridge::bridge_stop_browse,
             bridge::bridge_open,
             bridge::bridge_send_text,
             bridge::bridge_close,
             keep_awake::keep_awake,
-            settings::ble_transport_get,
-            settings::ble_transport_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

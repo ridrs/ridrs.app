@@ -4,6 +4,7 @@ export {
   BleSimulator,
   SimulatedPeripheral,
   type SimulatedPeripheralOptions,
+  type SimulatedWrite,
 } from '@ridrs/ble-simulator';
 export { SimulatedBridgeConnector, SimulatedNetwork } from './bridge-network.ts';
 export { MemoryAppFiles } from './memory-app-files.ts';

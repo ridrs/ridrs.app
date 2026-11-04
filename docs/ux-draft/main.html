@@ -1,0 +1,65 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Main</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="collapsed:From setup,ready:Ready,partial:HR missing,newdev:New device,expanded:Indicator open,companion:With companion,compoff:Companion offline,none:No devices,saved:After a ride">
+  <p class="note" id="note"></p>
+  <div class="stage"><div class="device"><div class="mainWrap">
+    <div class="topbar"><span></span><a class="iconbtn" href="menu.html" id="menuBtn" aria-label="Menu"></a></div>
+    <div class="logo">ridrs<i>.</i></div>
+    <div class="saved" data-show="saved"><span><b>Ride saved</b>24.3 km · 52:10</span><a class="btn lime" href="ride-saved.html" style="padding:8px 14px">Details</a></div>
+    <div id="ind"></div>
+    <div id="open" data-show="expanded">
+      <div id="openStrip"></div>
+      <div class="rows" id="rows"></div>
+      <div class="btnrow"><a class="btn ghost" href="device.html?state=search">Search again</a><a class="btn ghost" href="companion-add.html">Add companion</a></div>
+    </div>
+    <div class="hint" data-show="partial">No heart rate yet. You can ride without it.</div>
+    <div class="hint" data-show="compoff">Heart rate waits for Pixel 8. You can ride without it.</div>
+    <a class="cta" href="activity.html">Start ride <span class="arr">»</span></a>
+  </div></div></div>
+</main>
+<script src="proto.js"></script>
+<script>
+document.getElementById('menuBtn').innerHTML = ICON.menu;
+const NOTES = {
+  collapsed: '<b>Arriving from Setup.</b> The setup rows shrink into the <b>device indicator</b>: one dot per kind, a phone icon where the companion carries the device. Tap it to open the rows again.',
+  ready: '<b>Main = home.</b> Start ride is the one big action. The indicator is the whole device UI while nothing needs attention.',
+  partial: '<b>A device is missing.</b> Amber dot plus a one-line hint above Start ride; never a blocker.',
+  newdev: '<b>New device discovered later.</b> Only an amber badge, no toast, no sound: the rider decides when to look. Opening the indicator shows it with a "Review" entry.',
+  expanded: '<b>Indicator open.</b> Same rows as Setup, with route chips. Each row opens the Device page (choose device, connect via). The power row opens only once a second power source exists.',
+  companion: '<b>Companion paired.</b> The indicator gains a phone dot; the heart rate dot carries a phone icon because the strap goes via Pixel 8.',
+  compoff: '<b>Companion offline.</b> Devices that only the phone can reach turn amber; devices this Mac can see stay or fail over to this Mac by themselves.',
+  none: '<b>Setup skipped.</b> The indicator becomes an invitation instead of three grey dots.',
+  saved: '<b>After a ride.</b> A short "ride saved" card; details on their own page.',
+};
+const dot = (cls, label, via) => `<span class="d ${cls}"><i></i>${label}${via === 'comp' ? ` <small>${ICON.phone}</small>` : ''}</span>`;
+function indicator(s) {
+  if (s === 'none') return '<a class="indicator" href="setup.html?state=first"><span class="d busy"><i></i>Set up your devices</span><span class="small">›</span></a>';
+  // "Indicator open" shows the companion setup, so its dots match the rows below.
+  const withCompanion = s === 'companion' || s === 'expanded';
+  const hr = { partial: ['warn'], compoff: ['warn', 'comp'] }[s] ?? (withCompanion ? ['ok', 'comp'] : ['ok']);
+  const comp = withCompanion ? dot('ok', 'Pixel 8') : s === 'compoff' ? dot('warn', 'Pixel 8') : '';
+  return `<button type="button" class="indicator${s === 'collapsed' ? ' arrive' : ''}" aria-expanded="${s === 'expanded'}" aria-label="Devices">${dot('ok', 'Trainer')}${dot('ok', 'Power')}${dot(hr[0], 'Heart rate', hr[1])}${comp}${s === 'newdev' ? '<span class="badge">1 new</span>' : ''}<span class="small">${s === 'expanded' ? '▴' : '▾'}</span></button>`;
+}
+window.renderState = (s) => {
+  document.getElementById('note').innerHTML = NOTES[s];
+  document.getElementById('ind').innerHTML = indicator(s);
+  document.getElementById('openStrip').innerHTML = companionStrip('online');
+  document.getElementById('rows').innerHTML =
+    row('power', STATUS.none('From trainer'), { sub: 'Your trainer measures power' }) +
+    row('trainer', STATUS.ok(), { sub: 'Wahoo KICKR 1234', via: 'here', also: 'comp', href: 'device.html?state=trainer' }) +
+    row('hr', STATUS.ok(), { sub: 'Polar H10 A1B2', via: 'comp', href: 'device.html' }) +
+    `<a class="row" href="device.html?state=new"><span class="ico" style="color:var(--amber)">${ICON.heart}</span><span class="meta"><b>New: Garmin HRM-Pro</b><small>Heart rate · seen via Pixel 8</small></span><span class="st warn">Review</span><span class="chev">›</span></a>`;
+};
+document.addEventListener('click', (e) => {
+  if (e.target.closest('button.indicator')) setState(document.querySelector('[data-s=expanded]').classList.contains('on') ? 'ready' : 'expanded');
+});
+</script>
+</body>
+</html>

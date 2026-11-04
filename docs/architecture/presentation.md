@@ -19,7 +19,7 @@ physics-engine ──(every step)── RideSimulation
    ▼
 in-process UI bridge (allow-list from UI manifests)
    ▼
-UI plugin (ui-landscape-flat) ── createPhysicsPresentation(ctx.events)   ← @ridrs/presentation
+UI plugin (ui-landscape-demo) ── createPhysicsPresentation(ctx.events)   ← @ridrs/presentation
    │                               history (2 s) · at(frame time) · linear interpolation
    │ ctx.frames.onFrame(frame ⇒ presentation.at(frame.time))
    ▼
@@ -74,12 +74,14 @@ No extrapolation. Results are frozen; `at()` never changes the history. `stats()
 4. Draw only what the presented state says. Do not smooth, predict or integrate.
 5. On unmount, dispose the presentation; the shell releases the frame subscription.
 
-`ui-landscape-flat` is the reference: it moves its centre-line dashes by `distance mod 8 m` and exposes `data-distance` (two decimals, empty for `none`) and `data-basis` on its SVG. At ride finish it logs `presentation.stats()` through the UI logger.
+`ui-landscape-demo` is the reference: it moves its centre-line dashes by `distance mod 8 m`, draws the road sections by surface at the presented distance, and exposes `data-distance` (two decimals, empty for `none`), `data-basis` and `data-surface` on its SVG. At ride finish it logs `presentation.stats()` through the UI logger.
+
+**The landscape as a sensor (Phase 10).** A UI plugin may also deliver world data, like a device: `ui-landscape-demo` publishes the terrain it presents ahead as `ui.terrain-observed`, an external input that a driver validates ([ui-and-activity.md](ui-and-activity.md), [spatial.md](spatial.md)). It is still rendering that reads: it never writes simulation state, and the frame rate reaches the physics only through the timing of those inputs (AGENTS.md rule 10).
 
 ## Tests
 
 - `presentation/interpolation.feature`: the presentation alone, fed batches by hand.
 - `presentation/state-stream.feature`: the real host's batches (every step once, catch-up, finish, samples equal states).
-- `presentation/render-clock.feature`: the real host, the in-process bridge with `ui-landscape-flat` discovered, and a presentation client on a `FrameClock` with `timerFrameSource` on fake timers.
+- `presentation/render-clock.feature`: the real host, the in-process bridge with `ui-landscape-demo` discovered, and a presentation client on a `FrameClock` with `timerFrameSource` on fake timers.
 - `apps/ride-with-moving-road.feature` (`@ui`, real timers): `startRidrsApp` with the `simulated-trainer` fixture and a 60 FPS timer source.
 - Vitest: interpolation, session reset, gaps, trimming at exactly 2000 ms, frozen results, stats, the frame clock (start/stop, order, a throwing handler), the timer source, batching across catch-up chunks, and the manifest and frame-clock ownership tests.

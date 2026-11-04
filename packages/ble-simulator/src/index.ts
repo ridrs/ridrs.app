@@ -6,6 +6,7 @@ export {
   BleSimulator,
   SimulatedPeripheral,
   type SimulatedPeripheralOptions,
+  type SimulatedWrite,
 } from './ble-simulator.ts';
 export {
   DUMMY_PROFILES,

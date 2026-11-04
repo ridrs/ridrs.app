@@ -10,8 +10,11 @@ import { defineEvent } from './events.ts';
  * port and the events/capability ridrs plugins use to find and pair a companion.
  */
 
-/** Wire protocol version; a companion accepts clients within the same major version. */
-export const BLE_BRIDGE_PROTOCOL_VERSION = '1.0.0';
+/**
+ * Wire protocol version; a companion accepts clients within the same major version.
+ * 1.1: `write` / `written`.
+ */
+export const BLE_BRIDGE_PROTOCOL_VERSION = '1.1.0';
 
 /** DNS-SD service type a companion advertises (TXT: `protocol`, `name`, `id`). */
 export const BLE_BRIDGE_SERVICE_TYPE = '_ridrs-bridge._tcp';
@@ -112,6 +115,18 @@ export const bridgeMessageSchema = z.discriminatedUnion('type', [
   z
     .object({ type: z.literal('unsubscribe'), subscriptionId: z.number().int().nonnegative() })
     .strict(),
+  z
+    .object({
+      type: z.literal('write'),
+      requestId,
+      peripheralId: z.string().min(1),
+      serviceUuid: uuid,
+      characteristicUuid: uuid,
+      /** Lowercase hex, see `bytesToHex`. */
+      data: z.string().regex(/^(?:[0-9a-f]{2})*$/),
+    })
+    .strict(),
+  z.object({ type: z.literal('written'), requestId }).strict(),
   z.object({ type: z.literal('failed'), requestId, message: z.string() }).strict(),
 ]);
 export type BridgeMessage = z.infer<typeof bridgeMessageSchema>;
@@ -291,14 +306,4 @@ export const bridgeStateChangedEvent = defineEvent(
       reason: z.string().optional(),
     })
     .strict(),
-);
-
-/** Where `ble.central` comes from: this device's Bluetooth, or a companion over the network. */
-export const bleTransportSchema = z.enum(['local', 'bridge']);
-export type BleTransport = z.infer<typeof bleTransportSchema>;
-
-/** The rider asks the app to switch the BLE transport; the app applies it on its next start. */
-export const bleTransportRequestedEvent = defineEvent(
-  'ble.transport-requested',
-  z.object({ transport: bleTransportSchema }).strict(),
 );

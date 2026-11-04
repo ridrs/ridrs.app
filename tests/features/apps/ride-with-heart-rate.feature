@@ -5,6 +5,7 @@ Feature: Ride with a trainer and a heart-rate sensor
 
   Scenario: Riding with a simulated trainer and heart-rate band
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-ride"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
@@ -22,6 +23,7 @@ Feature: Ride with a trainer and a heart-rate sensor
 
   Scenario: Without a trainer, heart rate is still shown
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-ride"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     And the simulated trainer is switched off
@@ -35,6 +37,7 @@ Feature: Ride with a trainer and a heart-rate sensor
 
   Scenario: The HUD shows the widgets in contribution order
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-ride"
+    And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options

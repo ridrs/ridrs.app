@@ -35,6 +35,7 @@ describe('compare', () => {
         { type: 'x', source: 'p', recorded: 1, replayed: 1, matched: 1 },
         { type: 'y', source: 'q', recorded: 1, replayed: 1, matched: 1 },
       ],
+      notCompared: [],
       firstDifference: undefined,
     });
   });
@@ -86,5 +87,29 @@ describe('compare', () => {
       { from: T0, to: T0 + 1, compared: (type) => !type.startsWith('core.') },
     );
     expect(result).toMatchObject({ identical: true, streams: [] });
+  });
+
+  it('lists, but does not compare, an event type the recording never contained', () => {
+    const recorded = [envelope('x', 'p', T0, { v: 1 })];
+    const replayed = [
+      envelope('x', 'p', T0, { v: 1 }),
+      envelope('new.type', 'w', T0, { v: 1 }),
+      envelope('new.type', 'w', T0 + 5, { v: 2 }),
+    ];
+    expect(compare(recorded, replayed, everything)).toEqual({
+      identical: true,
+      streams: [{ type: 'x', source: 'p', recorded: 1, replayed: 1, matched: 1 }],
+      notCompared: [{ type: 'new.type', source: 'w', replayed: 2, reason: 'not-in-recording' }],
+      firstDifference: undefined,
+    });
+  });
+
+  it('still compares a type the recording contains, from any source and outside the ride too', () => {
+    // The recording holds an "x" only before the ride: the type is known, so a new "x" differs.
+    const recorded = [envelope('x', 'p', T0 - 1, { v: 1 })];
+    const result = compare(recorded, [envelope('x', 'q', T0, { v: 1 })], everything);
+    expect(result.identical).toBe(false);
+    expect(result.notCompared).toEqual([]);
+    expect(result.firstDifference).toMatchObject({ type: 'x', source: 'q', recorded: undefined });
   });
 });

@@ -41,7 +41,7 @@ describe('the aerodynamics plugin', () => {
     };
     plugin.initialize?.(ctx as never);
     assert(provided);
-    return provided.force({ at: 0, speed, mass: 85, road: { gradient: 0, origin: 'default' } });
+    return provided.force({ at: 0, speed, mass: 85, road: { gradient: 0, surface: 'asphalt', origin: 'default' } });
   }
 
   it('uses the air density of the environment', () => {

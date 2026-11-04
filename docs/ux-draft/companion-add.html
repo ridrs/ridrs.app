@@ -1,0 +1,58 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ridrs UX draft: Add companion</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main data-states="looking:Looking,found:Phone found,paired:Paired + merged,unreachable:Unreachable">
+  <p class="note" id="note"></p>
+  <div class="stage"><div class="device">
+    <div class="topbar"><a class="back" href="settings-connection.html">‹ Connection</a><b>Add companion</b><span style="width:40px"></span></div>
+    <div class="icon-hero" id="hero"></div>
+    <h1 class="title" style="font-size:28px">Lend this Mac a <em>phone's Bluetooth</em></h1>
+    <p class="sub">Open ridrs companion on a phone in the same Wi-Fi. Its devices are added to the ones this Mac sees.</p>
+
+    <div data-show="looking found">
+      <div class="card" style="text-align:center"><h3>Scan with the phone</h3><div class="qr" role="img" aria-label="Pairing QR code"></div><p>Valid for one pairing, 10 minutes.</p></div>
+      <div class="divider">or type the code the phone shows</div>
+      <div class="card" data-show="looking"><div class="compstrip busy" style="margin:0">${phone}<span><b>Looking for phones on this Wi-Fi…</b><small>Nothing to type yet</small></span><span></span></div></div>
+      <div class="card" data-show="found">
+        <h3>Pixel 8</h3>
+        <div class="code"><i class="f">4</i><i class="f">8</i><i class="f">2</i><i></i><i></i><i></i></div>
+        <div class="btnrow"><a class="btn" href="?state=paired">Pair</a></div>
+      </div>
+    </div>
+
+    <div data-show="paired">
+      <div class="card"><h3 style="color:var(--lime)">✓ Pixel 8 paired</h3><p>It sees 3 devices. 2 are the ones this Mac already uses, shown once. 1 is new.</p></div>
+      <div class="rows" id="merged"></div>
+      <a class="cta" href="main.html?state=companion">Done <span class="arr">»</span></a>
+    </div>
+
+    <div class="card warn" data-show="unreachable"><h3>Pixel 8 not reachable</h3><p>Is the companion app open and the phone on the same Wi-Fi? Some guest networks block devices from seeing each other.</p>
+      <div class="btnrow" style="justify-content:flex-start"><a class="btn" href="?state=looking">Try again</a><a class="btn ghost" href="settings-connection.html">Cancel</a></div></div>
+  </div></div>
+</main>
+<script src="proto.js"></script>
+<script>
+document.getElementById('hero').innerHTML = ICON.phoneBig;
+document.querySelectorAll('.compstrip').forEach((el) => { el.innerHTML = el.innerHTML.replace('${phone}', ICON.phone); });
+const NOTES = {
+  looking: '<b>Adding a companion</b> is additive: no mode switch, no restart. The pairing itself (QR or 6-digit code, token) is unchanged from Phase 3b.',
+  found: '<b>A phone was found</b> via mDNS; the rider types its code.',
+  paired: '<b>Right after pairing</b> the rider sees what the phone brought: merged duplicates and what is new. Nothing switches routes by itself: this Mac stays first for devices it already carries.',
+  unreachable: '<b>Unreachable</b> after 30 s, with the reasons from the bridge (refused, network, timeout).',
+};
+window.renderState = (s) => {
+  document.getElementById('note').innerHTML = NOTES[s];
+  document.getElementById('merged').innerHTML =
+    row('trainer', STATUS.ok(), { sub: 'Wahoo KICKR 1234', via: 'here', also: 'comp' }) +
+    row('hr', STATUS.ok(), { sub: 'Polar H10 A1B2', via: 'here', also: 'comp' }) +
+    `<a class="row" href="device.html?state=new"><span class="ico" style="color:var(--amber)">${ICON.heart}</span><span class="meta"><b>New: Garmin HRM-Pro</b><small>Heart rate</small><span class="routes">${route('comp')}</span></span><span class="st warn">Review</span><span class="chev">›</span></a>`;
+};
+</script>
+</body>
+</html>
