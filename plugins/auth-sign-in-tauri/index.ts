@@ -18,14 +18,14 @@ const RESPONSE = `<!doctype html><html><head><meta charset="utf-8"><title>ridrs<
 <h1>Signed in</h1><p>You can close this tab and return to ridrs.</p></body></html>`;
 
 /**
- * `auth.browser-sign-in` in the native app (ADR 0049): a one-shot server on 127.0.0.1 and a free
- * port (tauri-plugin-oauth) receives the redirect; the system browser (tauri-plugin-opener) shows
+ * `auth.browser-sign-in` in the native app (ADR 0049): a one-shot server on 127.0.0.1 and the
+ * caller's port (tauri-plugin-oauth) receives the redirect; the system browser (tauri-plugin-opener) shows
  * the service's page. The server accepts any request on its port, so the caller checks the
  * answer's `state`. One sign-in at a time.
  */
 const tauriSignIn: BrowserSignIn = {
-  async signIn({ authorizationUrl, callbackPath }) {
-    const port = await start({ response: RESPONSE });
+  async signIn({ authorizationUrl, callbackPath, callbackPort }) {
+    const port = await start({ ports: [callbackPort], response: RESPONSE });
     const redirectUri = `http://127.0.0.1:${port}${callbackPath}`;
     let unlisten: (() => void) | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
