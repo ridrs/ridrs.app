@@ -25,7 +25,6 @@ export interface HttpResponse {
 export interface SignInRequest {
   authorizationUrl(redirectUri: string): string;
   readonly callbackPath: string;
-  readonly callbackPort: number;
 }
 
 export interface SignInResult {
@@ -47,6 +46,7 @@ export interface PlannedEvent {
 }
 
 const API = 'https://intervals.icu';
+export const LOOPBACK_PORT = 53682;
 const ISSUED_TOKEN = 'simulated-token-7f3a9c';
 const ISSUED_CODE = 'simulated-code-41d2';
 
@@ -164,7 +164,7 @@ export class SimulatedIntervalsIcu {
 
   readonly signIn = {
     signIn: (request: SignInRequest): Promise<SignInResult> => {
-      const redirectUri = `http://127.0.0.1:${request.callbackPort}${request.callbackPath}`;
+      const redirectUri = `http://127.0.0.1:${LOOPBACK_PORT}${request.callbackPath}`;
       const url = new URL(request.authorizationUrl(redirectUri));
       this.openedUrls.push(url.toString());
       this.lastAuthorization = url;
