@@ -95,6 +95,13 @@ Feature: Device details in the device setup
     And the device setup shows the "Smart Trainer" as "Connected"
     And the page offers a "Done" button
 
+  Scenario: Escape returns to the rows
+    Given "test-device" reported its "trainer" "KICKR CORE 1234" as "connected"
+    And I open the device indicator
+    And I open the "Smart Trainer" in the device setup
+    When I press Escape
+    Then the device details are closed
+
   Scenario: A device that is searched for gives a tip
     Given "test-device" searches for a "heart-rate"
     And I open the device indicator

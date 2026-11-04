@@ -13,6 +13,10 @@ const Z_CONTROLS = 2;
 function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   const landscape = useRef<HTMLDivElement>(null);
   const hud = useRef<HTMLDivElement>(null);
+  const finish = useRef<HTMLButtonElement>(null);
+
+  // Back never ends a ride by accident: it offers Finish ride, which Enter then confirms.
+  useEffect(() => ctx.onBack(() => finish.current?.focus()), [ctx]);
 
   // The screen only offers extension points; it never knows who contributes to them.
   useEffect(() => {
@@ -50,6 +54,7 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         style={{ position: 'absolute', inset: 0, zIndex: Z_HUD, pointerEvents: 'none' }}
       />
       <button
+        ref={finish}
         type="button"
         data-testid="finish-ride"
         style={{

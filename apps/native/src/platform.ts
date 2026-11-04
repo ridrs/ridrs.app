@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { onBackButtonPress } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import type { KeepAwakePort } from './compose.ts';
 
@@ -43,5 +44,16 @@ export function createKeepAwake(): KeepAwakePort {
       wanted = on;
       void apply(on).catch((error: unknown) => console.warn('keep-awake failed', error));
     },
+  };
+}
+
+/**
+ * Android's back button and gesture. Listening takes over its default, so the app no longer closes
+ * on Back; the shell decides. Elsewhere there is no back button and registering fails quietly.
+ */
+export function androidBackButton(press: () => void): () => void {
+  const listening = onBackButtonPress(() => press()).catch(() => undefined);
+  return () => {
+    void listening.then((listener) => listener?.unregister());
   };
 }

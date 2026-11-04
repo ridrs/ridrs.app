@@ -16,6 +16,7 @@
     "@ridrs/ble-simulator": "workspace:*",
     "@ridrs/ble-tauri": "workspace:*",
     "@ridrs/contracts": "workspace:*",
+    "@ridrs/ui-shell": "workspace:*",
     "@tauri-apps/api": "2.12.4",
     "@tauri-apps/plugin-barcode-scanner": "2.5.3",
     "react": "19.3.1",

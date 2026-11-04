@@ -59,7 +59,7 @@ import { PluginHost, type PluginSource } from '@ridrs/core';
 import type { FrameSource } from '@ridrs/presentation';
 import { createInProcessUiBridge } from '@ridrs/ui-bridge';
 import type { UiLogger } from '@ridrs/ui-sdk';
-import { mountShell } from '@ridrs/ui-shell';
+import { mountShell, type ShellOptions } from '@ridrs/ui-shell';
 
 /** Every event the host can resolve by id and the UI bridge may carry (subject to the allow-list). */
 export const RIDRS_EVENTS: readonly EventDefinition[] = [
@@ -115,6 +115,8 @@ export interface RidrsAppOptions {
   readonly keepAwake?: KeepAwakePort;
   /** Paces the UI's render clock; requestAnimationFrame by default (tests pass a timer source). */
   readonly frameSource?: FrameSource;
+  /** The platform's back button (Android's); it goes back like Escape. */
+  readonly backButton?: ShellOptions['backButton'];
   /** Who runs the host; recordings name it. */
   readonly platform?: HostPlatform;
 }
@@ -169,6 +171,7 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
   const unmount = mountShell(options.root, bridge, {
     logger: options.uiLogger ?? console,
     frameSource: options.frameSource,
+    backButton: options.backButton,
   });
   options.logger.info('ridrs app started');
 

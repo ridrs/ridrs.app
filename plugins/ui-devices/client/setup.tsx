@@ -678,6 +678,7 @@ export function DeviceSetupView({
   // Back closes the details, or leaves the setup.
   const leave = useRef(close);
   leave.current = details ? close : () => ctx.navigate(MAIN);
+  useEffect(() => ctx.onBack(() => leave.current()), [ctx]);
   return (
     <main
       style={{

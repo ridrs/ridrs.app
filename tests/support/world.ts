@@ -263,6 +263,8 @@ export class RidrsWorld extends World {
   /** The native app's composition root, when a scenario starts it instead of a bare host. */
   nativeApp?: { readonly host: PluginHost; close(): Promise<void> };
   readonly keepAwakeRequests: boolean[] = [];
+  /** What the native app's shell does on the platform's back button, while it listens. */
+  backButtonPress?: () => void;
   /** Phase 7: paces the native app's render clock instead of requestAnimationFrame. */
   nativeFrameSource?: FrameSource;
   readonly uiViews: Array<{ readonly root: HTMLElement; dispose: () => void }> = [];
