@@ -20,6 +20,18 @@ export const HEART_RATE_SERVICE_UUID = '180d';
 /** Canonical 16-bit UUID for the Heart Rate Measurement characteristic (0x2A37). */
 export const HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID = '2a37';
 
+/**
+ * Zwift Ride controller service (0xFC82, advertised and on GATT). Its characteristics carry 128-bit
+ * Zwift UUIDs: notifications (keypad, battery) and the control point that wants a "RideOn" first.
+ */
+export const ZWIFT_RIDE_SERVICE_UUID = 'fc82';
+
+/** Zwift Ride notifications: keypad status, battery and others, each led by an opcode byte. */
+export const ZWIFT_RIDE_NOTIFY_CHARACTERISTIC_UUID = '00000002-19ca-4651-86e5-fa29dcdd09d1';
+
+/** Zwift Ride control point: written without response. */
+export const ZWIFT_RIDE_CONTROL_POINT_CHARACTERISTIC_UUID = '00000003-19ca-4651-86e5-fa29dcdd09d1';
+
 const BLUETOOTH_BASE_UUID_REGEX = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/;
 
 /**
@@ -60,6 +72,8 @@ export interface BleConnection {
     characteristic: BleCharacteristicTarget,
     onNotification: (data: Uint8Array) => void,
   ): Promise<() => void>;
+  /** Writes `data` as a Write Without Response (a command); resolves once it was sent. */
+  write(characteristic: BleCharacteristicTarget, data: Uint8Array): Promise<void>;
   onDisconnected(listener: () => void): () => void;
   disconnect(): Promise<void>;
 }

@@ -75,6 +75,15 @@ class TauriBleConnection implements BleConnection {
     };
   }
 
+  async write(target: BleCharacteristicTarget, data: Uint8Array): Promise<void> {
+    await this.ipc.invoke('ble_write', {
+      peripheralId: this.peripheralId,
+      ...targetArgs(target),
+      // Inside an argument object a typed array would serialize as an object, not as bytes.
+      data: Array.from(data),
+    });
+  }
+
   onDisconnected(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => {

@@ -23,6 +23,7 @@ pub fn run() {
             ble::ble_disconnect,
             ble::ble_subscribe,
             ble::ble_unsubscribe,
+            ble::ble_write,
             bridge::bridge_serve,
             bridge::bridge_unserve,
             bridge::bridge_server_send_text,

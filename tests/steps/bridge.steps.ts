@@ -182,6 +182,16 @@ Given(
 );
 
 Given(
+  'a companion {string} wrapping a simulated BLE environment with a Zwift Ride {string}',
+  function (this: RidrsWorld, name: string, controllerName: string) {
+    this.bleSimulator = new BleSimulator({ clock: this.clock });
+    this.bleSimulator.addZwiftRide(controllerName);
+    this.companionCentral = this.bleSimulator;
+    pendingCompanion.set(this, { name });
+  },
+);
+
+Given(
   'a companion {string} that sees an FTMS trainer {string}',
   function (this: RidrsWorld, name: string, trainerName: string) {
     // Its own devices: the phone gives the trainer another id than this device does.

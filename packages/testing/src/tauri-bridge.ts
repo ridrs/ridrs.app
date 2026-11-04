@@ -83,6 +83,8 @@ export class SimulatedTauriBridge {
         this.subscriptions.get(subscriptionKey(args))?.();
         this.subscriptions.delete(subscriptionKey(args));
         return undefined;
+      case 'ble_write':
+        return this.write(args);
       case 'ble_disconnect':
         return this.disconnect(String(args.peripheralId));
       default:
@@ -154,6 +156,22 @@ export class SimulatedTauriBridge {
       },
     );
     this.subscriptions.set(subscriptionKey(args), unsubscribe);
+  }
+
+  private async write(args: Args): Promise<void> {
+    const peripheralId = String(args.peripheralId);
+    const connection = this.connections.get(peripheralId);
+    if (!connection) {
+      throw new Error(`Peripheral "${peripheralId}" is not connected`);
+    }
+    // Like the Rust command, the bytes arrive as a JSON number array.
+    await connection.write(
+      {
+        serviceUuid: String(args.serviceUuid),
+        characteristicUuid: String(args.characteristicUuid),
+      },
+      Uint8Array.from(args.data as number[]),
+    );
   }
 
   private async disconnect(peripheralId: string): Promise<void> {
