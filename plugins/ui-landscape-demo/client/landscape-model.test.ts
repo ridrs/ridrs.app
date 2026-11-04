@@ -36,14 +36,14 @@ describe('gradientAt on the demo course', () => {
 describe('surfaceAt on the demo landscape', () => {
   it.each([
     [0, 'asphalt'],
-    [2999.99, 'asphalt'],
-    [3000, 'gravel'],
-    [3999.99, 'gravel'],
-    [4000, 'asphalt'],
-    [6999.99, 'asphalt'],
-    [7000, 'gravel'],
-    [8000, 'asphalt'],
-    [43_500, 'gravel'],
+    [499.99, 'asphalt'],
+    [500, 'gravel'],
+    [999.99, 'gravel'],
+    [1000, 'asphalt'],
+    [1499.99, 'asphalt'],
+    [1500, 'gravel'],
+    [2000, 'asphalt'],
+    [43_750, 'gravel'],
   ] as const)('at %f m is %s', (distance, surface) => {
     expect(surfaceAt(DEMO_SURFACE, distance)).toBe(surface);
   });
@@ -62,7 +62,7 @@ describe('terrainWindow on the demo landscape', () => {
   });
 
   it('carries the surface of every sample', () => {
-    const window = terrainWindow(DEMO_LANDSCAPE, 2990);
+    const window = terrainWindow(DEMO_LANDSCAPE, 490);
     expect(window.samples.map((s) => s.surface)).toEqual([
       ...Array(10).fill('asphalt'),
       ...Array(11).fill('gravel'),

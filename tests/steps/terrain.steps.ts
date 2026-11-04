@@ -128,15 +128,20 @@ Given(
  * lag): the window from 0 m when the ride starts, a new one whenever less than half is left.
  */
 Given(
-  'a mock world {string} feeds the demo landscape',
-  async function (this: RidrsWorld, probeId: string) {
+  /^a mock world "([^"]+)" feeds the demo (landscape|course on asphalt)$/,
+  async function (this: RidrsWorld, probeId: string, what: string) {
+    // "the demo course on asphalt": the gradients only; a window without surface is asphalt.
+    const surfaces = what === 'landscape';
     this.getBehavior(probeId).onStart.push((ctx) => {
       let revision = 0;
       let current: TerrainWindow | undefined;
       const feed = (distance: number) => {
         revision += 1;
         current = terrainWindow(DEMO_LANDSCAPE, distance);
-        ctx.inputs.accept(worldTerrainPreviewEvent, { revision, ...current });
+        const samples = current.samples.map(({ gradient, surface }) =>
+          surfaces ? { gradient, surface } : { gradient },
+        );
+        ctx.inputs.accept(worldTerrainPreviewEvent, { revision, ...current, samples });
       };
       ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
         if (payload.state === 'running') {
