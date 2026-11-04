@@ -8,6 +8,12 @@ export {
   activityStateSchema,
 } from './activity.ts';
 export {
+  authBrowserSignInCapability,
+  type BrowserSignIn,
+  type BrowserSignInRequest,
+  type BrowserSignInResult,
+} from './auth.ts';
+export {
   type BleCentral,
   type BleCharacteristicTarget,
   type BleConnection,
@@ -162,6 +168,12 @@ export {
   powerMetricReadingSchema,
 } from './metrics.ts';
 export {
+  type HttpClient,
+  type HttpRequest,
+  type HttpResponse,
+  netHttpCapability,
+} from './net.ts';
+export {
   type BicycleCapability,
   type BicycleParameters,
   type EnvironmentCapability,
@@ -248,7 +260,9 @@ export {
   type AppFileEntry,
   type AppFiles,
   assertAppFilePath,
+  type Secrets,
   storageAppFilesCapability,
+  storageSecretsCapability,
 } from './storage.ts';
 export type {
   EstimationStrategy,
@@ -264,6 +278,31 @@ export type {
   TemporalUnavailableReason,
   TemporalValue,
 } from './temporal.ts';
+export {
+  type PlannedWorkout,
+  plannedWorkoutSchema,
+  TRAINING_ACCOUNT_REASONS,
+  TRAINING_ACCOUNT_STATES,
+  type TrainingAccount,
+  type TrainingAthlete,
+  type TrainingPlan,
+  type TrainingService,
+  trainingAccountChangedEvent,
+  trainingAccountSchema,
+  trainingAthleteSchema,
+  trainingConnectRequestedEvent,
+  trainingDisconnectRequestedEvent,
+  trainingPlanChangedEvent,
+  trainingPlanSchema,
+  trainingRefreshRequestedEvent,
+  trainingServiceSchema,
+  type WorkoutInterval,
+  type WorkoutPower,
+  type WorkoutRepeat,
+  type WorkoutStep,
+  workoutPowerSchema,
+  workoutStepSchema,
+} from './training.ts';
 export {
   type UiManifestSection,
   type UiRegistry,

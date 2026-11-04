@@ -296,19 +296,20 @@ module.exports = {
     {
       name: 'tauri-only-in-transport-native-and-testing',
       comment:
-        '@tauri-apps/* may only be imported by the Tauri BLE package, the Tauri plugins (transport, bridge connector, app files), the Tauri apps and the simulated bridge in packages/testing.',
+        '@tauri-apps/* and the Tauri oauth plugin may only be imported by the Tauri BLE package, the Tauri plugins (transport, bridge connector, app files, secrets, HTTP, browser sign-in), the Tauri apps and the simulated bridge in packages/testing.',
       severity: 'error',
       from: {
         pathNot:
-          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri|storage-files-tauri)/|apps/(native|companion)/|packages/testing/)',
+          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri|storage-files-tauri|storage-secrets-tauri|net-http-tauri|auth-sign-in-tauri)/|apps/(native|companion)/|packages/testing/)',
       },
-      to: { path: '@tauri-apps' },
+      to: { path: '(@tauri-apps|@fabianlars/tauri-plugin-oauth)' },
     },
     {
       name: 'domain-plugins-know-no-ui',
-      comment: 'Activity, device, metric, transport and output plugins never import UI code.',
+      comment:
+        'Activity, device, metric, transport, planner and output plugins never import UI code.',
       severity: 'error',
-      from: { path: '^plugins/(activity-|device-|metric-|transport-|output-)' },
+      from: { path: '^plugins/(activity-|device-|metric-|transport-|planner-|output-)' },
       to: { path: '(^packages/ui-|react)' },
     },
     {

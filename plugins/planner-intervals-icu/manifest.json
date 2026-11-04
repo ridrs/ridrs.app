@@ -1,0 +1,9 @@
+{
+  "id": "planner-intervals-icu",
+  "name": "intervals.icu Training Plan",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": [],
+  "requires": ["net.http", "auth.browser-sign-in", "storage.secrets", "storage.app-files"],
+  "entry": "index.ts"
+}

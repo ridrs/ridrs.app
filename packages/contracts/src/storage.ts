@@ -30,6 +30,24 @@ export const storageAppFilesCapability = defineCapability<AppFiles, 'single', 's
 );
 
 /**
+ * Secrets such as access tokens, in the operating system's credential store (ADR 0050). Keys are
+ * dotted ids (`intervals-icu.token`); values are UTF-8 text. Secrets never go into events, logs,
+ * recordings or app files.
+ */
+export interface Secrets {
+  /** `undefined` when nothing is stored under `key`. */
+  get(key: string): Promise<string | undefined>;
+  set(key: string, value: string): Promise<void>;
+  /** Removing a missing key is not an error. */
+  remove(key: string): Promise<void>;
+}
+
+export const storageSecretsCapability = defineCapability<Secrets, 'single', 'storage.secrets'>(
+  'storage.secrets',
+  { cardinality: 'single' },
+);
+
+/**
  * Throws `invalid-path` unless `path` is relative, `/`-separated and free of `.`, `..` and empty
  * segments. Every provider checks paths with this before touching storage.
  */

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: core IPC (channels) and app files below $APPDATA/recordings (storage-files-tauri). The app-local ble_* and keep_awake commands need no plugin permission.",
+  "description": "Main window: core IPC (channels); app files below $APPDATA/recordings and $APPDATA/training (storage-files-tauri); HTTP to the intervals.icu API, its sign-in page in the system browser and the loopback redirect server (ADR 0049). The app-local ble_*, keep_awake and secret_* commands need no plugin permission.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -13,6 +13,12 @@
         },
         {
           "path": "$APPDATA/recordings/**"
+        },
+        {
+          "path": "$APPDATA/training"
+        },
+        {
+          "path": "$APPDATA/training/**"
         }
       ]
     },
@@ -21,6 +27,9 @@
       "allow": [
         {
           "path": "$APPDATA/recordings"
+        },
+        {
+          "path": "$APPDATA/training"
         }
       ]
     },
@@ -29,6 +38,9 @@
       "allow": [
         {
           "path": "$APPDATA/recordings"
+        },
+        {
+          "path": "$APPDATA/training"
         }
       ]
     },
@@ -37,6 +49,9 @@
       "allow": [
         {
           "path": "$APPDATA/recordings/**"
+        },
+        {
+          "path": "$APPDATA/training/**"
         }
       ]
     },
@@ -45,6 +60,9 @@
       "allow": [
         {
           "path": "$APPDATA/recordings/**"
+        },
+        {
+          "path": "$APPDATA/training/**"
         }
       ]
     },
@@ -53,6 +71,9 @@
       "allow": [
         {
           "path": "$APPDATA/recordings/**"
+        },
+        {
+          "path": "$APPDATA/training/**"
         }
       ]
     },
@@ -61,6 +82,9 @@
       "allow": [
         {
           "path": "$APPDATA/recordings/**"
+        },
+        {
+          "path": "$APPDATA/training/**"
         }
       ]
     },
@@ -69,8 +93,29 @@
       "allow": [
         {
           "path": "$APPDATA/recordings/**"
+        },
+        {
+          "path": "$APPDATA/training/**"
         }
       ]
-    }
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://intervals.icu/api/*"
+        }
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://intervals.icu/oauth/authorize*"
+        }
+      ]
+    },
+    "oauth:allow-start",
+    "oauth:allow-cancel"
   ]
 }

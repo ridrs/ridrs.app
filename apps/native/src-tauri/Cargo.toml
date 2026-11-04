@@ -24,6 +24,12 @@ tauri-plugin-blec = "0.18.0"
 # Recordings and FIT exports in the app container (plugins/storage-files-tauri); the JS side
 # is @tauri-apps/plugin-fs of the same version.
 tauri-plugin-fs = "2.7.1"
+# intervals.icu (ADR 0049): HTTP from Rust, the system browser and the loopback redirect.
+tauri-plugin-http = "2.8.3"
+tauri-plugin-opener = "2.7.2"
+tauri-plugin-oauth = "2.1.0"
+# The OS credential store for storage.secrets (ADR 0050); the store per platform is below.
+keyring-core = "1.0.1"
 ridrs-ble = { path = "../../../crates/ridrs-ble" }
 ridrs-bridge = { path = "../../../crates/ridrs-bridge" }
 serde = { version = "1", features = ["derive"] }
@@ -32,6 +38,16 @@ serde = { version = "1", features = ["derive"] }
 keepawake = "0.6.1"
 # Window size and position survive a restart (desktop only).
 tauri-plugin-window-state = "2.5.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# The legacy Keychain: the protected store needs a provisioning profile.
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-native-keyring-store = "1.0.0"
 
 [profile.release]
 codegen-units = 1

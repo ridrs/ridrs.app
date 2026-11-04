@@ -1,0 +1,11 @@
+{
+  "name": "@ridrs/plugin-storage-secrets-tauri",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "dependencies": {
+    "@ridrs/contracts": "workspace:*",
+    "@tauri-apps/api": "2.12.4"
+  }
+}
