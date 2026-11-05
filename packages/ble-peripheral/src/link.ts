@@ -31,6 +31,7 @@ import {
   advertisedApart,
   advertisesNews,
 } from './advertising.ts';
+import type { DeviceMemory } from './memory.ts';
 
 const RECONNECT_BACKOFF = {
   retries: Number.POSITIVE_INFINITY,
@@ -89,6 +90,11 @@ export interface BlePeripheralLinkOptions {
     packet: Uint8Array,
     characteristicUuid: string,
   ) => void;
+  /**
+   * What the link remembers across runs (ADR 0054); without it, the choices last for this run.
+   * A remembered device is the only one that connects on its own; a forgotten one stays forgotten.
+   */
+  readonly memory?: DeviceMemory;
 }
 
 export interface BlePeripheralLink {
@@ -164,7 +170,8 @@ function asPeripheral(sighting: Sighting): BleDiscoveredPeripheral {
  * `device.connection-changed` and every device found, one per link that sees it, as
  * `device.candidates-changed`. The rider can connect another device found, the same one over the
  * other link too, or forget it: then no device connects on its own until a device setup opens
- * again. These choices last for this run. Ends when the plugin's abort signal fires.
+ * again. With a memory these choices outlast the run (ADR 0054). Ends when the plugin's abort
+ * signal fires.
  */
 export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePeripheralLink {
   const { ctx, characteristic, label, kind } = options;
@@ -177,7 +184,12 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
 
   const sightings: Sighting[] = [];
   const scans = new Map<BleRoute, AbortController>();
-  let want: Want = 'first';
+  const memory = options.memory;
+  let want: Want = memory?.remembered?.state === 'forgotten' ? 'none' : 'first';
+  /** The device remembered from an earlier run: while set, only it connects on its own. */
+  let target = memory?.remembered?.state === 'chosen' ? memory.remembered : undefined;
+  const isTarget = (s: Sighting): boolean =>
+    target !== undefined && s.route === target.route && s.peripheralId === target.peripheralId;
   let chosen: Sighting | undefined;
   let connected: Connected | undefined;
   let attempt: Attempt | undefined;
@@ -362,7 +374,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     if (want !== 'first' || chosen) {
       return;
     }
-    if (route === 'companion' && centrals.has('local')) {
+    if (route === 'companion' && centrals.has('local') && !target) {
       // The direct link is preferred: it gets a moment to see the device too.
       directLinkWait ??= setTimeout(() => {
         directLinkWait = undefined;
@@ -392,7 +404,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     }
     const waiting = directLinkWait !== undefined;
     const order = sightings
-      .filter((s) => !waiting || s.route === 'local')
+      .filter((s) => (target ? isTarget(s) : !waiting || s.route === 'local'))
       .toSorted(
         (a, b) =>
           Number(b.route === 'local') - Number(a.route === 'local') ||
@@ -495,6 +507,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     }
     connected = { route, connection, teardown };
     publishState('connected', options.optionalSubscriptions ? subscribed : undefined);
+    remember(sighting);
     reconcileScans();
   };
 
@@ -551,6 +564,20 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       });
   };
 
+  /** The device that connected is the one to connect again after a restart. */
+  const remember = (sighting: Sighting): void => {
+    if (isTarget(sighting) && target?.name === sighting.name) {
+      return;
+    }
+    target = {
+      state: 'chosen',
+      route: sighting.route,
+      peripheralId: sighting.peripheralId,
+      name: sighting.name,
+    };
+    memory?.save(target);
+  };
+
   /** Ends the connection the link holds and the attempt in flight. */
   const release = async (): Promise<void> => {
     attempt?.controller.abort();
@@ -589,6 +616,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     }
     want = 'none';
     chosen = undefined;
+    target = undefined;
+    memory?.save({ state: 'forgotten' });
     void release().then(() => {
       // The rider may have connected a device meanwhile.
       if (ctx.signal.aborted || chosen) {
@@ -662,7 +691,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     );
   });
 
-  publishState('searching');
+  // A device forgotten in an earlier run: nothing is looked for until a device setup opens.
+  publishState(want === 'none' ? 'disconnected' : 'searching');
   reconcileScans();
 
   const write = (

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { type BlePeripheralLink, startBlePeripheralLink } from '@ridrs/ble-peripheral';
+import {
+  type BlePeripheralLink,
+  loadDeviceMemory,
+  startBlePeripheralLink,
+} from '@ridrs/ble-peripheral';
 import {
   activityStateChangedEvent,
   type BleCharacteristicTarget,
@@ -83,7 +87,8 @@ export default definePlugin({
     });
   },
 
-  start(ctx) {
+  async start(ctx) {
+    const memory = await loadDeviceMemory(ctx, 'device-trainer');
     const control = new FtmsTrainerControl({
       now: () => ctx.clock.now(),
       send: (device, command) => {
@@ -160,6 +165,7 @@ export default definePlugin({
         ],
         label: 'trainer',
         kind: 'trainer',
+        memory,
         onNotification: (peripheral, packet, characteristicUuid) => {
           if (characteristicUuid === FITNESS_MACHINE_CONTROL_POINT_CHARACTERISTIC_UUID) {
             control.response(packet);

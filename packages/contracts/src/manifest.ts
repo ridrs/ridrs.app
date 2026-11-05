@@ -22,6 +22,15 @@ export const hostPermissionSchema = z.enum(['observe-host']);
 
 export type HostPermission = z.infer<typeof hostPermissionSchema>;
 
+/** Settings scopes a plugin may keep documents in (ADR 0054). */
+export const persistenceScopeSchema = z.enum(['machine']);
+
+/**
+ * Plugin types on the input side that may keep settings: what they read only decides which
+ * inputs arrive. Values that affect the simulation enter as inputs instead (ADR 0052).
+ */
+export const PERSISTENCE_TYPES: readonly string[] = ['transport', 'storage', 'ui', 'device'];
+
 export const manifestSchema = z
   .object({
     id: pluginIdSchema,
@@ -40,8 +49,18 @@ export const manifestSchema = z
     entry: z.string().min(1, 'Must be a non-empty relative path'),
     ui: uiManifestSectionSchema.optional(),
     permissions: z.array(hostPermissionSchema).optional(),
+    persistence: z.array(persistenceScopeSchema).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (manifest) =>
+      !manifest.persistence?.length ||
+      manifest.types.some((type) => PERSISTENCE_TYPES.includes(type)),
+    {
+      path: ['persistence'],
+      message: `Only plugins of the types ${PERSISTENCE_TYPES.join(', ')} may declare persistence: values that affect the simulation enter as inputs`,
+    },
+  );
 
 export type PluginManifest = z.infer<typeof manifestSchema>;
 

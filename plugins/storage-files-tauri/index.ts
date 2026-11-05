@@ -7,6 +7,7 @@ import {
   definePlugin,
   storageAppFilesCapability,
 } from '@ridrs/contracts';
+import { invoke } from '@tauri-apps/api/core';
 import {
   BaseDirectory,
   exists,
@@ -31,7 +32,8 @@ async function withDirectory(path: string): Promise<string> {
 
 /**
  * `storage.app-files` in the native app: the app container's data directory through the official
- * Tauri fs plugin (ADR 0038). Its permissions are scoped to `$APPDATA/recordings/**`.
+ * Tauri fs plugin (ADR 0038), scoped to `$APPDATA/{recordings,training,config}/**`; replacing
+ * and flushing go through the app's `app_file_*` commands.
  */
 export const tauriAppFiles: AppFiles = {
   async append(path, text) {
@@ -39,6 +41,10 @@ export const tauriAppFiles: AppFiles = {
   },
   async write(path, bytes) {
     await writeFile(await withDirectory(assertAppFilePath(path)), bytes, { baseDir });
+  },
+  async replace(path, bytes) {
+    // The fs plugin cannot flush: the app command writes, flushes and renames (ADR 0054).
+    await invoke('app_file_replace', { path: assertAppFilePath(path), bytes: [...bytes] });
   },
   async read(path) {
     return readFile(assertAppFilePath(path), { baseDir });

@@ -33,7 +33,8 @@ export type DiagnosticCode =
   | 'fit-export-failed'
   | 'config-snapshot-failed'
   | 'trainer-command-failed'
-  | 'trainer-control-lost';
+  | 'trainer-control-lost'
+  | 'settings-invalid';
 
 export type RidrsErrorCode =
   | DiagnosticCode

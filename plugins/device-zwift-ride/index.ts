@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { type BlePeripheralLink, startBlePeripheralLink } from '@ridrs/ble-peripheral';
+import {
+  type BlePeripheralLink,
+  loadDeviceMemory,
+  startBlePeripheralLink,
+} from '@ridrs/ble-peripheral';
 import {
   type BleDiscoveredPeripheral,
   bleCentralCapability,
@@ -61,7 +65,13 @@ function handleNotification(
 }
 
 export default definePlugin({
-  start(ctx) {
+  async start(ctx) {
+    // Each link remembers its own controller.
+    const memories = await Promise.all(
+      Array.from({ length: CONTROLLERS_PER_PAIR }, (_, i) =>
+        loadDeviceMemory(ctx, i === 0 ? 'device-controller' : `device-controller-${i + 1}`),
+      ),
+    );
     const state: ZwiftRideState = { links: [], held: new Map() };
     states.set(ctx, state);
 
@@ -100,6 +110,7 @@ export default definePlugin({
           },
           label: 'Zwift Ride controller',
           kind: 'controller',
+          memory: memories[i],
           // Each link sees the raw packets of both (they are the plugin's inputs, also on
           // replay): one decodes them, or every packet would count twice.
           onNotification:

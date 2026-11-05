@@ -24,6 +24,10 @@ export class MemoryAppFiles implements AppFiles {
     this.files.set(path, bytes.slice());
   }
 
+  async replace(path: string, bytes: Uint8Array): Promise<void> {
+    await this.write(path, bytes);
+  }
+
   async read(path: string): Promise<Uint8Array> {
     const bytes = this.files.get(assertAppFilePath(path));
     if (!bytes) {

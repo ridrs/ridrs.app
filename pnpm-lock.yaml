@@ -629,6 +629,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
       '@tauri-apps/plugin-fs':
         specifier: 2.7.1
         version: 2.7.1

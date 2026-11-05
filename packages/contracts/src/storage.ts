@@ -12,6 +12,11 @@ export interface AppFiles {
   append(path: string, text: string): Promise<void>;
   /** Writes the whole file, creating or replacing it. */
   write(path: string, bytes: Uint8Array): Promise<void>;
+  /**
+   * Replaces the whole file atomically (ADR 0054): a temporary file, flushed to the disk and
+   * renamed over the old one. After a crash the file is the old one or the new one.
+   */
+  replace(path: string, bytes: Uint8Array): Promise<void>;
   read(path: string): Promise<Uint8Array>;
   /** The files directly in `directory`, sorted by path; an absent directory is empty. */
   list(directory: string): Promise<readonly AppFileEntry[]>;

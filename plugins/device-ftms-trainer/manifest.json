@@ -5,5 +5,6 @@
   "types": ["device"],
   "provides": ["config.snapshot"],
   "requires": ["ble.central"],
-  "entry": "index.ts"
+  "entry": "index.ts",
+  "persistence": ["machine"]
 }

@@ -6,6 +6,7 @@ import type { DiagnosticCode } from './diagnostics.ts';
 import type { PluginEventsContext, PluginIdsContext, PluginInputsContext } from './events.ts';
 import type { PluginHostAccess } from './host.ts';
 import type { PluginManifest } from './manifest.ts';
+import type { PluginSettingsContext } from './settings.ts';
 import type { PluginSpatialContext } from './spatial.ts';
 import type { PluginTemporalContext } from './temporal.ts';
 import type { UiRegistry } from './ui.ts';
@@ -54,6 +55,8 @@ export interface PluginContext {
   readonly ui: { registry(): UiRegistry };
   /** The whole host; usable only with the manifest permission `observe-host`. */
   readonly host: PluginHostAccess;
+  /** The plugin's settings documents; usable only with the manifest field `persistence`. */
+  readonly settings: PluginSettingsContext;
   reportDiagnostic(
     code: DiagnosticCode,
     message: string,
