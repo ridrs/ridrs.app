@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -63,6 +64,12 @@ pub struct ScanEvent {
     peripheral_id: String,
     name: String,
     service_uuids: Vec<String>,
+    /// Signal strength in dBm, when the platform measured it.
+    rssi: Option<i16>,
+    /// Manufacturer data by company id; the TS side writes it as hex.
+    manufacturer_data: HashMap<u16, Vec<u8>>,
+    /// Service data by service UUID.
+    service_data: HashMap<String, Vec<u8>>,
 }
 
 /// The scan ended: stopped, replaced, timed out, or cancelled by a connect.
@@ -118,6 +125,13 @@ pub async fn ble_scan(
                     peripheral_id: device.address,
                     name: device.name,
                     service_uuids: device.services.iter().map(Uuid::to_string).collect(),
+                    rssi: device.rssi,
+                    manufacturer_data: device.manufacturer_data,
+                    service_data: device
+                        .service_data
+                        .into_iter()
+                        .map(|(uuid, data)| (uuid.to_string(), data))
+                        .collect(),
                 });
             }
         }

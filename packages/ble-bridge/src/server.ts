@@ -42,6 +42,12 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Signal and advertising data in `discovered` came with 1.2: an older client rejects them. */
+function takesAdvertisingData(protocol: string): boolean {
+  const theirs = semver.parse(protocol);
+  return theirs !== null && semver.gte(theirs, '1.2.0');
+}
+
 function isCompatible(protocol: string): boolean {
   const ours = semver.parse(BLE_BRIDGE_PROTOCOL_VERSION);
   const theirs = semver.parse(protocol);
@@ -60,6 +66,8 @@ class ClientSession {
   constructor(
     readonly clientName: string,
     readonly token: string,
+    /** The protocol the client said in its `hello`. */
+    private readonly protocol: string,
     private readonly socket: BridgeSocket,
     private readonly server: BridgeServer,
     private readonly options: BridgeServerOptions,
@@ -126,6 +134,7 @@ class ClientSession {
   private async scan(requestId: number, serviceUuids: readonly string[]): Promise<void> {
     const abort = new AbortController();
     this.scans.set(requestId, abort);
+    const advertising = takesAdvertisingData(this.protocol);
     try {
       for await (const peripheral of this.options.central.scan({
         serviceUuids,
@@ -140,6 +149,13 @@ class ClientSession {
           peripheralId: peripheral.peripheralId,
           name: peripheral.name,
           serviceUuids: peripheral.serviceUuids.map(normalizeBleUuid),
+          ...(advertising && peripheral.rssi !== undefined ? { rssi: peripheral.rssi } : {}),
+          ...(advertising && peripheral.manufacturerData
+            ? { manufacturerData: { ...peripheral.manufacturerData } }
+            : {}),
+          ...(advertising && peripheral.serviceData
+            ? { serviceData: { ...peripheral.serviceData } }
+            : {}),
         });
       }
     } catch (error) {
@@ -326,7 +342,14 @@ export class BridgeServer {
       if (this.active?.token === result.token) {
         this.active.bye('disconnect');
       }
-      session = new ClientSession(message.clientName, result.token, socket, this, this.options);
+      session = new ClientSession(
+        message.clientName,
+        result.token,
+        message.protocol,
+        socket,
+        this,
+        this.options,
+      );
       this.active = session;
       sendMessage(socket, result);
       this.changed();

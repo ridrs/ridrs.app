@@ -1,12 +1,12 @@
 @devices @fake-timers
-Feature: Devices over this device's Bluetooth and the companion at once
+Feature: Devices over this device's Bluetooth or the companion
   This device's Bluetooth (the direct link) and a paired companion phone both look for
-  devices. A device that both see is one device: same kind, same name. It connects over every
-  link that sees it, if it takes several connections, and ridrs uses the data of one link: the
-  direct one, unless the rider chose the companion. Choosing a link only changes whose data is
-  used; nothing connects or disconnects. If the link in use is lost, the data of the other one
-  is used, and it stays the same device. A device only the companion sees waits two seconds
-  for the direct link before it connects through the companion. Choices last for this run.
+  devices. A device that both see is listed once per link, each a device of its own. The first
+  one seen directly connects; one only the companion sees waits two seconds for the direct link
+  before it connects through the companion. A lost link reconnects over the same link; ridrs
+  never switches links on its own. The rider switches by connecting the device found over the
+  other link, which lets the first one go. Choices last for this run. A device first seen
+  without its name takes the name once it arrives.
 
   Background:
     Given the host clock shows "10:00:00.000"
@@ -23,44 +23,77 @@ Feature: Devices over this device's Bluetooth and the companion at once
       | trainer | connected | KICKR CORE 1234 |
     And the "trainer" is connected through the "companion"
 
-  Scenario: A device both links see connects over both, and the direct link's data is used
+  Scenario: A device both links see is listed once per link and connects over this device's Bluetooth
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
     When the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the device setup looks for devices
     Then the "trainer" is connected through "this device"
-    And the "trainer" is connected over both links
-    And the device status lists the "trainer" devices "KICKR CORE 1234"
-    When the companion's trainer sends the Indoor Bike Data packet "45 00 B8 00 DC 00"
-    Then the published power measurement is "none"
+    And the companion's trainer "KICKR CORE 1234" is not connected
+    And the device status lists the "trainer" devices with their links:
+      | device          | links       |
+      | KICKR CORE 1234 | this device |
+      | KICKR CORE 1234 | companion   |
     When the trainer sends the Indoor Bike Data packet "45 00 B4 00 C8 00"
     Then the published power measurement is "200 W"
 
-  Scenario: A lost direct link: the companion's data is used, and it is the same device
+  Scenario: A lost direct link reconnects over this device's Bluetooth, not the companion
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
     And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
-    And the "trainer" is connected over both links
+    And the device setup looks for devices
+    And the "trainer" is connected through "this device"
     When the trainer "KICKR CORE 1234" drops the connection and refuses new connections
+    And 60 seconds pass
+    Then the device status is:
+      | kind    | state        | device          |
+      | trainer | reconnecting | KICKR CORE 1234 |
+    And the companion's trainer "KICKR CORE 1234" is not connected
+
+  Scenario: The rider connects the device found through the companion instead
+    Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
+    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the device setup looks for devices
+    And the "trainer" is connected through "this device"
+    When the rider connects the "trainer" through the "companion"
     Then the "trainer" is connected through the "companion"
-    And the trainer keeps the device id it had over this device
+    And the trainer "KICKR CORE 1234" is not connected
     When the companion's trainer sends the Indoor Bike Data packet "45 00 B8 00 DC 00"
     Then the published power measurement is "220 W"
 
-  Scenario: The rider uses the companion's data, and nothing connects or disconnects
+  Scenario: The rider connects the device over this device's Bluetooth again
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
     And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
-    And the "trainer" is connected over both links
-    When the rider uses the "trainer" data of the "companion"
-    Then the "trainer" is connected through the "companion"
-    And the "trainer" is connected over both links
-    When the trainer sends the Indoor Bike Data packet "45 00 B4 00 C8 00"
-    Then the published power measurement is "none"
-    When the companion's trainer sends the Indoor Bike Data packet "45 00 B8 00 DC 00"
-    Then the published power measurement is "220 W"
-
-  Scenario: The rider uses this device's data again
-    Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
-    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
-    And the "trainer" is connected over both links
-    And the rider used the "trainer" data of the "companion"
-    When the rider uses the "trainer" data of "this device"
+    And the device setup looks for devices
+    And the "trainer" is connected through "this device"
+    And the rider connected the "trainer" through the "companion"
+    When the rider connects the "trainer" through "this device"
     Then the "trainer" is connected through "this device"
-    And the "trainer" is connected over both links
+    And the companion's trainer "KICKR CORE 1234" is not connected
+
+  Scenario: The rider switches the link back and forth more than once
+    Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
+    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the device setup looks for devices
+    And the "trainer" is connected through "this device"
+    When the rider connects the "trainer" through the "companion"
+    And the rider connects the "trainer" through "this device"
+    And the rider connects the "trainer" through the "companion"
+    Then the "trainer" is connected through the "companion"
+    And the trainer "KICKR CORE 1234" is not connected
+    When the rider connects the "trainer" through "this device"
+    Then the "trainer" is connected through "this device"
+    And the companion's trainer "KICKR CORE 1234" is not connected
+
+  Scenario: A device first seen without its name takes its name once it arrives
+    Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234" that advertises its name only later
+    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the device setup looks for devices
+    Then the device status lists the "trainer" devices with their links:
+      | device          | links       |
+      |                 | this device |
+      | KICKR CORE 1234 | companion   |
+    When the trainer "KICKR CORE 1234" advertises its name
+    Then the device status lists the "trainer" devices with their links:
+      | device          | links       |
+      | KICKR CORE 1234 | this device |
+      | KICKR CORE 1234 | companion   |
+    And the "trainer" is connected through "this device"

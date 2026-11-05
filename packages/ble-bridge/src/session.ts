@@ -364,6 +364,9 @@ export class BridgeSession implements BleCentral {
             peripheralId: message.peripheralId,
             name: message.name,
             serviceUuids: message.serviceUuids.map(normalizeBleUuid),
+            ...(message.rssi === undefined ? {} : { rssi: message.rssi }),
+            ...(message.manufacturerData ? { manufacturerData: message.manufacturerData } : {}),
+            ...(message.serviceData ? { serviceData: message.serviceData } : {}),
           });
           scan.wake?.();
         }

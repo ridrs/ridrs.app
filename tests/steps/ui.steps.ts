@@ -113,7 +113,9 @@ Then('the page offers a {string} button', async function (this: RidrsWorld, labe
 
 Then('the page offers no {string} button', async function (this: RidrsWorld, label: string) {
   await this.settle();
-  assert.equal(within(ui(this)).queryByRole('button', { name: label }), null);
+  // A message of its own: printing the element found would print the whole page.
+  const found = within(ui(this)).queryByRole('button', { name: label });
+  assert.ok(found === null, `Expected no "${label}" button`);
 });
 
 Then(

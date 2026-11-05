@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
-import { AfterStep, Given, Then, When } from '@cucumber/cucumber';
+import { AfterStep, type DataTable, Given, Then, When } from '@cucumber/cucumber';
 import { BridgeRejectedError, BridgeSession } from '@ridrs/ble-bridge';
 import {
   DUMMY_PROFILES,
@@ -10,6 +10,7 @@ import {
   mergeBleCentrals,
 } from '@ridrs/ble-simulator';
 import {
+  type BleDiscoveredPeripheral,
   type BridgeState,
   bridgeCompanionsChangedEvent,
   bridgeConnectRequestedEvent,
@@ -18,6 +19,7 @@ import {
   bridgePairingOfferEvent,
   bridgePairRequestedEvent,
   bridgeStateChangedEvent,
+  deviceDiscoveryRequestedEvent,
   type EventDefinition,
   FTMS_SERVICE_UUID,
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
@@ -204,6 +206,99 @@ Given(
   },
 );
 
+/**
+ * "0157 a1b2c3d4": a company id (or a service) and the bytes it advertises; several are separated
+ * by commas. Empty: none.
+ */
+export function advertisedData(cell: string | undefined): Record<string, string> | undefined {
+  const parts = splitCsv(cell ?? '');
+  if (parts.length === 0) {
+    return undefined;
+  }
+  return Object.fromEntries(
+    parts.map((part) => {
+      const [key = '', ...bytes] = part.split(/\s+/);
+      return [key.toLowerCase(), bytes.join('').toLowerCase()];
+    }),
+  );
+}
+
+/** FTMS trainers with the advertising data of each row; ids are numbered, as names repeat. */
+function addTrainers(simulator: BleSimulator, table: DataTable, idPrefix: string) {
+  return table.hashes().map((row, i) => {
+    const name = row.device ?? '';
+    const manufacturerData = advertisedData(row['manufacturer data']);
+    const serviceData = advertisedData(row['service data']);
+    return simulator.addFtmsTrainer(name, {
+      peripheralId: `${idPrefix}-${name.toLowerCase().replaceAll(' ', '-')}-${i + 1}`,
+      ...(manufacturerData ? { manufacturerData } : {}),
+      ...(serviceData ? { serviceData } : {}),
+    });
+  });
+}
+
+Given(
+  'a simulated BLE environment with the FTMS trainers:',
+  function (this: RidrsWorld, table: DataTable) {
+    this.bleSimulator = new BleSimulator({ clock: this.clock });
+    this.trainer = addTrainers(this.bleSimulator, table, 'sim')[0];
+  },
+);
+
+Given(
+  'a companion {string} that sees the FTMS trainers:',
+  function (this: RidrsWorld, name: string, table: DataTable) {
+    // Its own devices: the phone gives every trainer another id than this device does.
+    this.companionSimulator = new BleSimulator({ clock: this.clock });
+    addTrainers(this.companionSimulator, table, 'phone');
+    this.companionCentral = this.companionSimulator;
+    pendingCompanion.set(this, { name });
+  },
+);
+
+When(
+  'ridrs runs paired with the companion and the device setup looks for devices',
+  async function (this: RidrsWorld) {
+    const pending = pendingCompanion.get(this);
+    assert.ok(pending && this.companionCentral, 'Expected a companion to be described first');
+    this.companion = new SimulatedCompanion({
+      network: network(this),
+      name: pending.name,
+      address: COMPANION_ADDRESS,
+      central: this.companionCentral,
+      clock: this.clock,
+      code: '482913',
+    });
+    connector(this).savePairing({
+      companionId: this.companion.authority.companionId,
+      companionName: pending.name,
+      address: this.companion.address,
+      token: this.companion.authority.issueToken('ridrs'),
+    });
+    await runOverNetwork(this, 'device-registry, transport-ble-bridge, device-ftms-trainer', {
+      local: true,
+    });
+    this.ensureHost()
+      .getPluginContext('test-observer')
+      ?.inputs.accept(deviceDiscoveryRequestedEvent, { active: true });
+    await this.settle();
+    // A device only the companion saw waits for the direct link this long.
+    assert.ok(this.fakeClock, 'Expected a @fake-timers scenario');
+    await this.fakeClock.tickAsync(2000);
+    await this.settle();
+  },
+);
+
+When(
+  "the companion's trainer {string} advertises the manufacturer data {string}",
+  async function (this: RidrsWorld, name: string, data: string) {
+    const trainer = this.companionSimulator?.getPeripheralByName(name);
+    assert.ok(trainer, `Expected the companion to see "${name}"`);
+    trainer.advertise({ manufacturerData: advertisedData(data) ?? {} });
+    await this.settle();
+  },
+);
+
 Given('a simulated BLE environment without devices', function (this: RidrsWorld) {
   this.bleSimulator = new BleSimulator({ clock: this.clock });
 });
@@ -379,6 +474,74 @@ Then('ridrs receives the notification bytes {string}', function (this: RidrsWorl
   assert.ok(last, 'Expected a notification');
   assert.deepEqual([...last], hexBytes(hex));
 });
+
+Given(
+  'the trainer advertises the manufacturer data {string} and the service data {string}',
+  function (this: RidrsWorld, manufacturer: string, service: string) {
+    assert.ok(this.trainer, 'Expected a trainer');
+    this.trainer.advertise({
+      manufacturerData: advertisedData(manufacturer) ?? {},
+      serviceData: advertisedData(service) ?? {},
+    });
+  },
+);
+
+Given('the trainer advertises a signal of {int} dBm', function (this: RidrsWorld, rssi: number) {
+  assert.ok(this.trainer, 'Expected a trainer');
+  this.trainer.setSignal(rssi);
+});
+
+const found = new WeakMap<RidrsWorld, BleDiscoveredPeripheral[]>();
+
+When('ridrs looks for devices through the bridge', async function (this: RidrsWorld) {
+  const session = welcomed(state(this).first);
+  const list: BleDiscoveredPeripheral[] = [];
+  found.set(this, list);
+  const abort = new AbortController();
+  const scan = (async () => {
+    for await (const peripheral of session.scan({ serviceUuids: [], signal: abort.signal })) {
+      list.push(peripheral);
+    }
+  })();
+  await this.settle();
+  abort.abort();
+  await scan.catch(() => undefined);
+});
+
+function foundByBridge(world: RidrsWorld, name: string): BleDiscoveredPeripheral {
+  const peripheral = found.get(world)?.find((p) => p.name === name);
+  assert.ok(peripheral, `ridrs found no "${name}" through the bridge`);
+  return peripheral;
+}
+
+Then(
+  'ridrs finds {string} with the manufacturer data {string} and the service data {string}',
+  function (this: RidrsWorld, name: string, manufacturer: string, service: string) {
+    const peripheral = foundByBridge(this, name);
+    assert.deepEqual(
+      [peripheral.manufacturerData, peripheral.serviceData],
+      [advertisedData(manufacturer), advertisedData(service)],
+    );
+  },
+);
+
+Then(
+  'ridrs finds {string} with a signal of {int} dBm',
+  function (this: RidrsWorld, name: string, rssi: number) {
+    assert.equal(foundByBridge(this, name).rssi, rssi);
+  },
+);
+
+Then(
+  'ridrs finds {string} without signal and advertising data',
+  function (this: RidrsWorld, name: string) {
+    const peripheral = foundByBridge(this, name);
+    assert.deepEqual(
+      [peripheral.rssi, peripheral.manufacturerData, peripheral.serviceData],
+      [undefined, undefined, undefined],
+    );
+  },
+);
 
 When('the ridrs socket closes', async function (this: RidrsWorld) {
   welcomed(state(this).first).close();

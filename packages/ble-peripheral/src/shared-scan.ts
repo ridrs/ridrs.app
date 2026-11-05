@@ -5,6 +5,7 @@ import {
   type BleScanOptions,
   normalizeBleUuid,
 } from '@ridrs/contracts';
+import { type Advertised, advertisedAfter, advertisesNews } from './advertising.ts';
 
 /** A running platform scan; `stop` ends it. */
 export interface NativeScan {
@@ -27,7 +28,8 @@ interface ScanSession {
   /** Requested services; empty means every peripheral. */
   readonly services: ReadonlySet<string>;
   readonly queue: BleDiscoveredPeripheral[];
-  readonly seen: Set<string>;
+  /** Each device reported, with the signal strength it was last reported with. */
+  readonly seen: Map<string, Reported>;
   wake?: () => void;
   done: boolean;
   error?: unknown;
@@ -39,6 +41,40 @@ interface RunningScan {
   handle?: NativeScan;
 }
 
+/**
+ * How much the signal must move before a device is reported again. Platforms report every
+ * advertisement, many a second, and the signal jitters by a few dB from one to the next.
+ */
+const SIGNAL_STEP_DB = 5;
+
+/** What a consumer was last told about a device. */
+interface Reported {
+  readonly rssi: number | undefined;
+  /** Whether it was reported with a name: a device's name may only come with a scan response. */
+  readonly named: boolean;
+  /** Its advertising data as reported: a key's bytes, or `changing` once a change was. */
+  readonly advertised: Advertised;
+}
+
+/**
+ * A device not reported yet, one reported without a name that now has one, one whose signal
+ * moved by a step since it was reported, or one whose advertising data has a key not reported
+ * yet or bytes of a key that changed for the first time.
+ */
+function news(seen: ReadonlyMap<string, Reported>, p: BleDiscoveredPeripheral): boolean {
+  const last = seen.get(p.peripheralId);
+  if (!last || (!last.named && p.name !== '')) {
+    return true;
+  }
+  if (advertisesNews(last.advertised, p)) {
+    return true;
+  }
+  if (p.rssi === undefined) {
+    return false;
+  }
+  return last.rssi === undefined || Math.abs(p.rssi - last.rssi) >= SIGNAL_STEP_DB;
+}
+
 function covers(running: readonly string[], wanted: readonly string[]): boolean {
   return running.length === 0 || (wanted.length > 0 && wanted.every((s) => running.includes(s)));
 }
@@ -46,13 +82,17 @@ function covers(running: readonly string[], wanted: readonly string[]): boolean 
 /**
  * Lets several plugins scan at once on a platform that runs one scan at a time (each device
  * plugin scans for its own service). One native scan covers the union of the requested services
- * and is stopped when the last consumer is done; each consumer sees its own services, once each.
+ * and is stopped when the last consumer is done; each consumer sees its own services, once each,
+ * and again once a device's name arrives, its signal strength moved by 5 dB or more, its
+ * advertising data brings a new key, or the bytes of a key change for the first time.
  */
 export class SharedBleScan {
   private readonly sessions = new Set<ScanSession>();
   private running?: RunningScan;
   /** Native starts and stops never overlap. */
   private queue: Promise<void> = Promise.resolve();
+  /** Work in flight that needs the platform's Bluetooth to itself: no native scan meanwhile. */
+  private pauses = 0;
 
   constructor(private readonly startNative: StartNativeScan) {}
 
@@ -64,7 +104,7 @@ export class SharedBleScan {
     const session: ScanSession = {
       services: new Set(options.serviceUuids.map(normalizeBleUuid)),
       queue: [],
-      seen: new Set(),
+      seen: new Map(),
       done: false,
     };
     const finish = (): void => {
@@ -97,15 +137,36 @@ export class SharedBleScan {
     }
   }
 
+  /**
+   * Runs `work` without a native scan: the running one stops first, none starts until `work`
+   * settles, then the one the consumers need starts again. For platforms whose connect scans on
+   * its own (blec looks for an address it does not know), where a scan of ours would end that one.
+   */
+  async pausedWhile<T>(work: () => Promise<T>): Promise<T> {
+    this.pauses += 1;
+    try {
+      await this.reconcile().catch(() => undefined);
+      return await work();
+    } finally {
+      this.pauses -= 1;
+      void this.reconcile().catch(() => undefined);
+    }
+  }
+
   private dispatch(peripheral: BleDiscoveredPeripheral): void {
     const services = peripheral.serviceUuids.map(normalizeBleUuid);
     for (const session of this.sessions) {
       const wanted =
         session.services.size === 0 || services.some((uuid) => session.services.has(uuid));
-      if (session.done || !wanted || session.seen.has(peripheral.peripheralId)) {
+      if (session.done || !wanted || !news(session.seen, peripheral)) {
         continue;
       }
-      session.seen.add(peripheral.peripheralId);
+      const last = session.seen.get(peripheral.peripheralId);
+      session.seen.set(peripheral.peripheralId, {
+        rssi: peripheral.rssi,
+        named: peripheral.name !== '' || last?.named === true,
+        advertised: advertisedAfter(last?.advertised, peripheral),
+      });
       session.queue.push({ ...peripheral, serviceUuids: services });
       session.wake?.();
     }
@@ -140,7 +201,7 @@ export class SharedBleScan {
   /** Makes the native scan cover what the sessions need, restarting it wider, or stops it. */
   private reconcile(): Promise<void> {
     const step = this.queue.then(async () => {
-      const wanted = this.wantedServices();
+      const wanted = this.pauses > 0 ? undefined : this.wantedServices();
       const running = this.running;
       if (running && wanted && covers(running.services, wanted)) {
         return;

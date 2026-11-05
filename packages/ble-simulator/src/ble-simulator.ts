@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type BleAdvertisedData,
   type BleCentral,
   type BleCharacteristicTarget,
   type BleConnection,
@@ -22,6 +23,17 @@ export interface SimulatedPeripheralOptions {
   readonly serviceUuids: readonly string[];
   readonly poweredOn?: boolean;
   readonly acceptingConnections?: boolean;
+  /** Signal strength in dBm its advertisements carry; none by default. */
+  readonly rssi?: number;
+  /** Manufacturer data its advertisements carry (company id → hex); none by default. */
+  readonly manufacturerData?: BleAdvertisedData;
+  /** Service data its advertisements carry (service → hex); none by default. */
+  readonly serviceData?: BleAdvertisedData;
+  /**
+   * Its advertisements carry no name until `advertiseName()`, like a device whose name only comes
+   * with the scan response.
+   */
+  readonly nameLater?: boolean;
 }
 
 /** One write a central made, with what it listened to at that moment. */
@@ -56,6 +68,10 @@ export class SimulatedPeripheral {
   readonly serviceUuids: readonly string[];
   private poweredOn: boolean;
   private acceptingConnections: boolean;
+  private rssi: number | undefined;
+  private manufacturerData: BleAdvertisedData | undefined;
+  private serviceData: BleAdvertisedData | undefined;
+  private nameAdvertised: boolean;
   private connected = false;
   private everConnected = false;
   private readonly disconnectListeners = new Set<() => void>();
@@ -78,6 +94,10 @@ export class SimulatedPeripheral {
     this.serviceUuids = options.serviceUuids.map(normalizeBleUuid);
     this.poweredOn = options.poweredOn ?? true;
     this.acceptingConnections = options.acceptingConnections ?? true;
+    this.rssi = options.rssi;
+    this.manufacturerData = options.manufacturerData;
+    this.serviceData = options.serviceData;
+    this.nameAdvertised = !options.nameLater;
     this.clock = clock;
     this.onBroadcastChanged = onBroadcastChanged;
   }
@@ -85,9 +105,38 @@ export class SimulatedPeripheral {
   toDiscoveredPeripheral(): BleDiscoveredPeripheral {
     return {
       peripheralId: this.peripheralId,
-      name: this.name,
+      name: this.nameAdvertised ? this.name : '',
       serviceUuids: [...this.serviceUuids],
+      ...(this.rssi === undefined ? {} : { rssi: this.rssi }),
+      ...(this.manufacturerData ? { manufacturerData: { ...this.manufacturerData } } : {}),
+      ...(this.serviceData ? { serviceData: { ...this.serviceData } } : {}),
     };
+  }
+
+  /** Its next advertisement carries this data in place of what it advertised so far. */
+  advertise(data: {
+    readonly manufacturerData?: BleAdvertisedData;
+    readonly serviceData?: BleAdvertisedData;
+  }): void {
+    if (data.manufacturerData) {
+      this.manufacturerData = data.manufacturerData;
+    }
+    if (data.serviceData) {
+      this.serviceData = data.serviceData;
+    }
+    this.onBroadcastChanged(this);
+  }
+
+  /** The device is nearer or farther: its next advertisement carries this signal strength. */
+  setSignal(rssi: number): void {
+    this.rssi = rssi;
+    this.onBroadcastChanged(this);
+  }
+
+  /** Its next advertisement carries its name. */
+  advertiseName(): void {
+    this.nameAdvertised = true;
+    this.onBroadcastChanged(this);
   }
 
   isPoweredOn(): boolean {
@@ -315,6 +364,8 @@ interface ActiveScanSession {
   readonly queue: BleDiscoveredPeripheral[];
   wakeUp?: () => void;
   stopped: boolean;
+  /** Why the scan ended, when it failed: the scan throws it. */
+  error?: unknown;
 }
 
 export class BleSimulator implements BleCentral {
@@ -346,6 +397,9 @@ export class BleSimulator implements BleCentral {
       readonly peripheralId?: string;
       readonly poweredOn?: boolean;
       readonly acceptingConnections?: boolean;
+      readonly nameLater?: boolean;
+      readonly manufacturerData?: BleAdvertisedData;
+      readonly serviceData?: BleAdvertisedData;
     },
   ): SimulatedPeripheral {
     return this.addPeripheral({
@@ -354,6 +408,9 @@ export class BleSimulator implements BleCentral {
       serviceUuids: [FTMS_SERVICE_UUID],
       poweredOn: options?.poweredOn ?? true,
       acceptingConnections: options?.acceptingConnections ?? true,
+      nameLater: options?.nameLater,
+      manufacturerData: options?.manufacturerData,
+      serviceData: options?.serviceData,
     });
   }
 
@@ -409,6 +466,18 @@ export class BleSimulator implements BleCentral {
 
   getPeripheralById(peripheralId: string): SimulatedPeripheral | undefined {
     return this.peripheralsById.get(peripheralId);
+  }
+
+  /** Every running scan fails with `error`, as when Bluetooth is switched off. */
+  failScans(error: unknown): void {
+    for (const session of [...this.activeScans]) {
+      session.error = error;
+      session.stopped = true;
+      this.activeScans.delete(session);
+      const wake = session.wakeUp;
+      session.wakeUp = undefined;
+      wake?.();
+    }
   }
 
   hasActiveScan(): boolean {
@@ -470,6 +539,9 @@ export class BleSimulator implements BleCentral {
               await new Promise<void>((resolve) => {
                 session.wakeUp = resolve;
               });
+            }
+            if (session.error !== undefined) {
+              throw session.error;
             }
             return { value: undefined, done: true };
           },
