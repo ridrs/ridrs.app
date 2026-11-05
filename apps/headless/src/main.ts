@@ -69,7 +69,7 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   // The bridge transport needs a connector; this host has none (the companion bridge is native-only).
   'transport-ble-bridge',
   'storage-files-tauri',
-  // intervals.icu needs HTTP, the browser sign-in and the keychain: native-only providers.
+  // intervals.icu needs HTTP, the browser sign-in and the secret store: native-only providers.
   'planner-intervals-icu',
   'net-http-tauri',
   'auth-sign-in-tauri',

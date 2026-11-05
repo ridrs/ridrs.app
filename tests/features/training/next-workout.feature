@@ -7,12 +7,12 @@ Feature: The next planned workout on the main screen
   the main screen (AGENTS.md rule 12). The plan loads at start, after a saved ride and on Refresh.
   Offline, the last plan is shown and marked as such.
 
-  Here intervals.icu, the browser and the keychain are simulated.
+  Here intervals.icu, the browser and the secret store are simulated.
 
   Background:
     Given the ridrs plugins "activity-session, ui-main-screen, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
-    And the keychain holds a token for intervals.icu
+    And the secret store holds a token for intervals.icu
     And the local time is "2026-11-04 08:00"
 
   Scenario: The plan of the next 14 days loads at start

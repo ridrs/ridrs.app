@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod keep_awake;
-mod secrets;
 
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
+use ridrs_secrets::commands as secrets;
 
+#[cfg(desktop)]
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -28,8 +29,10 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         // The arrow keys work from the start (AGENTS.md rule 12): without keyboard focus in the
         // webview, macOS sends no key but Tab to the page until the rider clicks into it.
-        .setup(|app| {
-            if let Some(window) = app.get_webview_window("main") {
+        // Desktop only: mobile webviews have the focus and no `set_focus`.
+        .setup(|_app| {
+            #[cfg(desktop)]
+            if let Some(window) = _app.get_webview_window("main") {
                 let webview: &tauri::Webview<_> = window.as_ref();
                 webview.set_focus()?;
             }

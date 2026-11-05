@@ -28,15 +28,43 @@ function write(key: string, value: string): void {
   }
 }
 
-/** The companion id and issued tokens survive restarts; reinstalling the app resets them. */
-export function webStoragePairingStore(): PairingStore {
-  const key = 'ridrs.companion.pairing';
+const PAIRING_SECRET = 'companion.state';
+const LEGACY_PAIRING_KEY = 'ridrs.companion.pairing';
+
+function parsePairing(raw: string | null | undefined): PairingState | undefined {
+  try {
+    return raw ? (JSON.parse(raw) as PairingState) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The companion id and issued tokens survive restarts in the app's secret store (ADR 0053), read
+ * once at start; a state left in the WebView's storage by an older companion moves there once.
+ * Without the store the companion forgets its pairings on restart; ridrs pairs again.
+ */
+export async function secretPairingStore(): Promise<PairingStore> {
+  let state = parsePairing(
+    await invoke<string | null>('secret_get', { key: PAIRING_SECRET }).catch(() => null),
+  );
+  const legacy = parsePairing(read(LEGACY_PAIRING_KEY));
+  if (!state && legacy) {
+    state = legacy;
+    await invoke('secret_set', { key: PAIRING_SECRET, value: JSON.stringify(legacy) })
+      .then(() => localStorage.removeItem(LEGACY_PAIRING_KEY))
+      .catch((error: unknown) => console.warn('pairing could not move to the secret store', error));
+  }
+  let saving = Promise.resolve();
   return {
-    load: () => {
-      const raw = read(key);
-      return raw ? (JSON.parse(raw) as PairingState) : undefined;
+    load: () => state,
+    save: (next) => {
+      state = next;
+      const value = JSON.stringify(next);
+      saving = saving
+        .then(() => invoke<void>('secret_set', { key: PAIRING_SECRET, value }))
+        .catch((error: unknown) => console.warn('pairing could not be saved', error));
     },
-    save: (state) => write(key, JSON.stringify(state)),
   };
 }
 
