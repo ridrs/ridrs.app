@@ -219,6 +219,7 @@ const SAMPLES: Record<string, unknown> = {
     targetPower: 180,
   },
   'trainer.erg-requested': { change: 'up' },
+  'drivetrain.shift-requested': { change: 'down' },
   'trainer.target-power': { watts: null },
   'ui.terrain-observed': {
     revision: 2,

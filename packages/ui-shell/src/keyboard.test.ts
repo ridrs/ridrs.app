@@ -78,6 +78,52 @@ describe('keyboardNavigation', () => {
     expect(back).not.toHaveBeenCalled();
   });
 
+  it('goes on from the place of a focused element that disappeared', () => {
+    const second = root.insertBefore(document.createElement('button'), field);
+    second.focus();
+    second.remove();
+    if (document.activeElement === second) {
+      // As a browser does it: the removed element loses the focus.
+      (document.activeElement as HTMLElement).blur();
+    }
+    press(document.body, 'ArrowDown');
+    expect(document.activeElement).toBe(field);
+
+    const third = root.insertBefore(document.createElement('button'), field);
+    third.focus();
+    third.remove();
+    third.blur();
+    press(document.body, 'ArrowUp');
+    expect(document.activeElement).toBe(first);
+  });
+
+  it('starts at the top of a new screen', () => {
+    const screen = () => {
+      const element = document.createElement('div');
+      element.append(...['a', 'b', 'c'].map(() => document.createElement('button')));
+      return element;
+    };
+    const before = screen();
+    root.replaceChildren(before);
+    (before.lastElementChild as HTMLElement).focus();
+    const after = screen();
+    root.replaceChildren(after);
+    (before.lastElementChild as HTMLElement).blur();
+    press(document.body, 'ArrowDown');
+    expect(document.activeElement).toBe(after.firstElementChild);
+  });
+
+  it('moves from an element outside the order to its neighbours', () => {
+    const marker = root.insertBefore(document.createElement('div'), choice);
+    marker.tabIndex = -1;
+    marker.focus();
+    press(marker, 'ArrowDown');
+    expect(document.activeElement).toBe(choice);
+    marker.focus();
+    press(marker, 'ArrowUp');
+    expect(document.activeElement).toBe(field);
+  });
+
   it('stops listening', () => {
     stop();
     press(first, 'Escape');

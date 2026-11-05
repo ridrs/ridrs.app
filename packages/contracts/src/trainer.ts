@@ -36,6 +36,17 @@ export const drivetrainGearChangedEvent = defineEvent(
 export type DrivetrainGearChangedPayload = z.infer<typeof drivetrainGearChangedEvent.schema>;
 
 /**
+ * The rider asks for a shift in the activity screen: `up` one gear harder, `down` one gear easier.
+ * The virtual gears shift as for a shift button of a controller.
+ */
+export const drivetrainShiftRequestedEvent = defineEvent(
+  'drivetrain.shift-requested',
+  z.object({ change: z.enum(['up', 'down']) }),
+);
+
+export type DrivetrainShiftRequestedPayload = z.infer<typeof drivetrainShiftRequestedEvent.schema>;
+
+/**
  * The rider asks for a change of the ERG target in the activity screen: `enter` starts ERG at the
  * default target, `up` and `down` change it by a step, `leave` ends ERG. The ERG driver turns it
  * into `trainer.target-power`.

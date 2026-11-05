@@ -15,15 +15,15 @@ Feature: Ride with trainer control in the app
     And eventually the virtual gear widget shows "12"
     When the simulated controller presses "shift-up-right"
     Then eventually the virtual gear widget shows "13"
-    When I move the focus to "Target power"
+    When I move the focus to "ERG"
     And I press Enter
     And I press the arrow key "Up"
     And I press the arrow key "Up"
-    Then the target power widget shows "ERG 160 W"
+    Then the ERG button is on at "160 W"
     And eventually the simulated trainer received a target power of 160 W
     And eventually the power widget shows "160" "W"
     When I press Back
-    Then the target power widget shows nothing
+    Then the ERG button is off
     And eventually the simulated trainer received a simulation command after the target power
     When I close the ridrs app
     Then the app reported no lifecycle problems
