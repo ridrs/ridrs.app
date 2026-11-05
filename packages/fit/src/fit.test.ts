@@ -194,6 +194,7 @@ describe('encodeActivity', () => {
     endedAt: T0 + 2000,
     timeZoneOffsetMinutes: 60,
     softwareVersion: '0.1.0',
+    pauses: [],
     records: [
       { at: T0, power: 200, heartRate: 150, speed: 0, distance: 0 },
       { at: T0 + 1000, power: 201, speed: 1.2345, distance: 0.5 },

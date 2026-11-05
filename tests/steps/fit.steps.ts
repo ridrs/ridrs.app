@@ -8,7 +8,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
-import { Then, When } from '@cucumber/cucumber';
+import { type DataTable, Then, When } from '@cucumber/cucumber';
 import { Decoder, Stream } from '@garmin/fitsdk';
 import { exportFitWrittenEvent } from '@ridrs/contracts';
 import { fitTimestamp } from '@ridrs/fit';
@@ -286,5 +286,29 @@ Then(
       .filter((file) => readFileSync(file, 'utf8').includes(specifier))
       .map((file) => relative(REPO_ROOT, file));
     assert.deepEqual(importers, []);
+  },
+);
+
+Then('the FIT file has the timer events:', async function (this: RidrsWorld, table: DataTable) {
+  const timers = ((await fitOf(this)).eventMesgs ?? []).filter((e) => e.event === 'timer');
+  assert.deepEqual(
+    timers.map((e) => ({ type: e.eventType, at: fitTime(e.timestamp) })),
+    table.hashes().map((row) => ({
+      type: camel(row.type ?? ''),
+      at: fitTimestamp(parseOffset(row.time ?? '')),
+    })),
+  );
+});
+
+Then(
+  'the FIT file has {int} records, none from {string} to {string}',
+  async function (this: RidrsWorld, count: number, from: string, to: string) {
+    const records = (await fitOf(this)).recordMesgs ?? [];
+    assert.equal(records.length, count);
+    const inPause = records.filter((r) => {
+      const at = fitTime(r.timestamp);
+      return at >= fitTimestamp(parseOffset(from)) && at <= fitTimestamp(parseOffset(to));
+    });
+    assert.deepEqual(inPause, []);
   },
 );

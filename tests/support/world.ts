@@ -8,6 +8,9 @@ import { setWorldConstructor, World } from '@cucumber/cucumber';
 import type { BridgeSession } from '@ridrs/ble-bridge';
 import {
   activityFinishRequestedEvent,
+  activityInterruptedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
   authBrowserSignInCapability,
@@ -154,6 +157,9 @@ export function createDefaultProbeBehavior(): ProbeBehavior {
 const PHASE_3_EVENTS: readonly EventDefinition[] = [
   activityStartRequestedEvent,
   activityFinishRequestedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
+  activityInterruptedEvent,
   activityStateChangedEvent,
   metricPowerEvent,
   metricCadenceEvent,

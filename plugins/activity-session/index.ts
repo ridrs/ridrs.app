@@ -3,6 +3,9 @@
 import {
   type ActivityState,
   activityFinishRequestedEvent,
+  activityInterruptedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
   definePlugin,
@@ -25,15 +28,19 @@ function reject(ctx: PluginContext, request: string, current: ActivityState): vo
   );
 }
 
-/** Ride lifecycle `idle -> running -> finished`, driven by request events. Knows nothing about any UI. */
+/**
+ * Ride lifecycle `idle -> running <-> paused -> finished`, driven by request events (ADR 0056).
+ * Knows nothing about any UI.
+ */
 export default definePlugin({
   start(ctx) {
     transition(ctx, { state: 'idle' });
+    const current = (): ActivityState => states.get(ctx) ?? { state: 'idle' };
 
     ctx.events.subscribe(activityStartRequestedEvent, () => {
-      const current = states.get(ctx) ?? { state: 'idle' };
-      if (current.state === 'running') {
-        reject(ctx, 'start', current);
+      const state = current();
+      if (state.state === 'running' || state.state === 'paused') {
+        reject(ctx, 'start', state);
         return;
       }
       transition(ctx, {
@@ -43,16 +50,47 @@ export default definePlugin({
       });
     });
 
+    const pause = (request: string, reason: 'rider' | 'interrupted') => {
+      const state = current();
+      if (state.state !== 'running') {
+        reject(ctx, request, state);
+        return;
+      }
+      transition(ctx, {
+        state: 'paused',
+        sessionId: state.sessionId,
+        startedAt: state.startedAt,
+        pausedAt: ctx.clock.now(),
+        reason,
+      });
+    };
+    ctx.events.subscribe(activityPauseRequestedEvent, () => pause('pause', 'rider'));
+    ctx.events.subscribe(activityInterruptedEvent, () => pause('interrupt', 'interrupted'));
+
+    ctx.events.subscribe(activityResumeRequestedEvent, () => {
+      const state = current();
+      if (state.state !== 'paused') {
+        reject(ctx, 'resume', state);
+        return;
+      }
+      transition(ctx, {
+        state: 'running',
+        sessionId: state.sessionId,
+        startedAt: state.startedAt,
+        resumedAt: ctx.clock.now(),
+      });
+    });
+
     ctx.events.subscribe(activityFinishRequestedEvent, () => {
-      const current = states.get(ctx) ?? { state: 'idle' };
-      if (current.state !== 'running') {
-        reject(ctx, 'finish', current);
+      const state = current();
+      if (state.state !== 'running' && state.state !== 'paused') {
+        reject(ctx, 'finish', state);
         return;
       }
       transition(ctx, {
         state: 'finished',
-        sessionId: current.sessionId,
-        startedAt: current.startedAt,
+        sessionId: state.sessionId,
+        startedAt: state.startedAt,
         endedAt: ctx.clock.now(),
       });
     });

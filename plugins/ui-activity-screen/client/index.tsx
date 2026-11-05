@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { activityFinishRequestedEvent, activityStateChangedEvent } from '@ridrs/contracts';
+import {
+  activityFinishRequestedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
+  activityStateChangedEvent,
+} from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
-import { useEffect, useRef } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 /** Explicit stacking order of this screen's layers, bottom to top. */
@@ -10,10 +15,13 @@ const Z_LANDSCAPE = 0;
 const Z_HUD = 1;
 const Z_CONTROLS = 2;
 
+const BUTTON: CSSProperties = { fontSize: 18, padding: '10px 20px', borderRadius: 10 };
+
 function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   const landscape = useRef<HTMLDivElement>(null);
   const hud = useRef<HTMLDivElement>(null);
   const finish = useRef<HTMLButtonElement>(null);
+  const [paused, setPaused] = useState(false);
 
   // Back never ends a ride by accident: it offers Finish ride, which Enter then confirms.
   useEffect(() => ctx.onBack(() => finish.current?.focus()), [ctx]);
@@ -34,7 +42,10 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   useEffect(
     () =>
       ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-        if (payload.state !== 'running') {
+        // A paused ride stays here (ADR 0056); a finished one goes back to the main screen.
+        if (payload.state === 'paused' || payload.state === 'running') {
+          setPaused(payload.state === 'paused');
+        } else {
           ctx.navigate('main');
         }
       }),
@@ -53,19 +64,49 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         ref={hud}
         style={{ position: 'absolute', inset: 0, zIndex: Z_HUD, pointerEvents: 'none' }}
       />
+      {paused ? (
+        <div
+          data-testid="ride-paused"
+          style={{
+            position: 'absolute',
+            top: '40%',
+            left: 0,
+            right: 0,
+            zIndex: Z_CONTROLS,
+            textAlign: 'center',
+            fontSize: 48,
+            fontWeight: 600,
+            pointerEvents: 'none',
+          }}
+        >
+          Paused
+        </div>
+      ) : null}
+      {/* Direct children like the HUD: one stacking context; Pause left, Finish ride right. */}
+      {paused ? (
+        <button
+          type="button"
+          data-testid="resume-ride"
+          style={{ ...BUTTON, position: 'absolute', top: 16, left: 16, zIndex: Z_CONTROLS }}
+          onClick={() => ctx.events.publish(activityResumeRequestedEvent, {})}
+        >
+          Resume
+        </button>
+      ) : (
+        <button
+          type="button"
+          data-testid="pause-ride"
+          style={{ ...BUTTON, position: 'absolute', top: 16, left: 16, zIndex: Z_CONTROLS }}
+          onClick={() => ctx.events.publish(activityPauseRequestedEvent, {})}
+        >
+          Pause
+        </button>
+      )}
       <button
         ref={finish}
         type="button"
         data-testid="finish-ride"
-        style={{
-          position: 'absolute',
-          top: 16,
-          right: 16,
-          zIndex: Z_CONTROLS,
-          fontSize: 18,
-          padding: '10px 20px',
-          borderRadius: 10,
-        }}
+        style={{ ...BUTTON, position: 'absolute', top: 16, right: 16, zIndex: Z_CONTROLS }}
         onClick={() => ctx.events.publish(activityFinishRequestedEvent, {})}
       >
         Finish ride

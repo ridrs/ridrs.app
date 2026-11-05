@@ -25,7 +25,9 @@
         "activity.state-changed"
       ],
       "publish": [
-        "activity.finish-requested"
+        "activity.finish-requested",
+        "activity.pause-requested",
+        "activity.resume-requested"
       ]
     }
   }

@@ -2,6 +2,9 @@
 
 import {
   activityFinishRequestedEvent,
+  activityInterruptedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
   authBrowserSignInCapability,
@@ -83,6 +86,9 @@ import { mountShell, type ShellOptions } from '@ridrs/ui-shell';
 export const RIDRS_EVENTS: readonly EventDefinition[] = [
   activityStartRequestedEvent,
   activityFinishRequestedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
+  activityInterruptedEvent,
   activityStateChangedEvent,
   deviceConnectionChangedEvent,
   deviceCandidatesChangedEvent,

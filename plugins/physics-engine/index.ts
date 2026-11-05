@@ -18,6 +18,8 @@ interface Engine {
   ride?: RideSimulation;
   /** The one scheduled task (step 0 or the next step), only while a ride starts or runs. */
   wake?: TaskId;
+  /** The ride stands still: no task is scheduled (ADR 0056). */
+  paused?: boolean;
 }
 
 const engines = new WeakMap<PluginContext, Engine>();
@@ -36,6 +38,7 @@ function stopRide(ctx: PluginContext, engine: Engine): void {
   }
   engine.wake = undefined;
   engine.ride = undefined;
+  engine.paused = false;
 }
 
 /** A failing contributor stops this ride's simulation - not the host, the metrics or the UI. */
@@ -124,6 +127,26 @@ export default definePlugin({
     };
 
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
+      const current = engine.ride;
+      if (payload.state === 'paused' && current?.sessionId === payload.sessionId) {
+        if (engine.wake !== undefined) {
+          ctx.clock.cancel(engine.wake);
+          engine.wake = undefined;
+        }
+        engine.paused = true;
+        return;
+      }
+      if (
+        payload.state === 'running' &&
+        payload.resumedAt !== undefined &&
+        current?.sessionId === payload.sessionId &&
+        engine.paused
+      ) {
+        engine.paused = false;
+        current.resume(payload.resumedAt);
+        arm(ctx, current);
+        return;
+      }
       if (payload.state === 'running') {
         stopRide(ctx, engine);
         const { sessionId, startedAt } = payload;
@@ -134,7 +157,8 @@ export default definePlugin({
       }
       const ride = engine.ride;
       if (payload.state === 'finished' && ride?.sessionId === payload.sessionId) {
-        guarded(ctx, ride, () => ride.finish(payload.endedAt));
+        const paused = engine.paused === true;
+        guarded(ctx, ride, () => ride.finish(payload.endedAt, paused));
         stopRide(ctx, engine);
       }
     });
