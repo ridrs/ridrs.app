@@ -220,7 +220,7 @@ async function loadPlan(
   try {
     token = await secrets.get(TOKEN_KEY);
   } catch (error) {
-    ctx.logger.warn({ error }, 'intervals.icu: the keychain could not be read');
+    ctx.logger.warn({ error }, 'intervals.icu: the secret store could not be read');
   }
   if (!token) {
     if (fromStart) {

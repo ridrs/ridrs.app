@@ -23,6 +23,8 @@ tauri = { version = "2.12.5", features = [] }
 tauri-plugin-blec = "0.18.0"
 ridrs-ble = { path = "../../../crates/ridrs-ble" }
 ridrs-bridge = { path = "../../../crates/ridrs-bridge" }
+# The companion id and the tokens it issued (ADR 0053).
+ridrs-secrets = { path = "../../../crates/ridrs-secrets" }
 
 # The phone scans the pairing QR code ridrs shows (mobile only).
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]

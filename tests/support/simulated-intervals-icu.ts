@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 
 /**
- * intervals.icu, the system browser and the OS keychain for the training scenarios (ADR 0048).
+ * intervals.icu, the system browser and the secret store for the training scenarios (ADR 0048).
  * The plugins see it through the capabilities `net.http`, `auth.browser-sign-in` and
  * `storage.secrets`; the steps drive the athlete's side. It answers like the real API for the
  * paths ridrs uses and rejects everything else, so a wrong request fails the scenario.

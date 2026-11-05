@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { StoredBridgePairing } from '@ridrs/contracts';
+import type { Secrets, StoredBridgePairing } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
 import { FakeIpc } from '../../packages/ble-tauri/src/testing/fake-ipc.ts';
-import { type PairingStore, TauriBridgeConnector } from './tauri-bridge-connector.ts';
+import {
+  PAIRING_SECRET,
+  type PairingStore,
+  secretPairingStore,
+  TauriBridgeConnector,
+} from './tauri-bridge-connector.ts';
 
 function memoryStore(): PairingStore {
   let pairing: StoredBridgePairing | undefined;
@@ -79,5 +84,100 @@ describe('TauriBridgeConnector', () => {
 
     expect(lists).toEqual([['Pixel 8']]);
     expect(ipc.callsOf('bridge_stop_browse')).toHaveLength(1);
+  });
+});
+
+const PAIRING: StoredBridgePairing = {
+  companionId: 'c1',
+  companionName: 'Pixel 8',
+  address: '192.168.1.5:4000',
+  token: 't0k3n',
+};
+
+function memorySecrets(failing = false): Secrets & { readonly values: Map<string, string> } {
+  const values = new Map<string, string>();
+  const check = async () => {
+    if (failing) throw new Error('store locked');
+  };
+  return {
+    values,
+    get: async (key) => (await check(), values.get(key)),
+    set: async (key, value) => {
+      await check();
+      values.set(key, value);
+    },
+    remove: async (key) => {
+      await check();
+      values.delete(key);
+    },
+  };
+}
+
+function legacyStorage(entries: Record<string, string>): Pick<Storage, 'getItem' | 'removeItem'> & {
+  readonly entries: Record<string, string>;
+} {
+  return {
+    entries,
+    getItem: (key) => entries[key] ?? null,
+    removeItem: (key) => {
+      delete entries[key];
+    },
+  };
+}
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+const quiet = () => undefined;
+
+describe('secretPairingStore', () => {
+  it('keeps the pairing, its token included, in the secret store only', async () => {
+    const secrets = memorySecrets();
+    const store = await secretPairingStore(secrets, legacyStorage({}), quiet);
+    expect(store.load()).toBeUndefined();
+    store.save(PAIRING);
+    expect(store.load()).toEqual(PAIRING);
+    await settle();
+    expect(JSON.parse(secrets.values.get(PAIRING_SECRET) ?? '')).toEqual(PAIRING);
+
+    const again = await secretPairingStore(secrets, legacyStorage({}), quiet);
+    expect(again.load()).toEqual(PAIRING);
+    again.clear();
+    await settle();
+    expect(again.load()).toBeUndefined();
+    expect(secrets.values.has(PAIRING_SECRET)).toBe(false);
+  });
+
+  it('moves a pairing out of the WebView storage once', async () => {
+    const secrets = memorySecrets();
+    const legacy = legacyStorage({ 'ridrs.bridge.pairing': JSON.stringify(PAIRING) });
+    const store = await secretPairingStore(secrets, legacy, quiet);
+    expect(store.load()).toEqual(PAIRING);
+    expect(JSON.parse(secrets.values.get(PAIRING_SECRET) ?? '')).toEqual(PAIRING);
+    expect(legacy.entries).toEqual({});
+  });
+
+  it('treats damaged data as no pairing', async () => {
+    const secrets = memorySecrets();
+    secrets.values.set(PAIRING_SECRET, '{"companionId":');
+    const legacy = legacyStorage({ 'ridrs.bridge.pairing': '{"token":1}' });
+    const store = await secretPairingStore(secrets, legacy, quiet);
+    expect(store.load()).toBeUndefined();
+    expect(legacy.entries).toEqual({});
+  });
+
+  it('starts without a pairing when the store fails, and keeps the old one where it was', async () => {
+    const legacy = legacyStorage({ 'ridrs.bridge.pairing': JSON.stringify(PAIRING) });
+    const warnings: string[] = [];
+    const store = await secretPairingStore(memorySecrets(true), legacy, (message) =>
+      warnings.push(message),
+    );
+    expect(store.load()).toEqual(PAIRING);
+    expect(Object.keys(legacy.entries)).toEqual(['ridrs.bridge.pairing']);
+    store.save(PAIRING);
+    await settle();
+    expect(warnings).toEqual([
+      'the companion pairing could not be read',
+      'the companion pairing could not move to the secret store',
+      'the companion pairing could not be saved',
+    ]);
   });
 });

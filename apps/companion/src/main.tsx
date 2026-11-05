@@ -13,7 +13,7 @@ import {
   createCompanionIpc,
   ensureBluetoothPermission,
   keepScreenOn,
-  webStoragePairingStore,
+  secretPairingStore,
 } from './platform.ts';
 
 async function main(): Promise<void> {
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
     ipc: createCompanionIpc(),
     central,
     name: companionName(),
-    pairingStore: webStoragePairingStore(),
+    pairingStore: await secretPairingStore(),
   });
   window.addEventListener('pagehide', () => {
     void companion.stop();

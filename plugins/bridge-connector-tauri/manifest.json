@@ -4,6 +4,6 @@
   "version": "0.1.0",
   "types": ["transport"],
   "provides": ["ble-bridge.connector"],
-  "requires": [],
+  "requires": ["storage.secrets"],
   "entry": "index.ts"
 }

@@ -30,7 +30,7 @@ export const storageAppFilesCapability = defineCapability<AppFiles, 'single', 's
 );
 
 /**
- * Secrets such as access tokens, in the operating system's credential store (ADR 0050). Keys are
+ * Secrets such as access tokens, kept without asking the rider (ADR 0053). Keys are
  * dotted ids (`intervals-icu.token`); values are UTF-8 text. Secrets never go into events, logs,
  * recordings or app files.
  */

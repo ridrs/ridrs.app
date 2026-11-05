@@ -5,6 +5,7 @@ import type {
   BleBridgeConnector,
   BridgeSocket,
   CompanionAdvert,
+  Secrets,
   StoredBridgePairing,
 } from '@ridrs/contracts';
 
@@ -13,7 +14,10 @@ const TAG_TEXT = 1;
 const TAG_BINARY = 2;
 const TAG_CLOSED = 3;
 
-const PAIRING_KEY = 'ridrs.bridge.pairing';
+/** The pairing's key in `storage.secrets` (ADR 0053): its token is the secret. */
+export const PAIRING_SECRET = 'bridge.pairing';
+/** Where ridrs kept the pairing before, in the WebView's local storage. */
+const LEGACY_PAIRING_KEY = 'ridrs.bridge.pairing';
 
 export interface PairingStore {
   load(): StoredBridgePairing | undefined;
@@ -33,39 +37,78 @@ function isPairing(value: Partial<StoredBridgePairing>): value is StoredBridgePa
   );
 }
 
-/** The WebView's local storage; a failing storage only means pairing again after a restart. */
-export function webStoragePairingStore(): PairingStore {
+/** Damaged data must not jam the app: it counts as no pairing, the rider pairs again. */
+function parsePairing(raw: string | null | undefined): StoredBridgePairing | undefined {
+  try {
+    const pairing = raw ? (JSON.parse(raw) as Partial<StoredBridgePairing>) : undefined;
+    return pairing && isPairing(pairing) ? pairing : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+type LegacyStorage = Pick<Storage, 'getItem' | 'removeItem'>;
+
+function webStorage(): LegacyStorage | undefined {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The pairing in `storage.secrets` (ADR 0053), read once when the plugin initializes and kept in
+ * memory; saves go to the store one after another. A pairing an older ridrs left in the WebView's
+ * local storage moves to the store once. A failing store only means pairing again after a restart.
+ */
+export async function secretPairingStore(
+  secrets: Secrets,
+  legacy: LegacyStorage | undefined = webStorage(),
+  warn: (message: string, error: unknown) => void = console.warn,
+): Promise<PairingStore> {
+  let pairing = parsePairing(
+    await secrets.get(PAIRING_SECRET).catch((error: unknown) => {
+      warn('the companion pairing could not be read', error);
+      return undefined;
+    }),
+  );
+  let legacyRaw: string | null | undefined;
+  try {
+    legacyRaw = legacy?.getItem(LEGACY_PAIRING_KEY);
+  } catch {
+    legacyRaw = undefined;
+  }
+  if (legacyRaw !== null && legacyRaw !== undefined) {
+    const moved = pairing ? undefined : parsePairing(legacyRaw);
+    try {
+      if (moved) {
+        await secrets.set(PAIRING_SECRET, JSON.stringify(moved));
+        pairing = moved;
+      }
+      legacy?.removeItem(LEGACY_PAIRING_KEY);
+    } catch (error) {
+      // Kept where it was: the next start tries again.
+      warn('the companion pairing could not move to the secret store', error);
+      pairing ??= moved;
+    }
+  }
+  let writes = Promise.resolve();
+  const enqueue = (write: () => Promise<void>): void => {
+    writes = writes
+      .then(write)
+      .catch((error: unknown) => warn('the companion pairing could not be saved', error));
+  };
   return {
-    load() {
-      try {
-        const raw = localStorage.getItem(PAIRING_KEY);
-        if (!raw) {
-          return undefined;
-        }
-        const pairing = JSON.parse(raw) as Partial<StoredBridgePairing>;
-        if (isPairing(pairing)) {
-          return pairing;
-        }
-        // Damaged data must not jam the app: forget it, the rider pairs again.
-        localStorage.removeItem(PAIRING_KEY);
-        return undefined;
-      } catch {
-        return undefined;
-      }
-    },
-    save(pairing) {
-      try {
-        localStorage.setItem(PAIRING_KEY, JSON.stringify(pairing));
-      } catch {
-        // see above
-      }
+    load: () => pairing,
+    save(next) {
+      pairing = next;
+      const value = JSON.stringify(next);
+      enqueue(() => secrets.set(PAIRING_SECRET, value));
     },
     clear() {
-      try {
-        localStorage.removeItem(PAIRING_KEY);
-      } catch {
-        // see above
-      }
+      pairing = undefined;
+      enqueue(() => secrets.remove(PAIRING_SECRET));
     },
   };
 }

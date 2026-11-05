@@ -3,9 +3,9 @@ Feature: Connecting intervals.icu
   The rider connects their intervals.icu account from the main screen (ADR 0048). ridrs opens
   intervals.icu in the system browser and receives the answer on 127.0.0.1. As a public client
   with PKCE, it sends no client secret, only the verifier of its challenge. The token goes to the
-  OS keychain and nowhere else, so a restart stays connected. Disconnecting revokes it.
+  secret store and nowhere else, so a restart stays connected. Disconnecting revokes it.
 
-  Here intervals.icu, the browser and the keychain are simulated; the simulated sign-in listens on
+  Here intervals.icu, the browser and the secret store are simulated; the simulated sign-in listens on
   port 53682.
 
   Background:
@@ -32,7 +32,7 @@ Feature: Connecting intervals.icu
     And the main panel shows "Connecting to intervals.icu…"
     When the athlete approves the sign-in
     Then the code was exchanged with the verifier of the challenge and without a client secret
-    And the keychain holds the intervals.icu token
+    And the secret store holds the intervals.icu token
     And the main panel shows "Connected as Alex Rider"
 
   Scenario: Declining the sign-in leaves the rider disconnected
@@ -42,7 +42,7 @@ Feature: Connecting intervals.icu
     And the athlete declines the sign-in
     Then the main panel shows "Sign-in cancelled"
     And the main panel offers a "Connect intervals.icu" button
-    And the keychain holds no intervals.icu token
+    And the secret store holds no intervals.icu token
 
   Scenario: An answer with a different state is rejected
     Given the host has started
@@ -51,7 +51,7 @@ Feature: Connecting intervals.icu
     And the browser returns a code with a different state
     Then no code was exchanged
     And the main panel shows "Sign-in failed"
-    And the keychain holds no intervals.icu token
+    And the secret store holds no intervals.icu token
 
   Scenario: The token stays secret
     Given the host has started
@@ -62,27 +62,27 @@ Feature: Connecting intervals.icu
     And no app file contains the intervals.icu token
 
   Scenario: A stored token connects at start without a sign-in
-    Given the keychain holds a token for intervals.icu
+    Given the secret store holds a token for intervals.icu
     When the host has started
     And the ridrs UI is shown
     Then the main panel shows "Connected as Alex Rider"
     And the browser was not opened
 
   Scenario: A rejected token asks the rider to reconnect
-    Given the keychain holds a token for intervals.icu
+    Given the secret store holds a token for intervals.icu
     And intervals.icu rejects the token
     When the host has started
     And the ridrs UI is shown
     Then the main panel offers a "Reconnect intervals.icu" button
-    And the keychain holds no intervals.icu token
+    And the secret store holds no intervals.icu token
 
   Scenario: Disconnecting revokes the token
-    Given the keychain holds a token for intervals.icu
+    Given the secret store holds a token for intervals.icu
     And the host has started
     And the ridrs UI is shown
     When I open the next workout
     And I press "Disconnect intervals.icu"
     Then intervals.icu received "DELETE /api/v1/disconnect-app" with the token
-    And the keychain holds no intervals.icu token
+    And the secret store holds no intervals.icu token
     And the "main" screen is shown
     And the main panel offers a "Connect intervals.icu" button

@@ -13,8 +13,9 @@ function checked(key: string): string {
 }
 
 /**
- * `storage.secrets` in the native app (ADR 0050): the app's `secret_*` commands keep each secret
- * in the OS credential store (macOS Keychain, Android Keystore) through keyring-core.
+ * `storage.secrets` in the native app (ADR 0053): the app's `secret_*` commands (`crates/ridrs-secrets`)
+ * keep the secrets in an encrypted app file on the desktop and in the Keystore-backed store on
+ * Android; neither asks the rider for anything.
  */
 const tauriSecrets: Secrets = {
   async get(key) {

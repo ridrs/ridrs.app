@@ -14,7 +14,7 @@ import {
 import type { RidrsWorld } from '../support/world.ts';
 import { useRealPlugins } from './devices-and-metrics.steps.ts';
 
-/** The keychain entry of ADR 0048. */
+/** The secret store entry of ADR 0048. */
 const TOKEN_KEY = 'intervals-icu.token';
 
 const simulations = new WeakMap<RidrsWorld, SimulatedIntervalsIcu>();
@@ -93,7 +93,7 @@ Given('the local time is {string}', function (this: RidrsWorld, text: string) {
   this.fakeClock.setSystemTime(localTime(date, time));
 });
 
-Given('the keychain holds a token for intervals.icu', function (this: RidrsWorld) {
+Given('the secret store holds a token for intervals.icu', function (this: RidrsWorld) {
   const simulation = intervals(this);
   simulation.secrets.set(TOKEN_KEY, simulation.token);
 });
@@ -329,12 +329,12 @@ Then(
 
 // ---- Keychain and leaks ------------------------------------------------------------------
 
-Then('the keychain holds the intervals.icu token', async function (this: RidrsWorld) {
+Then('the secret store holds the intervals.icu token', async function (this: RidrsWorld) {
   const simulation = intervals(this);
   await this.waitForIo(() => simulation.secrets.get(TOKEN_KEY) === simulation.token, 'the token');
 });
 
-Then('the keychain holds no intervals.icu token', async function (this: RidrsWorld) {
+Then('the secret store holds no intervals.icu token', async function (this: RidrsWorld) {
   await this.settle();
   assert.equal(intervals(this).secrets.has(TOKEN_KEY), false);
 });
