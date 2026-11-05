@@ -147,6 +147,49 @@ pnpm --filter @ridrs/companion tauri android build --apk --debug --target aarch6
 
 On the Android emulator, mDNS does not cross the emulator's NAT to a ridrs on the host. Run ridrs in the same emulator instead, or check a companion from the host with the probe through a forwarded port (`adb forward tcp:47000 tcp:42229`): `pnpm --filter @ridrs/companion probe <host:port> <code>` pairs like ridrs does and prints the trainer's notifications.
 
+### Release companion on an Android phone
+
+The release build (no dummy devices, not debuggable) is what riders use. Checked on a Pixel 8 over wireless debugging, 2026-11-04.
+
+1. **Environment.** The shell may have no `cargo` on the `PATH` (Homebrew `rustup` without proxies), and the Android lint step of release builds crashes on an OpenJ9 JDK (`NoClassDefFoundError ... J9VMInternals`). Use the rustup toolchain and Android Studio's JDK:
+
+   ```bash
+   export PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$PATH"
+   export ANDROID_HOME="$HOME/Library/Android/sdk"
+   export NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
+   export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+   ```
+
+   After switching `JAVA_HOME`, stop the old Gradle daemon once (`apps/companion/src-tauri/gen/android/gradlew --stop`).
+
+2. **Phone.** `adb devices -l` must list the phone as `device`. If a phone paired for wireless debugging is missing, restart adb (`adb kill-server && adb start-server`).
+
+3. **Build.**
+
+   ```bash
+   pnpm --filter @ridrs/companion tauri android build --apk --target aarch64
+   ```
+
+   The result is unsigned: `apps/companion/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk`.
+
+4. **Sign.** There is no release keystore yet; sign with the local debug keystore. This is the same key as debug builds, so the APK replaces an installed debug companion in place (with a different key, `adb uninstall org.ridrs.companion` first, which drops the pairing). It is not a key to publish with.
+
+   ```bash
+   cd apps/companion/src-tauri/gen/android/app/build/outputs/apk/universal/release
+   "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks ~/.android/debug.keystore \
+     --ks-pass pass:android --ks-key-alias androiddebugkey \
+     --out app-universal-release.apk app-universal-release-unsigned.apk
+   ```
+
+5. **Install and launch.**
+
+   ```bash
+   adb install -r app-universal-release.apk
+   adb shell monkey -p org.ridrs.companion -c android.intent.category.LAUNCHER 1
+   ```
+
+   Check that it runs: `adb shell pidof org.ridrs.companion` prints a pid, `adb logcat -d -b crash` stays empty, and `adb exec-out screencap -p > companion.png` shows the companion screen.
+
 ## Recording, replay and FIT export
 
 Every ride is recorded from "Start ride" to "Finish ride": every event, every diagnostic and the raw device bytes, with a minute of pre-roll and a configuration snapshot. After "Finish ride" the main screen shows **Ride saved** with the distance, the duration and the file names. Each ride is also exported as a FIT activity file. Recording is always on.

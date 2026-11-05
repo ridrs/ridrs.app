@@ -21,3 +21,9 @@ Do not introduce or change licenses without maintainer approval.
 10. **Rendering reads, never drives.** Rendering never writes simulation state directly; frame rate never changes physics results except through input timing. A UI plugin may act as a sensor: it delivers world data as an external input through a driver, like a device.
 11. **Layers.** Sensors → drivers → interpolation layer (`@ridrs/temporal`, `@ridrs/spatial`) → physics. Physics plugins read input data only through readers; they subscribe to lifecycle events (`activity.*`) only, never to data events.
 12. **Keyboard and remote first.** Every user interface is fully usable with the arrow keys, Enter and Back (Escape, Backspace or the platform back button) alone: arrows move the focus, Enter activates, Back leaves the current view. The focused element is always clearly visible, and no element looks focused or selected unless it is.
+
+## Building and Installing the Apps
+
+How to build the release companion and install and launch it on an Android phone over `adb`, including the local environment pitfalls (no `cargo` on the `PATH`, OpenJ9 JDK, signing): [README, "Release companion on an Android phone"](README.md#release-companion-on-an-android-phone).
+
+The native app on the Mac runs only from the repository root with `pnpm --filter @ridrs/native tauri dev`, in a terminal or in the background: it shows up as `ridrs-native`, with the current code and hot reload. Never open a bundled `ridrs.app` (`apps/native/src-tauri/target/{debug,release}/bundle/macos/`, also found by Spotlight and `open -a ridrs`): it holds the code of its last `tauri build`. Changes to the UI and TypeScript reach a running `tauri dev` by themselves; Rust changes rebuild and restart it.
