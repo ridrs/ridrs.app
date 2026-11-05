@@ -21,6 +21,8 @@ interface Registry {
   readonly lastNames: Map<DeviceKind, string>;
   /** Per kind, the links each device plugin scans over: several plugins may look for a kind. */
   readonly scans: Map<DeviceKind, Map<string, readonly BleRoute[]>>;
+  /** Until it starts, the registry only collects: `start` publishes the whole picture. */
+  started: boolean;
 }
 
 /** The links over which any device plugin looks for the kind, each once, in the order named. */
@@ -31,7 +33,11 @@ function scanning(scans: Registry['scans'], kind: DeviceKind): BleRoute[] | unde
 
 const registries = new WeakMap<PluginContext, Registry>();
 
-function publish(ctx: PluginContext, { byKind, candidates, lastNames, scans }: Registry): void {
+function publish(ctx: PluginContext, registry: Registry): void {
+  const { byKind, candidates, lastNames, scans, started } = registry;
+  if (!started) {
+    return;
+  }
   const devices = deviceKindSchema.options.flatMap((kind) => {
     const status = byKind.get(kind);
     const found = candidates.get(kind);
@@ -65,6 +71,7 @@ export default definePlugin({
       candidates: new Map(),
       lastNames: new Map(),
       scans: new Map(),
+      started: false,
     };
     registries.set(ctx, registry);
     const { byKind } = registry;
@@ -110,6 +117,7 @@ export default definePlugin({
   start(ctx) {
     const registry = registries.get(ctx);
     if (registry) {
+      registry.started = true;
       publish(ctx, registry);
     }
   },
