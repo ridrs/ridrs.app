@@ -49,6 +49,12 @@ function takesAdvertisingData(protocol: string): boolean {
   return theirs !== null && semver.gte(theirs, '1.2.0');
 }
 
+/** `vanished` came with 1.4: an older client rejects it. */
+function takesVanished(protocol: string): boolean {
+  const theirs = semver.parse(protocol);
+  return theirs !== null && semver.gte(theirs, '1.4.0');
+}
+
 function isCompatible(protocol: string): boolean {
   const ours = semver.parse(BLE_BRIDGE_PROTOCOL_VERSION);
   const theirs = semver.parse(protocol);
@@ -139,6 +145,7 @@ class ClientSession {
     const abort = new AbortController();
     this.scans.set(requestId, abort);
     const advertising = takesAdvertisingData(this.protocol);
+    const vanishing = takesVanished(this.protocol);
     try {
       for await (const peripheral of this.options.central.scan({
         serviceUuids,
@@ -146,6 +153,16 @@ class ClientSession {
       })) {
         if (this.closed) {
           break;
+        }
+        if (peripheral.vanished) {
+          if (vanishing) {
+            sendMessage(this.socket, {
+              type: 'vanished',
+              requestId,
+              peripheralId: peripheral.peripheralId,
+            });
+          }
+          continue;
         }
         sendMessage(this.socket, {
           type: 'discovered',

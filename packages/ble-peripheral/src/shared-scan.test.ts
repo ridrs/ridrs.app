@@ -244,4 +244,32 @@ describe('SharedBleScan', () => {
       [{ '0157': 'aa02' }, { fe95: '01' }],
     ]);
   });
+
+  it('reports a device still heard again once its report interval has passed', async () => {
+    let advertise: ((p: BleDiscoveredPeripheral) => void) | undefined;
+    let now = 0;
+    const scans = new SharedBleScan(
+      async (_services, onDiscovered) => {
+        advertise = onDiscovered;
+        return { stop: async () => undefined };
+      },
+      () => now,
+    );
+    const controller = new AbortController();
+    const seen: number[] = [];
+    const done = (async () => {
+      for await (const _ of scans.scan({ serviceUuids: ['180d'], signal: controller.signal })) {
+        seen.push(now);
+      }
+    })();
+    await flush();
+    for (const at of [0, 1000, 4999, 5000, 9000, 10_000]) {
+      now = at;
+      advertise?.({ peripheralId: 'hrm', name: 'HRM', serviceUuids: ['180d'] });
+      await flush();
+    }
+    controller.abort();
+    await done;
+    expect(seen).toEqual([0, 5000, 10_000]);
+  });
 });

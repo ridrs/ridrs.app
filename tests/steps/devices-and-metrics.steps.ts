@@ -821,3 +821,13 @@ Then(
     assert.deepEqual(named, [], `"${pluginId}" connected to "${name}"`);
   },
 );
+
+Given(
+  'the heart-rate sensor {string} has a battery at {int} %',
+  async function (this: RidrsWorld, name: string, level: number) {
+    const sensor = simulator(this).getPeripheralByName(name);
+    assert.ok(sensor, `Expected a heart-rate sensor "${name}"`);
+    sensor.setBatteryLevel(level);
+    await this.settle();
+  },
+);

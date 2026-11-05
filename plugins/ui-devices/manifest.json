@@ -31,8 +31,8 @@
       "subscribe": [
         "device.status-changed",
         "activity.state-changed",
-        "measurement.power",
-        "measurement.heart-rate",
+        "metric.power",
+        "metric.heart-rate",
         "controller.buttons-changed",
         "bridge.state-changed",
         "trainer.control-changed"

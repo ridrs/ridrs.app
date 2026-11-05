@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  BLE_SCAN_REPORT_INTERVAL_MS,
   type BleDiscoveredPeripheral,
   type BleScanOptions,
   normalizeBleUuid,
@@ -54,16 +55,26 @@ interface Reported {
   readonly named: boolean;
   /** Its advertising data as reported: a key's bytes, or `changing` once a change was. */
   readonly advertised: Advertised;
+  /** When it was reported. */
+  readonly at: number;
 }
 
 /**
  * A device not reported yet, one reported without a name that now has one, one whose signal
  * moved by a step since it was reported, or one whose advertising data has a key not reported
- * yet or bytes of a key that changed for the first time.
+ * yet or bytes of a key that changed for the first time; and every device heard again once its
+ * report interval has passed.
  */
-function news(seen: ReadonlyMap<string, Reported>, p: BleDiscoveredPeripheral): boolean {
+function news(
+  seen: ReadonlyMap<string, Reported>,
+  p: BleDiscoveredPeripheral,
+  now: number,
+): boolean {
   const last = seen.get(p.peripheralId);
   if (!last || (!last.named && p.name !== '')) {
+    return true;
+  }
+  if (now - last.at >= BLE_SCAN_REPORT_INTERVAL_MS) {
     return true;
   }
   if (advertisesNews(last.advertised, p)) {
@@ -84,7 +95,8 @@ function covers(running: readonly string[], wanted: readonly string[]): boolean 
  * plugin scans for its own service). One native scan covers the union of the requested services
  * and is stopped when the last consumer is done; each consumer sees its own services, once each,
  * and again once a device's name arrives, its signal strength moved by 5 dB or more, its
- * advertising data brings a new key, or the bytes of a key change for the first time.
+ * advertising data brings a new key, or the bytes of a key change for the first time; a device
+ * still heard is reported again every `BLE_SCAN_REPORT_INTERVAL_MS`.
  */
 export class SharedBleScan {
   private readonly sessions = new Set<ScanSession>();
@@ -94,7 +106,10 @@ export class SharedBleScan {
   /** Work in flight that needs the platform's Bluetooth to itself: no native scan meanwhile. */
   private pauses = 0;
 
-  constructor(private readonly startNative: StartNativeScan) {}
+  constructor(
+    private readonly startNative: StartNativeScan,
+    private readonly now: () => number = () => Date.now(),
+  ) {}
 
   async *scan(options: BleScanOptions): AsyncIterable<BleDiscoveredPeripheral> {
     const { signal } = options;
@@ -155,10 +170,11 @@ export class SharedBleScan {
 
   private dispatch(peripheral: BleDiscoveredPeripheral): void {
     const services = peripheral.serviceUuids.map(normalizeBleUuid);
+    const now = this.now();
     for (const session of this.sessions) {
       const wanted =
         session.services.size === 0 || services.some((uuid) => session.services.has(uuid));
-      if (session.done || !wanted || !news(session.seen, peripheral)) {
+      if (session.done || !wanted || !news(session.seen, peripheral, now)) {
         continue;
       }
       const last = session.seen.get(peripheral.peripheralId);
@@ -166,6 +182,7 @@ export class SharedBleScan {
         rssi: peripheral.rssi,
         named: peripheral.name !== '' || last?.named === true,
         advertised: advertisedAfter(last?.advertised, peripheral),
+        at: now,
       });
       session.queue.push({ ...peripheral, serviceUuids: services });
       session.wake?.();

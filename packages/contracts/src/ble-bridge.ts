@@ -14,9 +14,10 @@ import { defineEvent } from './events.ts';
  * Wire protocol version; a companion accepts clients within the same major version.
  * 1.1: `write` / `written`. 1.2: `rssi`, `manufacturerData` and `serviceData` in `discovered`,
  * sent only to a client of 1.2 or later. 1.3: `withResponse` in `write`, `read` / `read-result`
- * (ADR 0052); ridrs sends them only to a companion of 1.3 or later.
+ * (ADR 0052); ridrs sends them only to a companion of 1.3 or later. 1.4: `vanished`, sent only to
+ * a client of 1.4 or later.
  */
-export const BLE_BRIDGE_PROTOCOL_VERSION = '1.3.0';
+export const BLE_BRIDGE_PROTOCOL_VERSION = '1.4.0';
 
 /** The first protocol with `withResponse` in `write` and with `read`. */
 export const BLE_BRIDGE_READ_PROTOCOL_VERSION = '1.3.0';
@@ -101,6 +102,8 @@ export const bridgeMessageSchema = z.discriminatedUnion('type', [
       serviceData: z.record(z.string(), z.string()).optional(),
     })
     .strict(),
+  /** From 1.4: a device the scan reported is gone (a removed dummy device). */
+  z.object({ type: z.literal('vanished'), requestId, peripheralId: z.string().min(1) }).strict(),
   z.object({ type: z.literal('connect'), requestId, peripheralId: z.string().min(1) }).strict(),
   z.object({ type: z.literal('connected'), requestId, peripheralId: z.string().min(1) }).strict(),
   z.object({ type: z.literal('disconnect'), requestId, peripheralId: z.string().min(1) }).strict(),

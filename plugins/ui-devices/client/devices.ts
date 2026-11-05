@@ -29,11 +29,14 @@ export interface DeviceRow {
   readonly candidates: readonly DeviceCandidate[];
   /** The links over which ridrs looks for devices of the kind now; empty: it looks for none. */
   readonly scanning: readonly BleRoute[];
-  /** How many more devices of the kind were found: the row says so, the details list them. */
+  /**
+   * How many more devices of the kind were found, a device seen over both links once: the row
+   * says so, the details list them.
+   */
   readonly more: number;
   /**
    * While the kind searches without a device: how many devices of the kind were found, a
-   * forgotten one too. It takes the place of `more`.
+   * forgotten one too, a device seen over both links once. It takes the place of `more`.
    */
   readonly found: number;
   /** Long name for the setup rows. */
@@ -52,6 +55,8 @@ export interface DeviceRow {
   readonly state: DeviceConnectionState | 'none';
   readonly status: string;
   readonly tone: Tone;
+  /** The battery level of the device in percent, once it told it. */
+  readonly battery?: number;
   /** Buttons held down on the connected controller: they take the place of the check. */
   readonly held?: readonly ControllerButton[];
 }
@@ -137,11 +142,8 @@ const STATES: Record<DeviceRow['state'], { status: string; tone: Tone; tip?: str
   },
   connecting: { status: 'Connecting…', tone: 'busy' },
   connected: { status: 'Connected', tone: 'ok' },
-  reconnecting: {
-    status: 'Reconnecting…',
-    tone: 'busy',
-    tip: 'Connection lost; ridrs keeps trying.',
-  },
+  // "Reconnecting…" says it all: no tip.
+  reconnecting: { status: 'Reconnecting…', tone: 'busy' },
   disconnected: { status: 'Disconnected', tone: 'warn' },
 };
 
@@ -189,11 +191,16 @@ function row(kind: RowKind, device: DeviceStatus | undefined, readings: Readings
     deviceId: device?.deviceId ?? '',
     deviceName: device?.deviceName ?? '',
     ...(device?.route ? { route: device.route } : {}),
+    ...(device?.battery === undefined ? {} : { battery: device.battery }),
     candidates,
     scanning: device?.scanning ?? [],
+    // A device seen over both links counts once.
     more:
-      own && !searching ? candidates.filter((c) => c.deviceId !== device?.deviceId).length : 0,
-    found: own && searching ? candidates.length : 0,
+      own && !searching
+        ? byDevice(candidates).filter((g) => !g.some((c) => c.deviceId === device?.deviceId))
+            .length
+        : 0,
+    found: own && searching ? byDevice(candidates).length : 0,
     title: KINDS[kind].title,
     label: KINDS[kind].label,
     detail: device?.deviceName || device?.lastDeviceName || KINDS[kind].examples,
@@ -341,11 +348,8 @@ const BRIDGE_STATES: Record<BridgeState, { status: string; tone: Tone; tip?: str
   unpaired: { status: 'Not connected', tone: 'none' },
   connecting: { status: 'Connecting…', tone: 'busy' },
   connected: { status: 'Connected', tone: 'ok' },
-  reconnecting: {
-    status: 'Reconnecting…',
-    tone: 'busy',
-    tip: 'Connection lost; ridrs keeps trying.',
-  },
+  // "Reconnecting…" says it all: no tip.
+  reconnecting: { status: 'Reconnecting…', tone: 'busy' },
   unreachable: { status: 'Not reachable', tone: 'warn' },
   disconnected: { status: 'Disconnected', tone: 'warn' },
   rejected: { status: 'Pairing failed', tone: 'warn', tip: 'Check the code on the phone.' },

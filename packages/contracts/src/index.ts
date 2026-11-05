@@ -17,6 +17,9 @@ export {
   type BrowserSignInResult,
 } from './auth.ts';
 export {
+  BATTERY_LEVEL_CHARACTERISTIC_UUID,
+  BATTERY_SERVICE_UUID,
+  BLE_SCAN_REPORT_INTERVAL_MS,
   type BleAdvertisedData,
   type BleCentral,
   type BleCharacteristicTarget,
@@ -113,6 +116,7 @@ export {
   type DeviceStatus,
   type DeviceStatusChangedPayload,
   defineEvent,
+  deviceBatteryChangedEvent,
   deviceCandidateSchema,
   deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
@@ -319,13 +323,13 @@ export type {
 } from './temporal.ts';
 export {
   type DrivetrainGearChangedPayload,
+  type DrivetrainShiftRequestedPayload,
   drivetrainGearChangedEvent,
+  drivetrainShiftRequestedEvent,
   drivetrainVirtualGearCapability,
   type TrainerCommand,
   type TrainerCommandPayload,
-  type DrivetrainShiftRequestedPayload,
   type TrainerControl,
-  drivetrainShiftRequestedEvent,
   type TrainerControlChangedPayload,
   type TrainerErgRequestedPayload,
   type TrainerMode,

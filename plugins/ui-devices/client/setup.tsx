@@ -408,27 +408,50 @@ function Tip({ tip }: { readonly tip: string }) {
   );
 }
 
-/** The card's top line: laid out like a device found, its status where the link's chevron is. */
+/**
+ * The card's top: the icon, the device and how it is linked (the link's icon, its signal and its
+ * battery) on the first line; its status below the name.
+ */
 const CARD_HEADER = {
   display: 'grid',
-  gridTemplateColumns: ROW.gridTemplateColumns,
+  gridTemplateColumns: '44px minmax(0, 1fr) auto',
   alignItems: 'center',
-  gap: ROW.gap,
+  columnGap: ROW.gap,
+  rowGap: 4,
   padding: ROW.padding,
+} as const;
+
+/** The card's top right: the link's icon, the signal and the battery side by side. */
+const CARD_META = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 14,
+  justifySelf: 'end',
+  color: COLORS.muted,
+  fontSize: 13,
+} as const;
+
+/** The card's second line: the status. */
+const CARD_STATUS = {
+  gridColumn: '2 / span 2',
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  columnGap: 12,
+  rowGap: 4,
 } as const;
 
 /**
  * A row's current device: one card in place of the rows, with no box inside; the page above it
- * names the kind. On top the device as a device found shows it: its icon and name, a line with
- * how it is linked, the link's icon and signal, and its status as its row has it, with the check
- * and the reading. Below, the facts the top does not show, a tip while there is something to do,
+ * names the kind. On top its icon, its name, the link's icon, the signal and the battery; below the
+ * name its status as its row has it, with the check and the reading. Below, the facts the top does not show, a tip while there is something to do,
  * and the actions.
  */
 function DetailsCard({
   icon,
   device,
-  line,
   found,
+  battery,
   status,
   warnIcon = true,
   facts = [],
@@ -438,42 +461,48 @@ function DetailsCard({
   readonly icon: ReactNode;
   /** The device, or what kind of device would fit: the kind is the page's heading. */
   readonly device: string;
-  readonly line?: string | undefined;
   /** The device as its link sees it: the link's icon and the signal. */
   readonly found?: DeviceCandidate | undefined;
+  /** The battery level in percent, when the device told it. */
+  readonly battery?: number | undefined;
   readonly status: StatusView;
   readonly warnIcon?: boolean;
   readonly facts?: readonly Fact[];
   readonly tip?: string | undefined;
   readonly children: ReactNode;
 }) {
+  const meta = found !== undefined || battery !== undefined;
   return (
     <section aria-label={device} data-testid="details-card" style={PANEL}>
       <header data-testid="card-header" style={CARD_HEADER}>
-        <span style={{ display: 'flex', justifyContent: 'center', color: COLORS.cyan }}>
+        <span
+          style={{
+            gridRow: '1 / span 2',
+            display: 'flex',
+            justifyContent: 'center',
+            color: COLORS.cyan,
+          }}
+        >
           {icon}
         </span>
-        <span style={{ minWidth: 0 }}>
-          <h2
-            data-testid="details-device"
-            style={{ ...ROW_TITLE, display: 'block', margin: 0, fontWeight: 700 }}
-          >
-            {device}
-          </h2>
-          {line && (
-            <small
-              data-testid="card-line"
-              style={{ display: 'block', color: COLORS.muted, fontSize: 13 }}
-            >
-              {line}
-            </small>
-          )}
-        </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-          {found && <LinksAndSignal found={found} />}
+        <h2
+          data-testid="details-device"
+          title={device}
+          style={{ ...ROW_TITLE, display: 'block', margin: 0, fontWeight: 700 }}
+        >
+          {device}
+        </h2>
+        {meta ? (
+          <span style={CARD_META}>
+            {found && <LinksAndSignal found={found} />}
+            {battery !== undefined && <Battery level={battery} />}
+          </span>
+        ) : (
+          <span aria-hidden />
+        )}
+        <span style={CARD_STATUS}>
           <Status row={status} testId="card-status" warnIcon={warnIcon} />
         </span>
-        <span aria-hidden />
       </header>
       <div style={{ display: 'grid', gap: 16, padding: '4px 14px 16px' }}>
         {facts.length > 0 && <Facts facts={facts} />}
@@ -494,7 +523,7 @@ const REMOVE = { ...BUTTON, ...ICON_BUTTON, borderColor: COLORS.red, color: COLO
 
 const LINK_NAMES: Record<BleRoute, string> = { local: 'Direct', companion: 'Companion' };
 
-/** How the card's line names the link that carries the device. */
+/** How Switch to names the link. */
 const OVER: Record<BleRoute, string> = { local: 'Bluetooth', companion: 'companion' };
 
 /** The signal of a device found: four bars, as phones show them, the strong ones lit. */
@@ -520,6 +549,55 @@ function Signal({ rssi }: { readonly rssi: number }) {
           }}
         />
       ))}
+    </span>
+  );
+}
+
+/** The battery level: a battery filled to the level, and the level in percent. */
+function Battery({ level }: { readonly level: number }) {
+  const name = `Battery ${level} %`;
+  const low = level <= 20;
+  return (
+    <span
+      role="img"
+      aria-label={name}
+      title={name}
+      data-testid="card-battery"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: COLORS.muted }}
+    >
+      <span
+        aria-hidden
+        style={{
+          position: 'relative',
+          width: 20,
+          height: 10,
+          border: `1.5px solid ${low ? COLORS.red : COLORS.muted}`,
+          borderRadius: 2,
+          flex: 'none',
+        }}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            inset: 1,
+            width: `calc((100% - 2px) * ${level / 100})`,
+            background: low ? COLORS.red : COLORS.cyan,
+            borderRadius: 1,
+          }}
+        />
+        <span
+          style={{
+            position: 'absolute',
+            right: -4,
+            top: 2,
+            width: 2,
+            height: 4,
+            background: low ? COLORS.red : COLORS.muted,
+            borderRadius: 1,
+          }}
+        />
+      </span>
+      <span aria-hidden style={{ fontSize: 13, fontStyle: 'normal' }}>{`${level} %`}</span>
     </span>
   );
 }
@@ -678,8 +756,14 @@ function FoundGroup({
 /** States in which the device is held or tried: Remove ends that. */
 const HELD = new Set(['connecting', 'connected', 'reconnecting']);
 
-/** How ridrs controls the trainer, in a word or two: facts only (ADR 0056). */
-function controlFact(control: TrainerControlChangedPayload): Fact {
+/**
+ * How ridrs controls the trainer, in a word or two: facts only (ADR 0056). A trainer ridrs cannot
+ * control says nothing about control.
+ */
+function controlFact(control: TrainerControlChangedPayload): Fact | undefined {
+  if (control.control === 'unsupported') {
+    return undefined;
+  }
   const value =
     control.mode === 'erg'
       ? `ERG ${control.targetPower ?? ''} W`
@@ -687,17 +771,9 @@ function controlFact(control: TrainerControlChangedPayload): Fact {
         ? control.mode === 'simulation'
           ? 'simulation'
           : 'ready'
-        : control.control === 'unsupported'
-          ? 'not supported'
-          : control.control;
+        : control.control;
   const tone: Tone =
-    control.control === 'granted'
-      ? 'ok'
-      : control.control === 'requested'
-        ? 'busy'
-        : control.control === 'unsupported'
-          ? 'none'
-          : 'warn';
+    control.control === 'granted' ? 'ok' : control.control === 'requested' ? 'busy' : 'warn';
   return { icon: 'status', term: 'Control', value, tone };
 }
 
@@ -728,13 +804,14 @@ function DeviceDetails({
   readonly row: DeviceRow;
   /** Whether ridrs is connected to the companion: nothing connects with it before. */
   readonly companion: boolean;
-  /** Connect and Remove close the details: the row shows how it goes. */
+  /** Remove closes the details at once, Connect once the device asked for is connected. */
   readonly onClose: () => void;
 }) {
   const kind = row.deviceKind;
   const known = row.deviceId !== '';
   const route = row.route ?? 'local';
   const control = useTrainerControl(ctx, row.deviceId, kind);
+  const controlled = control && row.state === 'connected' ? controlFact(control) : undefined;
   // The signal of the device itself, as the devices found show theirs.
   const signal = row.candidates.find((c) => c.deviceId === row.deviceId)?.rssi;
   const reconnect = row.state === 'disconnected' && (route === 'local' || companion);
@@ -749,9 +826,16 @@ function DeviceDetails({
   const itself = (c: DeviceCandidate) => known && c.sameDeviceAs === row.deviceId;
   const links = kind === 'controller' ? [] : others.filter(itself);
   const groups = kind === 'controller' ? [] : byDevice(others.filter((c) => !itself(c)));
+  // The device the rider asked to connect: the details show how it goes and close once it is.
+  const [awaited, setAwaited] = useState<string>();
+  useEffect(() => {
+    if (awaited !== undefined && row.deviceId === awaited && row.state === 'connected') {
+      onClose();
+    }
+  }, [awaited, row.deviceId, row.state, onClose]);
   const connect = (deviceId: string) => {
     ctx.events.publish(deviceConnectRequestedEvent, { kind, deviceId });
-    onClose();
+    setAwaited(deviceId);
   };
   return (
     <div style={{ display: 'grid', gap: 10 }}>
@@ -760,22 +844,24 @@ function DeviceDetails({
         <DetailsCard
           icon={<KindIcon kind={row.kind} />}
           device={row.detail}
-          // The power row shows the trainer: the page names the power meter, the line the trainer.
-          line={row.kind !== kind ? `${row.type} over ${OVER[route]}` : `Over ${OVER[route]}`}
           found={{
             deviceId: row.deviceId,
             deviceName: row.deviceName,
             routes: [route],
             ...(signal === undefined ? {} : { rssi: signal }),
           }}
+          // The level a device told before it was lost may be long gone: shown while connected.
+          battery={row.state === 'connected' ? row.battery : undefined}
           status={row}
-          facts={control && row.state === 'connected' ? [controlFact(control)] : []}
+          facts={controlled ? [controlled] : []}
           tip={row.tip}
         >
           {(HELD.has(row.state) || reconnect || links.length > 0) && (
             <div style={ACTIONS}>
+              {/* Own keys: Connect never turns into Remove under the focus while it connects. */}
               {HELD.has(row.state) ? (
                 <button
+                  key="remove"
                   type="button"
                   style={REMOVE}
                   onClick={() => {
@@ -788,7 +874,12 @@ function DeviceDetails({
                 </button>
               ) : (
                 reconnect && (
-                  <button type="button" style={BUTTON} onClick={() => connect(row.deviceId)}>
+                  <button
+                    key="connect"
+                    type="button"
+                    style={BUTTON}
+                    onClick={() => connect(row.deviceId)}
+                  >
                     Connect {connectWith(route)}
                   </button>
                 )
@@ -853,10 +944,16 @@ function CompanionDetails({
 }: {
   readonly ctx: UiContext;
   readonly companion: CompanionRow;
-  /** Connect closes the details, as for a device. */
+  /** Connect closes the details once the companion is connected, as for a device. */
   readonly onClose: () => void;
 }) {
   const pairing = useRef<HTMLDivElement>(null);
+  const [awaited, setAwaited] = useState(false);
+  useEffect(() => {
+    if (awaited && companion.state === 'connected') {
+      onClose();
+    }
+  }, [awaited, companion.state, onClose]);
   useEffect(() => (pairing.current ? ctx.slot(PAIRING_SLOT, pairing.current) : undefined), [ctx]);
   const paired = companion.state !== 'unpaired' && companion.state !== 'rejected';
   const facts: Fact[] = companion.reason
@@ -881,7 +978,7 @@ function CompanionDetails({
               style={BUTTON}
               onClick={() => {
                 ctx.events.publish(bridgeConnectRequestedEvent, {});
-                onClose();
+                setAwaited(true);
               }}
             >
               {companion.state === 'unreachable' ? 'Try again' : 'Connect'}

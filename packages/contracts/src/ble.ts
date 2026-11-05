@@ -29,6 +29,12 @@ export const SUPPORTED_POWER_RANGE_CHARACTERISTIC_UUID = '2ad8';
  */
 export const FITNESS_MACHINE_CONTROL_POINT_CHARACTERISTIC_UUID = '2ad9';
 
+/** Canonical 16-bit UUID for the Bluetooth Battery Service (0x180F). */
+export const BATTERY_SERVICE_UUID = '180f';
+
+/** Canonical 16-bit UUID for the Battery Level characteristic (0x2A19): one byte, 0 to 100 %. */
+export const BATTERY_LEVEL_CHARACTERISTIC_UUID = '2a19';
+
 /** Canonical 16-bit UUID for the Bluetooth Heart Rate Service (0x180D). */
 export const HEART_RATE_SERVICE_UUID = '180d';
 
@@ -81,7 +87,19 @@ export interface BleDiscoveredPeripheral {
   readonly manufacturerData?: BleAdvertisedData;
   /** Service data: the normalized service UUID → its bytes. Absent when the device sends none. */
   readonly serviceData?: BleAdvertisedData;
+  /**
+   * The device is gone, reported once by a scan that knows it (a removed dummy device): it is
+   * not heard again unless it comes back. Platform Bluetooth never knows; its devices just fall
+   * silent.
+   */
+  readonly vanished?: boolean;
 }
+
+/**
+ * A scan reports every device it still hears at least this often, news or not: a device not
+ * reported for a while has fallen silent.
+ */
+export const BLE_SCAN_REPORT_INTERVAL_MS = 5000;
 
 /** Manufacturer data as the platforms report it: the company id as a number. */
 export function hexByCompany(

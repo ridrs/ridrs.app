@@ -67,5 +67,5 @@ Every byte string of the brief was checked against this; `05 b4 00` for 180 W is
 
 ## Consequences
 
-- The device details show the control in one line ("Control: simulation", "ERG 150 W", "not supported", "refused", "lost").
+- The device details show the control in one line ("Control: simulation", "ERG 150 W", "refused", "lost"); a trainer ridrs cannot control shows none.
 - A trainer without a control point, a lost control or a refused command leaves the ride running as before.

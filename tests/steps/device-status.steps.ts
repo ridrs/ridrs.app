@@ -95,6 +95,9 @@ function pluginContext(world: RidrsWorld, pluginId: string): PluginContext {
 }
 
 /** The test device measures as the device it reported for that kind (`<kind>-1`). */
+/** When each world measured last: on a clock that stands still, measurements still follow. */
+const lastMeasuredAt = new WeakMap<RidrsWorld, number>();
+
 async function measure(
   world: RidrsWorld,
   event: EventDefinition<MeasurementPayload>,
@@ -102,7 +105,12 @@ async function measure(
   value: number,
 ): Promise<void> {
   const ctx = pluginContext(world, 'test-device');
-  const now = ctx.clock.now();
+  // A device never measures twice at once: the metrics drop a duplicate.
+  const now = Math.max(
+    ctx.clock.now(),
+    (lastMeasuredAt.get(world) ?? Number.NEGATIVE_INFINITY) + 1,
+  );
+  lastMeasuredAt.set(world, now);
   ctx.inputs.accept(event, {
     deviceId,
     value,

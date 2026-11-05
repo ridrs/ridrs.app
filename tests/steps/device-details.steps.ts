@@ -10,8 +10,10 @@ import {
   type DeviceConnectionChangedPayload,
   type DeviceStatus,
   type DeviceStatusChangedPayload,
+  deviceBatteryChangedEvent,
   deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
+  deviceConnectionStateSchema,
   deviceConnectRequestedEvent,
   deviceDiscoveryRequestedEvent,
   deviceForgetRequestedEvent,
@@ -434,24 +436,18 @@ Then('the top right of the details says {string}', async function (this: RidrsWo
   });
 });
 
-Then(
-  'the details card shows the line {string} and the links {string}',
-  async function (this: RidrsWorld, line: string, links: string) {
-    await waitFor(async () => {
-      const header = await cardHeader(this);
-      assert.deepEqual(
-        [
-          within(header).getByTestId('card-line').textContent,
-          within(header)
-            .queryAllByTestId('found-link')
-            .map((icon) => icon.getAttribute('aria-label'))
-            .join(', '),
-        ],
-        [line, links],
-      );
-    });
-  },
-);
+Then('the details card shows the links {string}', async function (this: RidrsWorld, links) {
+  await waitFor(async () => {
+    const header = await cardHeader(this);
+    assert.equal(
+      within(header)
+        .queryAllByTestId('found-link')
+        .map((icon) => icon.getAttribute('aria-label'))
+        .join(', '),
+      links,
+    );
+  });
+});
 
 Then('the details card shows the signal {string}', async function (this: RidrsWorld, signal) {
   await waitFor(async () => {
@@ -733,6 +729,31 @@ Then(
   },
 );
 
+Then('the device details stay open', async function (this: RidrsWorld) {
+  await this.settle();
+  assert.ok(within(ui(this)).queryByTestId('details-bar') !== null, 'The details are closed');
+});
+
+When(
+  '{string} reports its {string} {string} with the id {string} as {string}',
+  async function (
+    this: RidrsWorld,
+    pluginId: string,
+    kind: string,
+    name: string,
+    deviceId: string,
+    state: string,
+  ) {
+    pluginContext(this, pluginId).inputs.accept(deviceConnectionChangedEvent, {
+      deviceId,
+      deviceName: name,
+      kind: deviceKindSchema.parse(kind),
+      state: deviceConnectionStateSchema.parse(state),
+    });
+    await this.settle();
+  },
+);
+
 Then('the device details are closed', async function (this: RidrsWorld) {
   await waitFor(() => {
     // Not assert.equal: its diff of a DOM element against null takes minutes.
@@ -743,4 +764,39 @@ Then('the device details are closed', async function (this: RidrsWorld) {
 
 Then('the rider asked to connect the companion', async function (this: RidrsWorld) {
   await waitFor(() => assert.equal(asked(this, bridgeConnectRequestedEvent).length, 1));
+});
+
+Given(
+  '{string} reported the battery of its {string} at {int} %',
+  async function (this: RidrsWorld, pluginId: string, kind: string, level: number) {
+    pluginContext(this, pluginId).inputs.accept(deviceBatteryChangedEvent, {
+      deviceId: `${kind}-1`,
+      kind: deviceKindSchema.parse(kind),
+      level,
+    });
+    await this.settle();
+  },
+);
+
+Then('the details card shows the battery {string}', async function (this: RidrsWorld, battery) {
+  await waitFor(async () => {
+    const header = await cardHeader(this);
+    assert.equal(within(header).getByTestId('card-battery').getAttribute('aria-label'), battery);
+  });
+});
+
+Then('the details card shows no battery', async function (this: RidrsWorld) {
+  const header = await cardHeader(this);
+  assert.equal(within(header).queryByTestId('card-battery'), null);
+});
+
+Then(
+  'the device status gives the {string} a battery of {int} %',
+  function (this: RidrsWorld, kind: string, level: number) {
+    assert.equal(statusOf(this, kind).battery, level);
+  },
+);
+
+Then('the device status gives the {string} no battery level', function (this: RidrsWorld, kind) {
+  assert.equal(statusOf(this, kind).battery, undefined);
 });

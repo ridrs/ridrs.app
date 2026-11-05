@@ -6,7 +6,8 @@ Feature: Using the UI with arrow keys, Enter and Back
   order, Enter activates the focused one, and Back (Escape, Backspace, or the platform's back
   button) goes to the screen, which decides what it means. In a text field the caret keeps the
   left and right arrows and Backspace deletes. The arrows never start over at the top by surprise:
-  when the focused control disappears, the next arrow goes on from its place.
+  when the focused control disappears, the next arrow goes on from its place, and a control never
+  turns into another one under the focus.
 
   A headless DOM has no default actions, so "I press Enter" clicks the focused button the way a
   browser does; the step checks that the focus is on a real button.
@@ -92,3 +93,13 @@ Feature: Using the UI with arrow keys, Enter and Back
     And I press the arrow key "Down"
     Then the focus is on "Connect Garmin HRM 3 with Bluetooth"
 
+  Scenario: Connect does not turn into Remove under the focus
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "disconnected"
+    And I open the device indicator
+    And I open the "Heart Rate Monitor" in the device setup
+    And I move the focus to "Connect with Bluetooth"
+    When I press Enter
+    And "test-device" reports its "heart-rate" "HRM-Pro 42" as "connecting"
+    Then nothing has the focus
+    When I press the arrow key "Down"
+    Then the focus is on "Remove"

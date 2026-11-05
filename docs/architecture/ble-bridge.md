@@ -25,7 +25,7 @@ WebSocket. Text messages are JSON (validated with zod); binary messages are noti
 |---|---|
 | `hello` (protocol, client name, pairing secret, pairing code or token) | `welcome` (companion id and name, token) or `rejected` (`bad-code`, `bad-token`, `locked`, `incompatible`, `busy`, `unknown-secret`) |
 | `ping` every 1 s | `pong` |
-| `scan`, `stop-scan` | `discovered` (from 1.2 signal strength and manufacturer and service data as hex, only to a client of 1.2 or later, [ADR 0046](../decisions/0046-one-link-per-device-and-signal-strength.md), [ADR 0051](../decisions/0051-same-device-over-both-links-by-advertising-data.md)) |
+| `scan`, `stop-scan` | `discovered` (from 1.2 signal strength and manufacturer and service data as hex, only to a client of 1.2 or later, [ADR 0046](../decisions/0046-one-link-per-device-and-signal-strength.md), [ADR 0051](../decisions/0051-same-device-over-both-links-by-advertising-data.md)); every device still heard again at least every 5 s; from 1.4 `vanished` once a device is gone, as a removed dummy device, only to a client of 1.4 or later) |
 | `connect`, `disconnect` | `connected`, `disconnected`, `failed`, `connection-lost` |
 | `subscribe`, `unsubscribe` | `subscribed`, binary frames |
 | `write` (hex bytes, Write Without Response; protocol 1.1; from 1.3 `withResponse`) | `written` or `failed` |

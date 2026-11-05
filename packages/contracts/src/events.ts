@@ -185,6 +185,18 @@ export const deviceScanChangedEvent = defineEvent(
 
 export type DeviceScanChangedPayload = z.infer<typeof deviceScanChangedEvent.schema>;
 
+/** A battery level in percent, 0 to 100. */
+const batteryLevelSchema = z.number().int().min(0).max(100);
+
+/**
+ * The battery level of a connected device, as its Battery Service tells it: read on every
+ * connection and again on every notification. A device without the service never tells it.
+ */
+export const deviceBatteryChangedEvent = defineEvent(
+  'device.battery-changed',
+  z.object({ deviceId: z.string().min(1), kind: deviceKindSchema, level: batteryLevelSchema }),
+);
+
 export const deviceStatusSchema = z.object({
   kind: deviceKindSchema,
   /** Empty while searching: no device is known yet. */
@@ -199,6 +211,8 @@ export const deviceStatusSchema = z.object({
   candidates: z.array(deviceCandidateSchema).optional(),
   /** The links over which device plugins look for devices of the kind now; absent in early recordings. */
   scanning: z.array(bleRouteSchema).optional(),
+  /** The battery level of the device, in percent, once it told it; absent for one that does not. */
+  battery: batteryLevelSchema.optional(),
 });
 
 export type DeviceStatus = z.infer<typeof deviceStatusSchema>;

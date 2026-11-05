@@ -6,8 +6,8 @@ import {
   controllerButtonsChangedEvent,
   type DeviceStatus,
   deviceStatusChangedEvent,
-  measurementHeartRateEvent,
-  measurementPowerEvent,
+  metricHeartRateEvent,
+  metricPowerEvent,
 } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useLayoutEffect, useState } from 'react';
@@ -29,16 +29,27 @@ function useDevices(ctx: UiContext): readonly DeviceStatus[] {
   return devices;
 }
 
-/** The latest power, heart rate and controller buttons, for the proofs in the setup rows. */
+/**
+ * The power, heart rate and controller buttons, for the proofs in the setup rows. Power and heart
+ * rate come from their metrics: a reading leaves once the device falls silent.
+ */
 function useReadings(ctx: UiContext): Readings {
   const [readings, setReadings] = useState<Readings>({});
   useLayoutEffect(() => {
     const subscriptions = [
-      ctx.events.subscribe(measurementPowerEvent, ({ payload }) =>
-        setReadings((r) => ({ ...r, power: { deviceId: payload.deviceId, watts: payload.value } })),
+      ctx.events.subscribe(metricPowerEvent, ({ payload }) =>
+        setReadings(({ power: _, ...r }) =>
+          payload.status === 'available'
+            ? { ...r, power: { deviceId: payload.deviceId, watts: payload.value } }
+            : r,
+        ),
       ),
-      ctx.events.subscribe(measurementHeartRateEvent, ({ payload }) =>
-        setReadings((r) => ({ ...r, heartRate: { deviceId: payload.deviceId, bpm: payload.value } })),
+      ctx.events.subscribe(metricHeartRateEvent, ({ payload }) =>
+        setReadings(({ heartRate: _, ...r }) =>
+          payload.status === 'available'
+            ? { ...r, heartRate: { deviceId: payload.deviceId, bpm: payload.value } }
+            : r,
+        ),
       ),
       ctx.events.subscribe(controllerButtonsChangedEvent, ({ payload }) =>
         setReadings((r) => ({ ...r, buttons: { ...r.buttons, [payload.deviceId]: payload.buttons } })),

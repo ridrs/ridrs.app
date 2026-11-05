@@ -42,7 +42,7 @@ Feature: Ride with the trainer connected to a companion
     Then the device setup shows the "Smart Trainer" as "Connected"
     When I open the "Smart Trainer" in the device setup
     Then the details are headed "Smart Trainer", the card "SIM KICKR" with the status "Connected"
-    And the details card shows the line "Over Bluetooth" and the links "Direct"
+    And the details card shows the links "Direct"
     And the top right of the details says "Searching…"
     When I close the ridrs app
     Then the app reported no lifecycle problems
