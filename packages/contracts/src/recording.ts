@@ -115,6 +115,43 @@ export const recordingFailedEvent = defineEvent(
   z.object({ sessionId: z.string().min(1), reason: z.string() }),
 );
 
+/**
+ * An interrupted ride found at start that can go on with the plugins as they are (ADR 0057): the
+ * rider continues it or finishes it.
+ */
+export const recoverableRideSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    /** The open recording (`.ridrs.jsonl`). */
+    file: z.string().min(1),
+    startedAt: z.number(),
+    /** Logical ms of the last committed event: where the ride was interrupted. */
+    lastRecordAt: z.number(),
+    /** m, from the last committed `physics.state`. */
+    distance: z.number().nonnegative().optional(),
+  })
+  .strict();
+
+export type RecoverableRide = z.infer<typeof recoverableRideSchema>;
+
+/** The interrupted ride on offer, or none (`ride` absent) once it was continued or finished. */
+export const recordingRecoverableChangedEvent = defineEvent(
+  'recording.recoverable-changed',
+  z.object({ ride: recoverableRideSchema.optional() }).strict(),
+);
+
+/** The rider continues the interrupted ride; the composition root does it (ADR 0057). */
+export const recordingContinueRequestedEvent = defineEvent(
+  'recording.continue-requested',
+  z.object({ file: z.string().min(1) }).strict(),
+);
+
+/** The rider finishes the interrupted ride: it is sealed as `recovered`. */
+export const recordingFinishRequestedEvent = defineEvent(
+  'recording.finish-requested',
+  z.object({ file: z.string().min(1) }).strict(),
+);
+
 /** The FIT export of a recording was written. */
 export const exportFitWrittenEvent = defineEvent(
   'export.fit-written',

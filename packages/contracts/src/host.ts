@@ -42,6 +42,8 @@ export interface HostDescription {
   /** Capability id -> the ids of the plugins that provide it, sorted. */
   readonly resolution: Readonly<Record<string, readonly string[]>>;
   readonly coreDefaults: { readonly temporal: Readonly<Record<string, number>> };
+  /** A host that continues an interrupted ride: the journal it goes on with (ADR 0057). */
+  readonly continuing?: { readonly file: string };
 }
 
 /** `ctx.host`: only for plugins whose manifest declares the permission `observe-host`. */

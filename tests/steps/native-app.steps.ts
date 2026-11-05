@@ -21,6 +21,10 @@ const LIFECYCLE_PROBLEMS = new Set([
 ]);
 
 When('I start the ridrs app with these options', async function (this: RidrsWorld) {
+  // Started again after a close: the new app is the one shown.
+  for (const view of this.uiViews.splice(0)) {
+    view.root.remove();
+  }
   const root = document.createElement('div');
   document.body.appendChild(root);
   this.nativeApp = await startRidrsApp({

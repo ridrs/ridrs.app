@@ -74,7 +74,10 @@ import {
   physicsTrainerLoadCapability,
   type ResistanceBreakdown,
   recordingCompletedEvent,
+  recordingContinueRequestedEvent,
   recordingFailedEvent,
+  recordingFinishRequestedEvent,
+  recordingRecoverableChangedEvent,
   type SpatialSeriesWriter,
   type SpatialWriteResult,
   spatialTerrainCapability,
@@ -98,7 +101,12 @@ import {
   uiTerrainObservedEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
-import { type BundledPluginSet, createBundledPluginSource, PluginHost } from '@ridrs/core';
+import {
+  type BundledPluginSet,
+  createBundledPluginSource,
+  PluginHost,
+  type PluginHostOptions,
+} from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
 import type { FrameSource } from '@ridrs/presentation';
 import type { ReplayResult } from '@ridrs/replay';
@@ -199,6 +207,9 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   trainerTargetPowerEvent,
   recordingCompletedEvent,
   recordingFailedEvent,
+  recordingRecoverableChangedEvent,
+  recordingContinueRequestedEvent,
+  recordingFinishRequestedEvent,
   exportFitWrittenEvent,
   trainingConnectRequestedEvent,
   trainingDisconnectRequestedEvent,
@@ -287,6 +298,12 @@ export class RidrsWorld extends World {
   /** ADR 0054: what the settings probe does when it starts, and what it read. */
   settingsProbe?: { readonly write?: { name: string; value: string }; readonly read?: string };
   settingsProbeValue?: string;
+  /** ADR 0057: the interrupted ride, and where the continued host's observations begin. */
+  interruptedSessionId?: string;
+  interruptedFile?: string;
+  interruptedStep?: number;
+  interruptionMark?: number;
+  continuedMark?: number;
   /** Phase 9: the file a step named last ("that file"). */
   lastRecordingFile?: string;
   /** Phase 9: the recording's lines as replay steps changed them. */
@@ -517,35 +534,45 @@ export class RidrsWorld extends World {
     }
   }
 
+  /** What every host of the scenario is composed with. */
+  hostOptions(): PluginHostOptions {
+    const dirs = [
+      ...(this.realPluginIds.length > 0
+        ? [this.tempPluginDir, REAL_PLUGINS_DIR]
+        : [this.tempPluginDir]),
+      ...this.extraPluginDirs,
+    ];
+    return {
+      sources: this.bundled
+        ? [createBundledPluginSource(this.bundled satisfies BundledPluginSet)]
+        : dirs.map(createFileSystemPluginSource),
+      disabledPlugins: this.realPluginIds.length > 0 ? this.unusedRealPlugins() : [],
+      timeSource: this.clock,
+      capabilities: [...this.capabilityContracts.values()],
+      events: [...this.eventDefinitions.values()],
+      settingsFiles: this.settingsFiles,
+    };
+  }
+
+  /** The World's UI bridge and taps on a new host, before it starts. */
+  attachHost(host: PluginHost): void {
+    this.host = host;
+    if (this.uiEnabled) {
+      this.uiBridge = createInProcessUiBridge(host, PHASE_3_EVENTS);
+    }
+    for (const event of HOST_OBSERVED_EVENTS) {
+      host.subscribeEvent('test-world', event, (envelope) => {
+        this.hostObserved.push(envelope);
+      });
+    }
+    host.observe('test-world', { onEvent: (envelope) => this.tapped.push(envelope) });
+  }
+
   ensureHost(): PluginHost {
     if (!this.host) {
-      const dirs = [
-        ...(this.realPluginIds.length > 0
-          ? [this.tempPluginDir, REAL_PLUGINS_DIR]
-          : [this.tempPluginDir]),
-        ...this.extraPluginDirs,
-      ];
-      this.host = new PluginHost({
-        sources: this.bundled
-          ? [createBundledPluginSource(this.bundled satisfies BundledPluginSet)]
-          : dirs.map(createFileSystemPluginSource),
-        disabledPlugins: this.realPluginIds.length > 0 ? this.unusedRealPlugins() : [],
-        timeSource: this.clock,
-        capabilities: this.capabilityContracts.values(),
-        events: this.eventDefinitions.values(),
-        settingsFiles: this.settingsFiles,
-      });
-      if (this.uiEnabled) {
-        this.uiBridge = createInProcessUiBridge(this.host, PHASE_3_EVENTS);
-      }
-      for (const event of HOST_OBSERVED_EVENTS) {
-        this.host.subscribeEvent('test-world', event, (envelope) => {
-          this.hostObserved.push(envelope);
-        });
-      }
-      this.host.observe('test-world', { onEvent: (envelope) => this.tapped.push(envelope) });
+      this.attachHost(new PluginHost(this.hostOptions()));
     }
-    return this.host;
+    return this.host as PluginHost;
   }
 
   bundle(): NonNullable<RidrsWorld['bundled']> {

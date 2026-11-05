@@ -14,6 +14,7 @@ export {
   recordingName,
   recordingPath,
 } from './files.ts';
+export { type CommittedJournal, committedJournal } from './journal.ts';
 export {
   lastRecordTime,
   parseRecording,

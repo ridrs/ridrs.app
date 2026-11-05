@@ -19,6 +19,7 @@ Plugins get it as `ctx.clock`; their tasks belong to their context and are cance
 
 - **`LiveClock`**: driven by a monotonic time source (`performance.timeOrigin + performance.now()`, whole ms; injected in tests) and woken by one timer for the next due task (a `TimerPort`, global timers by default).
 - **`ReplayClock`**: no time source, no timers; the replay calls `advanceTo(t)`.
+- **A held `LiveClock`** (`heldAt`, [ADR 0057](../decisions/0057-continuing-an-interrupted-ride.md)): a continuing host starts like a replay, moved only by `advanceTo(t)`, then `release()` hands it to the time source: logical time jumps from the interruption to now, the tasks due in between run at their planned times first. While held, the plugins' inputs wait in the host and enter after `goLive()`; injected inputs keep their ids and new input ids go on after the highest.
 
 A callback observes its **planned** time, however late it runs. Wall-clock time never enters a simulation calculation.
 

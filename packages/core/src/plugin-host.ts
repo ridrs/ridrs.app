@@ -53,6 +53,12 @@ export interface PluginHostOptions {
    * plugins dropped (their I/O is not replayed; the recorded inputs are injected instead).
    */
   readonly replay?: { readonly start: number; readonly runId?: string };
+  /**
+   * A host that continues an interrupted ride (ADR 0057): its clock is held at `start` with the
+   * recorded `runId` until `goLive()`; plugin inputs wait until then. `describe()` names the
+   * journal, so the recorder appends to it.
+   */
+  readonly continueFrom?: { readonly start: number; readonly runId: string; readonly file: string };
   readonly logger?: PluginLogger;
   readonly capabilities?: Iterable<CapabilityContract>;
   /** Event definitions the host can resolve by id (for bridges that only know ids). */
@@ -110,6 +116,9 @@ export class PluginHost {
   private readonly clock: TurnClock;
   private readonly runId: string;
   private readonly replayMode: boolean;
+  private readonly continuing: { readonly file: string } | undefined;
+  /** While a continuing host is held: the plugins' inputs, in order of arrival. */
+  private heldInputs: Array<() => void> | undefined;
   /** Lifecycle hooks run outside the turn queue; publishing is allowed while one runs. */
   private lifecycleDepth = 0;
   private inputSeq = 0;
@@ -142,10 +151,16 @@ export class PluginHost {
     this.settingsFiles = options.settingsFiles;
     this.disabledPlugins = new Set(options.disabledPlugins ?? []);
     this.replayMode = options.replay !== undefined;
+    this.continuing = options.continueFrom ? { file: options.continueFrom.file } : undefined;
+    this.heldInputs = options.continueFrom ? [] : undefined;
     this.clock = options.replay
       ? new ReplayClock(options.replay.start)
-      : new LiveClock({ timeSource: options.timeSource, timers: options.timers });
-    this.runId = options.replay?.runId ?? randomRunId();
+      : new LiveClock({
+          timeSource: options.timeSource,
+          timers: options.timers,
+          heldAt: options.continueFrom?.start,
+        });
+    this.runId = options.replay?.runId ?? options.continueFrom?.runId ?? randomRunId();
     this.clock.onError = (error, turn) => {
       const reason = error instanceof Error ? error.message : String(error);
       this.diagnostics.report({
@@ -232,6 +247,13 @@ export class PluginHost {
   /** Replay: queues a recorded input with its recorded time, id, source and payload. */
   injectInput(envelope: EventEnvelope, definition: EventDefinition): void {
     this.inputSeq += 1;
+    // New input ids go on after the recorded ones (a continuing host, ADR 0057).
+    const recorded = envelope.id.startsWith(`${this.runId}:in:`)
+      ? Number(envelope.id.slice(this.runId.length + 4))
+      : Number.NaN;
+    if (Number.isInteger(recorded) && recorded > this.inputSeq) {
+      this.inputSeq = recorded;
+    }
     const inputSeq = this.inputSeq;
     this.clock.enqueueInput(
       () =>
@@ -244,12 +266,35 @@ export class PluginHost {
     );
   }
 
-  /** Replay: moves logical time to `time`, running every task and input due by then. */
+  /**
+   * Replay, or a continuing host before `goLive()`: moves logical time to `time`, running every
+   * task and input due by then.
+   */
   advanceTo(time: number): void {
-    if (!(this.clock instanceof ReplayClock)) {
-      throw new Error('advanceTo needs a replay host');
+    if (
+      this.clock instanceof ReplayClock ||
+      (this.clock instanceof LiveClock && this.clock.isHeld())
+    ) {
+      this.clock.advanceTo(time);
+      return;
     }
-    this.clock.advanceTo(time);
+    throw new Error('advanceTo needs a replay host or a held continuing host');
+  }
+
+  /**
+   * A continuing host goes live (ADR 0057): the clock follows its time source from now on, and
+   * the plugins' inputs that waited enter now, in order.
+   */
+  goLive(): void {
+    const waiting = this.heldInputs;
+    if (!waiting || !(this.clock instanceof LiveClock)) {
+      throw new Error('goLive needs a continuing host');
+    }
+    this.heldInputs = undefined;
+    this.clock.release();
+    for (const accept of waiting) {
+      accept();
+    }
   }
 
   /** Tasks scheduled on the host clock. */
@@ -270,6 +315,11 @@ export class PluginHost {
     const data = this.eventBus.validate(source, event, payload);
     if (this.replayMode && fromPlugin) {
       // A replay host's own I/O: the recorded inputs stand in for it.
+      return;
+    }
+    if (this.heldInputs && fromPlugin) {
+      // A continuing host rebuilds the ride first: live I/O enters once it goes live.
+      this.heldInputs.push(() => this.acceptInput(source, event, data, fromPlugin));
       return;
     }
     const at = this.clock.now();
@@ -382,7 +432,13 @@ export class PluginHost {
         .sort((a, b) => a.localeCompare(b)),
       resolution: this.capabilityRegistry.resolution(),
       coreDefaults: { temporal: { ...TEMPORAL_DEFAULTS } },
+      ...(this.continuing ? { continuing: { ...this.continuing } } : {}),
     };
+  }
+
+  /** The provider of a `single` capability, for composition roots (reading a journal, ADR 0057). */
+  getProvider<TImpl>(contract: CapabilityContract<TImpl, 'single'>): TImpl | undefined {
+    return this.capabilityRegistry.providersOf(contract.id)[0]?.implementation as TImpl | undefined;
   }
 
   /** The providers of a `multiple` capability, for composition roots; sorted by plugin id. */

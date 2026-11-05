@@ -65,6 +65,17 @@ const state = {
 const SAMPLES: Record<string, unknown> = {
   'activity.start-requested': {},
   'activity.finish-requested': {},
+  'recording.continue-requested': { file: 'recordings/r.ridrs.jsonl' },
+  'recording.finish-requested': { file: 'recordings/r.ridrs.jsonl' },
+  'recording.recoverable-changed': {
+    ride: {
+      sessionId: 's-1',
+      file: 'recordings/r.ridrs.jsonl',
+      startedAt: T,
+      lastRecordAt: T + 1,
+      distance: 1.5,
+    },
+  },
   'activity.pause-requested': {},
   'activity.resume-requested': {},
   'activity.interrupted': {},
