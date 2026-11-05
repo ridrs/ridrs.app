@@ -11,7 +11,7 @@ import {
   trainerControlChangedEvent,
 } from '@ridrs/contracts';
 import type { SimulatedPeripheral } from '@ridrs/testing';
-import { fireEvent, waitFor, within } from '@testing-library/dom';
+import { waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 
 /** How long "eventually" waits: the ui profile runs on real time. */
@@ -140,21 +140,23 @@ Then(
   },
 );
 
-Then('the target power widget shows {string}', async function (this: RidrsWorld, text: string) {
-  const element = await widget('target-power');
-  await waitFor(() => assert.equal(within(element).getByTestId('value').textContent, text));
+Then('the virtual gear widget shows {string}', async function (this: RidrsWorld, gear: string) {
+  const element = await widget('virtual-gear');
+  await waitFor(() => assert.equal(within(element).getByTestId('value').textContent, gear));
 });
 
-Then('the target power widget shows nothing', async function (this: RidrsWorld) {
+Then('the ERG button is on at {string}', async function (this: RidrsWorld, target: string) {
   const element = await widget('target-power');
-  await waitFor(() => assert.equal(within(element).getByTestId('value').textContent, ''));
+  await waitFor(() => {
+    assert.equal(element.getAttribute('aria-pressed'), 'true');
+    assert.equal(within(element).getByTestId('value').textContent, target);
+  });
 });
 
-/** Arrow keys alone, as a remote has them: down until the focus is on the element. */
-When('I move the focus to {string}', async function (this: RidrsWorld, name: string) {
-  const target = await within(ui()).findByRole('button', { name }, EVENTUALLY);
-  for (let step = 0; step < 50 && document.activeElement !== target; step += 1) {
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'ArrowDown' });
-  }
-  assert.equal(document.activeElement, target, `The arrows never reached "${name}"`);
+Then('the ERG button is off', async function (this: RidrsWorld) {
+  const element = await widget('target-power');
+  await waitFor(() => {
+    assert.equal(element.getAttribute('aria-pressed'), 'false');
+    assert.equal(within(element).getByTestId('value').textContent, 'Off');
+  });
 });

@@ -9,7 +9,7 @@ The virtual gradient and speed drive the trainer's resistance, the Zwift Ride sh
  metric.power ─► … ─► physics-virtual-speed ─► physics.state / state-batch ─┐
                                                  + trainerLoad              │ derived event
  controller.buttons-changed ─► control-virtual-gears                        ▼
-   (input)                       │ series drivetrain.virtual-gear      device-ftms-trainer
+ drivetrain.shift-requested ─►   │ series drivetrain.virtual-gear      device-ftms-trainer
                                  ▼ (hold, never stale)                  │ mode by target + Feature bits
                         physics-trainer-load (reader only)              │ clamps, rate-limits, encodes
                           resistance / resistanceWithVirtualGear        ▼
@@ -24,11 +24,11 @@ The virtual gradient and speed drive the trainer's resistance, the Zwift Ride sh
 | Plugin | Type | Role |
 |---|---|---|
 | `physics-trainer-load` | physics | `physics.trainer-load`: both loads per step as FTMS simulation parameters ([ADR 0054](../decisions/0054-trainer-load-and-virtual-gear-formula.md)) |
-| `control-virtual-gears` | control | 24 virtual gears from any controller's shift buttons; series `drivetrain.virtual-gear`, event `drivetrain.gear-changed` ([ADR 0055](../decisions/0055-virtual-gears-and-never-stale-series.md)) |
+| `control-virtual-gears` | control | 24 virtual gears from any controller's shift buttons and the rider's shifts in the activity screen (`drivetrain.shift-requested`, an input from the UI); series `drivetrain.virtual-gear`, event `drivetrain.gear-changed` ([ADR 0055](../decisions/0055-virtual-gears-and-never-stale-series.md)) |
 | `control-erg` | control, transport (a driver) | the rider's ERG target from the activity screen and the power-up buttons, as the input `trainer.target-power` |
 | `device-ftms-trainer` | device | reads the Feature, takes control, chooses and sends the commands ([ADR 0056](../decisions/0056-ftms-trainer-control.md)) |
-| `ui-widget-virtual-gear` | ui | "12 / 24" in the HUD |
-| `ui-widget-target-power` | ui | "ERG 150 W" or nothing; Enter starts ERG, ↑/↓ ±5 W while focused, Back leaves ERG |
+| `ui-widget-virtual-gear` | ui | "12 / 24" in the HUD; ↑/↓ shift while focused, + and - anywhere on the screen without ERG |
+| `ui-widget-target-power` | ui | the ERG button: "150 W" or "Off"; Enter turns ERG on and off, in ERG ↑/↓ ±5 W while focused and + and - anywhere on the screen, Back leaves ERG while focused |
 
 `ui-devices` shows the trainer's control state in its details: "Control: simulation", "ERG 150 W", "not supported", "refused", "lost".
 
@@ -44,7 +44,7 @@ The virtual gradient and speed drive the trainer's resistance, the Zwift Ride sh
 | Parameter | Default | Owner |
 |---|---|---|
 | Real chainring / cog | 34 T / 14 T | `control-virtual-gears` |
-| Virtual gears | 24, geometric 1.0 … 4.818, start gear 12 | `control-virtual-gears` |
+| Virtual gears | 24, geometric 1.0 … 4.818, start gear 12 at each new ride (a resume keeps the gear) | `control-virtual-gears` |
 | Simulation command interval | ≥ 1000 ms, on change only | `device-ftms-trainer` |
 | ERG target and gear changes | at once, ≤ 4 per second | `device-ftms-trainer` |
 | ERG target step / default | 5 W / 150 W | `control-erg` |

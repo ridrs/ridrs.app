@@ -7,6 +7,7 @@ import {
   controllerButtonsChangedEvent,
   definePlugin,
   drivetrainGearChangedEvent,
+  drivetrainShiftRequestedEvent,
   drivetrainVirtualGearCapability,
   type PluginContext,
   type TemporalSeriesWriter,
@@ -41,9 +42,10 @@ function setGear(ctx: PluginContext, gears: Gears, gear: number): void {
 
 /**
  * Virtual gears, independent of the trainer protocol: a press of a shift button of any controller
- * shifts one gear, holding shifts nothing more. The gear is a temporal series that never goes
+ * shifts one gear, holding shifts nothing more, and so does a shift the rider asks for in the
+ * activity screen (`drivetrain.shift-requested`). The gear is a temporal series that never goes
  * stale; the physics reads it at its steps, the HUD hears `drivetrain.gear-changed`. Every ride
- * starts in the start gear.
+ * starts in the start gear; a resumed one keeps its gear.
  */
 export default definePlugin({
   initialize(ctx) {
@@ -73,9 +75,18 @@ export default definePlugin({
       return;
     }
     const held = new Map<string, readonly ControllerButton[]>();
+    const shift = (by: number): void => {
+      const gear = shifted(gears.gear, by, gears.ratios.length);
+      if (gear !== gears.gear) {
+        setGear(ctx, gears, gear);
+      }
+    };
 
+    // A resumed ride runs again in the same session and keeps its gear.
+    let session: string | undefined;
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-      if (payload.state === 'running') {
+      if (payload.state === 'running' && payload.sessionId !== session) {
+        session = payload.sessionId;
         setGear(ctx, gears, GEAR_DEFAULTS.startGear);
       }
     });
@@ -83,10 +94,11 @@ export default definePlugin({
     ctx.events.subscribe(controllerButtonsChangedEvent, ({ payload }) => {
       const before = held.get(payload.deviceId) ?? [];
       held.set(payload.deviceId, payload.buttons);
-      const gear = shifted(gears.gear, shiftOf(before, payload.buttons), gears.ratios.length);
-      if (gear !== gears.gear) {
-        setGear(ctx, gears, gear);
-      }
+      shift(shiftOf(before, payload.buttons));
+    });
+
+    ctx.events.subscribe(drivetrainShiftRequestedEvent, ({ payload }) => {
+      shift(payload.change === 'up' ? 1 : -1);
     });
   },
 });

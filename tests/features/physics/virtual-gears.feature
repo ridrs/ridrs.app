@@ -49,3 +49,9 @@ Feature: Virtual gears from the Zwift Ride
     And "test-ui" publishes "activity.finish-requested"
     And "test-ui" publishes "activity.start-requested"
     Then the latest "drivetrain.gear-changed" event has the gear 12 of 24
+
+  Scenario: Resuming a paused ride keeps the gear
+    When "test-ride" presses "shift-up-right" 3 times
+    And "test-ui" publishes "activity.pause-requested"
+    And "test-ui" publishes "activity.resume-requested"
+    Then the latest "drivetrain.gear-changed" event has the gear 15 of 24

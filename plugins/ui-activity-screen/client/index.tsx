@@ -54,16 +54,6 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
-      <div
-        data-testid="slot-activity-landscape"
-        ref={landscape}
-        style={{ position: 'absolute', inset: 0, zIndex: Z_LANDSCAPE }}
-      />
-      <div
-        data-testid="slot-activity-hud"
-        ref={hud}
-        style={{ position: 'absolute', inset: 0, zIndex: Z_HUD, pointerEvents: 'none' }}
-      />
       {paused ? (
         <div
           data-testid="ride-paused"
@@ -82,7 +72,11 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
           Paused
         </div>
       ) : null}
-      {/* Direct children like the HUD: one stacking context; Pause left, Finish ride right. */}
+      {/*
+        Direct children like the HUD: one stacking context; Pause left, Finish ride right. They
+        come first in reading order: the first arrow of a ride focuses Pause, not a HUD control
+        that changes the ride.
+      */}
       {paused ? (
         <button
           type="button"
@@ -111,6 +105,16 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
       >
         Finish ride
       </button>
+      <div
+        data-testid="slot-activity-landscape"
+        ref={landscape}
+        style={{ position: 'absolute', inset: 0, zIndex: Z_LANDSCAPE }}
+      />
+      <div
+        data-testid="slot-activity-hud"
+        ref={hud}
+        style={{ position: 'absolute', inset: 0, zIndex: Z_HUD, pointerEvents: 'none' }}
+      />
     </div>
   );
 }

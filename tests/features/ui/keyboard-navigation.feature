@@ -5,7 +5,8 @@ Feature: Using the UI with arrow keys, Enter and Back
   this for every screen: the arrow keys move the focus through the screen's controls in reading
   order, Enter activates the focused one, and Back (Escape, Backspace, or the platform's back
   button) goes to the screen, which decides what it means. In a text field the caret keeps the
-  left and right arrows and Backspace deletes.
+  left and right arrows and Backspace deletes. The arrows never start over at the top by surprise:
+  when the focused control disappears, the next arrow goes on from its place.
 
   A headless DOM has no default actions, so "I press Enter" clicks the focused button the way a
   browser does; the step checks that the focus is on a real button.
@@ -80,3 +81,14 @@ Feature: Using the UI with arrow keys, Enter and Back
   Scenario: The main screen ignores Back
     When I press Back
     Then the "main" screen is shown
+
+  Scenario: The arrows go on from where a control was when it disappears
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And "test-device" found the "heart-rate" devices "HRM-Pro 42, Garmin HRM 3, Polar H10 A1B2"
+    And I open the device indicator
+    And I open the "Heart Rate Monitor" in the device setup
+    And I move the focus to "Connect Polar H10 A1B2 with Bluetooth"
+    When "test-device" found the "heart-rate" devices "HRM-Pro 42, Garmin HRM 3"
+    And I press the arrow key "Down"
+    Then the focus is on "Connect Garmin HRM 3 with Bluetooth"
+

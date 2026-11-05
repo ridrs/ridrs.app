@@ -53,6 +53,44 @@ When('I press Enter', async function (this: RidrsWorld) {
   await this.settle();
 });
 
+When('I press the key {string}', async function (this: RidrsWorld, key: string) {
+  await press(this, key);
+});
+
+/** What can take the focus: buttons and other controls with a role, by name. */
+function focusableNamed(name: string): HTMLElement | undefined {
+  return [...document.body.querySelectorAll<HTMLElement>('button, [tabindex]')].find(
+    (element) => !(element as HTMLButtonElement).disabled && nameOf(element) === name,
+  );
+}
+
+/**
+ * Arrow keys alone, as a remote has them: Right towards a control later in reading order, Left
+ * towards one before. Left and Right always move the focus, also on a control that takes Up and
+ * Down for itself.
+ */
+When('I move the focus to {string}', async function (this: RidrsWorld, name: string) {
+  let target: HTMLElement | undefined;
+  await waitFor(
+    () => {
+      target = focusableNamed(name);
+      assert.ok(target, `No control "${name}"`);
+    },
+    { timeout: 15_000, interval: 100 },
+  );
+  for (let step = 0; step < 50 && document.activeElement !== target; step += 1) {
+    const focused = document.activeElement;
+    const before =
+      focused &&
+      focused !== document.body &&
+      target &&
+      focused.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_PRECEDING;
+    fireEvent.keyDown(keyTarget(), { key: before ? 'ArrowLeft' : 'ArrowRight' });
+    await this.settle();
+  }
+  assert.ok(document.activeElement === target, `The arrows never reached "${name}"`);
+});
+
 When('I press Back', async function (this: RidrsWorld) {
   await press(this, 'Escape');
 });
@@ -66,6 +104,22 @@ Then('the focus is on {string}', async function (this: RidrsWorld, name: string)
     const focused = document.activeElement;
     assert.ok(focused && ui(this).contains(focused), 'Nothing in the UI has the focus');
     assert.equal(nameOf(focused), name);
+  });
+});
+
+Then('nothing has the focus', async function (this: RidrsWorld) {
+  await waitFor(() => {
+    const focused = document.activeElement;
+    // Names, not elements: a diff of two DOM nodes does not end.
+    assert.ok(focused === document.body, `The focus is on "${focused && nameOf(focused)}"`);
+  });
+});
+
+Then('the focused control shows the keys {string}', async function (this: RidrsWorld, keys) {
+  await waitFor(() => {
+    const focused = document.activeElement;
+    assert.ok(focused instanceof HTMLElement, 'Nothing has the focus');
+    assert.equal(within(focused).getByTestId('keys').textContent, keys);
   });
 });
 

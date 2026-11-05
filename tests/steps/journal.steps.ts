@@ -183,11 +183,16 @@ Then('no physics step ran since the interruption', function (this: RidrsWorld) {
   assert.deepEqual(physicsSince(this, this.continuedMark ?? 0), []);
 });
 
-/** The `.ridrs` the interrupted ride ends up in. */
+/**
+ * The `.ridrs` the interrupted ride ends up in, once sealing is over: the sealed file is read back
+ * and checked before the journal is removed, so it exists a moment before sealing ends.
+ */
 async function sealedRideOf(world: RidrsWorld): Promise<Recording> {
-  const file = world.interruptedFile?.replace(/\.jsonl$/, '');
-  assert.ok(file && world.memoryFiles, 'Expected an interrupted ride');
-  await world.waitForIo(() => world.memoryFiles?.files.has(file) === true, 'the sealed ride');
+  const journal = world.interruptedFile;
+  const file = journal?.replace(/\.jsonl$/, '');
+  assert.ok(journal && file && world.memoryFiles, 'Expected an interrupted ride');
+  const files = world.memoryFiles.files;
+  await world.waitForIo(() => files.has(file) && !files.has(journal), 'the sealed ride');
   world.lastRecordingFile = file;
   return readRecording(memoryFile(world, file));
 }

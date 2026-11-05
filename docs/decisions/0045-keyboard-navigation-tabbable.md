@@ -18,3 +18,4 @@ AGENTS.md rule 12 asks that every UI is usable with the arrow keys, Enter and Ba
 - One small library instead of an own focusable-element query, which is easy to get subtly wrong (disabled fieldsets, `inert`, `<details>`, radio groups).
 - In happy-dom, tabbable cannot see what CSS hides (no layout); screens remove elements instead of hiding them, so the scenarios see what the rider sees.
 - A spatial order can replace the linear one later without changing screens: they only register Back handlers.
+- The shell remembers the place of the focused element among the tabbable ones: when it disappears, the next arrow goes on from that place on the same screen instead of the first element, and a focused element outside the order steps to its neighbours in document order (`compareDocumentPosition`).

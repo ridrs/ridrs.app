@@ -17,8 +17,8 @@
       }
     ],
     "events": {
-      "subscribe": ["drivetrain.gear-changed"],
-      "publish": []
+      "subscribe": ["drivetrain.gear-changed", "trainer.target-power"],
+      "publish": ["drivetrain.shift-requested"]
     }
   }
 }
