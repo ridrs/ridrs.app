@@ -13,6 +13,7 @@
     "@ridrs/contracts": "workspace:*",
     "@ridrs/core": "workspace:*",
     "@ridrs/presentation": "workspace:*",
+    "@ridrs/replay": "workspace:*",
     "@ridrs/ui-bridge": "workspace:*",
     "@ridrs/ui-sdk": "workspace:*",
     "@ridrs/ui-shell": "workspace:*",

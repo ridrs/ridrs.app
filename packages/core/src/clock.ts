@@ -206,6 +206,11 @@ export interface LiveClockOptions {
   readonly timers?: TimerPort;
   /** Turns per chunk before yielding to the event loop during a catch-up. */
   readonly turnsPerChunk?: number;
+  /**
+   * Starts held at this time (ADR 0057): like a replay clock, time moves only by `advanceTo`,
+   * with no timers, until `release` hands it to the time source.
+   */
+  readonly heldAt?: number;
 }
 
 /**
@@ -220,10 +225,13 @@ export class LiveClock extends TurnClock {
   private wake: { readonly handle: unknown; readonly due: number } | undefined;
   /** One reading per synchronous run outside turns: preparing an input does not advance time. */
   private reading: number | undefined;
+  /** While held, the time `advanceTo` reached. */
+  private held: { target: number } | undefined;
 
   constructor(options: LiveClockOptions = {}) {
     const source = options.timeSource ?? createSystemTimeSource();
-    super(source.now());
+    super(options.heldAt ?? source.now());
+    this.held = options.heldAt === undefined ? undefined : { target: options.heldAt };
     this.source = source;
     this.timers = options.timers ?? {
       setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay),
@@ -233,6 +241,9 @@ export class LiveClock extends TurnClock {
   }
 
   protected outsideNow(): number {
+    if (this.held) {
+      return this.held.target;
+    }
     if (this.reading === undefined) {
       this.reading = this.source.now();
       queueMicrotask(() => {
@@ -243,11 +254,11 @@ export class LiveClock extends TurnClock {
   }
 
   protected horizon(): number {
-    return Math.max(this.last, this.source.now());
+    return this.held ? this.held.target : Math.max(this.last, this.source.now());
   }
 
   protected shouldYield(turns: number): boolean {
-    if (turns < this.turnsPerChunk) {
+    if (this.held || turns < this.turnsPerChunk) {
       return false;
     }
     this.arm(this.source.now());
@@ -255,11 +266,41 @@ export class LiveClock extends TurnClock {
   }
 
   protected idle(nextDue: number | undefined): void {
+    if (this.held) {
+      return;
+    }
     if (nextDue === undefined) {
       this.disarm();
       return;
     }
     this.arm(nextDue);
+  }
+
+  isHeld(): boolean {
+    return this.held !== undefined;
+  }
+
+  /** While held: moves logical time to `time`, running every task and input due by then. */
+  advanceTo(time: number): void {
+    const held = this.held;
+    if (!held) {
+      throw new Error('advanceTo needs a held clock');
+    }
+    held.target = Math.max(held.target, time);
+    this.pump();
+    this.last = Math.max(this.last, held.target);
+  }
+
+  /**
+   * Hands the clock to its time source: logical time goes on from the time source's reading, and
+   * the tasks due in between run at their planned times (ADR 0057).
+   */
+  release(): void {
+    if (!this.held) {
+      return;
+    }
+    this.held = undefined;
+    this.pump();
   }
 
   /** Stops waking up; scheduled tasks stay. For host disposal. */

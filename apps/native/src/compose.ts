@@ -33,6 +33,7 @@ import {
   drivetrainGearChangedEvent,
   drivetrainVirtualGearCapability,
   type EventDefinition,
+  type EventSubscription,
   exportFitWrittenEvent,
   type HostPlatform,
   measurementCadenceEvent,
@@ -59,7 +60,10 @@ import {
   physicsTotalResistanceCapability,
   physicsTrainerLoadCapability,
   recordingCompletedEvent,
+  recordingContinueRequestedEvent,
   recordingFailedEvent,
+  recordingFinishRequestedEvent,
+  recordingRecoverableChangedEvent,
   spatialTerrainCapability,
   storageAppFilesCapability,
   storageSecretsCapability,
@@ -76,9 +80,10 @@ import {
   uiTerrainObservedEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
-import { PluginHost, type PluginSource } from '@ridrs/core';
+import { PluginHost, type PluginHostOptions, type PluginSource } from '@ridrs/core';
 import type { FrameSource } from '@ridrs/presentation';
-import { createInProcessUiBridge } from '@ridrs/ui-bridge';
+import { continueRecording } from '@ridrs/replay';
+import { createInProcessUiBridge, type InProcessUiBridge } from '@ridrs/ui-bridge';
 import type { UiLogger } from '@ridrs/ui-sdk';
 import { mountShell, type ShellOptions } from '@ridrs/ui-shell';
 
@@ -127,12 +132,40 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   trainerTargetPowerEvent,
   recordingCompletedEvent,
   recordingFailedEvent,
+  recordingRecoverableChangedEvent,
+  recordingContinueRequestedEvent,
+  recordingFinishRequestedEvent,
   exportFitWrittenEvent,
   trainingConnectRequestedEvent,
   trainingDisconnectRequestedEvent,
   trainingRefreshRequestedEvent,
   trainingAccountChangedEvent,
   trainingPlanChangedEvent,
+];
+
+/** Every capability the host resolves. */
+const CAPABILITIES = [
+  bleCentralCapability,
+  bleBridgeConnectorCapability,
+  metricPowerCapability,
+  metricCadenceCapability,
+  metricHeartRateCapability,
+  metricPowerHeartRateRatioCapability,
+  physicsBicycleCapability,
+  physicsRiderCapability,
+  physicsEnvironmentCapability,
+  physicsResistanceCapability,
+  physicsTotalResistanceCapability,
+  physicsPowertrainCapability,
+  physicsMotionCapability,
+  physicsTrainerLoadCapability,
+  drivetrainVirtualGearCapability,
+  configSnapshotCapability,
+  storageAppFilesCapability,
+  spatialTerrainCapability,
+  netHttpCapability,
+  authBrowserSignInCapability,
+  storageSecretsCapability,
 ];
 
 /** Port to the platform's "keep the display on" facility. */
@@ -159,74 +192,147 @@ export interface RidrsAppOptions {
 }
 
 export interface RidrsApp {
+  /** The running host; another one once an interrupted ride was continued (ADR 0057). */
   readonly host: PluginHost;
   /** Unmounts the UI and disposes the host. */
   close(): Promise<void>;
+}
+
+/** One host with its UI bridge, shell and the root's own subscriptions. */
+interface Composed {
+  readonly host: PluginHost;
+  readonly bridge: InProcessUiBridge;
+  readonly subscriptions: readonly EventSubscription[];
+  unmount?: () => void;
 }
 
 /**
  * Composition root of the native app: host, in-process UI bridge and shell in one process. Shared
  * by the Tauri WebView (bundled plugins) and the Cucumber e2e scenarios (plugin folders). This
  * device's Bluetooth and the companion bridge both provide `ble.central`: they run at once.
+ * When the rider continues an interrupted ride, the root composes a continuing host in place of
+ * the running one (ADR 0057).
  */
 export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp> {
-  const host = new PluginHost({
+  const hostOptions: PluginHostOptions = {
     sources: options.sources,
     disabledPlugins: options.disabledPlugins,
     timeSource: options.timeSource,
     logger: options.logger,
-    capabilities: [
-      bleCentralCapability,
-      bleBridgeConnectorCapability,
-      metricPowerCapability,
-      metricCadenceCapability,
-      metricHeartRateCapability,
-      metricPowerHeartRateRatioCapability,
-      physicsBicycleCapability,
-      physicsRiderCapability,
-      physicsEnvironmentCapability,
-      physicsResistanceCapability,
-      physicsTotalResistanceCapability,
-      physicsPowertrainCapability,
-      physicsMotionCapability,
-      physicsTrainerLoadCapability,
-      drivetrainVirtualGearCapability,
-      configSnapshotCapability,
-      storageAppFilesCapability,
-      spatialTerrainCapability,
-      netHttpCapability,
-      authBrowserSignInCapability,
-      storageSecretsCapability,
-    ],
+    capabilities: CAPABILITIES,
     events: RIDRS_EVENTS,
     platform: options.platform,
-  });
-  // Before start, so values published while plugins start (the initial activity state) are cached.
-  const bridge = createInProcessUiBridge(host, RIDRS_EVENTS);
+  };
   const keepAwake = options.keepAwake;
-  const rideWatch = keepAwake
-    ? host.subscribeEvent('ridrs-app', activityStateChangedEvent, ({ payload }) =>
-        keepAwake.setKeepAwake(payload.state === 'running'),
-      )
-    : undefined;
-  await host.start();
-  const unmount = mountShell(options.root, bridge, {
-    logger: options.uiLogger ?? console,
-    frameSource: options.frameSource,
-    backButton: options.backButton,
-  });
+  let current: Composed | undefined;
+  let continuing: Promise<void> | undefined;
+  /** The host composed last; `attach` sets it, also from inside `continueRecording`. */
+  const latest = (): Composed | undefined => current;
+
+  // Before start, so values published while plugins start (the initial activity state) are cached.
+  const attach = (host: PluginHost): Composed => {
+    const subscriptions = [
+      host.subscribeEvent('ridrs-app', recordingContinueRequestedEvent, ({ payload }) => {
+        continuing ??= continueRide(payload.file).finally(() => {
+          continuing = undefined;
+        });
+      }),
+      ...(keepAwake
+        ? [
+            host.subscribeEvent('ridrs-app', activityStateChangedEvent, ({ payload }) =>
+              keepAwake.setKeepAwake(payload.state === 'running'),
+            ),
+          ]
+        : []),
+    ];
+    const composed: Composed = {
+      host,
+      bridge: createInProcessUiBridge(host, RIDRS_EVENTS),
+      subscriptions,
+    };
+    current = composed;
+    return composed;
+  };
+
+  const mount = (composed: Composed): void => {
+    composed.unmount = mountShell(options.root, composed.bridge, {
+      logger: options.uiLogger ?? console,
+      frameSource: options.frameSource,
+      backButton: options.backButton,
+    });
+  };
+
+  const teardown = async (composed: Composed): Promise<void> => {
+    composed.unmount?.();
+    for (const subscription of composed.subscriptions) {
+      subscription.unsubscribe();
+    }
+    keepAwake?.setKeepAwake(false);
+    composed.bridge.dispose();
+    await composed.host.dispose();
+  };
+
+  const startFresh = async (): Promise<void> => {
+    const composed = attach(new PluginHost(hostOptions));
+    await composed.host.start();
+    mount(composed);
+  };
+
+  /** Reads the journal, closes the running host and continues the ride in a new one. */
+  async function continueRide(file: string): Promise<void> {
+    const running = current;
+    const storage = running?.host.getProvider(storageAppFilesCapability);
+    if (!running || !storage) {
+      return;
+    }
+    let text: string;
+    try {
+      text = new TextDecoder().decode(await storage.read(file));
+    } catch (error) {
+      options.logger.error({ err: error, file }, 'the interrupted ride could not be read');
+      return;
+    }
+    await teardown(running);
+    current = undefined;
+    try {
+      // The continuing host's bridge and subscriptions are attached before it starts.
+      await continueRecording(text, { ...hostOptions, file, beforeStart: attach });
+      const composed = latest();
+      if (!composed) {
+        throw new Error('no continuing host');
+      }
+      mount(composed);
+      options.logger.info({ file }, 'interrupted ride continued');
+    } catch (error) {
+      // The ride stays in its journal; the app goes on without it.
+      options.logger.error({ err: error, file }, 'the interrupted ride could not be continued');
+      const failed = latest();
+      if (failed) {
+        await teardown(failed);
+      }
+      await startFresh();
+    }
+  }
+
+  await startFresh();
   options.logger.info('ridrs app started');
 
   let closing: Promise<void> | undefined;
   return {
-    host,
+    get host() {
+      const composed = latest();
+      if (!composed) {
+        throw new Error('The ridrs app has no host');
+      }
+      return composed.host;
+    },
     close() {
       closing ??= (async () => {
-        unmount();
-        rideWatch?.unsubscribe();
-        keepAwake?.setKeepAwake(false);
-        bridge.dispose();
-        await host.dispose();
+        await continuing?.catch(() => undefined);
+        const composed = latest();
+        if (composed) {
+          await teardown(composed);
+        }
         options.logger.info('host stopped');
       })();
       return closing;

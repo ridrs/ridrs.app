@@ -13,7 +13,8 @@ apps/native  (one process: the Tauri WebView)
                                                     allow-list,             one screen at a time,
                                                     last-value replay       synced slots
    ├─ screen "main"      ui-main-screen          [Start ride]
-   └─ screen "activity"  ui-activity-screen      declares: activity/landscape, activity/hud   [Finish ride]
+   │     └─ main/panel  ◄─ ui-ride-recovery      [Continue ride] [Finish ride] for an interrupted ride (ADR 0057)
+   └─ screen "activity"  ui-activity-screen      declares: activity/landscape, activity/hud   [Pause|Resume] [Finish ride]
          ├─ activity/landscape  ◄─ ui-landscape-demo     (Phase 10: the world's sensor, publishes ui.terrain-observed)
          └─ activity/hud        ◄─ ui-hud                declares: hud/widget
                └─ hud/widget    ◄─ ui-widget-power, ui-widget-cadence,

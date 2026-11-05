@@ -115,6 +115,23 @@ function isLifecycle(type: string): boolean {
   return type.startsWith('core.') || type === deviceConnectionChangedEvent.id;
 }
 
+/**
+ * What entered the recorded host through its input queue. Recordings from before the queue carry
+ * no flag: there, anything from outside the recorded plugins counts.
+ */
+export function recordedInputs(
+  recording: Recording,
+  recordedIds: ReadonlySet<string>,
+): Recording['events'] {
+  const events = recording.events;
+  const flagged = events.some((e) => e.envelope.input === true);
+  return events.filter((e) =>
+    flagged
+      ? e.envelope.input === true
+      : !recordedIds.has(e.envelope.source) && !isLifecycle(e.envelope.type),
+  );
+}
+
 function pathOf(segments: readonly (string | number)[]): string {
   return segments
     .map((s, i) => (typeof s === 'number' ? `[${s}]` : i === 0 ? s : `.${s}`))
@@ -206,14 +223,7 @@ export async function replay(recording: Recording, options: ReplayOptions): Prom
 
   const events = recording.events;
   const definitions = new Map([...options.events].map((d) => [d.id, d] as const));
-  // Inputs: what entered the recorded host through its input queue. Recordings from before the
-  // queue carry no flag: there, anything from outside the recorded plugins counts.
-  const flagged = events.some((e) => e.envelope.input === true);
-  const inputs = events.filter((e) =>
-    flagged
-      ? e.envelope.input === true
-      : !allRecordedIds.has(e.envelope.source) && !isLifecycle(e.envelope.type),
-  );
+  const inputs = recordedInputs(recording, allRecordedIds);
   const inputCounts = new Map<string, number>();
   for (const { envelope } of inputs) {
     const key = JSON.stringify([envelope.type, envelope.source]);

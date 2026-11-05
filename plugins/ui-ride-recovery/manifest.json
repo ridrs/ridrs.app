@@ -1,0 +1,32 @@
+{
+  "id": "ui-ride-recovery",
+  "name": "Ride Recovery",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [],
+    "contributions": [
+      {
+        "id": "interrupted-ride",
+        "extensionPoint": "main/panel",
+        "export": "InterruptedRide",
+        "order": 0
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "recording.recoverable-changed"
+      ],
+      "publish": [
+        "recording.continue-requested",
+        "recording.finish-requested"
+      ]
+    }
+  }
+}

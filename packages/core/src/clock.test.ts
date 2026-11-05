@@ -250,3 +250,35 @@ describe('turns in the host', () => {
     await host.dispose();
   });
 });
+
+describe('LiveClock held at a time (ADR 0057)', () => {
+  it('moves only by advanceTo while held, then follows its time source from the release', () => {
+    let now = 100_000;
+    const timers: Array<() => void> = [];
+    const clock = new LiveClock({
+      heldAt: 1000,
+      timeSource: { now: () => now },
+      timers: {
+        setTimeout: (callback) => timers.push(callback),
+        clearTimeout: () => undefined,
+      },
+    });
+    const ran: number[] = [];
+    clock.scheduleAt(1500, () => ran.push(clock.now()));
+    clock.scheduleAt(5000, () => ran.push(clock.now()));
+    expect(clock.now()).toBe(1000);
+    expect(timers).toHaveLength(0);
+
+    clock.advanceTo(2000);
+    expect(ran).toEqual([1500]);
+    expect(clock.now()).toBe(2000);
+
+    // The gap's tasks run at their planned times; then time is the source's.
+    clock.release();
+    expect(ran).toEqual([1500, 5000]);
+    expect(clock.now()).toBe(100_000);
+    expect(() => clock.advanceTo(200_000)).toThrow(/held/);
+    now = 100_500;
+    expect(clock.now()).toBeGreaterThanOrEqual(100_000);
+  });
+});

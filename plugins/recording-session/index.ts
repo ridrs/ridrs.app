@@ -3,6 +3,7 @@
 import {
   type ActivityState,
   type AppFiles,
+  activityInterruptedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
   configSnapshotCapability,
@@ -11,15 +12,20 @@ import {
   definePlugin,
   deviceConnectionChangedEvent,
   type EventEnvelope,
+  type HostDescription,
   type PhysicsState,
   type PluginContext,
   physicsStateEvent,
   recordingCompletedEvent,
   recordingFailedEvent,
+  recordingFinishRequestedEvent,
+  recordingRecoverableChangedEvent,
   storageAppFilesCapability,
 } from '@ridrs/contracts';
 import {
   buildConfigSnapshot,
+  type CommittedJournal,
+  committedJournal,
   fileNameOf,
   gzip,
   lastRecordTime,
@@ -83,7 +89,18 @@ interface Recorder {
   /** The latest connection state per device that fell out of the pre-roll window. */
   readonly connections: Map<string, Buffered>;
   ride?: Ride;
+  /** The interrupted ride on offer (ADR 0057): continued by the composition root or finished. */
+  offered?: { readonly openPath: string };
+  /**
+   * A continuing host (ADR 0057): the journal to go on with. Until its `activity.interrupted`
+   * input everything is the rebuilt past; from it on, envelopes wait here while the file is
+   * cut back to its committed part, then go to it.
+   */
+  continuing?: { readonly file: string; waiting?: EventEnvelope[]; attached: boolean };
 }
+
+/** Plugin types a replay or a continuation does not run on recorded data: they may differ. */
+const INPUT_SIDE_TYPES = new Set(['transport', 'storage', 'recording', 'export', 'ui']);
 
 const recorders = new WeakMap<PluginContext, Recorder>();
 
@@ -298,46 +315,230 @@ async function closeRide(ctx: PluginContext, recorder: Recorder, ride: Ride): Pr
   }
 }
 
-/** Completes every open recording a crash left behind. */
+/** Completes an open recording a crash left behind, as `recovered`. */
+async function sealOrphan(
+  ctx: PluginContext,
+  recorder: Recorder,
+  openPath: string,
+  why?: string,
+): Promise<void> {
+  const path = openPath.slice(0, -'.jsonl'.length);
+  try {
+    const { text } = recoverRecording(
+      new TextDecoder().decode(await recorder.storage.read(openPath)),
+    );
+    const { recording, bytes } = await seal(recorder.storage, openPath, path, text);
+    ctx.reportDiagnostic('recording-recovered', `Recovered the interrupted recording "${path}"`, {
+      file: path,
+      status: recording.footer?.status,
+      ...(why ? { notContinued: why } : {}),
+    });
+    if (ctx.signal.aborted) {
+      return;
+    }
+    const distance = distanceOf(recording);
+    ctx.events.publish(recordingCompletedEvent, {
+      sessionId: recording.header.sessionId,
+      file: path,
+      bytes,
+      events: recording.events.length,
+      ...(distance !== undefined ? { distance } : {}),
+      durationMs: lastRecordTime(recording) - recording.header.startedAt,
+    });
+  } catch (error) {
+    ctx.reportDiagnostic(
+      'recording-failed',
+      `The interrupted recording "${fileNameOf(openPath)}" could not be recovered: ${reason(error)}`,
+      { file: openPath },
+    );
+  }
+}
+
+/**
+ * Whether the ride can go on with the plugins as they are now: the simulation plugins of the
+ * recording must all run, each in its recorded version; different code could compute a different
+ * state. Input-side plugins may differ (ADR 0057).
+ */
+function whyNotContinuable(journal: CommittedJournal, current: HostDescription): string | undefined {
+  if (!journal.ride) {
+    return 'no-ride';
+  }
+  if (!journal.recording.header.runId) {
+    return 'no-run-id';
+  }
+  const recorded = ((journal.recording.snapshot.host as unknown as HostDescription).plugins ?? [])
+    .filter((p) => p.state === 'started' && !p.types.some((t) => INPUT_SIDE_TYPES.has(t)));
+  // At start-up the plugins after this one are still starting: present and not failed counts.
+  const now = new Map(
+    current.plugins
+      .filter((p) => p.state !== 'failed' && p.state !== 'blocked')
+      .map((p) => [p.id, p.version] as const),
+  );
+  if (recorded.some((p) => !now.has(p.id))) {
+    return 'plugin-missing';
+  }
+  if (recorded.some((p) => now.get(p.id) !== p.version)) {
+    return 'plugin-version-changed';
+  }
+  return undefined;
+}
+
+/**
+ * At start: the newest open recording whose ride can go on is offered to be continued or
+ * finished (ADR 0057); every other open recording a crash left behind is completed as
+ * `recovered`, as before.
+ */
 async function recoverOrphans(ctx: PluginContext, recorder: Recorder): Promise<void> {
   const entries = await recorder.storage.list(RECORDINGS_DIRECTORY);
+  const rides: Array<{ readonly openPath: string; readonly journal: CommittedJournal }> = [];
   for (const { path: openPath } of entries) {
-    if (!openPath.endsWith(OPEN_RECORDING_EXTENSION) || openPath === recorder.ride?.openPath) {
+    if (
+      !openPath.endsWith(OPEN_RECORDING_EXTENSION) ||
+      openPath === recorder.ride?.openPath ||
+      openPath === recorder.continuing?.file
+    ) {
       continue;
     }
-    const path = openPath.slice(0, -'.jsonl'.length);
+    let journal: CommittedJournal | undefined;
     try {
-      const { text } = recoverRecording(
-        new TextDecoder().decode(await recorder.storage.read(openPath)),
-      );
-      const { recording, bytes } = await seal(recorder.storage, openPath, path, text);
-      ctx.reportDiagnostic('recording-recovered', `Recovered the interrupted recording "${path}"`, {
-        file: path,
-        status: recording.footer?.status,
-      });
-      if (ctx.signal.aborted) {
-        return;
-      }
-      const distance = distanceOf(recording);
-      ctx.events.publish(recordingCompletedEvent, {
-        sessionId: recording.header.sessionId,
-        file: path,
-        bytes,
-        events: recording.events.length,
-        ...(distance !== undefined ? { distance } : {}),
-        durationMs: lastRecordTime(recording) - recording.header.startedAt,
-      });
-    } catch (error) {
-      ctx.reportDiagnostic(
-        'recording-failed',
-        `The interrupted recording "${fileNameOf(openPath)}" could not be recovered: ${reason(error)}`,
-        { file: openPath },
-      );
+      journal = committedJournal(new TextDecoder().decode(await recorder.storage.read(openPath)));
+    } catch {
+      journal = undefined;
     }
+    const why = journal ? whyNotContinuable(journal, ctx.host.describe()) : 'unreadable';
+    if (journal && why === undefined) {
+      rides.push({ openPath, journal });
+    } else {
+      await sealOrphan(ctx, recorder, openPath, why);
+    }
+  }
+  rides.sort((a, b) => b.journal.recording.header.startedAt - a.journal.recording.header.startedAt);
+  const [newest, ...older] = rides;
+  for (const { openPath } of older) {
+    await sealOrphan(ctx, recorder, openPath, 'older');
+  }
+  if (!newest || ctx.signal.aborted) {
+    return;
+  }
+  const { openPath, journal } = newest;
+  const distance = distanceOf(journal.recording);
+  recorder.offered = { openPath };
+  ctx.events.publish(recordingRecoverableChangedEvent, {
+    ride: {
+      sessionId: journal.recording.header.sessionId,
+      file: openPath,
+      startedAt: journal.recording.header.startedAt,
+      lastRecordAt: journal.lastRecordAt,
+      ...(distance !== undefined ? { distance } : {}),
+    },
+  });
+}
+
+/** The rider finishes the interrupted ride on offer: it is completed as `recovered`. */
+async function finishOffered(ctx: PluginContext, recorder: Recorder, file: string): Promise<void> {
+  if (recorder.offered?.openPath !== file) {
+    return;
+  }
+  recorder.offered = undefined;
+  await sealOrphan(ctx, recorder, file);
+  if (!ctx.signal.aborted) {
+    ctx.events.publish(recordingRecoverableChangedEvent, {});
+  }
+}
+
+/**
+ * A continuing host reached the interruption: cuts the journal back to its committed part, then
+ * records on in it, numbering lines on from its last `seq` (ADR 0057).
+ */
+async function attach(ctx: PluginContext, recorder: Recorder, file: string): Promise<void> {
+  const continuing = recorder.continuing;
+  if (!continuing) {
+    return;
+  }
+  let journal: CommittedJournal | undefined;
+  try {
+    journal = committedJournal(new TextDecoder().decode(await recorder.storage.read(file)));
+    if (!journal?.ride) {
+      throw new Error('it holds no ride');
+    }
+    await recorder.storage.replace(file, new TextEncoder().encode(journal.text));
+  } catch (error) {
+    continuing.waiting = undefined;
+    ctx.reportDiagnostic(
+      'recording-failed',
+      `The interrupted recording "${fileNameOf(file)}" could not be continued: ${reason(error)}`,
+      { file },
+    );
+    return;
+  }
+  const { header } = journal.recording;
+  const ride: Ride = {
+    sessionId: header.sessionId,
+    startedAt: header.startedAt,
+    openPath: file,
+    path: file.slice(0, -'.jsonl'.length),
+    writer: RecordingWriter.continuing(journal.recording),
+    pending: [],
+    lines: journal.recording.lines,
+    writes: Promise.resolve(),
+    finishing: false,
+    closed: false,
+    failed: false,
+    syncSoon: false,
+    distance: distanceOf(journal.recording),
+  };
+  recorder.ride = ride;
+  const waiting = continuing.waiting ?? [];
+  continuing.waiting = undefined;
+  continuing.attached = true;
+  for (const envelope of waiting) {
+    record(ctx, recorder, ride, envelope);
+  }
+  flush(ctx, recorder, ride);
+  sync(ctx, recorder, ride);
+  ride.timer = setInterval(() => flush(ctx, recorder, ride), RECORDING_DEFAULTS.flushIntervalMs);
+  ride.syncTimer = setInterval(() => sync(ctx, recorder, ride), RECORDING_DEFAULTS.syncIntervalMs);
+}
+
+/** One envelope of a running ride goes to its recording. */
+function record(ctx: PluginContext, recorder: Recorder, ride: Ride, envelope: EventEnvelope): void {
+  if (ride.closed) {
+    return;
+  }
+  if (!ride.failed) {
+    ride.pending.push(ride.writer.event(serializeEnvelope(envelope), false));
+  }
+  if (envelope.type === activityStateChangedEvent.id && !ride.finishing) {
+    syncSoon(ctx, recorder, ride);
+  }
+  if (envelope.type === physicsStateEvent.id) {
+    const state = envelope.payload as PhysicsState;
+    if (state.sessionId === ride.sessionId) {
+      ride.distance = state.distance;
+    }
+  }
+  const state = envelope.type === activityStateChangedEvent.id && (envelope.payload as ActivityState);
+  if (state && state.state === 'finished' && state.sessionId === ride.sessionId && !ride.finishing) {
+    ride.finishing = true;
+    ride.endedAt = state.endedAt;
+    // Events published while the bus delivers `finished` (the final physics state) still belong
+    // to the ride: close once that run-to-completion cascade is over.
+    queueMicrotask(() => void closeRide(ctx, recorder, ride));
   }
 }
 
 function onEvent(ctx: PluginContext, recorder: Recorder, envelope: EventEnvelope): void {
+  const continuing = recorder.continuing;
+  if (continuing && !continuing.attached) {
+    if (continuing.waiting) {
+      continuing.waiting.push(envelope);
+    } else if (envelope.type === activityInterruptedEvent.id && envelope.input) {
+      // What the continuing host published before was the rebuilt past: it is in the file.
+      continuing.waiting = [envelope];
+      void attach(ctx, recorder, continuing.file);
+    }
+    return;
+  }
   const serialized = serializeEnvelope(envelope);
   const ride = recorder.ride;
   const recording = ride !== undefined && !ride.closed;
@@ -353,30 +554,14 @@ function onEvent(ctx: PluginContext, recorder: Recorder, envelope: EventEnvelope
   prune(recorder, envelope.timestamp - RECORDING_DEFAULTS.prerollMs);
 
   if (ride && recording) {
-    if (!ride.failed) {
-      ride.pending.push(ride.writer.event(serialized, false));
-    }
-    if (envelope.type === activityStateChangedEvent.id && !ride.finishing) {
-      syncSoon(ctx, recorder, ride);
-    }
-    if (envelope.type === physicsStateEvent.id) {
-      const state = envelope.payload as PhysicsState;
-      if (state.sessionId === ride.sessionId) {
-        ride.distance = state.distance;
-      }
-    }
-    const state = envelope.type === activityStateChangedEvent.id && (envelope.payload as ActivityState);
-    if (state && state.state === 'finished' && state.sessionId === ride.sessionId && !ride.finishing) {
-      ride.finishing = true;
-      ride.endedAt = state.endedAt;
-      // Events published while the bus delivers `finished` (the final physics state) still belong
-      // to the ride: close once that run-to-completion cascade is over.
-      queueMicrotask(() => void closeRide(ctx, recorder, ride));
-    }
+    record(ctx, recorder, ride, envelope);
   }
 }
 
 function onDiagnostic(ctx: PluginContext, recorder: Recorder, diagnostic: Diagnostic): void {
+  if (recorder.continuing && !recorder.continuing.attached) {
+    return;
+  }
   const ride = recorder.ride;
   if (ride && !ride.closed && !ride.failed) {
     ride.pending.push(ride.writer.diagnostic(diagnostic, ctx.clock.now()));
@@ -394,11 +579,13 @@ function observeHost(ctx: PluginContext): Recorder {
   if (existing) {
     return existing;
   }
+  const continuing = ctx.host.describe().continuing;
   const recorder: Recorder = {
     storage: ctx.capabilities.get(storageAppFilesCapability),
     observed: 0,
     buffer: [],
     connections: new Map(),
+    ...(continuing ? { continuing: { file: continuing.file, attached: false } } : {}),
   };
   recorders.set(ctx, recorder);
   ctx.host.observe({
@@ -417,6 +604,9 @@ export default definePlugin({
   start(ctx) {
     // A restarted plugin has a fresh context (and no initialize): it observes from here.
     const recorder = observeHost(ctx);
+    ctx.events.subscribe(recordingFinishRequestedEvent, ({ payload }) => {
+      void finishOffered(ctx, recorder, payload.file);
+    });
     void recoverOrphans(ctx, recorder).catch((error: unknown) =>
       ctx.reportDiagnostic(
         'recording-failed',

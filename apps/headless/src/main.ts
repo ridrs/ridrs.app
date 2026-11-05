@@ -46,7 +46,10 @@ import {
   physicsTotalResistanceCapability,
   physicsTrainerLoadCapability,
   recordingCompletedEvent,
+  recordingContinueRequestedEvent,
   recordingFailedEvent,
+  recordingFinishRequestedEvent,
+  recordingRecoverableChangedEvent,
   spatialTerrainCapability,
   storageAppFilesCapability,
   trainerCommandEvent,
@@ -56,8 +59,9 @@ import {
   uiTerrainObservedEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
-import { PluginHost } from '@ridrs/core';
+import { PluginHost, type PluginHostOptions } from '@ridrs/core';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
+import { continueRecording } from '@ridrs/replay';
 import pino from 'pino';
 import pretty from 'pino-pretty';
 import { runRecordingCommand } from './recording-cli.ts';
@@ -132,6 +136,9 @@ const EVENTS: readonly EventDefinition[] = [
   worldTerrainPreviewEvent,
   recordingCompletedEvent,
   recordingFailedEvent,
+  recordingRecoverableChangedEvent,
+  recordingContinueRequestedEvent,
+  recordingFinishRequestedEvent,
   exportFitWrittenEvent,
 ];
 
@@ -181,7 +188,7 @@ async function main(): Promise<void> {
   const stream = process.stdout.isTTY ? pretty({ sync: true }) : pino.destination({ sync: true });
   const logger = pino({ name: 'ridrs-headless' }, stream);
 
-  const host = new PluginHost({
+  const hostOptions: PluginHostOptions = {
     sources: pluginsDirs.map(createFileSystemPluginSource),
     disabledPlugins,
     logger,
@@ -193,6 +200,30 @@ async function main(): Promise<void> {
       os: process.platform,
       appVersion: versionOf(new URL('../package.json', import.meta.url)),
     },
+  };
+  let host = new PluginHost(hostOptions);
+
+  /**
+   * Headless continues an interrupted ride on its own (ADR 0057): the ride goes on paused, in a
+   * continuing host that replaces the first one, until `activity.resume-requested` arrives.
+   */
+  host.subscribeEvent('ridrs-headless', recordingRecoverableChangedEvent, ({ payload }) => {
+    const ride = payload.ride;
+    const storage = host.getProvider(storageAppFilesCapability);
+    if (!ride || !storage) {
+      return;
+    }
+    void (async () => {
+      const text = new TextDecoder().decode(await storage.read(ride.file));
+      await host.dispose();
+      host = await continueRecording(text, { ...hostOptions, file: ride.file });
+      logger.info(
+        { file: ride.file, sessionId: ride.sessionId },
+        'interrupted ride continued, paused',
+      );
+    })().catch((error: unknown) => {
+      logger.error({ err: error, file: ride.file }, 'the interrupted ride could not be continued');
+    });
   });
 
   const keepAlive = setInterval(() => {}, 60_000);

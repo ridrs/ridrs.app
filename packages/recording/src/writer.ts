@@ -35,6 +35,27 @@ export class RecordingWriter {
   private diagnostics = 0;
   private readonly byType = new Map<string, number>();
 
+  /** Goes on numbering and counting after the lines of an open recording (ADR 0057). */
+  static continuing(recording: {
+    readonly events: readonly {
+      readonly seq: number;
+      readonly envelope: { readonly type: string };
+    }[];
+    readonly diagnostics: readonly { readonly seq: number }[];
+  }): RecordingWriter {
+    const writer = new RecordingWriter();
+    for (const { seq, envelope } of recording.events) {
+      writer.seq = Math.max(writer.seq, seq);
+      writer.events += 1;
+      writer.byType.set(envelope.type, (writer.byType.get(envelope.type) ?? 0) + 1);
+    }
+    for (const { seq } of recording.diagnostics) {
+      writer.seq = Math.max(writer.seq, seq);
+      writer.diagnostics += 1;
+    }
+    return writer;
+  }
+
   header(header: Omit<RecordingHeader, 'kind'>): string {
     return line({ kind: 'header', ...header });
   }
