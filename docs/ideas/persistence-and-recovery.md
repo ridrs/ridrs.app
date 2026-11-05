@@ -2,7 +2,7 @@
 
 # Proposal: Persistence, Data Ownership, Providers, Sync and Session Recovery
 
-**Status: proposal for architectural review (2026-11-04). Nothing here is decided or implemented.** No code, schema, migration or dependency was changed for this document. It reviews the brief "Persistence, Data Ownership, Provider Abstraction, Cloud Synchronization, and Session Recovery" against the code as it is today, challenges parts of it, and proposes an incremental plan. Every step still starts with failing Cucumber scenarios and gets its own ADR (AGENTS.md rules 1–3).
+**Status: accepted with changes on 2026-11-05 ([ADR 0052](../decisions/0052-persistence-domains-and-plan.md)); phases P0–P5 implemented ([ADR 0053](../decisions/0053-secrets-in-an-encrypted-app-file.md)–[ADR 0057](../decisions/0057-continuing-an-interrupted-ride.md)).** The text below is the proposal as reviewed; where the decisions differ, the ADRs hold. The main changes: no OS keychain on macOS (an encrypted app file, ADR 0053), JSON settings documents before SQLite (ADR 0054), no `KnownDevice` list or route preference (ADR 0046 removed the second link per device), ADR numbers 0052–0057 instead of 0046–0051. It reviews the brief "Persistence, Data Ownership, Provider Abstraction, Cloud Synchronization, and Session Recovery" against the code as it is today, challenges parts of it, and proposes an incremental plan. Every step still starts with failing Cucumber scenarios and gets its own ADR (AGENTS.md rules 1–3).
 
 Markers:
 

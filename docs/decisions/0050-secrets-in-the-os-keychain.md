@@ -4,6 +4,8 @@
 
 Status: accepted on 2026-11-04 and implemented the same day, for [ADR 0048](0048-intervals-icu-connection-and-training-plan.md). Keychain over a file: chosen by the maintainer on 2026-11-04.
 
+**Superseded on macOS and the desktop by [ADR 0053](0053-secrets-in-an-encrypted-app-file.md)** (2026-11-05): the Keychain asked for the login password after every build. Android keeps the store below.
+
 ## Context
 
 The intervals.icu token works like a password for the athlete's calendar and settings. App files (`storage.app-files`) are plain files in the app container. `storage.secrets` should keep the token in the operating system's credential store on macOS and Android, without asking the rider for anything.
