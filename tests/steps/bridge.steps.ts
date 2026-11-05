@@ -184,6 +184,18 @@ Given(
 );
 
 Given(
+  'a companion {string} wrapping a simulated BLE environment with an FTMS trainer {string} that supports simulation and target power',
+  function (this: RidrsWorld, name: string, trainerName: string) {
+    this.bleSimulator = new BleSimulator({ clock: this.clock });
+    this.trainer = this.bleSimulator.addFtmsTrainer(trainerName, {
+      control: { simulation: true, targetPower: true },
+    });
+    this.companionCentral = this.bleSimulator;
+    pendingCompanion.set(this, { name });
+  },
+);
+
+Given(
   'a companion {string} wrapping a simulated BLE environment with a Zwift Ride {string}',
   function (this: RidrsWorld, name: string, controllerName: string) {
     this.bleSimulator = new BleSimulator({ clock: this.clock });

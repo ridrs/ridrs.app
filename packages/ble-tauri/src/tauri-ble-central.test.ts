@@ -199,6 +199,28 @@ describe('TauriBleConnection', () => {
       serviceUuid: 'fc82',
       characteristicUuid: '00000003-19ca-4651-86e5-fa29dcdd09d1',
       data: [0x52, 0x69],
+      withResponse: false,
+    });
+  });
+
+  it('writes with response when asked to', async () => {
+    const ipc = new FakeIpc();
+    const connection = await new TauriBleCentral(ipc).connect('trainer');
+
+    await connection.write(
+      { serviceUuid: '1826', characteristicUuid: '2AD9' },
+      new Uint8Array([0]),
+      {
+        withResponse: true,
+      },
+    );
+
+    expect(ipc.callsOf('ble_write')[0]?.args).toEqual({
+      peripheralId: 'trainer',
+      serviceUuid: '1826',
+      characteristicUuid: '2ad9',
+      data: [0],
+      withResponse: true,
     });
   });
 

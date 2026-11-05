@@ -2,19 +2,23 @@
 
 import {
   BLE_BRIDGE_PROTOCOL_VERSION,
+  BLE_BRIDGE_READ_PROTOCOL_VERSION,
   type BleCentral,
   type BleCharacteristicTarget,
   type BleConnection,
   type BleDiscoveredPeripheral,
   type BleScanOptions,
+  type BleWriteOptions,
   type BridgeMessage,
   type BridgeRejectReason,
   type BridgeSocket,
   bytesToHex,
   decodeBridgeFrame,
+  hexToBytes,
   normalizeBleUuid,
   type TimeSource,
 } from '@ridrs/contracts';
+import semver from 'semver';
 import { Liveness, parseMessage, sendMessage } from './link.ts';
 
 export class BridgeRejectedError extends Error {
@@ -72,8 +76,16 @@ class RemoteConnection implements BleConnection {
     return this.session.subscribe(this.peripheralId, target, onNotification);
   }
 
-  write(target: BleCharacteristicTarget, data: Uint8Array): Promise<void> {
-    return this.session.write(this.peripheralId, target, data);
+  write(
+    target: BleCharacteristicTarget,
+    data: Uint8Array,
+    options?: BleWriteOptions,
+  ): Promise<void> {
+    return this.session.write(this.peripheralId, target, data, options);
+  }
+
+  read(target: BleCharacteristicTarget): Promise<Uint8Array> {
+    return this.session.read(this.peripheralId, target);
   }
 
   onDisconnected(listener: () => void): () => void {
@@ -292,7 +304,12 @@ export class BridgeSession implements BleCentral {
     peripheralId: string,
     target: BleCharacteristicTarget,
     data: Uint8Array,
+    options?: BleWriteOptions,
   ): Promise<void> {
+    const withResponse = options?.withResponse ?? false;
+    if (withResponse) {
+      this.requireReads('a write with response');
+    }
     const reply = await this.request({
       type: 'write',
       requestId: this.nextRequestId++,
@@ -300,9 +317,39 @@ export class BridgeSession implements BleCentral {
       serviceUuid: normalizeBleUuid(target.serviceUuid),
       characteristicUuid: normalizeBleUuid(target.characteristicUuid),
       data: bytesToHex(data),
+      ...(withResponse ? { withResponse } : {}),
     });
     if (reply.type !== 'written') {
       throw new Error(`Unexpected reply "${reply.type}" to write`);
+    }
+  }
+
+  /** @internal */
+  async read(peripheralId: string, target: BleCharacteristicTarget): Promise<Uint8Array> {
+    this.requireReads('a read');
+    const reply = await this.request({
+      type: 'read',
+      requestId: this.nextRequestId++,
+      peripheralId,
+      serviceUuid: normalizeBleUuid(target.serviceUuid),
+      characteristicUuid: normalizeBleUuid(target.characteristicUuid),
+    });
+    if (reply.type !== 'read-result') {
+      throw new Error(`Unexpected reply "${reply.type}" to read`);
+    }
+    return hexToBytes(reply.data);
+  }
+
+  /**
+   * A companion of 1.2 or older would reject the message as unknown (its messages are strict):
+   * say so here instead of failing on the other side.
+   */
+  private requireReads(what: string): void {
+    const theirs = semver.parse(this.welcome.protocol);
+    if (theirs === null || semver.lt(theirs, BLE_BRIDGE_READ_PROTOCOL_VERSION)) {
+      throw new Error(
+        `The companion speaks bridge protocol ${this.welcome.protocol}: ${what} needs ${BLE_BRIDGE_READ_PROTOCOL_VERSION} or later; update the companion app`,
+      );
     }
   }
 
@@ -382,6 +429,7 @@ export class BridgeSession implements BleCentral {
       case 'disconnected':
       case 'subscribed':
       case 'written':
+      case 'read-result':
       case 'failed': {
         const scan = this.scans.get(message.requestId);
         if (scan && message.type === 'failed') {

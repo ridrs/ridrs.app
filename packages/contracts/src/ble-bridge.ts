@@ -13,9 +13,13 @@ import { defineEvent } from './events.ts';
 /**
  * Wire protocol version; a companion accepts clients within the same major version.
  * 1.1: `write` / `written`. 1.2: `rssi`, `manufacturerData` and `serviceData` in `discovered`,
- * sent only to a client of 1.2 or later.
+ * sent only to a client of 1.2 or later. 1.3: `withResponse` in `write`, `read` / `read-result`
+ * (ADR 0052); ridrs sends them only to a companion of 1.3 or later.
  */
-export const BLE_BRIDGE_PROTOCOL_VERSION = '1.2.0';
+export const BLE_BRIDGE_PROTOCOL_VERSION = '1.3.0';
+
+/** The first protocol with `withResponse` in `write` and with `read`. */
+export const BLE_BRIDGE_READ_PROTOCOL_VERSION = '1.3.0';
 
 /** DNS-SD service type a companion advertises (TXT: `protocol`, `name`, `id`). */
 export const BLE_BRIDGE_SERVICE_TYPE = '_ridrs-bridge._tcp';
@@ -130,9 +134,28 @@ export const bridgeMessageSchema = z.discriminatedUnion('type', [
       characteristicUuid: uuid,
       /** Lowercase hex, see `bytesToHex`. */
       data: z.string().regex(/^(?:[0-9a-f]{2})*$/),
+      /** From 1.3: a Write With Response; `written` follows the peripheral's write response. */
+      withResponse: z.boolean().optional(),
     })
     .strict(),
   z.object({ type: z.literal('written'), requestId }).strict(),
+  z
+    .object({
+      type: z.literal('read'),
+      requestId,
+      peripheralId: z.string().min(1),
+      serviceUuid: uuid,
+      characteristicUuid: uuid,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('read-result'),
+      requestId,
+      /** Lowercase hex, see `bytesToHex`. */
+      data: z.string().regex(/^(?:[0-9a-f]{2})*$/),
+    })
+    .strict(),
   z.object({ type: z.literal('failed'), requestId, message: z.string() }).strict(),
 ]);
 export type BridgeMessage = z.infer<typeof bridgeMessageSchema>;

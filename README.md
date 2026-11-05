@@ -189,6 +189,26 @@ Record the file sizes (`.ridrs`, `.fit`) per 10 minutes, the replay duration, th
 
 The FIT files are written by ridrs' own encoder. The official Garmin FIT SDK (`@garmin/fitsdk`) is a test-only devDependency that validates every exported file; it is never bundled or distributed ([ADR 0034](docs/decisions/0034-fit-own-encoder-sdk-validation-only.md)). `pnpm check:native-bundle` builds the native app and checks that its bundle contains neither the SDK nor the Node storage provider.
 
+## Trainer control: gradient, virtual gears and ERG
+
+With an FTMS trainer that offers a control point (a KICKR CORE, say), ridrs takes control on connecting and drives its resistance ([trainer-control.md](docs/architecture/trainer-control.md)):
+
+- **Free ride:** the trainer gets harder uphill and easier downhill, following the landscape, and gravel feels heavier (FTMS simulation parameters, at most once a second when they change).
+- **Virtual shifting:** the Zwift Ride's shift buttons change one of 24 virtual gears (from 34 × 34 to 53 × 11 on a real 34 × 14; every ride starts in gear 12). The HUD shows the gear. A harder gear makes the same cadence harder; the virtual speed still comes from the power you measure.
+- **ERG:** move the focus to **Target power** in the HUD with the arrow keys and press Enter: ERG holds 150 W. ↑ and ↓ change the target by 5 W, Back leaves ERG. The Zwift Ride's right power-up button starts ERG or adds 5 W, the left one takes 5 W off. Finishing the ride leaves ERG and gives the trainer a flat road.
+- The trainer's details in the device setup show "Control: simulation", "ERG 150 W", "not supported", "refused" or "lost". A trainer without a control point stays a power and cadence sensor.
+- Through the companion, trainer control needs a companion app of bridge protocol 1.3 or later. On Android, ridrs uses a patched copy of `tauri-plugin-blec` that enables indications ([ADR 0052](docs/decisions/0052-ble-write-with-response-read-and-indications.md)).
+
+**Manual check (with hardware, D7).** A KICKR CORE with the Zwift Ride, on the Mac and on Android (directly and through the companion). Set the trainer's rider weight in the Wahoo app to about 75 kg (ridrs simulates 85 kg with the bike).
+
+1. Ride the demo landscape in free ride. Check that the resistance follows the gradient and that gravel feels heavier.
+2. Shift through all 24 gears at 90 rpm on the flat and note the power per gear (predicted: 81 W in gear 12, 163 W in gear 16, 342 W in gear 20; [ADR 0054](docs/decisions/0054-trainer-load-and-virtual-gear-formula.md)).
+3. ERG 150 → 250 W: the power settles within a few seconds at any cadence between 70 and 100 rpm.
+4. Switch the trainer off and on again: control comes back without a restart.
+5. Finish the ride and replay the recording: "identical".
+
+Record the power per gear, the ERG settle times and anything the KICKR CORE refused (the device details and the `trainer-command-failed` diagnostics).
+
 ## Tests
 
 - `pnpm test` runs Vitest and Cucumber. Cucumber runs twice: Node-only scenarios, then the `@ui` scenarios (profile `ui`), which render the real shell and UI plugins into a headless DOM (happy-dom). No browser and no Rust toolchain are needed.

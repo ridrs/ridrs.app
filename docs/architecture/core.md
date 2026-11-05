@@ -51,3 +51,7 @@ Discovery goes through the `PluginSource` port, so the core stays runtime-neutra
 - **Inputs.** `ctx.inputs.accept` and `PluginHost.publishEvent` queue external inputs (`input: true`, `receivedAt`); `PluginHost.input(run)` runs a composition root's action as an input turn; `injectInput` and `advanceTo` drive a replay host. Publishing or writing a series outside a turn throws `outside-turn`, except publications of input-side plugins, which are accepted as inputs.
 - **Envelopes** carry a global `seq`; ids and `ctx.ids` derive from the host's `runId` (in `describe()`).
 - Details and the ordering rules: [time-and-scheduling.md](time-and-scheduling.md).
+
+## Optional capabilities (Phase 8)
+
+A manifest may list `optionalRequires`: the plugin starts after their providers when they are there and may access them (`ctx.capabilities.find` returns the provider or `undefined`; their series may be read), but a missing provider does not block it. `physics-engine` uses `physics.trainer-load` this way, `physics-trainer-load` the virtual gear ([ADR 0053](../decisions/0053-optional-capabilities.md)).

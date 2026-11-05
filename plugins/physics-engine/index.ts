@@ -9,6 +9,7 @@ import {
   physicsMotionCapability,
   physicsStateBatchEvent,
   physicsStateEvent,
+  physicsTrainerLoadCapability,
   type TaskId,
 } from '@ridrs/contracts';
 import { ENGINE_DEFAULTS, RideSimulation } from './simulation.ts';
@@ -81,7 +82,8 @@ function arm(ctx: PluginContext, ride: RideSimulation): void {
 /**
  * The simulation clock: a fixed 10 ms step while a ride runs, publishing `physics.state` and
  * every step's sample in `physics.state-batch`. It knows nothing about frames or rendering. The
- * only physics plugin with a timer; it knows nothing but `physics.motion`.
+ * only physics plugin with a timer; it knows nothing but `physics.motion` and, when installed,
+ * `physics.trainer-load`, which it asks once per step after the motion.
  */
 export default definePlugin({
   initialize(ctx) {
@@ -104,10 +106,16 @@ export default definePlugin({
     const begin = (sessionId: string, startedAt: number) => {
       engine.wake = undefined;
       try {
-        engine.ride = new RideSimulation(sessionId, startedAt, motion, {
-          state: (state) => ctx.events.publish(physicsStateEvent, state),
-          batch: (batch) => ctx.events.publish(physicsStateBatchEvent, batch),
-        });
+        engine.ride = new RideSimulation(
+          sessionId,
+          startedAt,
+          motion,
+          {
+            state: (state) => ctx.events.publish(physicsStateEvent, state),
+            batch: (batch) => ctx.events.publish(physicsStateBatchEvent, batch),
+          },
+          ctx.capabilities.find(physicsTrainerLoadCapability),
+        );
       } catch (error) {
         fail(ctx, sessionId, 0, error);
         return;

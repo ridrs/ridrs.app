@@ -64,3 +64,7 @@ ridrs-headless recording export-fit <file> [-o out.fit]    the written file and 
 ```
 
 The CLI's `export-fit` runs the same three calls as the plugin (`readRecording`, `buildActivity`, `encodeActivity`): byte-identical output.
+
+## Phase 8: trainer commands
+
+The events ADR 0029 anticipated are real: `device.raw-write` (published by the device plugin's link in the turn that decided the write) and `trainer.command` are derived and compared, like `trainer.control-changed` and `drivetrain.gear-changed`. The inputs that drive trainer control are recorded and injected: the connection (with the optional characteristics subscribed), `device.raw-read` (the Feature and the power range read on connecting), the trainer's answers (`device.raw-notification` on `2ad9`), `device.raw-write-failed`, `controller.buttons-changed` and `trainer.target-power` (from the ERG driver `control-erg`, which a replay leaves out like the world driver). The replay central still connects to nothing: writes need no device on replay, and reads come back as their recorded inputs ([ADR 0056](../decisions/0056-ftms-trainer-control.md)). `trainer-control-replay.feature` replays a ride with a climb, shifts and ERG identically.

@@ -44,6 +44,21 @@ const state = {
   driveForce: 200,
   resistance: { total: 3.3, contributions: [{ source: 'physics-aerodynamics', force: 0.2 }] },
   road: { gradient: 0.05, surface: 'gravel', origin: 'default' },
+  trainerLoad: {
+    resistance: {
+      gradient: 0.05,
+      rollingResistanceCoefficient: 0.008,
+      windResistanceCoefficient: 0.392,
+      windSpeed: 0,
+    },
+    resistanceWithVirtualGear: {
+      gradient: 0.05669412345678901,
+      rollingResistanceCoefficient: 0.008,
+      windResistanceCoefficient: 0.392,
+      windSpeed: 0,
+    },
+    virtualGear: { index: 13, ratio: 2.2713704592830495 },
+  },
 };
 
 /** A valid payload for every event of the contracts: the recording stores them all verbatim. */
@@ -101,6 +116,32 @@ const SAMPLES: Record<string, unknown> = {
     data: '44000000b400c800',
     receivedAt: T,
   },
+  'device.raw-read': {
+    deviceId: 'sim-1',
+    deviceName: 'SIM KICKR',
+    serviceUuid: '1826',
+    characteristicUuid: '2acc',
+    data: '0240000008200000',
+    receivedAt: T,
+  },
+  'device.raw-write': {
+    deviceId: 'sim-1',
+    deviceName: 'SIM KICKR',
+    serviceUuid: '1826',
+    characteristicUuid: '2ad9',
+    data: '05b400',
+    withResponse: true,
+    writtenAt: T,
+  },
+  'device.raw-write-failed': {
+    deviceId: 'sim-1',
+    deviceName: 'SIM KICKR',
+    serviceUuid: '1826',
+    characteristicUuid: '2ad9',
+    data: '00',
+    reason: 'ATT error 0xFD',
+  },
+  'drivetrain.gear-changed': { index: 13, ratio: 2.2713704592830495, count: 24 },
   'export.fit-written': { sessionId: 's-1', file: 'recordings/a.fit', bytes: 10, records: 11 },
   'measurement.power': {
     deviceId: 'd',
@@ -132,7 +173,15 @@ const SAMPLES: Record<string, unknown> = {
     sessionId: 's-1',
     samples: [
       { step: 4, at: T + 40, speed: 0.1, distance: 0.002, acceleration: 2.5, gradient: 0 },
-      { step: 5, at: T + 50, speed: 0.125, distance: 0.003, acceleration: 2.5, gradient: 0 },
+      {
+        step: 5,
+        at: T + 50,
+        speed: 0.125,
+        distance: 0.003,
+        acceleration: 2.5,
+        gradient: 0,
+        trainerLoad: state.trainerLoad,
+      },
     ],
   },
   'recording.completed': {
@@ -144,6 +193,19 @@ const SAMPLES: Record<string, unknown> = {
     durationMs: 10_000,
   },
   'recording.failed': { sessionId: 's-1', reason: 'disk full' },
+  'trainer.command': {
+    deviceId: 'sim-1',
+    command: { kind: 'simulation', windSpeed: 0, gradient: -0.0123, crr: 0.004, cw: 0.39 },
+  },
+  'trainer.control-changed': {
+    deviceId: 'sim-1',
+    mode: 'erg',
+    control: 'granted',
+    features: { simulation: true, targetPower: true },
+    targetPower: 180,
+  },
+  'trainer.erg-requested': { change: 'up' },
+  'trainer.target-power': { watts: null },
   'ui.terrain-observed': {
     revision: 2,
     originDistance: 2999,

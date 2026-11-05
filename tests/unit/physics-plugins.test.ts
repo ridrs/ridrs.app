@@ -6,6 +6,7 @@ import {
   activityStartRequestedEvent,
   type CapabilityContract,
   configSnapshotCapability,
+  drivetrainVirtualGearCapability,
   measurementPowerEvent,
   metricPowerCapability,
   type PhysicsState,
@@ -19,6 +20,7 @@ import {
   physicsRiderCapability,
   physicsStateEvent,
   physicsTotalResistanceCapability,
+  physicsTrainerLoadCapability,
   type ResistanceProvider,
   spatialTerrainCapability,
 } from '@ridrs/contracts';
@@ -86,6 +88,10 @@ function recordingContext(id: string) {
       getAll: (capability: { id: string }) => {
         capabilities.push(`getAll ${capability.id}`);
         return [];
+      },
+      find: (capability: { id: string }) => {
+        capabilities.push(`find ${capability.id}`);
+        return undefined;
       },
     },
     spatial: {
@@ -173,14 +179,16 @@ describe('physics engine on the real host', () => {
   });
 
   /** Starts a ride, delivers 200 W every 250 ms for 5 s, lets the host sleep 30 s, finishes. */
-  async function ride(): Promise<{ states: PhysicsState[]; afterLateWake: number }> {
+  async function ride(
+    extraPlugins: readonly string[] = [],
+  ): Promise<{ states: PhysicsState[]; afterLateWake: number }> {
     clock = FakeTimers.install({
       now: T0,
       toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
     });
     const manifests: Record<string, string> = {};
     const modules: Record<string, () => Promise<unknown>> = {};
-    for (const id of RIDE_PLUGINS) {
+    for (const id of [...RIDE_PLUGINS, ...extraPlugins]) {
       manifests[`plugins/${id}/manifest.json`] = readFileSync(
         resolve(PLUGINS_DIR, id, 'manifest.json'),
         'utf8',
@@ -200,6 +208,8 @@ describe('physics engine on the real host', () => {
         physicsTotalResistanceCapability,
         physicsPowertrainCapability,
         physicsMotionCapability,
+        physicsTrainerLoadCapability,
+        drivetrainVirtualGearCapability,
         configSnapshotCapability,
         spatialTerrainCapability,
       ],
@@ -251,6 +261,16 @@ describe('physics engine on the real host', () => {
     const second = (await ride()).states.map(withoutSession);
     expect(second).toEqual(first);
     expect(first.at(-1)?.speed).toBeGreaterThan(0);
+  });
+
+  it('moves exactly the same with a trainer load as without one', async () => {
+    const motionOf = ({ sessionId: _s, trainerLoad: _t, ...state }: PhysicsState) => state;
+    const without = (await ride()).states.map(motionOf);
+    clock?.uninstall();
+    const withLoad = (await ride(['physics-trainer-load'])).states;
+    expect(withLoad.every((s) => s.trainerLoad !== undefined)).toBe(true);
+    // Bit for bit: the engine asks the load after the motion, never before.
+    expect(withLoad.map(motionOf)).toEqual(without);
   });
 
   it('leaves no timer behind once the host stopped', async () => {

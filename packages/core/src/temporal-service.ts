@@ -4,7 +4,6 @@ import {
   type CapabilityCardinality,
   type CapabilityContract,
   type Clock,
-  type EstimationStrategy,
   type Freshness,
   type PluginManifest,
   type PluginTemporalContext,
@@ -15,6 +14,7 @@ import {
   type TemporalSeriesReader,
   type TemporalSeriesWriter,
   type TemporalSnapshot,
+  type TemporalWriterOptions,
 } from '@ridrs/contracts';
 import { buildSnapshot, type FreshnessTransition, TemporalSeries } from '@ridrs/temporal';
 import { queueScheduler } from 'rxjs';
@@ -96,7 +96,7 @@ export class TemporalService {
     return Object.freeze({
       writer: (
         capability: CapabilityContract<unknown, CapabilityCardinality>,
-        options: { readonly strategy: EstimationStrategy; readonly min?: number },
+        options: TemporalWriterOptions,
       ): TemporalSeriesWriter => {
         if (!manifest.provides.includes(capability.id) || !isInitializing()) {
           throw new RidrsError(
@@ -126,6 +126,7 @@ export class TemporalService {
       reader: (capability: CapabilityContract<unknown, CapabilityCardinality>) => {
         if (
           !manifest.requires.includes(capability.id) &&
+          !manifest.optionalRequires?.includes(capability.id) &&
           !manifest.provides.includes(capability.id)
         ) {
           throw new RidrsError(

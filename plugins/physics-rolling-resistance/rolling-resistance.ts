@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { STANDARD_GRAVITY, type TerrainSurface } from '@ridrs/contracts';
+import { STANDARD_GRAVITY, SURFACE_ROLLING_FACTORS, type TerrainSurface } from '@ridrs/contracts';
 
 /**
  * F_roll = Crr · m · g · cos θ with θ = atan(gradient) while moving, 0 at standstill: a bicycle
@@ -21,7 +21,7 @@ export const ROLLING_DEFAULTS = Object.freeze({
    * The bicycle's coefficient is the tyre on asphalt; the surface only scales it. Gravel doubles
    * it: 0.004 → 0.008 (ADR 0044).
    */
-  surfaceFactors: Object.freeze({ asphalt: 1, gravel: 2 } satisfies Record<TerrainSurface, number>),
+  surfaceFactors: SURFACE_ROLLING_FACTORS,
 });
 
 /** The rolling resistance coefficient of the bicycle's tyres on `surface`. */

@@ -10,6 +10,8 @@ import {
   deviceConnectRequestedEvent,
   deviceDiscoveryRequestedEvent,
   deviceForgetRequestedEvent,
+  type TrainerControlChangedPayload,
+  trainerControlChangedEvent,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -676,6 +678,46 @@ function FoundGroup({
 /** States in which the device is held or tried: Remove ends that. */
 const HELD = new Set(['connecting', 'connected', 'reconnecting']);
 
+/** How ridrs controls the trainer, in a word or two: facts only (ADR 0056). */
+function controlFact(control: TrainerControlChangedPayload): Fact {
+  const value =
+    control.mode === 'erg'
+      ? `ERG ${control.targetPower ?? ''} W`
+      : control.control === 'granted'
+        ? control.mode === 'simulation'
+          ? 'simulation'
+          : 'ready'
+        : control.control === 'unsupported'
+          ? 'not supported'
+          : control.control;
+  const tone: Tone =
+    control.control === 'granted'
+      ? 'ok'
+      : control.control === 'requested'
+        ? 'busy'
+        : control.control === 'unsupported'
+          ? 'none'
+          : 'warn';
+  return { icon: 'status', term: 'Control', value, tone };
+}
+
+/** The trainer's control state, as its device plugin published it last for the device. */
+function useTrainerControl(
+  ctx: UiContext,
+  deviceId: string,
+  kind: string,
+): TrainerControlChangedPayload | undefined {
+  const [control, setControl] = useState<TrainerControlChangedPayload>();
+  useEffect(
+    () =>
+      kind === 'trainer'
+        ? ctx.events.subscribe(trainerControlChangedEvent, ({ payload }) => setControl(payload))
+        : undefined,
+    [ctx, kind],
+  );
+  return control?.deviceId === deviceId ? control : undefined;
+}
+
 function DeviceDetails({
   ctx,
   row,
@@ -692,6 +734,7 @@ function DeviceDetails({
   const kind = row.deviceKind;
   const known = row.deviceId !== '';
   const route = row.route ?? 'local';
+  const control = useTrainerControl(ctx, row.deviceId, kind);
   // The signal of the device itself, as the devices found show theirs.
   const signal = row.candidates.find((c) => c.deviceId === row.deviceId)?.rssi;
   const reconnect = row.state === 'disconnected' && (route === 'local' || companion);
@@ -726,6 +769,7 @@ function DeviceDetails({
             ...(signal === undefined ? {} : { rssi: signal }),
           }}
           status={row}
+          facts={control && row.state === 'connected' ? [controlFact(control)] : []}
           tip={row.tip}
         >
           {(HELD.has(row.state) || reconnect || links.length > 0) && (

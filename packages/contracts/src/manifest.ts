@@ -32,6 +32,11 @@ export const manifestSchema = z
     types: z.array(z.string().min(1)).min(1, 'Must contain at least one plugin type'),
     provides: z.array(capabilityIdSchema),
     requires: z.array(capabilityIdSchema),
+    /**
+     * Capabilities the plugin uses when a plugin provides them: it starts after their providers
+     * and may access them, but is not blocked without them (ADR 0053).
+     */
+    optionalRequires: z.array(capabilityIdSchema).optional(),
     entry: z.string().min(1, 'Must be a non-empty relative path'),
     ui: uiManifestSectionSchema.optional(),
     permissions: z.array(hostPermissionSchema).optional(),

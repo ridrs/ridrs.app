@@ -15,6 +15,16 @@ import type { TerrainSurface } from './world.ts';
 /** m/s². Shared so that every resistance plugin uses the same value. */
 export const STANDARD_GRAVITY = 9.81;
 
+/**
+ * What a road surface does to the tyres' rolling resistance coefficient: the bicycle's Crr is the
+ * tyre on asphalt, gravel doubles it (ADR 0044). Shared by the rolling resistance and the trainer
+ * load, so that both use the same value.
+ */
+export const SURFACE_ROLLING_FACTORS: Readonly<Record<TerrainSurface, number>> = Object.freeze({
+  asphalt: 1,
+  gravel: 2,
+});
+
 /** Where a parameter value comes from. There is no configuration yet, so everything is a default. */
 export type PhysicsParameterOrigin = 'default';
 
@@ -146,6 +156,40 @@ export interface MotionCapability {
 }
 
 /**
+ * What a trainer should resist with, as FTMS indoor bike simulation parameters (FTMS 1.0,
+ * 4.16.2.18): the trainer computes its brake force from these and its own wheel speed.
+ */
+export interface TrainerLoad {
+  /** Rise over run, 0.05 = 5 %. */
+  readonly gradient: number;
+  /** Crr · surface factor, dimensionless. */
+  readonly rollingResistanceCoefficient: number;
+  /** ρ · CdA in kg/m: the air resistance is ½ · cw · v² (the FE-C and FTMS convention). */
+  readonly windResistanceCoefficient: number;
+  /** m/s; 0, still air, in this phase. */
+  readonly windSpeed: number;
+}
+
+/** The two loads of one step, for the same simulation time. */
+export interface TrainerLoadSample {
+  /** The virtual bike's own load, without the virtual gear (`trainerResistance`). */
+  readonly resistance: TrainerLoad;
+  /**
+   * The same load as a trainer without virtual shifting must feel it on its real gear, so that
+   * the same cadence feels the virtual gear (`trainerResistanceWithVirtualGear`, ADR 0054). Equal
+   * to `resistance` without a gear source.
+   */
+  readonly resistanceWithVirtualGear: TrainerLoad;
+  /** The virtual gear the load used; absent without a gear source. */
+  readonly virtualGear?: { readonly index: number; readonly ratio: number };
+}
+
+export interface TrainerLoadCapability {
+  /** The loads at the state the motion just computed; never changes the motion. */
+  load(state: MotionResult): TrainerLoadSample;
+}
+
+/**
  * A step failed in a contributor. Carries the failing plugin when the thrower knows it, so the
  * engine can name it; any other exception fails the step too, just without a plugin.
  */
@@ -194,6 +238,12 @@ export const physicsPowertrainCapability = defineCapability<
   'physics.powertrain'
 >('physics.powertrain', { cardinality: 'single' });
 
+export const physicsTrainerLoadCapability = defineCapability<
+  TrainerLoadCapability,
+  'single',
+  'physics.trainer-load'
+>('physics.trainer-load', { cardinality: 'single' });
+
 export const physicsMotionCapability = defineCapability<
   MotionCapability,
   'single',
@@ -219,12 +269,29 @@ const temporalValueSchema: z.ZodType<TemporalValue> = z.discriminatedUnion('stat
 // zod numbers reject NaN and ±Infinity.
 const finite = z.number();
 
+const trainerLoadSchema: z.ZodType<TrainerLoad> = z.object({
+  gradient: finite,
+  rollingResistanceCoefficient: finite.nonnegative(),
+  windResistanceCoefficient: finite.nonnegative(),
+  windSpeed: finite,
+});
+
+const trainerLoadSampleSchema: z.ZodType<TrainerLoadSample> = z.object({
+  resistance: trainerLoadSchema,
+  resistanceWithVirtualGear: trainerLoadSchema,
+  virtualGear: z
+    .object({ index: z.number().int().positive(), ratio: finite.positive() })
+    .optional(),
+});
+
 /** A motion result of one activity session at step `step`. */
 export interface PhysicsState extends MotionResult {
   /** The activity session the state belongs to. */
   readonly sessionId: string;
   /** 0 at ride start; `at = startedAt + 10 · step`. */
   readonly step: number;
+  /** What a trainer should feel at this step; present when a trainer load is installed. */
+  readonly trainerLoad?: TrainerLoadSample;
 }
 
 export const physicsStateSchema: z.ZodType<PhysicsState> = z.object({
@@ -247,6 +314,7 @@ export const physicsStateSchema: z.ZodType<PhysicsState> = z.object({
     surface: z.enum(['asphalt', 'gravel']),
     origin: z.literal('default'),
   }),
+  trainerLoad: trainerLoadSampleSchema.optional(),
 });
 
 /** Interim publication of the simulation state at about 4 Hz of simulation time. */
@@ -268,6 +336,8 @@ export interface PhysicsSample {
   readonly acceleration: number;
   /** Rise over run, from the state's road sample. */
   readonly gradient: number;
+  /** The state's trainer load, when one is installed. */
+  readonly trainerLoad?: TrainerLoadSample;
 }
 
 /** Consecutive step samples of one session, ascending: every step goes out in exactly one batch. */
@@ -284,6 +354,7 @@ const physicsSampleSchema: z.ZodType<PhysicsSample> = z.object({
   distance: finite.nonnegative(),
   acceleration: finite,
   gradient: finite,
+  trainerLoad: trainerLoadSampleSchema.optional(),
 });
 
 export const physicsStateBatchSchema: z.ZodType<PhysicsStateBatch> = z

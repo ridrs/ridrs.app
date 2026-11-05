@@ -6,6 +6,7 @@ import {
   type BleConnection,
   type BleDiscoveredPeripheral,
   type BleRoute,
+  type BleWriteOptions,
   bytesToHex,
   type DeviceConnectionState,
   type DeviceKind,
@@ -15,6 +16,9 @@ import {
   deviceDiscoveryRequestedEvent,
   deviceForgetRequestedEvent,
   deviceRawNotificationEvent,
+  deviceRawReadEvent,
+  deviceRawWriteEvent,
+  deviceRawWriteFailedEvent,
   deviceScanChangedEvent,
   hexToBytes,
   normalizeBleUuid,
@@ -66,13 +70,39 @@ export interface BlePeripheralLinkOptions {
     readonly data: Uint8Array;
   };
   /**
+   * Characteristics a device may not have (a control point), subscribed on every connection
+   * after the main one; a failed one is left out. Their notifications and indications are raw
+   * notifications like the main one's; `connected` names the ones subscribed (`characteristics`).
+   */
+  readonly optionalSubscriptions?: readonly BleCharacteristicTarget[];
+  /**
+   * Read on every connection before it counts as `connected`; each result, a failure too, enters
+   * as a `device.raw-read` input.
+   */
+  readonly reads?: readonly BleCharacteristicTarget[];
+  /**
    * Raw notification bytes; decoding stays with the device plugin. Every packet is published as
    * `device.raw-notification` first, malformed ones too.
    */
-  readonly onNotification: (peripheral: BleDiscoveredPeripheral, packet: Uint8Array) => void;
+  readonly onNotification: (
+    peripheral: BleDiscoveredPeripheral,
+    packet: Uint8Array,
+    characteristicUuid: string,
+  ) => void;
 }
 
 export interface BlePeripheralLink {
+  /**
+   * Writes to the connected device, in a turn: publishes `device.raw-write` at once, then writes
+   * when a connection is there (a replay has none). A failed write enters as a
+   * `device.raw-write-failed` input.
+   */
+  write(
+    device: { readonly deviceId: string; readonly deviceName: string },
+    target: BleCharacteristicTarget,
+    data: Uint8Array,
+    options?: BleWriteOptions,
+  ): void;
   /** Unsubscribes, disconnects and publishes `disconnected`. */
   stop(): Promise<void>;
 }
@@ -169,7 +199,10 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     return taken.has(sighting);
   };
 
-  const publishState = (state: DeviceConnectionState): void => {
+  const publishState = (
+    state: DeviceConnectionState,
+    characteristics?: readonly string[],
+  ): void => {
     const deviceId = chosen?.deviceId ?? '';
     const deviceName = chosen?.name ?? '';
     const route = connected?.route ?? attempt?.route ?? lastRoute;
@@ -183,6 +216,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       kind,
       state,
       ...(route ? { route } : {}),
+      ...(characteristics ? { characteristics: [...characteristics] } : {}),
     });
   };
 
@@ -383,21 +417,25 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
   ): Promise<void> => {
     const connection = await central.connect(id, { signal });
     let teardown: (() => void) | undefined;
+    const subscribed: string[] = [];
 
     try {
-      const unsubscribe = await connection.subscribe(characteristic, (packet) => {
-        if (!ctx.signal.aborted && connected?.connection === connection) {
-          // The bytes are an input; they are decoded in the input's turn (below).
-          ctx.inputs.accept(deviceRawNotificationEvent, {
-            deviceId: sighting.deviceId,
-            deviceName: sighting.name,
-            serviceUuid,
-            characteristicUuid,
-            data: bytesToHex(packet),
-            receivedAt: ctx.clock.now(),
-          });
-        }
-      });
+      const raw =
+        (target: BleCharacteristicTarget) =>
+        (packet: Uint8Array): void => {
+          if (!ctx.signal.aborted && connected?.connection === connection) {
+            // The bytes are an input; they are decoded in the input's turn (below).
+            ctx.inputs.accept(deviceRawNotificationEvent, {
+              deviceId: sighting.deviceId,
+              deviceName: sighting.name,
+              serviceUuid: normalizeBleUuid(target.serviceUuid),
+              characteristicUuid: normalizeBleUuid(target.characteristicUuid),
+              data: bytesToHex(packet),
+              receivedAt: ctx.clock.now(),
+            });
+          }
+        };
+      const unsubscribes = [await connection.subscribe(characteristic, raw(characteristic))];
       const stopListening = connection.onDisconnected(() => {
         if (connected?.connection !== connection) {
           return;
@@ -411,8 +449,36 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       });
       teardown = () => {
         stopListening();
-        unsubscribe();
+        for (const unsubscribe of unsubscribes) {
+          unsubscribe();
+        }
       };
+      for (const target of options.optionalSubscriptions ?? []) {
+        try {
+          unsubscribes.push(await connection.subscribe(target, raw(target)));
+          subscribed.push(normalizeBleUuid(target.characteristicUuid));
+        } catch (error) {
+          ctx.logger.info(
+            { err: error, characteristic: target.characteristicUuid },
+            `${label} has no ${target.characteristicUuid}`,
+          );
+        }
+      }
+      for (const target of options.reads ?? []) {
+        // Read results come from BLE I/O: they enter the simulation as inputs.
+        const result = await connection.read(target).then(
+          (data) => ({ data: bytesToHex(data) }),
+          (error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }),
+        );
+        ctx.inputs.accept(deviceRawReadEvent, {
+          deviceId: sighting.deviceId,
+          deviceName: sighting.name,
+          serviceUuid: normalizeBleUuid(target.serviceUuid),
+          characteristicUuid: normalizeBleUuid(target.characteristicUuid),
+          ...result,
+          receivedAt: ctx.clock.now(),
+        });
+      }
       if (options.handshake) {
         await connection.write(options.handshake.characteristic, options.handshake.data);
       }
@@ -428,7 +494,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       return;
     }
     connected = { route, connection, teardown };
-    publishState('connected');
+    publishState('connected', options.optionalSubscriptions ? subscribed : undefined);
     reconcileScans();
   };
 
@@ -577,8 +643,12 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
 
   // Decoding runs in the turn of the raw input, live and on replay alike: a replay injects the
   // recorded raw inputs with this plugin as their source.
+  const heard = new Set([
+    characteristicUuid,
+    ...(options.optionalSubscriptions ?? []).map((t) => normalizeBleUuid(t.characteristicUuid)),
+  ]);
   ctx.events.subscribe(deviceRawNotificationEvent, ({ source, payload }) => {
-    if (source !== ctx.manifest.id || payload.characteristicUuid !== characteristicUuid) {
+    if (source !== ctx.manifest.id || !heard.has(payload.characteristicUuid)) {
       return;
     }
     options.onNotification(
@@ -588,13 +658,50 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         serviceUuids: [payload.serviceUuid],
       },
       hexToBytes(payload.data),
+      payload.characteristicUuid,
     );
   });
 
   publishState('searching');
   reconcileScans();
 
+  const write = (
+    device: { readonly deviceId: string; readonly deviceName: string },
+    target: BleCharacteristicTarget,
+    data: Uint8Array,
+    writeOptions?: BleWriteOptions,
+  ): void => {
+    const written = {
+      // The device as the caller knows it from its inputs: a replay has no connection to ask.
+      deviceId: device.deviceId,
+      deviceName: device.deviceName,
+      serviceUuid: normalizeBleUuid(target.serviceUuid),
+      characteristicUuid: normalizeBleUuid(target.characteristicUuid),
+      data: bytesToHex(data),
+    };
+    ctx.events.publish(deviceRawWriteEvent, {
+      ...written,
+      withResponse: writeOptions?.withResponse ?? false,
+      writtenAt: ctx.clock.now(),
+    });
+    const connection =
+      connected && chosen?.deviceId === device.deviceId ? connected.connection : undefined;
+    if (!connection) {
+      return;
+    }
+    connection.write(target, data, writeOptions).catch((error: unknown) => {
+      if (!ctx.signal.aborted) {
+        // The failure is the result of BLE I/O: it enters as an input before anyone reports it.
+        ctx.inputs.accept(deviceRawWriteFailedEvent, {
+          ...written,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+  };
+
   return {
+    write,
     async stop(): Promise<void> {
       clearTimeout(directLinkWait);
       directLinkWait = undefined;

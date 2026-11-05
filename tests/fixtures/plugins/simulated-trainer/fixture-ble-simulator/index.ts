@@ -8,7 +8,31 @@ const PACKET_INTERVAL_MS = 250;
 const PACKETS_BEFORE_DROP = 4;
 const AWAY_MS = 500;
 const FIRST_PACKET = '45 00 B4 00 C8 00'; // 200 W, 90 rpm
-const SECOND_PACKET = '45 00 B8 00 DC 00'; // 220 W, 92 rpm
+const SECOND_PACKET_WATTS = 220; // at 92 rpm
+
+/** Zwift Ride keypad packets: nothing held, and the right shift-up button held. */
+const KEYPAD_RELEASED = '23 08 ff ff ff ff 0f';
+const KEYPAD: Readonly<Record<string, string>> = { 'shift-up-right': '23 08 ff df ff ff 0f' };
+
+/** Steps reach the running fixture through this global handle (Phase 8). */
+const CONTROL = Symbol.for('ridrs.fixture.simulated-trainer');
+
+export interface SimulatedTrainerControl {
+  /** The trainer: its control point (`ftmsControl`) and every write it received. */
+  readonly trainer: () => SimulatedPeripheral | undefined;
+  /** The Zwift Ride presses and releases a button. */
+  press(button: string): void;
+}
+
+/** Indoor Bike Data with power and 92 rpm (cadence in 0.5 rpm). */
+function packet(watts: number): Uint8Array {
+  const bytes = new Uint8Array(6);
+  const view = new DataView(bytes.buffer);
+  view.setUint16(0, 0x45, true);
+  view.setUint16(2, 92 * 2, true);
+  view.setInt16(4, watts, true);
+  return bytes;
+}
 
 export default definePlugin({
   initialize(ctx) {
@@ -22,7 +46,8 @@ export default definePlugin({
       timers.add(timer);
     };
 
-    // Script: trainer appears -> 4 packets -> drops for 500 ms -> packets forever.
+    // Script: trainer appears -> 4 packets -> drops for 500 ms -> packets forever. Its control
+    // point holds an ERG target: then the rider "pedals" exactly that power (Phase 8).
     const play = (trainer: SimulatedPeripheral): void => {
       let connections = 0;
       trainer.onCentralConnected(() => {
@@ -42,7 +67,9 @@ export default definePlugin({
           later(tick, PACKET_INTERVAL_MS);
         } else {
           const tick = (): void => {
-            trainer.notifyIndoorBikeData(SECOND_PACKET);
+            trainer.notifyIndoorBikeData(
+              packet(trainer.ftmsControl?.targetPower ?? SECOND_PACKET_WATTS),
+            );
             later(tick, PACKET_INTERVAL_MS);
           };
           later(tick, PACKET_INTERVAL_MS);
@@ -51,13 +78,33 @@ export default definePlugin({
     };
 
     let started = false;
+    let trainer: SimulatedPeripheral | undefined;
+    const ride = simulator.addZwiftRide('Zwift Ride');
     simulator.onScanStart(() => {
       if (started) {
         return;
       }
       started = true;
-      later(() => play(simulator.addFtmsTrainer('SIM KICKR')), APPEAR_AFTER_MS);
+      later(() => {
+        trainer = simulator.addFtmsTrainer('SIM KICKR', {
+          control: { simulation: true, targetPower: true },
+        });
+        play(trainer);
+      }, APPEAR_AFTER_MS);
     });
+
+    const control: SimulatedTrainerControl = {
+      trainer: () => trainer,
+      press: (button) => {
+        const held = KEYPAD[button];
+        if (!held) {
+          throw new Error(`The fixture's controller has no "${button}"`);
+        }
+        ride.notifyZwiftRide(held);
+        ride.notifyZwiftRide(KEYPAD_RELEASED);
+      },
+    };
+    (globalThis as Record<symbol, unknown>)[CONTROL] = control;
 
     ctx.signal.addEventListener(
       'abort',
@@ -66,6 +113,7 @@ export default definePlugin({
           clearTimeout(timer);
         }
         timers.clear();
+        delete (globalThis as Record<symbol, unknown>)[CONTROL];
       },
       { once: true },
     );

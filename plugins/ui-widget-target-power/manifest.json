@@ -1,0 +1,24 @@
+{
+  "id": "ui-widget-target-power",
+  "name": "Target Power Widget",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "target-power",
+        "extensionPoint": "hud/widget",
+        "export": "TargetPowerWidget",
+        "order": 8
+      }
+    ],
+    "events": {
+      "subscribe": ["trainer.target-power"],
+      "publish": ["trainer.erg-requested"]
+    }
+  }
+}

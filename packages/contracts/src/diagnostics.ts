@@ -31,7 +31,9 @@ export type DiagnosticCode =
   | 'recording-failed'
   | 'recording-recovered'
   | 'fit-export-failed'
-  | 'config-snapshot-failed';
+  | 'config-snapshot-failed'
+  | 'trainer-command-failed'
+  | 'trainer-control-lost';
 
 export type RidrsErrorCode =
   | DiagnosticCode

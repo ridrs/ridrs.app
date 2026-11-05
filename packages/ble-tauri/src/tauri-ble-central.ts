@@ -7,6 +7,7 @@ import {
   type BleConnection,
   type BleDiscoveredPeripheral,
   type BleScanOptions,
+  type BleWriteOptions,
   hexByCompany,
   hexByService,
   normalizeBleUuid,
@@ -83,13 +84,26 @@ class TauriBleConnection implements BleConnection {
     };
   }
 
-  async write(target: BleCharacteristicTarget, data: Uint8Array): Promise<void> {
+  async write(
+    target: BleCharacteristicTarget,
+    data: Uint8Array,
+    options?: BleWriteOptions,
+  ): Promise<void> {
     await this.ipc.invoke('ble_write', {
       peripheralId: this.peripheralId,
       ...targetArgs(target),
       // Inside an argument object a typed array would serialize as an object, not as bytes.
       data: Array.from(data),
+      withResponse: options?.withResponse ?? false,
     });
+  }
+
+  async read(target: BleCharacteristicTarget): Promise<Uint8Array> {
+    const data = await this.ipc.invoke<readonly number[]>('ble_read', {
+      peripheralId: this.peripheralId,
+      ...targetArgs(target),
+    });
+    return Uint8Array.from(data);
   }
 
   onDisconnected(listener: () => void): () => void {

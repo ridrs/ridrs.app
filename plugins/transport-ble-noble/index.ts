@@ -124,39 +124,41 @@ function createCentral(): BleCentral {
       signal?.removeEventListener('abort', onAbort);
     }
 
+    const find = async (target: BleCharacteristicTarget) => {
+      const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
+        [target.serviceUuid],
+        [target.characteristicUuid],
+      );
+      const characteristic = characteristics[0];
+      if (!characteristic) {
+        throw new Error(
+          `Characteristic ${target.characteristicUuid} of service ${target.serviceUuid} not found`,
+        );
+      }
+      return characteristic;
+    };
+
     return {
       peripheralId,
       async subscribe(target: BleCharacteristicTarget, onNotification) {
-        const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
-          [target.serviceUuid],
-          [target.characteristicUuid],
-        );
-        const characteristic = characteristics[0];
-        if (!characteristic) {
-          throw new Error(
-            `Characteristic ${target.characteristicUuid} of service ${target.serviceUuid} not found`,
-          );
-        }
+        const characteristic = await find(target);
         const onData = (data: Buffer): void => onNotification(new Uint8Array(data));
         characteristic.on('data', onData);
+        // noble enables indications for a characteristic that only indicates (FTMS control point).
         await characteristic.subscribeAsync();
         return () => {
           characteristic.removeListener('data', onData);
           void characteristic.unsubscribeAsync().catch(() => undefined);
         };
       },
-      async write(target: BleCharacteristicTarget, data) {
-        const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
-          [target.serviceUuid],
-          [target.characteristicUuid],
-        );
-        const characteristic = characteristics[0];
-        if (!characteristic) {
-          throw new Error(
-            `Characteristic ${target.characteristicUuid} of service ${target.serviceUuid} not found`,
-          );
-        }
-        await characteristic.writeAsync(Buffer.from(data), true);
+      async write(target: BleCharacteristicTarget, data, options) {
+        const characteristic = await find(target);
+        // noble's second argument is `withoutResponse`.
+        await characteristic.writeAsync(Buffer.from(data), !(options?.withResponse ?? false));
+      },
+      async read(target: BleCharacteristicTarget) {
+        const characteristic = await find(target);
+        return new Uint8Array(await characteristic.readAsync());
       },
       onDisconnected(listener) {
         peripheral.once('disconnect', listener);

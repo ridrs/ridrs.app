@@ -7,6 +7,7 @@ export {
   SimulatedPeripheral,
   type SimulatedPeripheralOptions,
   type SimulatedWrite,
+  type SimulatedWriteHandler,
 } from './ble-simulator.ts';
 export {
   DUMMY_PROFILES,
@@ -15,3 +16,10 @@ export {
   type DummyProfile,
   mergeBleCentrals,
 } from './dummy-devices.ts';
+export {
+  FTMS_OP_CODES,
+  FTMS_RESULT_CODES,
+  type SimulatedFtmsControlOptions,
+  SimulatedFtmsControlPoint,
+  type SimulatedSimulation,
+} from './ftms-control.ts';

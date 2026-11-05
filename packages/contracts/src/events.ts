@@ -107,6 +107,11 @@ export const deviceConnectionChangedEvent = defineEvent(
     reason: z.string().optional(),
     /** The link that carries the device (or did last); absent in early recordings. */
     route: bleRouteSchema.optional(),
+    /**
+     * With `connected`: the device plugin's optional characteristics this connection subscribed
+     * to, e.g. a control point that not every device has. Absent when the plugin has none.
+     */
+    characteristics: z.array(z.string().min(1)).optional(),
   }),
 );
 
@@ -284,3 +289,60 @@ export const deviceRawNotificationEvent = defineEvent(
 );
 
 export type DeviceRawNotificationPayload = z.infer<typeof deviceRawNotificationEvent.schema>;
+
+const hexSchema = z.string().regex(/^(?:[0-9a-f]{2})*$/);
+
+/**
+ * The value a device plugin's link read from a characteristic on connecting, or why it could not.
+ * An input like a notification: a replay feeds it to the current decoders.
+ */
+export const deviceRawReadEvent = defineEvent(
+  'device.raw-read',
+  z.object({
+    deviceId: z.string(),
+    deviceName: z.string(),
+    serviceUuid: z.string().min(1),
+    characteristicUuid: z.string().min(1),
+    /** Lowercase hex; absent when the read failed. */
+    data: hexSchema.optional(),
+    /** Why the read failed. */
+    error: z.string().optional(),
+    receivedAt: z.number(),
+  }),
+);
+
+export type DeviceRawReadPayload = z.infer<typeof deviceRawReadEvent.schema>;
+
+/**
+ * One BLE write exactly as a device plugin's link is about to send it, published in the turn that
+ * decided it, before the write. Derived: a replay compares it.
+ */
+export const deviceRawWriteEvent = defineEvent(
+  'device.raw-write',
+  z.object({
+    deviceId: z.string(),
+    deviceName: z.string(),
+    serviceUuid: z.string().min(1),
+    characteristicUuid: z.string().min(1),
+    data: hexSchema,
+    withResponse: z.boolean(),
+    writtenAt: z.number(),
+  }),
+);
+
+export type DeviceRawWritePayload = z.infer<typeof deviceRawWriteEvent.schema>;
+
+/** A write the device refused or that never reached it: the result of BLE I/O, so an input. */
+export const deviceRawWriteFailedEvent = defineEvent(
+  'device.raw-write-failed',
+  z.object({
+    deviceId: z.string(),
+    deviceName: z.string(),
+    serviceUuid: z.string().min(1),
+    characteristicUuid: z.string().min(1),
+    data: hexSchema,
+    reason: z.string(),
+  }),
+);
+
+export type DeviceRawWriteFailedPayload = z.infer<typeof deviceRawWriteFailedEvent.schema>;

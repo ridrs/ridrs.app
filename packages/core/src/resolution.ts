@@ -11,6 +11,14 @@ export interface ResolutionResult {
   readonly dependencyGraph: DepGraph<string>;
 }
 
+/**
+ * The capabilities a plugin starts after: what it requires and, when provided, what it may use
+ * (`optionalRequires`, ADR 0053). Only the required ones block it when missing.
+ */
+function dependenciesOf(plugin: DiscoveredPlugin): readonly string[] {
+  return [...plugin.manifest.requires, ...(plugin.manifest.optionalRequires ?? [])];
+}
+
 export function resolveCapabilities(
   plugins: readonly DiscoveredPlugin[],
   contracts: ReadonlyMap<string, CapabilityContract>,
@@ -21,7 +29,11 @@ export function resolveCapabilities(
 
   // 1. Validate that all referenced capabilities have registered contracts.
   for (const plugin of sortedPlugins) {
-    const referenced = [...plugin.manifest.provides, ...plugin.manifest.requires];
+    const referenced = [
+      ...plugin.manifest.provides,
+      ...plugin.manifest.requires,
+      ...(plugin.manifest.optionalRequires ?? []),
+    ];
     for (const capId of referenced) {
       if (!contracts.has(capId)) {
         diagnostics.report({
@@ -93,7 +105,7 @@ export function resolveCapabilities(
     fullGraph.addNode(plugin.manifest.id);
   }
   for (const plugin of sortedPlugins) {
-    for (const reqCap of plugin.manifest.requires) {
+    for (const reqCap of dependenciesOf(plugin)) {
       const providers = providersByCap.get(reqCap) ?? [];
       for (const providerId of providers) {
         fullGraph.addDependency(plugin.manifest.id, providerId);
@@ -114,7 +126,7 @@ export function resolveCapabilities(
       if (blocked.has(pluginId)) {
         continue;
       }
-      for (const reqCap of plugin.manifest.requires) {
+      for (const reqCap of dependenciesOf(plugin)) {
         const providers = providersByCap.get(reqCap) ?? [];
         for (const providerId of providers) {
           if (!blocked.has(providerId)) {

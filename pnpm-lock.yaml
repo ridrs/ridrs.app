@@ -417,6 +417,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contracts
 
+  plugins/control-erg:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
+  plugins/control-virtual-gears:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
   plugins/device-ftms-trainer:
     dependencies:
       '@ridrs/ble-peripheral':
@@ -565,6 +577,12 @@ importers:
         version: link:../../packages/contracts
 
   plugins/physics-total-resistance:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
+  plugins/physics-trainer-load:
     dependencies:
       '@ridrs/contracts':
         specifier: workspace:*
@@ -841,7 +859,37 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
 
+  plugins/ui-widget-target-power:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+
   plugins/ui-widget-virtual-distance:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+
+  plugins/ui-widget-virtual-gear:
     dependencies:
       '@ridrs/contracts':
         specifier: workspace:*

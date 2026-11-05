@@ -209,10 +209,29 @@ module.exports = {
     },
     {
       name: 'physics-widgets-know-contracts-sdk-and-react',
-      comment: 'The physics HUD widgets import packages/contracts, packages/ui-sdk and React only.',
+      comment:
+        'The physics and trainer control HUD widgets import packages/contracts, packages/ui-sdk and React only.',
       severity: 'error',
-      from: { path: '^plugins/ui-widget-(virtual-speed|virtual-distance|gradient)/' },
+      from: {
+        path: '^plugins/ui-widget-(virtual-speed|virtual-distance|gradient|virtual-gear|target-power)/',
+      },
       to: { path: '^(packages/(?!contracts/|ui-sdk/)|apps/|tests/)' },
+    },
+    {
+      name: 'control-plugins-import-contracts-only',
+      comment:
+        'The virtual gears and the ERG driver import packages/contracts only: no device plugin, no BLE, no physics (Phase 8, ADR 0055, ADR 0056).',
+      severity: 'error',
+      from: { path: '^plugins/control-', pathNot: '\\.test\\.ts$' },
+      to: { path: '^(packages/(?!contracts/)|apps/|tests/)' },
+    },
+    {
+      name: 'only-device-and-transport-plugins-reach-ble',
+      comment:
+        'Only device plugins write to a device, through the peripheral link (the noble transport shares its scan helper): no control, physics or UI plugin reaches it (Phase 8).',
+      severity: 'error',
+      from: { path: '^plugins/(?!device-|transport-ble-)' },
+      to: { path: '^packages/ble-peripheral/' },
     },
     {
       name: 'ui-sdk-only-imports-contracts',

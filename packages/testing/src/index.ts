@@ -2,8 +2,13 @@
 
 export {
   BleSimulator,
+  FTMS_OP_CODES,
+  FTMS_RESULT_CODES,
+  type SimulatedFtmsControlOptions,
+  SimulatedFtmsControlPoint,
   SimulatedPeripheral,
   type SimulatedPeripheralOptions,
+  type SimulatedSimulation,
   type SimulatedWrite,
 } from '@ridrs/ble-simulator';
 export { SimulatedBridgeConnector, SimulatedNetwork } from './bridge-network.ts';

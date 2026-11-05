@@ -42,7 +42,7 @@ Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/
 | Crate | Version | SPDX License | Purpose |
 |---|---|---|---|
 | `tauri` / `tauri-build` | 2.12.5 / 2.7.4 | Apache-2.0 OR MIT | Native app shell |
-| `tauri-plugin-blec` / `blec` | 0.18.0 | MIT OR Apache-2.0 | BLE platform backends (incl. Android) |
+| `tauri-plugin-blec` / `blec` | 0.18.0 | MIT OR Apache-2.0 | BLE platform backends (incl. Android); `tauri-plugin-blec` is a patched copy in `crates/vendor/tauri-plugin-blec` (Copyright (c) 2023 Manuel Philipp; upstream license texts kept there): indications for indicate-only characteristics on Android (ADR 0052) |
 | `btleplug` | 0.13.5 | MIT/Apache-2.0/BSD-3-Clause | BLE on Windows, macOS, iOS (via blec) |
 | `keepawake` | 0.6.1 | MIT | Keeping the display on during a ride (desktop) |
 | `tauri-plugin-window-state` | 2.5.0 | Apache-2.0 OR MIT | Window size and position across restarts (desktop) |

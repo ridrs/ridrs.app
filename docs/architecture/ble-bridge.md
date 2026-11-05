@@ -28,12 +28,13 @@ WebSocket. Text messages are JSON (validated with zod); binary messages are noti
 | `scan`, `stop-scan` | `discovered` (from 1.2 signal strength and manufacturer and service data as hex, only to a client of 1.2 or later, [ADR 0046](../decisions/0046-one-link-per-device-and-signal-strength.md), [ADR 0051](../decisions/0051-same-device-over-both-links-by-advertising-data.md)) |
 | `connect`, `disconnect` | `connected`, `disconnected`, `failed`, `connection-lost` |
 | `subscribe`, `unsubscribe` | `subscribed`, binary frames |
-| `write` (hex bytes, Write Without Response; protocol 1.1) | `written` or `failed` |
+| `write` (hex bytes, Write Without Response; protocol 1.1; from 1.3 `withResponse`) | `written` or `failed` |
+| `read` (protocol 1.3) | `read-result` (hex bytes) or `failed` |
 
 - **Pairing**: either the phone scans the QR code ridrs shows (`hello.pairingSecret`, ADR 0021), or the rider types the 6-digit code the phone shows into ridrs (`hello.pairingCode`). Both earn a token, which ridrs stores for later connects. A scanned secret is good for one pairing within ten minutes, and misses never lock. Five wrong codes lock code pairing for a minute, and the phone shows a fresh code after a successful one. "Forget paired ridrs" revokes all tokens.
 - **One ridrs at a time**: a second client is rejected with `busy`.
 - **Liveness**: any inbound message counts. After 5 s of silence either side closes the link; shorter Wi-Fi stalls (up to 0.8 s seen with the Wi-Fi locks) are no connection loss. When the link closes, the companion releases every scan, subscription and Bluetooth connection of that client.
-- **Versions**: a companion accepts clients of the same major protocol version.
+- **Versions**: a companion accepts clients of the same major protocol version. ridrs sends a write with response or a read only to a companion of 1.3 or later; to an older one the call fails at once and says why ([ADR 0052](../decisions/0052-ble-write-with-response-read-and-indications.md)).
 
 ## Connection states: both devices agree, and there is always a way out
 
