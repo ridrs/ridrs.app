@@ -7,6 +7,8 @@ export class MemoryAppFiles implements AppFiles {
   readonly files = new Map<string, Uint8Array>();
   /** While set, every append and write rejects. */
   failWrites = false;
+  /** How many bytes of each file are on the "disk": appended bytes count once synced. */
+  private readonly synced = new Map<string, number>();
   private readonly encoder = new TextEncoder();
 
   async append(path: string, text: string): Promise<void> {
@@ -22,10 +24,40 @@ export class MemoryAppFiles implements AppFiles {
   async write(path: string, bytes: Uint8Array): Promise<void> {
     this.assertWritable(path);
     this.files.set(path, bytes.slice());
+    // Whole files count as on the disk at once: only appends wait for a sync.
+    this.synced.set(path, bytes.length);
   }
 
   async replace(path: string, bytes: Uint8Array): Promise<void> {
     await this.write(path, bytes);
+  }
+
+  async sync(path: string): Promise<void> {
+    this.assertWritable(path);
+    const bytes = this.files.get(path);
+    if (bytes) {
+      this.synced.set(path, bytes.length);
+    }
+  }
+
+  /**
+   * A power loss: every file keeps only what was on the disk, an appended file never synced is
+   * gone, and nothing is written until `powerRestored`.
+   */
+  losePower(): void {
+    for (const [path, bytes] of [...this.files]) {
+      const kept = this.synced.get(path);
+      if (kept === undefined) {
+        this.files.delete(path);
+      } else {
+        this.files.set(path, bytes.slice(0, kept));
+      }
+    }
+    this.failWrites = true;
+  }
+
+  powerRestored(): void {
+    this.failWrites = false;
   }
 
   async read(path: string): Promise<Uint8Array> {
@@ -46,6 +78,7 @@ export class MemoryAppFiles implements AppFiles {
 
   async remove(path: string): Promise<void> {
     this.files.delete(assertAppFilePath(path));
+    this.synced.delete(path);
   }
 
   private assertWritable(path: string): void {
