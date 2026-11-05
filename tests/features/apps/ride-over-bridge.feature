@@ -20,6 +20,7 @@ Feature: Ride with the trainer connected to a companion
     And the companion "Pixel 8" is offered for pairing
     And the code field of "Pixel 8" takes 6 digits
     And there is no field for a companion address
+    And the page offers no "Pair" button
     When I enter the pairing code "482913" for "Pixel 8"
     Then the companion is shown as connected to "Pixel 8"
     When I press "Back"
@@ -40,9 +41,9 @@ Feature: Ride with the trainer connected to a companion
     When I press "Back"
     Then the device setup shows the "Smart Trainer" as "Connected"
     When I open the "Smart Trainer" in the device setup
-    Then the details card is headed "Smart Trainer" "SIM KICKR" with the status "Connected"
-    And the device details show:
-      | Link | Direct |
+    Then the details are headed "Smart Trainer", the card "SIM KICKR" with the status "Connected"
+    And the details card shows the line "Over Bluetooth" and the links "Direct"
+    And the top right of the details says "Searching…"
     When I close the ridrs app
     Then the app reported no lifecycle problems
 
@@ -54,7 +55,7 @@ Feature: Ride with the trainer connected to a companion
     And I enter the pairing code "482913" for "Pixel 8"
     Then the companion is shown as connected to "Pixel 8"
     And the page offers no "Disconnect" button
-    When I press "Forget companion"
+    When I press "Remove"
     Then a pairing QR code is shown
     When I close the ridrs app
     Then the app reported no lifecycle problems

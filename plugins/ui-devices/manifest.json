@@ -38,8 +38,7 @@
       ],
       "publish": [
         "device.connect-requested",
-        "device.disconnect-requested",
-        "device.route-requested",
+        "device.forget-requested",
         "device.discovery-requested",
         "bridge.connect-requested",
         "bridge.forget-requested"

@@ -67,7 +67,7 @@ Feature: Using the UI with arrow keys, Enter and Back
     And I press the arrow key "Down"
     Then the focus is on the "Heart Rate Monitor" row
     When I press Enter
-    Then the details card is headed "Heart Rate Monitor" "HRM-Pro 42" with the status "Connected"
+    Then the details are headed "Heart Rate Monitor", the card "HRM-Pro 42" with the status "Connected"
     And the focus is on "Back"
 
   Scenario: Back during a ride does not finish it, but offers Finish ride

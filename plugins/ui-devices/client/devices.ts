@@ -23,19 +23,24 @@ export interface DeviceRow {
   /** The device the row shows; empty while none is known. */
   readonly deviceId: string;
   readonly deviceName: string;
-  /** The link whose data is used, once one carried the device. */
+  /** The link that carries the device, once one did. */
   readonly route?: BleRoute;
-  /** Every link connected to the device; with both, the rider chooses whose data is used. */
-  readonly connectedRoutes: readonly BleRoute[];
   /** Every device of the kind found; the one shown is among them. */
   readonly candidates: readonly DeviceCandidate[];
+  /** The links over which ridrs looks for devices of the kind now; empty: it looks for none. */
+  readonly scanning: readonly BleRoute[];
   /** How many more devices of the kind were found: the row says so, the details list them. */
   readonly more: number;
+  /**
+   * While the kind searches without a device: how many devices of the kind were found, a
+   * forgotten one too. It takes the place of `more`.
+   */
+  readonly found: number;
   /** Long name for the setup rows. */
   readonly title: string;
   /** Short name for the indicator dots. */
   readonly label: string;
-  /** The connected device, or what kind of device would fit. */
+  /** The device, else the one connected last, else what kind of device would fit. */
   readonly detail: string;
   /** The kind of device behind the row, by its long name: the power row names the trainer. */
   readonly type: string;
@@ -58,6 +63,21 @@ export interface Readings {
   /** Per controller: a pair is two devices, the row stands for both. */
   readonly buttons?: Readonly<Record<string, readonly ControllerButton[]>>;
 }
+
+/** What the heart rate monitor's details say in place of what it is for: one, picked on open. */
+export const HEART_RATE_THOUGHTS: readonly string[] = [
+  'Your heart is a muscle, not a machine. Train it consistently, challenge it progressively, and give it time to adapt.',
+  "A stronger heart doesn't always beat faster. One of the beautiful signs of endurance adaptation is delivering more blood with fewer beats.",
+  "Don't chase your heart rate. Understand it. Power tells you what you produce; heart rate tells you how your body responds.",
+  'The heart remembers consistency. One heroic ride changes little. Hundreds of ordinary rides change everything.',
+  'Easy rides build a strong heart, too. The discipline to ride slowly is often more valuable than the courage to ride hard.',
+  'Heart rate is a conversation, not a command. Heat, fatigue, stress, hydration and sleep all influence what your heart tells you.',
+  'A drifting heart rate is a message. When the same power requires more effort over time, your body is telling you something about its current limits.',
+  'Recovery is when the heart gets stronger. Training provides the stimulus; adaptation happens afterward.',
+  "Your heart has no interest in your FTP. It doesn't care about segments, rankings or personal records. It cares about staying healthy enough to keep going.",
+  "The ultimate goal is not a lower heart rate. It's a longer life in motion. The best training is the training that allows you to keep riding, exploring and enjoying the road for decades.",
+  'Train your legs to climb mountains. Train your heart to enjoy the journey.',
+];
 
 const KINDS: Record<RowKind, { title: string; label: string; examples: string; about: string }> =
   {
@@ -160,20 +180,23 @@ function row(kind: RowKind, device: DeviceStatus | undefined, readings: Readings
   const state = device?.state ?? 'none';
   const deviceKind: DeviceKind = kind === 'power' ? 'trainer' : kind;
   const candidates = device?.candidates ?? [];
+  // The power row shows the trainer: its counts stay in the trainer's row.
+  const own = kind === deviceKind;
+  const searching = state === 'searching' && !device?.deviceId;
   return {
     kind,
     deviceKind,
     deviceId: device?.deviceId ?? '',
     deviceName: device?.deviceName ?? '',
     ...(device?.route ? { route: device.route } : {}),
-    connectedRoutes: device?.connectedRoutes ?? [],
     candidates,
-    // The power row shows the trainer: its hint stays in the trainer's row.
+    scanning: device?.scanning ?? [],
     more:
-      kind === deviceKind ? candidates.filter((c) => c.deviceId !== device?.deviceId).length : 0,
+      own && !searching ? candidates.filter((c) => c.deviceId !== device?.deviceId).length : 0,
+    found: own && searching ? candidates.length : 0,
     title: KINDS[kind].title,
     label: KINDS[kind].label,
-    detail: device?.deviceName || KINDS[kind].examples,
+    detail: device?.deviceName || device?.lastDeviceName || KINDS[kind].examples,
     type: KINDS[deviceKind].title,
     about: KINDS[kind].about,
     state,
@@ -206,6 +229,81 @@ export function describeDevices(
     row('heart-rate', devices.find((d) => d.kind === 'heart-rate'), readings),
     ...(controller ? [row('controller', controller, readings)] : []),
   ];
+}
+
+/**
+ * The devices found over the links ridrs can use now: those of the companion only while it is
+ * connected, so nothing is offered with the companion before the phone is there.
+ */
+export function overLinksInReach(
+  devices: readonly DeviceStatus[],
+  companion: BridgeState | undefined,
+): DeviceStatus[] {
+  if (companion === 'connected') {
+    return [...devices];
+  }
+  return devices.map((device) =>
+    device.candidates
+      ? {
+          ...device,
+          candidates: device.candidates.filter((c) =>
+            c.routes.some((route) => route !== 'companion'),
+          ),
+        }
+      : device,
+  );
+}
+
+/** The link a device found is seen over: since ADR 0046 each is found over one link. */
+export function linkOf(candidate: DeviceCandidate): BleRoute {
+  return candidate.routes[0] ?? 'local';
+}
+
+/**
+ * The devices found, the strongest signal first: in a room full of trainers the one next to the
+ * rider leads. Devices without a signal follow in the order found.
+ */
+export function bySignal(candidates: readonly DeviceCandidate[]): DeviceCandidate[] {
+  return [...candidates].sort(
+    (a, b) => (b.rssi ?? Number.NEGATIVE_INFINITY) - (a.rssi ?? Number.NEGATIVE_INFINITY),
+  );
+}
+
+/**
+ * The devices found in the order already shown, by id; devices not shown yet follow, the
+ * strongest signal first. Signals change all the time: rows that move would be hard to hit.
+ */
+export function inShownOrder(
+  shown: readonly string[],
+  candidates: readonly DeviceCandidate[],
+): DeviceCandidate[] {
+  const place = (c: DeviceCandidate) => {
+    const at = shown.indexOf(c.deviceId);
+    return at === -1 ? Number.POSITIVE_INFINITY : at;
+  };
+  const known = candidates.filter((c) => shown.includes(c.deviceId));
+  const added = candidates.filter((c) => !shown.includes(c.deviceId));
+  return [...known.sort((a, b) => place(a) - place(b)), ...bySignal(added)];
+}
+
+/**
+ * The devices found, one group per device: a device seen over both links is found once per link,
+ * and the device plugin names the other one `sameDeviceAs`. A group stands where its first link
+ * does, its links in that order.
+ */
+export function byDevice(candidates: readonly DeviceCandidate[]): DeviceCandidate[][] {
+  const groups = new Map<string, DeviceCandidate[]>();
+  for (const candidate of candidates) {
+    const twin = candidate.sameDeviceAs;
+    const key = twin !== undefined && groups.has(twin) ? twin : candidate.deviceId;
+    groups.set(key, [...(groups.get(key) ?? []), candidate]);
+  }
+  return [...groups.values()];
+}
+
+/** Bars out of four for a signal in dBm, as phones show them. */
+export function signalBars(rssi: number): number {
+  return rssi >= -60 ? 4 : rssi >= -70 ? 3 : rssi >= -80 ? 2 : 1;
 }
 
 /** What the setup says under its title. */

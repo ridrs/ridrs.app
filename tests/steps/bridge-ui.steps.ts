@@ -23,15 +23,13 @@ When(
   'I enter the pairing code {string} for {string}',
   async function (this: RidrsWorld, code: string, name: string) {
     const input = await within(appRoot(this)).findByLabelText(`Pairing code for ${name}`);
+    // The sixth digit pairs: there is nothing to press.
     fireEvent.change(input, { target: { value: code } });
-    const form = input.closest('form');
-    assert.ok(form, 'Expected the code field to belong to a form');
-    fireEvent.click(within(form).getByRole('button', { name: 'Pair' }));
     await this.settle();
   },
 );
 
-/** The header of the companion's details in the device setup: its name and its status. */
+/** The companion's details in the device setup: its name and its status in the card. */
 Then(
   'the companion is shown as connected to {string}',
   async function (this: RidrsWorld, name: string) {
@@ -39,8 +37,8 @@ Then(
       const card = within(appRoot(this)).getByTestId('details-card');
       assert.deepEqual(
         [
-          within(card).getByTestId('details-subtitle').textContent,
-          within(card).getByTestId('details-status').textContent,
+          within(card).getByTestId('details-device').textContent,
+          within(card).getByTestId('card-status').textContent,
         ],
         [name, 'Connected'],
       );

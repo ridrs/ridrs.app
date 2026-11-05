@@ -105,10 +105,8 @@ export const deviceConnectionChangedEvent = defineEvent(
     kind: deviceKindSchema.optional(),
     state: deviceConnectionStateSchema,
     reason: z.string().optional(),
-    /** The link whose data is used (or was last); absent in early recordings. */
+    /** The link that carries the device (or did last); absent in early recordings. */
     route: bleRouteSchema.optional(),
-    /** Every link connected to the device: the switch between them changes only whose data is used. */
-    connectedRoutes: z.array(bleRouteSchema).optional(),
   }),
 );
 
@@ -119,13 +117,23 @@ export const deviceCandidateSchema = z.object({
   deviceId: z.string().min(1),
   deviceName: z.string(),
   routes: z.array(bleRouteSchema),
+  /**
+   * Its signal strength in dBm when its link last reported it: the nearest device has the
+   * strongest. Absent when the link reported none.
+   */
+  rssi: z.number().int().optional(),
+  /**
+   * The id of the device found over the other link that is this device: same name, and no
+   * advertising data that tells them apart. Absent when there is none, or in early recordings.
+   */
+  sameDeviceAs: z.string().min(1).optional(),
 });
 
 export type DeviceCandidate = z.infer<typeof deviceCandidateSchema>;
 
 /**
  * Every device of a kind that a device plugin found in this run, in the order found; the one it
- * connects is among them. A device seen over both links is listed once.
+ * connects is among them. A device seen over both links is listed once per link.
  */
 export const deviceCandidatesChangedEvent = defineEvent(
   'device.candidates-changed',
@@ -135,8 +143,8 @@ export const deviceCandidatesChangedEvent = defineEvent(
 export type DeviceCandidatesChangedPayload = z.infer<typeof deviceCandidatesChangedEvent.schema>;
 
 /**
- * The rider connects a device of a kind: another one found, or the same one again after a
- * disconnect. The choice lasts for this run.
+ * The rider connects a device of a kind: another one found, or the same one again after it was
+ * forgotten. The choice lasts for this run.
  */
 export const deviceConnectRequestedEvent = defineEvent(
   'device.connect-requested',
@@ -144,17 +152,11 @@ export const deviceConnectRequestedEvent = defineEvent(
 );
 
 /**
- * The rider uses the data of the device of a kind from this link, while it is connected over
- * both. Nothing connects or disconnects. The choice lasts for this run.
+ * The rider forgets the device of a kind: it is let go and no device of the kind connects on its
+ * own until a device setup opens again; then the best device found connects.
  */
-export const deviceRouteRequestedEvent = defineEvent(
-  'device.route-requested',
-  z.object({ kind: deviceKindSchema, route: bleRouteSchema }),
-);
-
-/** The rider disconnects the device of a kind; it stays disconnected until connected again. */
-export const deviceDisconnectRequestedEvent = defineEvent(
-  'device.disconnect-requested',
+export const deviceForgetRequestedEvent = defineEvent(
+  'device.forget-requested',
   z.object({ kind: deviceKindSchema }),
 );
 
@@ -167,18 +169,31 @@ export const deviceDiscoveryRequestedEvent = defineEvent(
   z.object({ active: z.boolean() }),
 );
 
+/**
+ * The links over which a device plugin looks for devices of a kind right now, in the order it
+ * started them; empty: it looks for none. A search that failed (Bluetooth off) is not named.
+ */
+export const deviceScanChangedEvent = defineEvent(
+  'device.scan-changed',
+  z.object({ kind: deviceKindSchema, routes: z.array(bleRouteSchema) }),
+);
+
+export type DeviceScanChangedPayload = z.infer<typeof deviceScanChangedEvent.schema>;
+
 export const deviceStatusSchema = z.object({
   kind: deviceKindSchema,
   /** Empty while searching: no device is known yet. */
   deviceId: z.string(),
   deviceName: z.string(),
   state: deviceConnectionStateSchema,
-  /** The link whose data is used, once one carried the device. */
+  /** The link that carries the device, once one did. */
   route: bleRouteSchema.optional(),
-  /** Every link connected to the device. */
-  connectedRoutes: z.array(bleRouteSchema).optional(),
+  /** While no device is known: the device of the kind connected last in this run, if any. */
+  lastDeviceName: z.string().optional(),
   /** Every device of the kind found in this run; absent in early recordings. */
   candidates: z.array(deviceCandidateSchema).optional(),
+  /** The links over which device plugins look for devices of the kind now; absent in early recordings. */
+  scanning: z.array(bleRouteSchema).optional(),
 });
 
 export type DeviceStatus = z.infer<typeof deviceStatusSchema>;

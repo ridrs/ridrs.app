@@ -17,8 +17,8 @@ interface Companion {
   readonly paired: boolean;
 }
 
-/** The look of the device setup around it (`ui-devices`): dark tiles, cyan for actions. */
-const COLORS = { line: '#1f3447', cyan: '#27c8ff', muted: '#8b9db2', field: '#06121c' } as const;
+/** The look of the device setup around it (`ui-devices`): dark tiles and fields. */
+const COLORS = { line: '#1f3447', muted: '#8b9db2', field: '#06121c' } as const;
 
 /** The code the companion shows has six digits. */
 const CODE_LENGTH = 6;
@@ -37,7 +37,10 @@ const TILE = {
 
 const HEADING = { margin: 0, fontSize: 15, fontWeight: 700 } as const;
 
-/** Code entry for a companion found in the network: the code the phone shows. */
+/**
+ * Code entry for a companion found in the network: the code the phone shows. The sixth digit
+ * pairs, with nothing to press; Enter tries a full code again.
+ */
 function PairForm({
   companion,
   onPair,
@@ -46,11 +49,21 @@ function PairForm({
   readonly onPair: (address: string, code: string) => void;
 }) {
   const [code, setCode] = useState('');
+  const pair = (full: string) => {
+    if (full.length === CODE_LENGTH) {
+      onPair(companion.address, full);
+    }
+  };
+  const change = (value: string) => {
+    const next = value.replace(/\D/g, '').slice(0, CODE_LENGTH);
+    setCode(next);
+    if (next !== code) {
+      pair(next);
+    }
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (code.length === CODE_LENGTH) {
-      onPair(companion.address, code);
-    }
+    pair(code);
   };
   return (
     <form onSubmit={submit} style={{ width: '100%', display: 'grid', gap: 6 }}>
@@ -74,7 +87,7 @@ function PairForm({
         maxLength={CODE_LENGTH}
         placeholder={'0'.repeat(CODE_LENGTH)}
         value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
+        onChange={(e) => change(e.target.value)}
         style={{
           boxSizing: 'border-box',
           width: '100%',
@@ -88,21 +101,6 @@ function PairForm({
           borderRadius: 10,
         }}
       />
-      <button
-        type="submit"
-        style={{
-          padding: '8px 0',
-          fontSize: 15,
-          fontWeight: 700,
-          fontStyle: 'italic',
-          color: '#fff',
-          background: '#0a2230',
-          border: `1.5px solid ${COLORS.cyan}`,
-          borderRadius: 10,
-        }}
-      >
-        Pair
-      </button>
     </form>
   );
 }

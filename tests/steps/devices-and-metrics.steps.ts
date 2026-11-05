@@ -154,6 +154,14 @@ Given(
 );
 
 Given(
+  'a simulated BLE environment with an FTMS trainer {string} that advertises its name only later',
+  function (this: RidrsWorld, name: string) {
+    this.bleSimulator = new BleSimulator({ clock: this.clock });
+    this.trainer = this.bleSimulator.addFtmsTrainer(name, { nameLater: true });
+  },
+);
+
+Given(
   'a simulated Tauri bridge with an FTMS trainer {string}',
   function (this: RidrsWorld, name: string) {
     this.bleSimulator = new BleSimulator({ clock: this.clock });
@@ -227,6 +235,14 @@ for (const device of ['trainer', 'heart-rate sensor', 'controller']) {
     peripheral(this, name).switchOn();
     await this.settle();
   });
+
+  When(
+    `the ${device} {string} has a signal of {int} dBm`,
+    async function (this: RidrsWorld, name: string, rssi: number) {
+      peripheral(this, name).setSignal(rssi);
+      await this.settle();
+    },
+  );
 }
 
 for (const device of ['trainer', 'heart-rate sensor', 'controller']) {

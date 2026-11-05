@@ -41,6 +41,7 @@ describe('TauriBleCentral.scan', () => {
 
     expect(seen.map((p) => p.peripheralId)).toEqual(['a', 'b']);
     expect(seen[0]?.serviceUuids).toEqual(['1826']);
+    expect(seen[0]?.rssi).toBe(-60);
   });
 
   it('stops the native scan and ends iteration when the signal aborts', async () => {
@@ -116,6 +117,43 @@ describe('TauriBleCentral.scan', () => {
     await flush();
     // Stopped for the restart with both services, and once more when both are done.
     expect(ipc.callsOf('ble_stop_scan')).toHaveLength(2);
+  });
+});
+
+describe('TauriBleCentral.connect', () => {
+  it('leaves Bluetooth to blec while it connects: no scan of ours stops its search for the address', async () => {
+    const ipc = new FakeIpc();
+    const central = new TauriBleCentral(ipc);
+    const controller = new AbortController();
+    const done = (async () => {
+      for await (const _ of central.scan({ serviceUuids: ['1826'], signal: controller.signal })) {
+        // Only the scans started matter here.
+      }
+    })();
+    await flush();
+    let connected: () => void = () => undefined;
+    ipc.on('ble_connect', () => {
+      // blec scans for an address it does not know, which ends our scan.
+      ipc.channel<Record<string, never>>('ble_scan', 'onEnded').onmessage({});
+      return new Promise<void>((resolve) => {
+        connected = resolve;
+      });
+    });
+
+    const connection = central.connect('trainer');
+    await flush();
+    expect(ipc.calls.map((call) => call.command)).toEqual([
+      'ble_scan',
+      'ble_stop_scan',
+      'ble_connect',
+    ]);
+
+    connected();
+    await connection;
+    await flush();
+    expect(ipc.callsOf('ble_scan')).toHaveLength(2);
+    controller.abort();
+    await done;
   });
 });
 
