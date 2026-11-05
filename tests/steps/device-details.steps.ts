@@ -627,6 +627,12 @@ Then('the devices found follow the details card as rows', async function (this: 
   }
 });
 
+Then('the page shows {string}', async function (this: RidrsWorld, text: string) {
+  await waitFor(() =>
+    assert.ok((ui(this).textContent ?? '').includes(text), `The page does not show "${text}"`),
+  );
+});
+
 Then('the page shows no {string}', async function (this: RidrsWorld, text: string) {
   await this.settle();
   assert.ok(!(ui(this).textContent ?? '').includes(text), `The page shows "${text}"`);

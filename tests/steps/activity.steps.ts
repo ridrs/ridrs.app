@@ -60,6 +60,34 @@ Given(
   },
 );
 
+Given('the ride is running', function (this: RidrsWorld) {
+  assert.equal(latest(this).state, 'running');
+});
+
+Given('the ride is paused', async function (this: RidrsWorld) {
+  await publishFrom(this, 'test-ui', 'activity.pause-requested');
+  assert.equal(latest(this).state, 'paused');
+});
+
+Then('it was paused at {string} by the rider', function (this: RidrsWorld, time: string) {
+  const state = latest(this);
+  assert.equal(state.state, 'paused');
+  assert.equal(state.pausedAt, parseTime(time));
+  assert.equal(state.reason, 'rider');
+});
+
+Then('it was paused because the ride was interrupted', function (this: RidrsWorld) {
+  const state = latest(this);
+  assert.equal(state.state, 'paused');
+  assert.equal(state.reason, 'interrupted');
+});
+
+Then('it was resumed at {string}', function (this: RidrsWorld, time: string) {
+  const state = latest(this);
+  assert.equal(state.state, 'running');
+  assert.equal(state.resumedAt, parseTime(time));
+});
+
 Given('the ride is idle', function (this: RidrsWorld) {
   assert.equal(latest(this).state, 'idle');
 });

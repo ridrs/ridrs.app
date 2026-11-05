@@ -65,6 +65,9 @@ const state = {
 const SAMPLES: Record<string, unknown> = {
   'activity.start-requested': {},
   'activity.finish-requested': {},
+  'activity.pause-requested': {},
+  'activity.resume-requested': {},
+  'activity.interrupted': {},
   'activity.state-changed': { state: 'finished', sessionId: 's-1', startedAt: T, endedAt: T + 1 },
   'bridge.companions-changed': {
     companions: [{ companionId: 'c', name: 'Phone', address: '10.0.0.2:4711', paired: true }],

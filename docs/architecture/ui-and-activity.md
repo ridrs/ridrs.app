@@ -70,11 +70,11 @@ Back goes to the component that registered `ctx.onBack(handler)` last and is sti
 
 ## Layering
 
-`ui-activity-screen` stacks its two slot containers absolutely in one stacking context: `activity/landscape` (z 0), `activity/hud` (z 1, `pointer-events: none`), and its own **Finish ride** button (z 2). `ui-hud` lays out `hud/widget` in the lower corners and lets pointer events through except on widgets. Screens navigate on `activity.state-changed`, not on clicks: `running` leads to `activity` (including the replayed state after a reload), anything else back to `main`.
+`ui-activity-screen` stacks its two slot containers absolutely in one stacking context: `activity/landscape` (z 0), `activity/hud` (z 1, `pointer-events: none`), its own **Pause** (or **Resume**, with a large "Paused" while the ride stands still) at the top left and **Finish ride** at the top right (z 2; [ADR 0056](../decisions/0056-pause-and-resume-a-ride.md), `pause-a-ride.feature`). `ui-hud` lays out `hud/widget` in the lower corners and lets pointer events through except on widgets. Screens navigate on `activity.state-changed`, not on clicks: `running` and `paused` lead to `activity` (including the replayed state after a reload), anything else back to `main`. The keep-awake follows `running` only.
 
 ## Activity session
 
-`activity-session` publishes `{ state: 'idle' }` on start, moves to `running` (new `sessionId` from `ctx.ids.next()`, `startedAt` from the injected clock) on `activity.start-requested` and to `finished` on `activity.finish-requested`. Any other transition is an `invalid-transition` diagnostic with no event. A ride never needs a trainer.
+`activity-session` publishes `{ state: 'idle' }` on start, moves to `running` (new `sessionId` from `ctx.ids.next()`, `startedAt` from the injected clock) on `activity.start-requested` to `paused` on `activity.pause-requested` (`reason: 'rider'`) or `activity.interrupted` (`reason: 'interrupted'`, the input a recovery injects), back to `running` with `resumedAt` on `activity.resume-requested`, and to `finished` on `activity.finish-requested`, from running or paused ([ADR 0056](../decisions/0056-pause-and-resume-a-ride.md)). Any other transition is an `invalid-transition` diagnostic with no event. A ride never needs a trainer.
 
 ## Tests
 

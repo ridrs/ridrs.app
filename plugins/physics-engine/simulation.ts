@@ -60,6 +60,9 @@ export class RideSimulation {
   /** The trainer load of the current state, when a trainer load is installed. */
   private currentLoad: TrainerLoadSample | undefined;
   private step = 0;
+  /** Steps are planned from here: the start, or the last resume (ADR 0056). */
+  private base: number;
+  private baseStep = 0;
   private lastPublishedStep = -1;
   /** Samples computed since the previous batch. */
   private pending: PhysicsSample[] = [];
@@ -71,6 +74,7 @@ export class RideSimulation {
     private readonly outputs: SimulationOutputs,
     private readonly trainerLoad?: TrainerLoadCapability,
   ) {
+    this.base = startedAt;
     this.current = motion.initial(startedAt);
     this.currentLoad = trainerLoad?.load(this.current);
     this.pending.push(sampleOf(0, this.current, this.currentLoad));
@@ -80,7 +84,17 @@ export class RideSimulation {
 
   /** When the next step is due. */
   nextDueAt(): number {
-    return stepTime(this.startedAt, this.step + 1);
+    return stepTime(this.base, this.step + 1 - this.baseStep);
+  }
+
+  /**
+   * Goes on after a pause: the state stood still, with no time passing for it, and the next
+   * step is due one step after `resumedAt`.
+   */
+  resume(resumedAt: number): void {
+    this.base = resumedAt;
+    this.baseStep = this.step;
+    this.current = { ...this.current, at: resumedAt };
   }
 
   /** Computes due steps with `t <= until`, at most `limit`; returns whether more are due. */
@@ -101,9 +115,11 @@ export class RideSimulation {
     return this.nextDueAt() <= until;
   }
 
-  /** The final state, unless it already went out. */
-  finish(endedAt: number): void {
-    this.advanceUntil(endedAt);
+  /** The final state, unless it already went out; a paused ride computes no more steps. */
+  finish(endedAt: number, paused = false): void {
+    if (!paused) {
+      this.advanceUntil(endedAt);
+    }
     if (this.lastPublishedStep !== this.step) {
       this.emit();
     }

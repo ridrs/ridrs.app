@@ -5,6 +5,9 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   activityFinishRequestedEvent,
+  activityInterruptedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
   bleCentralCapability,
@@ -100,6 +103,9 @@ const CAPABILITIES: readonly CapabilityContract[] = [
 const EVENTS: readonly EventDefinition[] = [
   activityStartRequestedEvent,
   activityFinishRequestedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
+  activityInterruptedEvent,
   activityStateChangedEvent,
   deviceConnectionChangedEvent,
   deviceStatusChangedEvent,

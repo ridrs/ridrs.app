@@ -161,8 +161,29 @@ export function encodeActivity(model: ActivityModel): Uint8Array {
     event: ENUMS.event.timer,
     eventType: ENUMS.eventType.start,
   });
+  // Records and the timer's stops and starts of the pauses, in time order.
+  const pauses = [...model.pauses];
+  const timer = (at: number, eventType: number) =>
+    messages.write(MESSAGES.event, {
+      timestamp: fitTimestamp(at),
+      event: ENUMS.event.timer,
+      eventType,
+    });
   for (const record of model.records) {
+    while (pauses[0] && pauses[0].from < record.at) {
+      const pause = pauses.shift() as (typeof pauses)[number];
+      timer(pause.from, ENUMS.eventType.stop);
+      if (pause.to < model.endedAt) {
+        timer(pause.to, ENUMS.eventType.start);
+      }
+    }
     messages.write(MESSAGES.record, recordValues(record));
+  }
+  for (const pause of pauses) {
+    timer(pause.from, ENUMS.eventType.stop);
+    if (pause.to < model.endedAt) {
+      timer(pause.to, ENUMS.eventType.start);
+    }
   }
   messages.write(MESSAGES.event, {
     timestamp: end,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type ActivityState,
+  activityStateChangedEvent,
   type MetricReading,
   metricCadenceEvent,
   metricHeartRateEvent,
@@ -57,7 +59,14 @@ export interface ActivityModel {
   /** e.g. "0.1.0" */
   readonly softwareVersion: string;
   readonly records: readonly ActivityRecord[];
+  /** When the ride stood still (ADR 0056): the timer stops at `from` and starts at `to`. */
+  readonly pauses: readonly Pause[];
   readonly summary: ActivitySummary;
+}
+
+export interface Pause {
+  readonly from: number;
+  readonly to: number;
 }
 
 export const FIT_DEFAULTS = Object.freeze({
@@ -117,6 +126,28 @@ function max(values: readonly number[]): number | undefined {
   return values.length === 0 ? undefined : Math.max(...values);
 }
 
+/** The pauses of the ride, from its activity states; one still open at the end lasts until then. */
+function pausesOf(events: readonly RecordingEvent[], endedAt: number): Pause[] {
+  const pauses: Pause[] = [];
+  let from: number | undefined;
+  for (const { envelope } of events) {
+    if (envelope.type !== activityStateChangedEvent.id) {
+      continue;
+    }
+    const state = envelope.payload as ActivityState;
+    if (state.state === 'paused' && from === undefined) {
+      from = state.pausedAt;
+    } else if (state.state !== 'paused' && from !== undefined) {
+      pauses.push({ from, to: state.state === 'running' ? (state.resumedAt ?? from) : endedAt });
+      from = undefined;
+    }
+  }
+  if (from !== undefined) {
+    pauses.push({ from, to: endedAt });
+  }
+  return pauses;
+}
+
 function defined<T>(values: readonly (T | undefined)[]): T[] {
   return values.filter((v): v is T => v !== undefined);
 }
@@ -136,9 +167,15 @@ export function buildActivity(recording: ActivitySource): ActivityModel {
   const heartRate = new Cursor(metricSeries(ride, metricHeartRateEvent.id));
   const samples = new Cursor(sampleSeries(ride));
 
+  const pauses = pausesOf(ride, endedAt);
+  const paused = (at: number) => pauses.some((p) => at > p.from && at < p.to);
   const records: ActivityRecord[] = [];
   const interval = FIT_DEFAULTS.recordIntervalMs;
   for (let at = Math.ceil(startedAt / interval) * interval; at <= endedAt; at += interval) {
+    if (paused(at)) {
+      // The timer stands still: FIT has no records then.
+      continue;
+    }
     const sample = samples.at(at);
     records.push({
       at,
@@ -151,6 +188,7 @@ export function buildActivity(recording: ActivitySource): ActivityModel {
   }
 
   const durationMs = endedAt - startedAt;
+  const timerMs = durationMs - pauses.reduce((sum, p) => sum + (p.to - p.from), 0);
   const totalDistance = defined(records.map((r) => r.distance)).at(-1);
   const powers = defined(records.map((r) => r.power));
   const cadences = defined(records.map((r) => r.cadence));
@@ -161,15 +199,13 @@ export function buildActivity(recording: ActivitySource): ActivityModel {
     timeZoneOffsetMinutes: recording.header.timeZoneOffsetMinutes,
     softwareVersion: recording.header.ridrsVersion,
     records,
+    pauses,
     summary: {
-      // ridrs has no pause yet: the timer runs for the whole ride.
       totalElapsedMs: durationMs,
-      totalTimerMs: durationMs,
+      totalTimerMs: timerMs,
       totalDistance,
       avgSpeed:
-        totalDistance !== undefined && durationMs > 0
-          ? totalDistance / (durationMs / 1000)
-          : undefined,
+        totalDistance !== undefined && timerMs > 0 ? totalDistance / (timerMs / 1000) : undefined,
       maxSpeed: max(defined(records.map((r) => r.speed))),
       avgPower: mean(powers),
       maxPower: max(powers),

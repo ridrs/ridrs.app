@@ -3,6 +3,9 @@
 export {
   type ActivityState,
   activityFinishRequestedEvent,
+  activityInterruptedEvent,
+  activityPauseRequestedEvent,
+  activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
   activityStateSchema,

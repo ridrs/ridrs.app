@@ -11,7 +11,7 @@ Phase 10 use case: **the road the rider sees is the road the physics rides.** Th
 ```text
 event-driven:  trainer ─► device-ftms-trainer ─► measurement.power ─► metric-power ─► series metric.power (damped-trend)
                                                                                            │ reader.valueAt(t)
-clock-driven:  activity.state-changed ─► physics-engine: running → step 0 as a task at t₀ = startedAt, step n every 10 ms (t = t₀ + 10·n)
+clock-driven:  activity.state-changed ─► physics-engine: running → step 0 as a task at t₀ = startedAt, step n every 10 ms (t = t₀ + 10·n); paused → no task; running again (`resumedAt`) → the next step at resumedAt + 10, the state unchanged (ADR 0056)
                                               │ motion.advance(previous, t)
                                               ▼
                                      physics-virtual-speed  (integrator: acceleration, speed, distance)

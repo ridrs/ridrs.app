@@ -21,7 +21,7 @@ function MainScreenView({ ctx }: { readonly ctx: UiContext }) {
   useEffect(
     () =>
       ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-        if (payload.state === 'running') {
+        if (payload.state === 'running' || payload.state === 'paused') {
           ctx.navigate('activity');
         }
       }),
