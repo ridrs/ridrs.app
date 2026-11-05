@@ -12,9 +12,10 @@ import { defineEvent } from './events.ts';
 
 /**
  * Wire protocol version; a companion accepts clients within the same major version.
- * 1.1: `write` / `written`.
+ * 1.1: `write` / `written`. 1.2: `rssi`, `manufacturerData` and `serviceData` in `discovered`,
+ * sent only to a client of 1.2 or later.
  */
-export const BLE_BRIDGE_PROTOCOL_VERSION = '1.1.0';
+export const BLE_BRIDGE_PROTOCOL_VERSION = '1.2.0';
 
 /** DNS-SD service type a companion advertises (TXT: `protocol`, `name`, `id`). */
 export const BLE_BRIDGE_SERVICE_TYPE = '_ridrs-bridge._tcp';
@@ -89,6 +90,11 @@ export const bridgeMessageSchema = z.discriminatedUnion('type', [
       peripheralId: z.string().min(1),
       name: z.string(),
       serviceUuids: z.array(uuid),
+      rssi: z.number().int().optional(),
+      /** Company id (4 hex digits) → bytes as hex; see `BleDiscoveredPeripheral`. */
+      manufacturerData: z.record(z.string(), z.string()).optional(),
+      /** Normalized service UUID → bytes as hex. */
+      serviceData: z.record(z.string(), z.string()).optional(),
     })
     .strict(),
   z.object({ type: z.literal('connect'), requestId, peripheralId: z.string().min(1) }).strict(),

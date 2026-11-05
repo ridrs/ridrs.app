@@ -12,15 +12,21 @@ import {
   deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
   deviceConnectRequestedEvent,
-  deviceDisconnectRequestedEvent,
   deviceDiscoveryRequestedEvent,
+  deviceForgetRequestedEvent,
   deviceRawNotificationEvent,
-  deviceRouteRequestedEvent,
+  deviceScanChangedEvent,
   hexToBytes,
   normalizeBleUuid,
   type PluginContext,
 } from '@ridrs/contracts';
 import pRetry from 'p-retry';
+import {
+  type Advertised,
+  advertisedAfter,
+  advertisedApart,
+  advertisesNews,
+} from './advertising.ts';
 
 const RECONNECT_BACKOFF = {
   retries: Number.POSITIVE_INFINITY,
@@ -29,9 +35,6 @@ const RECONNECT_BACKOFF = {
   maxTimeout: 30_000,
   randomize: false,
 } as const;
-
-/** The direct link first: the companion carries a device only when this device cannot. */
-const ROUTE_ORDER: readonly BleRoute[] = ['local', 'companion'];
 
 /**
  * How long a device that only the companion saw waits for this device's Bluetooth to see it too,
@@ -75,24 +78,40 @@ export interface BlePeripheralLink {
 }
 
 /**
- * One physical device, seen over one or both links. Its id is the one the first link reported,
- * and it keeps it when it moves to the other link, so measurements name one device throughout.
+ * A device seen over one link. A device both links see is two devices, one per link: the rider
+ * switches links by connecting the other one.
  */
 interface Sighting {
+  /** The id the device is known by in ridrs: the link's own id, unless the other link has it. */
   readonly deviceId: string;
-  readonly name: string;
+  readonly route: BleRoute;
+  /** The device's id on its link. */
+  readonly peripheralId: string;
+  /** Empty until the link reports it: some devices only send it in a scan response. */
+  name: string;
   readonly serviceUuids: readonly string[];
-  /** The device's id on each link that saw it. */
-  readonly ids: Map<BleRoute, string>;
+  /** The signal strength the link last reported, in dBm. */
+  rssi: number | undefined;
+  /** Its advertising data as the link reported it: tells devices of one name apart. */
+  advertised: Advertised;
 }
 
-/** What the link is after: the first device found, a device the rider chose, or nothing. */
-type Want = 'first' | 'chosen' | 'off';
+/**
+ * What the link is after: the first device found, a device the rider chose, or none on its own
+ * since the rider forgot the device, until a device setup opens again.
+ */
+type Want = 'first' | 'chosen' | 'none';
 
 interface Connected {
   readonly route: BleRoute;
   readonly connection: BleConnection;
   readonly teardown: () => void;
+}
+
+/** A connection attempt in flight: over which link, and how to call it off. */
+interface Attempt {
+  readonly route: BleRoute;
+  readonly controller: AbortController;
 }
 
 function routeOf(central: BleCentral): BleRoute {
@@ -109,13 +128,13 @@ function asPeripheral(sighting: Sighting): BleDiscoveredPeripheral {
 
 /**
  * The connection lifecycle shared by device plugins: scan for one service over every link,
- * connect to the first device found over every link that sees it (one that only the companion
- * saw waits a moment for this device's Bluetooth), subscribe to one characteristic, reconnect
- * each link with backoff, and publish every state as `device.connection-changed` and every
- * device found as `device.candidates-changed`. Only the data of one link is used: the direct
- * one, unless the rider chose the companion, and the other one while it is lost. The rider can
- * connect another device found, disconnect it, or choose whose data is used; these choices last
- * for this run. Ends when the plugin's abort signal fires.
+ * connect to the first device found (one seen directly first, then the strongest signal; a device
+ * the companion saw waits a moment for this device's Bluetooth), subscribe to one characteristic,
+ * reconnect over the same link with backoff, and publish every state as
+ * `device.connection-changed` and every device found, one per link that sees it, as
+ * `device.candidates-changed`. The rider can connect another device found, the same one over the
+ * other link too, or forget it: then no device connects on its own until a device setup opens
+ * again. These choices last for this run. Ends when the plugin's abort signal fires.
  */
 export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePeripheralLink {
   const { ctx, characteristic, label, kind } = options;
@@ -130,35 +149,33 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
   const scans = new Map<BleRoute, AbortController>();
   let want: Want = 'first';
   let chosen: Sighting | undefined;
-  /** The device's connections, one per link at most. */
-  const connections = new Map<BleRoute, Connected>();
-  /** The connection attempts in flight, per link. */
-  const attempts = new Map<BleRoute, AbortController>();
-  /** Whose data is used while the device is connected over both links. */
-  let preferred: BleRoute = 'local';
-  /** The link whose data was used last; connection states name it. */
+  let connected: Connected | undefined;
+  let attempt: Attempt | undefined;
+  /** The link that carried the device last; connection states name it. */
   let lastRoute: BleRoute | undefined;
-  let state: DeviceConnectionState = 'searching';
+  /** The state published last; published again when the device's name arrives. */
+  let lastState: DeviceConnectionState = 'searching';
   /** Open device setups; while there is one, every link keeps looking for devices. */
   let discovery = 0;
+  /** Devices the plugin took: it takes each once, so a forgotten one can come back. */
+  const taken = new Set<Sighting>();
   /** Running while a device only the companion saw waits for the direct link. */
   let directLinkWait: ReturnType<typeof setTimeout> | undefined;
 
-  /** The link whose data is used: the preferred one while connected, else any connected one. */
-  const activeRoute = (): BleRoute | undefined =>
-    connections.has(preferred) ? preferred : ROUTE_ORDER.find((r) => connections.has(r));
+  const takes = (sighting: Sighting): boolean => {
+    if (!taken.has(sighting) && (options.accept?.(asPeripheral(sighting)) ?? true)) {
+      taken.add(sighting);
+    }
+    return taken.has(sighting);
+  };
 
-  const publishState = (next: DeviceConnectionState): void => {
-    state = next;
+  const publishState = (state: DeviceConnectionState): void => {
     const deviceId = chosen?.deviceId ?? '';
     const deviceName = chosen?.name ?? '';
-    const route = activeRoute() ?? lastRoute;
+    const route = connected?.route ?? attempt?.route ?? lastRoute;
     lastRoute = route;
-    const connectedRoutes = ROUTE_ORDER.filter((r) => connections.has(r));
-    ctx.logger.info(
-      { deviceId, deviceName, state, route, connectedRoutes },
-      `${label} connection state: ${state}`,
-    );
+    lastState = state;
+    ctx.logger.info({ deviceId, deviceName, state, route }, `${label} connection state: ${state}`);
     // Connection results come from BLE I/O: they enter the simulation as inputs.
     ctx.inputs.accept(deviceConnectionChangedEvent, {
       deviceId,
@@ -166,39 +183,66 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       kind,
       state,
       ...(route ? { route } : {}),
-      ...(chosen ? { connectedRoutes } : {}),
     });
+  };
+
+  /** The same device over the other link: same name, nothing in their data tells them apart. */
+  const alike = (a: Sighting, b: Sighting): boolean =>
+    a.route !== b.route &&
+    a.name !== '' &&
+    a.name === b.name &&
+    !advertisedApart(a.advertised, b.advertised);
+
+  /** The one device over the other link that is this one, when it is the only one either way. */
+  const twinOf = (sighting: Sighting): Sighting | undefined => {
+    const [twin, ...more] = sightings.filter((o) => alike(sighting, o));
+    if (!twin || more.length > 0) {
+      return undefined;
+    }
+    return sightings.filter((o) => alike(twin, o)).length === 1 ? twin : undefined;
   };
 
   const publishCandidates = (): void => {
     ctx.inputs.accept(deviceCandidatesChangedEvent, {
       kind,
-      devices: sightings.map((s) => ({
-        deviceId: s.deviceId,
-        deviceName: s.name,
-        routes: ROUTE_ORDER.filter((route) => s.ids.has(route)),
-      })),
+      devices: sightings.map((s) => {
+        const twin = twinOf(s);
+        return {
+          deviceId: s.deviceId,
+          deviceName: s.name,
+          routes: [s.route],
+          ...(s.rssi === undefined ? {} : { rssi: s.rssi }),
+          ...(twin ? { sameDeviceAs: twin.deviceId } : {}),
+        };
+      }),
     });
   };
 
-  /**
-   * A link scans while there is no device yet, while the device setup is open, or while it has
-   * not seen the device: then it can carry the device too.
-   */
-  const scanNeeded = (route: BleRoute): boolean => {
-    if (ctx.signal.aborted) {
-      return false;
+  /** The links named as scanning last; published again only when they change. */
+  let scanning = '';
+
+  /** The links that scan now: a scan ended or failed is no longer one of them. */
+  const publishScans = (): void => {
+    const routes = [...scans.keys()];
+    if (routes.join() === scanning) {
+      return;
     }
-    if (discovery > 0) {
-      return true;
-    }
-    return want !== 'off' && !chosen?.ids.has(route);
+    scanning = routes.join();
+    // Whether a scan runs depends on BLE I/O: it enters the simulation as an input.
+    ctx.inputs.accept(deviceScanChangedEvent, { kind, routes });
   };
+
+  /**
+   * Every link scans while a device setup is open, or while there is no device yet and the rider
+   * did not forget the device.
+   */
+  const scanNeeded = (): boolean =>
+    !ctx.signal.aborted && (discovery > 0 || (!chosen && want !== 'none'));
 
   const reconcileScans = (): void => {
     for (const [route, central] of centrals) {
       const running = scans.get(route);
-      const needed = scanNeeded(route);
+      const needed = scanNeeded();
       if (needed && !running) {
         startScan(route, central);
       } else if (!needed && running) {
@@ -206,6 +250,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         running.abort();
       }
     }
+    publishScans();
   };
 
   const startScan = (route: BleRoute, central: BleCentral): void => {
@@ -236,39 +281,50 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         ctx.signal.removeEventListener('abort', abort);
         if (scans.get(route) === controller) {
           scans.delete(route);
+          if (!ctx.signal.aborted) {
+            publishScans();
+          }
         }
       });
   };
 
-  /**
-   * One device seen over one link. The same device over the other link has another id; it is
-   * the same device when the kind (the service scanned for) and the advertised name agree.
-   */
+  /** One device seen over one link; over the other link, the same device is another one. */
   const sighted = (route: BleRoute, peripheral: BleDiscoveredPeripheral): void => {
-    const known =
-      sightings.find((s) => s.ids.get(route) === peripheral.peripheralId) ??
-      (peripheral.name
-        ? sightings.find((s) => !s.ids.has(route) && s.name === peripheral.name)
-        : undefined);
-    if (known?.ids.get(route) === peripheral.peripheralId) {
+    const known = sightings.find(
+      (s) => s.route === route && s.peripheralId === peripheral.peripheralId,
+    );
+    if (known) {
+      // Seen again: only its name, when it had none yet, and its signal can be news.
+      let news = false;
+      if (!known.name && peripheral.name) {
+        named(known, peripheral.name);
+        news = true;
+      }
+      if (peripheral.rssi !== undefined && known.rssi !== peripheral.rssi) {
+        known.rssi = peripheral.rssi;
+        news = true;
+      }
+      if (advertisesNews(known.advertised, peripheral)) {
+        known.advertised = advertisedAfter(known.advertised, peripheral);
+        news = true;
+      }
+      if (news) {
+        publishCandidates();
+      }
       return;
     }
-    if (known) {
-      known.ids.set(route, peripheral.peripheralId);
-    } else {
-      sightings.push({
-        deviceId: peripheral.peripheralId,
-        name: peripheral.name,
-        serviceUuids: peripheral.serviceUuids.map(normalizeBleUuid),
-        ids: new Map([[route, peripheral.peripheralId]]),
-      });
-    }
+    // Requests name a device by id alone: one the other link uses already takes the link's name.
+    const idTaken = sightings.some((s) => s.deviceId === peripheral.peripheralId);
+    sightings.push({
+      deviceId: idTaken ? `${route}:${peripheral.peripheralId}` : peripheral.peripheralId,
+      route,
+      peripheralId: peripheral.peripheralId,
+      name: peripheral.name,
+      serviceUuids: peripheral.serviceUuids.map(normalizeBleUuid),
+      rssi: peripheral.rssi,
+      advertised: advertisedAfter(undefined, peripheral),
+    });
     publishCandidates();
-    if (known && known === chosen) {
-      // The device is seen over another link: it connects there too.
-      reconcileScans();
-      connectAll('first');
-    }
     if (want !== 'first' || chosen) {
       return;
     }
@@ -283,24 +339,39 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     chooseFirst();
   };
 
-  /** Connects the first device found that the plugin takes, the ones seen directly first. */
+  /** A device seen without its name took it. */
+  const named = (sighting: Sighting, name: string): void => {
+    sighting.name = name;
+    if (sighting === chosen) {
+      // The connection states carry the name.
+      publishState(lastState);
+    }
+  };
+
+  /**
+   * Connects the best device found that the plugin takes: the ones seen directly first, then the
+   * strongest signal, then the first found.
+   */
   const chooseFirst = (): void => {
     if (ctx.signal.aborted || want !== 'first' || chosen) {
       return;
     }
-    const seenDirectly = sightings.filter((s) => s.ids.has('local'));
     const waiting = directLinkWait !== undefined;
-    const order = waiting ? seenDirectly : [...seenDirectly, ...sightings];
-    const first = order.find((s) => options.accept?.(asPeripheral(s)) ?? true);
+    const order = sightings
+      .filter((s) => !waiting || s.route === 'local')
+      .toSorted(
+        (a, b) =>
+          Number(b.route === 'local') - Number(a.route === 'local') ||
+          (b.rssi ?? Number.NEGATIVE_INFINITY) - (a.rssi ?? Number.NEGATIVE_INFINITY),
+      );
+    const first = order.find(takes);
     if (!first) {
       return;
     }
     clearTimeout(directLinkWait);
     directLinkWait = undefined;
     chosen = first;
-    publishState('connecting');
-    reconcileScans();
-    connectAll('first');
+    connect('first');
   };
 
   const connectAndSubscribe = async (
@@ -315,8 +386,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
 
     try {
       const unsubscribe = await connection.subscribe(characteristic, (packet) => {
-        // Only the data of the link in use counts; the other link stands by.
-        if (!ctx.signal.aborted && activeRoute() === route) {
+        if (!ctx.signal.aborted && connected?.connection === connection) {
           // The bytes are an input; they are decoded in the input's turn (below).
           ctx.inputs.accept(deviceRawNotificationEvent, {
             deviceId: sighting.deviceId,
@@ -329,17 +399,14 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         }
       });
       const stopListening = connection.onDisconnected(() => {
-        const current = connections.get(route);
-        if (current?.connection !== connection) {
+        if (connected?.connection !== connection) {
           return;
         }
-        current.teardown();
-        connections.delete(route);
-        if (!ctx.signal.aborted && want !== 'off') {
-          // The data of the other link is used while this one reconnects.
-          publishState(connections.size > 0 ? 'connected' : 'reconnecting');
-          reconcileScans();
-          connectRoute(route, 'lost');
+        connected.teardown();
+        connected = undefined;
+        if (!ctx.signal.aborted) {
+          // Lost: the same link tries again; ridrs never switches links on its own.
+          connect('lost');
         }
       });
       teardown = () => {
@@ -360,36 +427,32 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       await connection.disconnect();
       return;
     }
-    connections.set(route, { route, connection, teardown });
+    connected = { route, connection, teardown };
     publishState('connected');
     reconcileScans();
   };
 
-  /** Connects the chosen device over every link that saw it and does not hold it yet. */
-  const connectAll = (why: 'first' | 'rider'): void => {
-    for (const route of ROUTE_ORDER) {
-      if (chosen?.ids.has(route) && !connections.has(route) && !attempts.has(route)) {
-        connectRoute(route, why);
-      }
-    }
-  };
-
   /**
-   * Connects the chosen device over one link, over and over with backoff until it works. After a
+   * Connects the chosen device over its link, over and over with backoff until it works. After a
    * loss the first real attempt comes after the initial backoff delay.
    */
-  const connectRoute = (route: BleRoute, why: 'first' | 'lost' | 'rider'): void => {
+  const connect = (why: 'first' | 'lost' | 'rider'): void => {
     const sighting = chosen;
-    const central = centrals.get(route);
-    const id = sighting?.ids.get(route);
-    if (!sighting || !central || !id) {
+    const route = sighting?.route;
+    const central = route && centrals.get(route);
+    if (!sighting || !route || !central) {
       return;
     }
-    attempts.get(route)?.abort();
+    const id = sighting.peripheralId;
+    attempt?.controller.abort();
     const controller = new AbortController();
-    attempts.set(route, controller);
+    const current: Attempt = { route, controller };
+    attempt = current;
+    publishState(why === 'lost' ? 'reconnecting' : 'connecting');
+    reconcileScans();
     const abort = () => controller.abort();
     ctx.signal.addEventListener('abort', abort, { once: true });
+    let failed = false;
     void pRetry(
       async (attemptNumber) => {
         // Attempt 1 stands for the connection that was just lost.
@@ -402,9 +465,9 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         ...RECONNECT_BACKOFF,
         signal: controller.signal,
         onFailedAttempt: () => {
-          if (state === 'connecting' && connections.size === 0 && !controller.signal.aborted) {
+          if (!failed && why !== 'lost' && !controller.signal.aborted) {
+            failed = true;
             publishState('reconnecting');
-            reconcileScans();
           }
         },
       },
@@ -416,72 +479,78 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       })
       .finally(() => {
         ctx.signal.removeEventListener('abort', abort);
-        if (attempts.get(route) === controller) {
-          attempts.delete(route);
+        if (attempt === current) {
+          attempt = undefined;
         }
       });
   };
 
-  /** Ends every connection the link holds and the attempts in flight. */
+  /** Ends the connection the link holds and the attempt in flight. */
   const release = async (): Promise<void> => {
-    for (const controller of attempts.values()) {
-      controller.abort();
+    attempt?.controller.abort();
+    attempt = undefined;
+    const current = connected;
+    connected = undefined;
+    if (current) {
+      current.teardown();
+      await current.connection.disconnect().catch(() => undefined);
     }
-    attempts.clear();
-    const current = [...connections.values()];
-    connections.clear();
-    for (const { teardown } of current) {
-      teardown();
-    }
-    await Promise.all(
-      current.map(({ connection }) => connection.disconnect().catch(() => undefined)),
-    );
   };
 
   const connectRequested = (deviceId: string): void => {
     const sighting = sightings.find((s) => s.deviceId === deviceId);
-    if (!sighting) {
-      return;
-    }
     // Several links of one plugin share out the devices: a device another one holds stays there.
-    if (sighting !== chosen && !(options.accept?.(asPeripheral(sighting)) ?? true)) {
+    if (!sighting || !takes(sighting)) {
       return;
     }
-    const same = sighting === chosen && connections.size > 0;
     want = 'chosen';
-    if (same) {
+    if (sighting === chosen && (connected || attempt)) {
       return;
-    }
-    if (sighting !== chosen) {
-      preferred = 'local';
     }
     void release().then(() => {
       if (ctx.signal.aborted) {
         return;
       }
       chosen = sighting;
-      publishState('connecting');
-      reconcileScans();
-      connectAll('rider');
+      connect('rider');
     });
   };
 
-  /** Only changes whose data is used: nothing connects or disconnects. */
-  const routeRequested = (route: BleRoute): void => {
-    preferred = route;
-    if (connections.has(route)) {
-      publishState(state);
+  /** Lets the device go: no device connects on its own until a device setup opens again. */
+  const forgetRequested = (): void => {
+    if (!chosen) {
+      return;
     }
+    want = 'none';
+    chosen = undefined;
+    void release().then(() => {
+      // The rider may have connected a device meanwhile.
+      if (ctx.signal.aborted || chosen) {
+        return;
+      }
+      lastRoute = undefined;
+      publishState(discovery > 0 ? 'searching' : 'disconnected');
+      reconcileScans();
+    });
   };
 
-  const disconnectRequested = (): void => {
-    want = 'off';
-    void release().then(() => {
-      if (!ctx.signal.aborted) {
-        publishState('disconnected');
-        reconcileScans();
-      }
-    });
+  /** A device setup opened: after a forgotten device, the best device found connects again. */
+  const discoveryStarted = (): void => {
+    if (want !== 'none') {
+      return;
+    }
+    want = 'first';
+    if (!chosen) {
+      publishState('searching');
+    }
+    chooseFirst();
+  };
+
+  /** The last device setup closed: with the device forgotten, the link stops looking. */
+  const discoveryEnded = (): void => {
+    if (want === 'none' && !chosen && lastState === 'searching') {
+      publishState('disconnected');
+    }
   };
 
   // The rider's requests and the open device setups are UI events.
@@ -490,18 +559,19 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       connectRequested(payload.deviceId);
     }
   });
-  ctx.events.subscribe(deviceRouteRequestedEvent, ({ payload }) => {
+  ctx.events.subscribe(deviceForgetRequestedEvent, ({ payload }) => {
     if (payload.kind === kind) {
-      routeRequested(payload.route);
-    }
-  });
-  ctx.events.subscribe(deviceDisconnectRequestedEvent, ({ payload }) => {
-    if (payload.kind === kind) {
-      disconnectRequested();
+      forgetRequested();
     }
   });
   ctx.events.subscribe(deviceDiscoveryRequestedEvent, ({ payload }) => {
+    const before = discovery;
     discovery = Math.max(0, discovery + (payload.active ? 1 : -1));
+    if (before === 0 && discovery > 0) {
+      discoveryStarted();
+    } else if (before > 0 && discovery === 0) {
+      discoveryEnded();
+    }
     reconcileScans();
   });
 

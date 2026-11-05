@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type { BleRoute } from '@ridrs/contracts';
 import type { RowKind } from './devices.ts';
 
 /**
@@ -13,14 +14,16 @@ const CSS = `
 .rd-indicator::after { content: '›'; color: #8b9db2; font-style: normal; }
 .rd-indicator:hover { border-color: #27c8ff; }
 .rd-row:hover, .rd-back:hover, .rd-continue:hover { border-color: #27c8ff !important; }
-.rd-row:focus-visible, .rd-indicator:focus-visible, .rd-back:focus-visible,
+.rd-line:hover { background: #27c8ff14 !important; }
+.rd-row:focus-visible,.rd-indicator:focus-visible, .rd-back:focus-visible,
 .rd-continue:focus-visible { outline: 2px solid #8dff2a; outline-offset: 2px; }
 .rd-dot { display: inline-flex; align-items: center; gap: 6px; color: #8b9db2; font-style: normal; }
 .rd-dot i { width: 10px; height: 10px; border-radius: 50%; background: #8b9db2; }
 .rd-dot.ok i { background: #8dff2a; box-shadow: 0 0 8px #8dff2a; }
 .rd-dot.busy i { background: #27c8ff; animation: rd-pulse 1s infinite; }
 .rd-dot.warn i { background: #ffb62e; }
-.rd-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #27c8ff40;
+.rd-spin { display: inline-block; flex: none; vertical-align: middle;
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid #27c8ff40;
   border-top-color: #27c8ff; animation: rd-spin 1s linear infinite; }
 @keyframes rd-pulse { 50% { opacity: .3; } }
 @keyframes rd-spin { to { transform: rotate(360deg); } }
@@ -38,7 +41,34 @@ export const COLORS = {
   lime: '#8dff2a',
   amber: '#ffb62e',
   muted: '#8b9db2',
+  red: '#ff4d5e',
 } as const;
+
+/**
+ * The icons in `assets/icons` come unchanged from Lucide (ISC, see the folder's LICENSE). They
+ * are painted as a mask, so they take the text colour like the drawn icons below.
+ */
+const TRASH = new URL('./assets/icons/trash-2.svg', import.meta.url).href;
+
+/** The bin of Remove, sized to sit before the button's word. */
+export function TrashIcon() {
+  const mask = `url("${TRASH}") center / contain no-repeat`;
+  return (
+    <span
+      aria-hidden
+      data-icon="trash"
+      style={{
+        display: 'inline-block',
+        flex: 'none',
+        width: 18,
+        height: 18,
+        background: 'currentColor',
+        WebkitMask: mask,
+        mask,
+      }}
+    />
+  );
+}
 
 const svg = {
   'aria-hidden': true,
@@ -81,12 +111,51 @@ export function KindIcon({ kind }: { readonly kind: RowKind }) {
   }
 }
 
+/**
+ * A phone: a wide body with a screen, a speaker slot at the top and a dot at the bottom. A plain
+ * rounded bar with one line reads as a battery.
+ */
+function PhoneShape() {
+  return (
+    <>
+      <rect x="5.5" y="2" width="13" height="20" rx="3" />
+      <rect x="7.5" y="5.5" width="9" height="11.5" rx="0.5" strokeWidth={1.2} />
+      <path d="M10.5 3.8h3" />
+      <circle cx="12" cy="19.4" r="0.6" fill="currentColor" />
+    </>
+  );
+}
+
 /** The companion phone's row. */
 export function PhoneIcon() {
   return (
     <svg {...svg} width="30" height="30" viewBox="0 0 24 24">
-      <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
-      <path d="M11 18.5h2" />
+      <PhoneShape />
+    </svg>
+  );
+}
+
+/** The link a device found is seen over, sized to sit next to the signal bars. */
+export function LinkIcon({ route, label }: { readonly route: BleRoute; readonly label: string }) {
+  return (
+    <svg
+      {...svg}
+      aria-hidden={undefined}
+      role="img"
+      aria-label={label}
+      data-testid="found-link"
+      strokeWidth={2}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+    >
+      <title>{label}</title>
+      {route === 'local' ? (
+        // The Bluetooth rune.
+        <path d="m7 7 10 10-5 5V2l5 5L7 17" />
+      ) : (
+        <PhoneShape />
+      )}
     </svg>
   );
 }
@@ -120,13 +189,11 @@ export function BoltIcon() {
 }
 
 /** The small icons of the details grid. */
-export type FactKind = 'type' | 'status' | 'link';
+export type FactKind = 'status';
 
 export function FactIcon({ icon }: { readonly icon: FactKind }) {
   const paths: Record<FactKind, string> = {
-    type: 'M12 2.5 21 7v10l-9 4.5L3 17V7zM3 7l9 4.5L21 7M12 11.5v10',
     status: 'M3 12h4l3-7 4 14 3-7h4',
-    link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
   };
   return (
     <svg {...svg} strokeWidth={1.8} width="18" height="18" viewBox="0 0 24 24">

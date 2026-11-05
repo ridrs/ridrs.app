@@ -67,6 +67,21 @@ Feature: Forwarding BLE over the bridge
     When the trainer sends the Indoor Bike Data packet "45 00 B4 00 C8 00"
     Then ridrs receives the notification bytes "45 00 B4 00 C8 00"
 
+  Scenario: The companion forwards the signal and the advertising data of the devices it finds
+    Given the trainer advertises the manufacturer data "0157 a1b2c3d4" and the service data "fe95 0102"
+    And the trainer advertises a signal of -62 dBm
+    And ridrs paired with the companion
+    When ridrs looks for devices through the bridge
+    Then ridrs finds "KICKR CORE 1234" with the manufacturer data "0157 a1b2c3d4" and the service data "fe95 0102"
+    And ridrs finds "KICKR CORE 1234" with a signal of -62 dBm
+
+  Scenario: A ridrs with protocol 1.1 finds the devices without signal and advertising data
+    Given the trainer advertises the manufacturer data "0157 a1b2c3d4" and the service data "fe95 0102"
+    And the trainer advertises a signal of -62 dBm
+    And ridrs connects to the companion speaking protocol "1.1.0"
+    When ridrs looks for devices through the bridge
+    Then ridrs finds "KICKR CORE 1234" without signal and advertising data
+
   Scenario: Closing the socket releases everything on the companion
     Given ridrs paired with the companion
     And ridrs is subscribed to Indoor Bike Data of "KICKR CORE 1234" through the bridge

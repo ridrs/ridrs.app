@@ -25,7 +25,7 @@ WebSocket. Text messages are JSON (validated with zod); binary messages are noti
 |---|---|
 | `hello` (protocol, client name, pairing secret, pairing code or token) | `welcome` (companion id and name, token) or `rejected` (`bad-code`, `bad-token`, `locked`, `incompatible`, `busy`, `unknown-secret`) |
 | `ping` every 1 s | `pong` |
-| `scan`, `stop-scan` | `discovered` |
+| `scan`, `stop-scan` | `discovered` (from 1.2 signal strength and manufacturer and service data as hex, only to a client of 1.2 or later, [ADR 0046](../decisions/0046-one-link-per-device-and-signal-strength.md), [ADR 0051](../decisions/0051-same-device-over-both-links-by-advertising-data.md)) |
 | `connect`, `disconnect` | `connected`, `disconnected`, `failed`, `connection-lost` |
 | `subscribe`, `unsubscribe` | `subscribed`, binary frames |
 | `write` (hex bytes, Write Without Response; protocol 1.1) | `written` or `failed` |
@@ -58,8 +58,8 @@ WebSocket. Text messages are JSON (validated with zod); binary messages are noti
 - Events: `bridge.companions-changed` (listed companions, paired flag), `bridge.pairing-offer` (the QR code URI while nothing is paired, `null` otherwise), `bridge.pair-requested` (address of a listed companion + code, from the UI), `bridge.state-changed` (`unpaired`, `connecting`, `connected`, `reconnecting`, `rejected`).
 - Discovery is mDNS only: there is no field for typing an address.
 - `bridge-connector-tauri` provides the connector: mDNS browse and sockets in Rust (`crates/ridrs-bridge`), pairing in the WebView's local storage. A companion that moved to another address is found again by its id in the announcements.
-- The companion has its own row in the device setup (`ui-devices`, see [ui-and-activity.md](ui-and-activity.md)): its status, and in its details Connect or Try again, and Forget companion. ridrs offers no Disconnect: `bridge.disconnect-requested` stays in the contract (the protocol and `bridge-control.feature` use it), but no UI publishes it. `ui-bridge-pairing` contributes the pairing to the extension point `setup/companion` of those details: while nothing is paired, two ways side by side, Scan the QR code or Enter the code (six digits) for each companion found.
-- **Both links at once** ([ADR 0042](../decisions/0042-device-links-in-the-peripheral-link.md)): `ble.central` is `multiple`. This device's Bluetooth and the companion both provide one, and `@ridrs/ble-peripheral` merges what they see, prefers the direct link and fails over to the other one ([devices-and-metrics.md](devices-and-metrics.md)). There is no transport to switch and no restart. A damaged stored pairing is discarded, and the rider pairs again.
+- The companion has its own row in the device setup (`ui-devices`, see [ui-and-activity.md](ui-and-activity.md)): its status, and in its details Connect or Try again, and Remove (it forgets the companion). ridrs offers no Disconnect: `bridge.disconnect-requested` stays in the contract (the protocol and `bridge-control.feature` use it), but no UI publishes it. `ui-bridge-pairing` contributes the pairing to the extension point `setup/companion` of those details: while nothing is paired, two ways side by side, Scan the QR code or Enter the code (six digits) for each companion found; the sixth digit pairs, with no button to press.
+- **Both links at once** ([ADR 0042](../decisions/0042-device-links-in-the-peripheral-link.md)): `ble.central` is `multiple`. This device's Bluetooth and the companion both provide one, and `@ridrs/ble-peripheral` lists a device both see once per link and connects it over one of them, the direct link first, with no failover; the rider switches by connecting the device found over the other link ([ADR 0046](../decisions/0046-one-link-per-device-and-signal-strength.md), [devices-and-metrics.md](devices-and-metrics.md)). There is no transport to switch and no restart. A damaged stored pairing is discarded, and the rider pairs again.
 
 ## Companion side
 

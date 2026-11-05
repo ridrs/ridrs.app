@@ -7,6 +7,8 @@ import {
   type BleConnection,
   type BleDiscoveredPeripheral,
   type BleScanOptions,
+  hexByCompany,
+  hexByService,
   normalizeBleUuid,
 } from '@ridrs/contracts';
 import { decodeNotificationFrame } from './frame.ts';
@@ -17,6 +19,12 @@ interface ScanEvent {
   readonly peripheralId: string;
   readonly name: string;
   readonly serviceUuids: readonly string[];
+  /** dBm; absent when the platform did not measure it. */
+  readonly rssi?: number | null;
+  /** Bytes by company id (JSON keys are strings); empty when the device advertises none. */
+  readonly manufacturerData?: Readonly<Record<string, readonly number[]>>;
+  /** Bytes by service UUID. */
+  readonly serviceData?: Readonly<Record<string, readonly number[]>>;
 }
 
 function abortError(): Error {
@@ -105,12 +113,20 @@ export class TauriBleCentral implements BleCentral {
   constructor(private readonly ipc: BleIpc) {
     this.scans = new SharedBleScan(async (serviceUuids, onDiscovered, _signal, onEnded) => {
       const channel = this.ipc.createChannel<ScanEvent>();
-      channel.onmessage = (event) =>
+      channel.onmessage = (event) => {
+        const manufacturerData = hexByCompany(
+          Object.entries(event.manufacturerData ?? {}).map(([id, bytes]) => [Number(id), bytes]),
+        );
+        const serviceData = hexByService(Object.entries(event.serviceData ?? {}));
         onDiscovered({
           peripheralId: event.peripheralId,
           name: event.name,
           serviceUuids: event.serviceUuids,
+          ...(typeof event.rssi === 'number' ? { rssi: event.rssi } : {}),
+          ...(manufacturerData ? { manufacturerData } : {}),
+          ...(serviceData ? { serviceData } : {}),
         });
+      };
       // blec ends the scan after its timeout and whenever it connects a device.
       const ended = this.ipc.createChannel<Record<string, never>>();
       ended.onmessage = () => onEnded();
@@ -141,7 +157,11 @@ export class TauriBleCentral implements BleCentral {
     const lostChannel = this.ipc.createChannel<{ readonly peripheralId: string }>();
     lostChannel.onmessage = () => connection.handleConnectionLost();
 
-    await this.ipc.invoke('ble_connect', { peripheralId, onConnectionLost: lostChannel });
+    // blec scans by itself for an address it does not know (Android forgets every device when
+    // a scan starts), and a scan of ours would end that one: no device would ever be found.
+    await this.scans.pausedWhile(() =>
+      this.ipc.invoke('ble_connect', { peripheralId, onConnectionLost: lostChannel }),
+    );
     if (signal?.aborted) {
       await connection.disconnect().catch(() => undefined);
       throw abortError();

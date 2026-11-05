@@ -8,6 +8,8 @@ import {
   type BleScanOptions,
   bleCentralCapability,
   definePlugin,
+  hexByCompany,
+  hexByService,
   normalizeBleUuid,
 } from '@ridrs/contracts';
 import { SharedBleScan } from '@ridrs/ble-peripheral';
@@ -54,10 +56,21 @@ async function waitForPoweredOn(signal?: AbortSignal): Promise<void> {
 }
 
 function toDiscovered(peripheral: NobleTypes.Peripheral): BleDiscoveredPeripheral {
+  const { advertisement } = peripheral;
+  // noble hands over the whole field: the company id (little endian) leads the bytes.
+  const raw = advertisement.manufacturerData;
+  const manufacturerData =
+    raw && raw.length >= 2 ? hexByCompany([[raw.readUInt16LE(0), raw.subarray(2)]]) : undefined;
+  const serviceData = hexByService(
+    (advertisement.serviceData ?? []).map(({ uuid, data }) => [uuid, data] as const),
+  );
   return {
     peripheralId: peripheral.id,
-    name: peripheral.advertisement.localName ?? '',
-    serviceUuids: peripheral.advertisement.serviceUuids.map(normalizeBleUuid),
+    name: advertisement.localName ?? '',
+    serviceUuids: advertisement.serviceUuids.map(normalizeBleUuid),
+    ...(Number.isFinite(peripheral.rssi) ? { rssi: peripheral.rssi } : {}),
+    ...(manufacturerData ? { manufacturerData } : {}),
+    ...(serviceData ? { serviceData } : {}),
   };
 }
 
