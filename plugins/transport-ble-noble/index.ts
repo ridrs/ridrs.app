@@ -86,7 +86,8 @@ function createCentral(): BleCentral {
     };
     noble.on('discover', onDiscover);
     try {
-      await noble.startScanningAsync([...serviceUuids], false);
+      // Every advertisement: a device still heard is reported again now and then (SharedBleScan).
+      await noble.startScanningAsync([...serviceUuids], true);
     } catch (error) {
       noble.removeListener('discover', onDiscover);
       throw error;

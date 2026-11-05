@@ -3,14 +3,15 @@ Feature: Device details in the device setup
   A click on a row of the device setup shows that device's details in place of the rows. The
   page is headed by the kind of device and what it is for, not by the setup's heading, with
   whether ridrs looks for devices of the kind at the top right ("Searching…" or "Not searching",
-  as the device plugin tells); below, the current device as one card, laid out like a device
-  found: its icon and name, a line with its link (and the device behind the power), the link's
-  icon and signal, and its status with the check and its reading, as its row has them. Below
-  that, a tip while something needs the rider, and the actions. Without a current device there
-  is no card, and the devices found follow the heading. Back (or Escape) returns to
-  the rows; Continue (or Done) is only offered there. Details have Remove (with a bin icon)
-  while a device is connected or tried, and Connect once it is disconnected; both return to the
-  rows as well. Every Connect names the link it uses: "Connect with Bluetooth" (this device's
+  as the device plugin tells); below, the current device as one card: its icon, its name, its
+  link's icon, the signal and, while connected, the battery level of a device that tells it, at the
+  top right; below the name its status with the check and its reading, as its row has them. Below that, a tip while something needs the rider (not while it
+  reconnects: the status says it all), and the actions. Without a current device there is no
+  card, and the devices found follow the heading. Back (or Escape) returns to the rows; Continue
+  (or Done) is only offered there. Details have Remove (with a bin icon) while a device is
+  connected or tried, which returns to the rows at once, and Connect once it is disconnected.
+  After any Connect (or Switch to) the details stay open and show how it goes; they return to the
+  rows once the device asked for is connected. Every Connect names the link it uses: "Connect with Bluetooth" (this device's
   Bluetooth) or "Connect with companion". Over the companion, only while ridrs is connected to the
   phone: until then, the devices it found are not listed or counted, and nothing connects
   with the companion.
@@ -25,12 +26,12 @@ Feature: Device details in the device setup
   its card, next to Remove, with the link's icon and no signal. Devices
   of one name that are not the same device stay apart. Without a device, a kind names the device connected
   last in this run. While a kind searches, its row counts the devices of the kind found, a
-  forgotten one too. The companion phone has a row of its own; its details have no Disconnect,
+  forgotten one too. Both counts count a device seen over both links once. The companion phone has a row of its own; its details have no Disconnect,
   only Remove (with a bin icon, as a device has it). While the companion is not connected, its
   status shows no warning icon, in its row and in its card.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, device-registry, metric-power, metric-heart-rate, ui-main-screen, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 
@@ -39,7 +40,7 @@ Feature: Device details in the device setup
     And I open the device indicator
     When I open the "Heart Rate Monitor" in the device setup
     Then the details are headed "Heart Rate Monitor", the card "HRM-Pro 42" with the status "Connected"
-    And the details card shows the line "Over Bluetooth" and the links "Direct"
+    And the details card shows the links "Direct"
     And the badge of the details card shows "✓"
     And the page shows no "Link"
     And the page offers a "Remove" button with a bin icon
@@ -58,6 +59,28 @@ Feature: Device details in the device setup
     Then the details are headed "Heart Rate Monitor", the card "HRM-Pro 42" with the status "72 bpm"
     And the badge of the details card shows "✓"
     And the details card shows the signal "Signal 4 of 4"
+
+  Scenario: The card shows the battery level of the device
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And "test-device" reported the battery of its "heart-rate" at 80 %
+    And I open the device indicator
+    When I open the "Heart Rate Monitor" in the device setup
+    Then the details card shows the battery "Battery 80 %"
+
+  Scenario: A reconnecting device shows neither its last battery level nor a tip
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And "test-device" reported the battery of its "heart-rate" at 30 %
+    And "test-device" reported its "heart-rate" "HRM-Pro 42" as "reconnecting"
+    And I open the device indicator
+    When I open the "Heart Rate Monitor" in the device setup
+    Then the details card shows no battery
+    And the page shows no "Connection lost; ridrs keeps trying."
+
+  Scenario: A device that tells no battery level shows none
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And I open the device indicator
+    When I open the "Heart Rate Monitor" in the device setup
+    Then the details card shows no battery
 
   Scenario: The top right says whether ridrs looks for devices of the kind
     Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
@@ -123,13 +146,26 @@ Feature: Device details in the device setup
       | Smart Trainer      | e.g. Wahoo, Tacx, Elite      | Not set up |
       | Heart Rate Monitor | HRM-Pro 42                   | Searching… |
 
-  Scenario: A disconnected device offers Connect, which closes the details
+  Scenario: A disconnected device offers Connect; the details close once it is connected
     Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "disconnected"
     And I open the device indicator
     And I open the "Heart Rate Monitor" in the device setup
     When I press "Connect with Bluetooth"
     Then the rider asked to connect the "heart-rate" "heart-rate-1"
-    And the device details are closed
+    And the device details stay open
+    When "test-device" reports its "heart-rate" "HRM-Pro 42" as "connecting"
+    Then the device details stay open
+    When "test-device" reports its "heart-rate" "HRM-Pro 42" as "connected"
+    Then the device details are closed
+
+  Scenario: A connection that does not come keeps the details open
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "disconnected"
+    And I open the device indicator
+    And I open the "Heart Rate Monitor" in the device setup
+    When I press "Connect with Bluetooth"
+    And "test-device" reports its "heart-rate" "HRM-Pro 42" as "reconnecting"
+    Then the device details stay open
+    And the details are headed "Heart Rate Monitor", the card "HRM-Pro 42" with the status "Reconnecting…"
 
   Scenario: A disconnected device of the companion offers Connect with companion
     Given the companion bridge reports "connected" to "Pixel 8"
@@ -182,7 +218,7 @@ Feature: Device details in the device setup
     And I open the device indicator
     When I open the "Power Meter" in the device setup
     Then the details are headed "Power Meter", the card "KICKR CORE 1234" with the status "Connected"
-    And the details card shows the line "Smart Trainer over Bluetooth" and the links "Direct"
+    And the details card shows the links "Direct"
 
   Scenario: More devices found show in the row, and the rider can connect one of them
     Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
@@ -192,7 +228,30 @@ Feature: Device details in the device setup
     When I open the "Heart Rate Monitor" in the device setup
     And I press "Connect Polar H10 A1B2 with Bluetooth"
     Then the rider asked to connect the "heart-rate" "heart-rate-2"
-    And the device details are closed
+    And the device details stay open
+    When "test-device" reports its "heart-rate" "Polar H10 A1B2" with the id "heart-rate-2" as "connected"
+    Then the device details are closed
+
+  Scenario: A device seen over both links counts once among the devices found
+    Given the companion bridge reports "connected" to "Pixel 8"
+    And "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And "test-device" found the "heart-rate" devices over the links:
+      | device                    | links                  |
+      | HRM-Pro 42                | this device, companion |
+      | Xiaomi Smart Band 10 6014 | companion, this device |
+    When I open the device indicator
+    Then the "Heart Rate Monitor" shows that 1 more device was found
+
+  Scenario: A kind that searches counts a device seen over both links once
+    Given the companion bridge reports "connected" to "Pixel 8"
+    And "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And "test-device" found the "heart-rate" devices over the links:
+      | device                    | links                  |
+      | HRM-Pro 42                | this device            |
+      | Xiaomi Smart Band 10 6014 | companion, this device |
+    When "test-device" searches for a "heart-rate"
+    And I open the device indicator
+    Then the "Heart Rate Monitor" counts 2 devices found
 
   Scenario: The devices found are listed by signal strength, the strongest first
     Given "test-device" reported its "trainer" "KICKR CORE 1234" as "connected"
@@ -220,7 +279,7 @@ Feature: Device details in the device setup
       | Smart Trainer      | KICKR CORE 1234                 | Connected  |
       | Heart Rate Monitor | e.g. Polar, Garmin, Apple Watch | Not set up |
     When I open the "Smart Trainer" in the device setup
-    Then the details card shows the line "Over companion" and the links "Companion"
+    Then the details card shows the links "Companion"
 
   Scenario: The devices found keep their order while the details are open
     Given "test-device" reported its "trainer" "KICKR CORE 1234" as "connected"
@@ -315,7 +374,9 @@ Feature: Device details in the device setup
       | Polar H10 A1B2 | Direct |
     When I press "Switch to companion"
     Then the rider asked to connect the "heart-rate" "heart-rate-2"
-    And the device details are closed
+    And the device details stay open
+    When "test-device" reports its "heart-rate" "HRM-Pro 42" with the id "heart-rate-2" as "connected"
+    Then the device details are closed
 
   Scenario: Back returns to the rows
     Given "test-device" reported its "trainer" "KICKR CORE 1234" as "connected"
@@ -369,7 +430,9 @@ Feature: Device details in the device setup
     And I open the "Companion App" in the device setup
     When I press "Connect"
     Then the rider asked to connect the companion
-    And the device details are closed
+    And the device details stay open
+    When the companion bridge reports "connected" to "Pixel 8"
+    Then the device details are closed
 
   Scenario: A companion out of reach gives a tip
     Given the companion bridge reports "unreachable" to "Pixel 8"

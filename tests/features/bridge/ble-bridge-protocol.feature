@@ -82,6 +82,16 @@ Feature: Forwarding BLE over the bridge
     When ridrs looks for devices through the bridge
     Then ridrs finds "KICKR CORE 1234" without signal and advertising data
 
+  Scenario: The companion tells ridrs at once that a device vanished
+    Given ridrs paired with the companion
+    When the trainer vanishes while ridrs looks for devices through the bridge
+    Then ridrs is told that "KICKR CORE 1234" vanished
+
+  Scenario: A ridrs with protocol 1.3 is not told that a device vanished
+    Given ridrs connects to the companion speaking protocol "1.3.0"
+    When the trainer vanishes while ridrs looks for devices through the bridge
+    Then ridrs is not told that "KICKR CORE 1234" vanished
+
   Scenario: Closing the socket releases everything on the companion
     Given ridrs paired with the companion
     And ridrs is subscribed to Indoor Bike Data of "KICKR CORE 1234" through the bridge

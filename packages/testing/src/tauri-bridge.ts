@@ -116,6 +116,10 @@ export class SimulatedTauriBridge {
     // The Rust command returns once the scan runs; results follow on the channel.
     void (async () => {
       for await (const peripheral of this.simulator.scan({ serviceUuids, signal: abort.signal })) {
+        // blec never learns that a device is gone: it just falls silent.
+        if (peripheral.vanished) {
+          continue;
+        }
         channel.onmessage({ ...peripheral, rssi: null });
       }
     })();

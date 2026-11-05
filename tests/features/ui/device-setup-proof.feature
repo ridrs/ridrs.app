@@ -4,10 +4,11 @@ Feature: The device setup shows the controller once found, and proof of every de
   was found, and never counts against "Everything is connected" before that. While a device
   is connected its status proves that it works: the watts of the power meter and the heart
   rate take the place of "Connected", and held controller buttons take the place of the
-  check.
+  check. A reading proves the device only while it is fresh: once the device falls silent, as a
+  band whose heart rate was switched off, the row says "Connected" again.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, device-registry, metric-power, metric-heart-rate, ui-main-screen, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 
@@ -105,6 +106,15 @@ Feature: The device setup shows the controller once found, and proof of every de
     And the "heart-rate" measures 72 bpm
     When "test-device" reports its "heart-rate" "HRM-Pro 42" as "reconnecting"
     Then the device setup shows the "Heart Rate Monitor" as "Reconnecting…"
+
+  @fake-timers
+  Scenario: A device that falls silent proves nothing any more
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And I open the device indicator
+    And the "heart-rate" measures 72 bpm
+    And the device setup shows the "Heart Rate Monitor" as "72 bpm"
+    When 5 seconds pass
+    Then the device setup shows the "Heart Rate Monitor" as "Connected"
 
   Scenario: Only the shown device proves the row
     Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"

@@ -10,6 +10,7 @@ import {
   mergeBleCentrals,
 } from '@ridrs/ble-simulator';
 import {
+  type BleCentral,
   type BleDiscoveredPeripheral,
   type BridgeState,
   bridgeCompanionsChangedEvent,
@@ -520,6 +521,40 @@ When('ridrs looks for devices through the bridge', async function (this: RidrsWo
   await scan.catch(() => undefined);
 });
 
+When(
+  'the trainer vanishes while ridrs looks for devices through the bridge',
+  async function (this: RidrsWorld) {
+    const session = welcomed(state(this).first);
+    const list: BleDiscoveredPeripheral[] = [];
+    found.set(this, list);
+    const abort = new AbortController();
+    const scan = (async () => {
+      for await (const peripheral of session.scan({ serviceUuids: [], signal: abort.signal })) {
+        list.push(peripheral);
+      }
+    })();
+    await this.settle();
+    assert.ok(this.trainer && this.bleSimulator, 'Expected a trainer');
+    this.bleSimulator.removePeripheral(this.trainer.peripheralId);
+    await this.settle();
+    abort.abort();
+    await scan.catch(() => undefined);
+  },
+);
+
+function vanished(world: RidrsWorld, name: string): boolean {
+  const id = foundByBridge(world, name).peripheralId;
+  return found.get(world)?.some((p) => p.peripheralId === id && p.vanished === true) ?? false;
+}
+
+Then('ridrs is told that {string} vanished', function (this: RidrsWorld, name: string) {
+  assert.ok(vanished(this, name), `ridrs was not told that "${name}" vanished`);
+});
+
+Then('ridrs is not told that {string} vanished', function (this: RidrsWorld, name: string) {
+  assert.ok(!vanished(this, name), `ridrs was told that "${name}" vanished`);
+});
+
 function foundByBridge(world: RidrsWorld, name: string): BleDiscoveredPeripheral {
   const peripheral = found.get(world)?.find((p) => p.name === name);
   assert.ok(peripheral, `ridrs found no "${name}" through the bridge`);
@@ -673,11 +708,18 @@ Given(
     dummiesOf.set(this, devices);
     // Steps that look up a trainer by name find the dummies in their simulator.
     this.bleSimulator = devices.central;
-    this.companionCentral = mergeBleCentrals(
-      new BleSimulator({ clock: this.clock }),
-      devices.central,
-      (id) => devices.central.getPeripheralById(id) !== undefined,
-    );
+    const empty = new BleSimulator({ clock: this.clock });
+    // Like blec on the phone: it keeps searching for an address it does not know.
+    const real: BleCentral = {
+      scan: (options) => empty.scan(options),
+      connect: (_id, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), {
+            once: true,
+          });
+        }),
+    };
+    this.companionCentral = mergeBleCentrals(real, devices.central, (id) => devices.owns(id));
     pendingCompanion.set(this, { name });
   },
 );

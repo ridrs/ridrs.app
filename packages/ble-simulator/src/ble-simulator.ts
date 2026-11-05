@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  BATTERY_LEVEL_CHARACTERISTIC_UUID,
+  BATTERY_SERVICE_UUID,
   type BleAdvertisedData,
   type BleCentral,
   type BleCharacteristicTarget,
@@ -260,6 +262,18 @@ export class SimulatedPeripheral {
     );
   }
 
+  /**
+   * Its Battery Service tells this level from now on: a central reads it, and one subscribed is
+   * notified. The GATT table gets the Battery Level, when the peripheral has a table.
+   */
+  setBatteryLevel(percent: number): void {
+    this.characteristics?.add(
+      characteristicKey(BATTERY_SERVICE_UUID, BATTERY_LEVEL_CHARACTERISTIC_UUID),
+    );
+    this.setValue(BATTERY_SERVICE_UUID, BATTERY_LEVEL_CHARACTERISTIC_UUID, Uint8Array.of(percent));
+    this.notify(BATTERY_SERVICE_UUID, BATTERY_LEVEL_CHARACTERISTIC_UUID, Uint8Array.of(percent));
+  }
+
   /** A value a central can read from the characteristic from now on. */
   setValue(serviceUuid: string, characteristicUuid: string, bytesOrHex: Uint8Array | string): void {
     this.values.set(characteristicKey(serviceUuid, characteristicUuid), toBytes(bytesOrHex));
@@ -432,8 +446,13 @@ export class SimulatedPeripheral {
   }
 }
 
+/** Real devices advertise many times a second; once a second is enough for every scan. */
+const ADVERTISING_INTERVAL_MS = 1000;
+
 interface ActiveScanSession {
   readonly requestedServices: ReadonlySet<string>;
+  /** Reports every device the scan hears again, like the advertisements of real devices. */
+  advertising?: ReturnType<typeof setInterval>;
   readonly queue: BleDiscoveredPeripheral[];
   wakeUp?: () => void;
   stopped: boolean;
@@ -527,6 +546,14 @@ export class BleSimulator implements BleCentral {
     }
     peripheral.switchOff();
     this.peripheralsById.delete(peripheralId);
+    for (const session of this.activeScans) {
+      if (!session.stopped && this.matchesServices(peripheral, session.requestedServices)) {
+        session.queue.push({ ...peripheral.toDiscoveredPeripheral(), vanished: true });
+        const wake = session.wakeUp;
+        session.wakeUp = undefined;
+        wake?.();
+      }
+    }
   }
 
   peripherals(): readonly SimulatedPeripheral[] {
@@ -555,6 +582,7 @@ export class BleSimulator implements BleCentral {
     for (const session of [...this.activeScans]) {
       session.error = error;
       session.stopped = true;
+      clearInterval(session.advertising);
       this.activeScans.delete(session);
       const wake = session.wakeUp;
       session.wakeUp = undefined;
@@ -588,6 +616,7 @@ export class BleSimulator implements BleCentral {
         return;
       }
       session.stopped = true;
+      clearInterval(session.advertising);
       this.activeScans.delete(session);
       const wake = session.wakeUp;
       session.wakeUp = undefined;
@@ -599,11 +628,20 @@ export class BleSimulator implements BleCentral {
     } else {
       this.activeScans.add(session);
       signal?.addEventListener('abort', stopSession, { once: true });
-      for (const peripheral of this.peripheralsById.values()) {
-        if (peripheral.isPoweredOn() && this.matchesServices(peripheral, requestedServices)) {
-          session.queue.push(peripheral.toDiscoveredPeripheral());
+      const advertise = (): void => {
+        for (const peripheral of this.peripheralsById.values()) {
+          if (peripheral.isPoweredOn() && this.matchesServices(peripheral, requestedServices)) {
+            session.queue.push(peripheral.toDiscoveredPeripheral());
+          }
         }
-      }
+      };
+      advertise();
+      session.advertising = setInterval(() => {
+        advertise();
+        const wake = session.wakeUp;
+        session.wakeUp = undefined;
+        wake?.();
+      }, ADVERTISING_INTERVAL_MS);
       for (const listener of [...this.scanStartListeners]) {
         listener(signal);
       }

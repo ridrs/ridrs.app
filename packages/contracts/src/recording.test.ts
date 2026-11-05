@@ -107,6 +107,7 @@ const SAMPLES: Record<string, unknown> = {
   'device.forget-requested': { kind: 'heart-rate' },
   'device.discovery-requested': { active: true },
   'device.scan-changed': { kind: 'heart-rate', routes: ['local', 'companion'] },
+  'device.battery-changed': { deviceId: 'sim-hr', kind: 'heart-rate', level: 80 },
   'controller.buttons-changed': { deviceId: 'sim-ride', buttons: ['a', 'shift-up-right'] },
   'device.status-changed': {
     devices: [
@@ -218,8 +219,8 @@ const SAMPLES: Record<string, unknown> = {
     features: { simulation: true, targetPower: true },
     targetPower: 180,
   },
-  'trainer.erg-requested': { change: 'up' },
   'drivetrain.shift-requested': { change: 'down' },
+  'trainer.erg-requested': { change: 'up' },
   'trainer.target-power': { watts: null },
   'ui.terrain-observed': {
     revision: 2,

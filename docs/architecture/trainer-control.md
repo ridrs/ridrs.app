@@ -30,7 +30,7 @@ The virtual gradient and speed drive the trainer's resistance, the Zwift Ride sh
 | `ui-widget-virtual-gear` | ui | "12 / 24" in the HUD; ↑/↓ shift while focused, + and - anywhere on the screen without ERG |
 | `ui-widget-target-power` | ui | the ERG button: "150 W" or "Off"; Enter turns ERG on and off, in ERG ↑/↓ ±5 W while focused and + and - anywhere on the screen, Back leaves ERG while focused |
 
-`ui-devices` shows the trainer's control state in its details: "Control: simulation", "ERG 150 W", "not supported", "refused", "lost".
+`ui-devices` shows the trainer's control state in its details: "Control: simulation", "ERG 150 W", "refused", "lost"; a trainer ridrs cannot control shows no control line.
 
 ## Rules
 

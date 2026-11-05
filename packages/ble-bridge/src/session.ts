@@ -404,6 +404,19 @@ export class BridgeSession implements BleCentral {
       case 'bye':
         this.byeReason = message.reason;
         return;
+      case 'vanished': {
+        const scan = this.scans.get(message.requestId);
+        if (scan && !scan.done) {
+          scan.queue.push({
+            peripheralId: message.peripheralId,
+            name: '',
+            serviceUuids: [],
+            vanished: true,
+          });
+          scan.wake?.();
+        }
+        return;
+      }
       case 'discovered': {
         const scan = this.scans.get(message.requestId);
         if (scan && !scan.done) {

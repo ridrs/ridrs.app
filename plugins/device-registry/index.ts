@@ -6,6 +6,7 @@ import {
   type DeviceKind,
   type DeviceStatus,
   definePlugin,
+  deviceBatteryChangedEvent,
   deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
   deviceKindSchema,
@@ -17,6 +18,8 @@ import {
 interface Registry {
   readonly byKind: Map<DeviceKind, DeviceStatus>;
   readonly candidates: Map<DeviceKind, readonly DeviceCandidate[]>;
+  /** The battery level the device of each kind told last, with that device. */
+  readonly batteries: Map<DeviceKind, { readonly deviceId: string; readonly level: number }>;
   /** The name of the device of each kind connected last in this run. */
   readonly lastNames: Map<DeviceKind, string>;
   /** Per kind, the links each device plugin scans over: several plugins may look for a kind. */
@@ -34,7 +37,7 @@ function scanning(scans: Registry['scans'], kind: DeviceKind): BleRoute[] | unde
 const registries = new WeakMap<PluginContext, Registry>();
 
 function publish(ctx: PluginContext, registry: Registry): void {
-  const { byKind, candidates, lastNames, scans, started } = registry;
+  const { byKind, candidates, batteries, lastNames, scans, started } = registry;
   if (!started) {
     return;
   }
@@ -42,6 +45,9 @@ function publish(ctx: PluginContext, registry: Registry): void {
     const status = byKind.get(kind);
     const found = candidates.get(kind);
     const looking = scanning(scans, kind);
+    // Only the device that told it has the level: another device of the kind may have none.
+    const battery = batteries.get(kind);
+    const level = battery && battery.deviceId === status?.deviceId ? battery.level : undefined;
     // Without a device, the one connected last names the kind.
     const last = status?.deviceName === '' ? lastNames.get(kind) : undefined;
     return status
@@ -51,6 +57,7 @@ function publish(ctx: PluginContext, registry: Registry): void {
             ...(last ? { lastDeviceName: last } : {}),
             ...(found ? { candidates: [...found] } : {}),
             ...(looking ? { scanning: looking } : {}),
+            ...(level === undefined ? {} : { battery: level }),
           },
         ]
       : [];
@@ -69,6 +76,7 @@ export default definePlugin({
     const registry: Registry = {
       byKind: new Map(),
       candidates: new Map(),
+      batteries: new Map(),
       lastNames: new Map(),
       scans: new Map(),
       started: false,
@@ -99,6 +107,13 @@ export default definePlugin({
 
     ctx.events.subscribe(deviceCandidatesChangedEvent, ({ payload }) => {
       registry.candidates.set(payload.kind, payload.devices);
+      if (byKind.has(payload.kind)) {
+        publish(ctx, registry);
+      }
+    });
+
+    ctx.events.subscribe(deviceBatteryChangedEvent, ({ payload }) => {
+      registry.batteries.set(payload.kind, { deviceId: payload.deviceId, level: payload.level });
       if (byKind.has(payload.kind)) {
         publish(ctx, registry);
       }

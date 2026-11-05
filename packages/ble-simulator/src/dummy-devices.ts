@@ -47,6 +47,8 @@ export class DummyDevices {
   readonly central: BleSimulator;
   private readonly clock: TimeSource;
   private readonly running = new Map<string, Running>();
+  /** Every id handed out, removed devices too: connects to them must never reach real Bluetooth. */
+  private readonly issued = new Set<string>();
   private readonly listeners = new Set<(devices: readonly DummyDevice[]) => void>();
 
   constructor(options: { readonly clock?: TimeSource } = {}) {
@@ -63,6 +65,7 @@ export class DummyDevices {
     const device: DummyDevice = { peripheralId: trainer.peripheralId, name: trainer.name, profile };
     const timers: Array<ReturnType<typeof setTimeout>> = [];
     this.running.set(device.peripheralId, { device, timers });
+    this.issued.add(device.peripheralId);
 
     let firstConnectedAt: number | undefined;
     let dropped = false;
@@ -103,6 +106,14 @@ export class DummyDevices {
     for (const timer of running.timers) clearInterval(timer);
     this.central.removePeripheral(peripheralId);
     this.changed();
+  }
+
+  /**
+   * Whether the id is a dummy's, also of one removed since: a connect to it belongs to the
+   * simulator, which refuses it at once, while real Bluetooth would keep searching for it.
+   */
+  owns(peripheralId: string): boolean {
+    return this.issued.has(peripheralId);
   }
 
   list(): readonly DummyDevice[] {

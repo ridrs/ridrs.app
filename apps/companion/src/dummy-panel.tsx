@@ -18,11 +18,7 @@ export const DUMMY_DEVICES_MARKER = 'ridrs-companion-dummy-devices';
 /** Merges dummy devices into the forwarded central; the panel adds and removes them. */
 export function withDummyDevices(real: BleCentral): { central: BleCentral; dummies: DummyDevices } {
   const dummies = new DummyDevices();
-  const central = mergeBleCentrals(
-    real,
-    dummies.central,
-    (id) => dummies.central.getPeripheralById(id) !== undefined,
-  );
+  const central = mergeBleCentrals(real, dummies.central, (id) => dummies.owns(id));
   return { central, dummies };
 }
 

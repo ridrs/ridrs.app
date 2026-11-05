@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  BATTERY_LEVEL_CHARACTERISTIC_UUID,
+  BATTERY_SERVICE_UUID,
   type BleCentral,
   type BleCharacteristicTarget,
   type BleConnection,
@@ -10,6 +12,7 @@ import {
   bytesToHex,
   type DeviceConnectionState,
   type DeviceKind,
+  deviceBatteryChangedEvent,
   deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
   deviceConnectRequestedEvent,
@@ -46,6 +49,20 @@ const RECONNECT_BACKOFF = {
  * before it connects through the companion: the direct link is always preferred.
  */
 const DIRECT_LINK_WAIT_MS = 2000;
+
+/**
+ * A device a scan has not reported for this long has fallen silent and leaves the list. Scans
+ * report every device they still hear every `BLE_SCAN_REPORT_INTERVAL_MS`.
+ */
+const SILENT_AFTER_MS = 15_000;
+/** How often the link looks for devices that fell silent. */
+const SILENCE_CHECK_MS = 1000;
+
+/** Any device may tell its battery level: the link reads it and follows it, for every kind. */
+const BATTERY_LEVEL: BleCharacteristicTarget = {
+  serviceUuid: BATTERY_SERVICE_UUID,
+  characteristicUuid: BATTERY_LEVEL_CHARACTERISTIC_UUID,
+};
 
 export interface BlePeripheralLinkOptions {
   readonly ctx: PluginContext;
@@ -130,6 +147,8 @@ interface Sighting {
   rssi: number | undefined;
   /** Its advertising data as the link reported it: tells devices of one name apart. */
   advertised: Advertised;
+  /** When its link last reported it, or started to scan again. */
+  heardAt: number;
 }
 
 /**
@@ -203,6 +222,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
   const taken = new Set<Sighting>();
   /** Running while a device only the companion saw waits for the direct link. */
   let directLinkWait: ReturnType<typeof setTimeout> | undefined;
+  /** Running while any link scans: drops the devices that fell silent. */
+  let silenceCheck: ReturnType<typeof setInterval> | undefined;
 
   const takes = (sighting: Sighting): boolean => {
     if (!taken.has(sighting) && (options.accept?.(asPeripheral(sighting)) ?? true)) {
@@ -296,7 +317,32 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         running.abort();
       }
     }
+    if (scans.size > 0) {
+      silenceCheck ??= setInterval(dropSilent, SILENCE_CHECK_MS);
+    } else {
+      clearInterval(silenceCheck);
+      silenceCheck = undefined;
+    }
     publishScans();
+  };
+
+  /** A device leaves the list, unless it is the one the link holds: that one reconnects. */
+  const drop = (gone: readonly Sighting[]): void => {
+    const dropped = gone.filter((s) => s !== chosen);
+    if (dropped.length === 0) {
+      return;
+    }
+    for (const sighting of dropped) {
+      sightings.splice(sightings.indexOf(sighting), 1);
+      taken.delete(sighting);
+    }
+    publishCandidates();
+  };
+
+  /** Only a scan that runs hears its devices: the others' devices keep their place. */
+  const dropSilent = (): void => {
+    const now = ctx.clock.now();
+    drop(sightings.filter((s) => scans.has(s.route) && now - s.heardAt >= SILENT_AFTER_MS));
   };
 
   const startScan = (route: BleRoute, central: BleCentral): void => {
@@ -304,6 +350,13 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     const abort = () => controller.abort();
     ctx.signal.addEventListener('abort', abort, { once: true });
     scans.set(route, controller);
+    // Not heard while no scan ran: the new scan gets its full time to hear them again.
+    const now = ctx.clock.now();
+    for (const sighting of sightings) {
+      if (sighting.route === route) {
+        sighting.heardAt = now;
+      }
+    }
     void (async () => {
       for await (const peripheral of central.scan({
         serviceUuids: [serviceUuid],
@@ -311,6 +364,14 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       })) {
         if (controller.signal.aborted) {
           break;
+        }
+        if (peripheral.vanished) {
+          drop(
+            sightings.filter(
+              (s) => s.route === route && s.peripheralId === peripheral.peripheralId,
+            ),
+          );
+          continue;
         }
         // Centrals may report more than asked for: never take another plugin's device.
         if (peripheral.serviceUuids.some((uuid) => normalizeBleUuid(uuid) === serviceUuid)) {
@@ -340,6 +401,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       (s) => s.route === route && s.peripheralId === peripheral.peripheralId,
     );
     if (known) {
+      known.heardAt = ctx.clock.now();
       // Seen again: only its name, when it had none yet, and its signal can be news.
       let news = false;
       if (!known.name && peripheral.name) {
@@ -369,6 +431,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       serviceUuids: peripheral.serviceUuids.map(normalizeBleUuid),
       rssi: peripheral.rssi,
       advertised: advertisedAfter(undefined, peripheral),
+      heardAt: ctx.clock.now(),
     });
     publishCandidates();
     if (want !== 'first' || chosen) {
@@ -476,6 +539,30 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
           );
         }
       }
+      // The battery level: one byte in percent. A device without the Battery Service has none.
+      const battery = (data: Uint8Array): void => {
+        const level = data[0];
+        if (level !== undefined && level <= 100 && !ctx.signal.aborted) {
+          // The level comes from BLE I/O: it enters the simulation as an input.
+          ctx.inputs.accept(deviceBatteryChangedEvent, {
+            deviceId: sighting.deviceId,
+            kind,
+            level,
+          });
+        }
+      };
+      try {
+        unsubscribes.push(
+          await connection.subscribe(BATTERY_LEVEL, (data) => {
+            if (connected?.connection === connection) {
+              battery(data);
+            }
+          }),
+        );
+      } catch {
+        // Not every device notifies its battery level; the read below still tells it.
+      }
+      await connection.read(BATTERY_LEVEL).then(battery, () => undefined);
       for (const target of options.reads ?? []) {
         // Read results come from BLE I/O: they enter the simulation as inputs.
         const result = await connection.read(target).then(
@@ -691,6 +778,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     );
   });
 
+  ctx.signal.addEventListener('abort', () => clearInterval(silenceCheck), { once: true });
+
   // A device forgotten in an earlier run: nothing is looked for until a device setup opens.
   publishState(want === 'none' ? 'disconnected' : 'searching');
   reconcileScans();
@@ -735,6 +824,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     async stop(): Promise<void> {
       clearTimeout(directLinkWait);
       directLinkWait = undefined;
+      clearInterval(silenceCheck);
+      silenceCheck = undefined;
       for (const scan of scans.values()) {
         scan.abort();
       }
