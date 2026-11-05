@@ -29,7 +29,7 @@ The event bus is the ride's complete, ordered history, and the raw device bytes 
 ## Recording lifecycle
 
 1. From `initialize`, `recording-session` observes every event and diagnostic and keeps a rolling 60 s pre-roll (plus the latest connection state per device).
-2. On `activity.state-changed` `running` it creates `<name>.ridrs.jsonl` with header, snapshot and pre-roll, then records live. Lines are queued in order and appended every 1000 ms; the bus is never blocked.
+2. On `activity.state-changed` `running` it creates `<name>.ridrs.jsonl` with header, snapshot and pre-roll, then records live. Lines are queued in order and appended every 1000 ms; the bus is never blocked. The open file is the ride's journal ([ADR 0055](../decisions/0055-the-recording-is-the-session-journal.md)): it is flushed to the disk (`AppFiles.sync`) every 5 s and right after every `activity.state-changed`, in the write chain, so a power loss loses at most the last ~6 s and every line on the disk is complete or torn last. `durable-journal.feature` covers it.
 3. On `finished` it records the rest of that cascade, flushes, writes the footer, gzips to `.ridrs`, reads it back and checks header, footer and line count, removes the `.jsonl` and publishes `recording.completed` (`distance` from the last `physics.state`).
 4. A storage error reports `recording-failed` once and publishes `recording.failed`; recording stops for that ride, the ride goes on.
 5. At host start, every orphaned `.ridrs.jsonl` is recovered (`recording-recovered`) and announced with `recording.completed`, which also triggers its FIT export.

@@ -46,6 +46,9 @@ export const tauriAppFiles: AppFiles = {
     // The fs plugin cannot flush: the app command writes, flushes and renames (ADR 0054).
     await invoke('app_file_replace', { path: assertAppFilePath(path), bytes: [...bytes] });
   },
+  async sync(path) {
+    await invoke('app_file_sync', { path: assertAppFilePath(path) });
+  },
   async read(path) {
     return readFile(assertAppFilePath(path), { baseDir });
   },

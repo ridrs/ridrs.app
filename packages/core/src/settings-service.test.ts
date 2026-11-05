@@ -16,6 +16,7 @@ class Files implements AppFiles {
   async replace(path: string, bytes: Uint8Array) {
     await this.write(path, bytes);
   }
+  async sync() {}
   async read(path: string) {
     return new TextEncoder().encode(this.files.get(path) ?? '');
   }

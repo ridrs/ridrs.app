@@ -17,6 +17,8 @@ export interface AppFiles {
    * renamed over the old one. After a crash the file is the old one or the new one.
    */
   replace(path: string, bytes: Uint8Array): Promise<void>;
+  /** Resolves once what was appended to `path` is on the disk (ADR 0055). */
+  sync(path: string): Promise<void>;
   read(path: string): Promise<Uint8Array>;
   /** The files directly in `directory`, sorted by path; an absent directory is empty. */
   list(directory: string): Promise<readonly AppFileEntry[]>;

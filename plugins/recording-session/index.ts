@@ -41,6 +41,8 @@ export const RECORDING_DEFAULTS = Object.freeze({
   prerollMs: 60_000,
   /** The open recording is appended to about this often. */
   flushIntervalMs: 1000,
+  /** ... and flushed to the disk this often, and right after a lifecycle event (ADR 0055). */
+  syncIntervalMs: 5000,
 });
 
 interface Buffered {
@@ -62,6 +64,9 @@ interface Ride {
   /** Storage writes run one after another, in order. */
   writes: Promise<void>;
   timer?: ReturnType<typeof setInterval>;
+  syncTimer?: ReturnType<typeof setInterval>;
+  /** A lifecycle event waits for its line to be on the disk. */
+  syncSoon: boolean;
   /** The `finished` state was observed; the rest of its run-to-completion cascade still belongs to the ride. */
   finishing: boolean;
   endedAt?: number;
@@ -112,6 +117,7 @@ function fail(ctx: PluginContext, ride: Ride, error: unknown): void {
   ride.failed = true;
   ride.pending = [];
   clearInterval(ride.timer);
+  clearInterval(ride.syncTimer);
   ctx.reportDiagnostic(
     'recording-failed',
     `The recording of ride ${ride.sessionId} failed: ${reason(error)}`,
@@ -133,6 +139,31 @@ function flush(ctx: PluginContext, recorder: Recorder, ride: Ride): void {
   ride.writes = ride.writes
     .then(() => (ride.failed ? undefined : recorder.storage.append(ride.openPath, text)))
     .catch((error: unknown) => fail(ctx, ride, error));
+}
+
+/** Flushes what storage was handed to the disk, in the write chain: never on the turn queue. */
+function sync(ctx: PluginContext, recorder: Recorder, ride: Ride): void {
+  if (ride.failed) {
+    return;
+  }
+  ride.writes = ride.writes
+    .then(() => (ride.failed ? undefined : recorder.storage.sync(ride.openPath)))
+    .catch((error: unknown) => fail(ctx, ride, error));
+}
+
+/** Appends and syncs at once: after the turn's cascade, so the batch ends at a turn boundary. */
+function syncSoon(ctx: PluginContext, recorder: Recorder, ride: Ride): void {
+  if (ride.syncSoon) {
+    return;
+  }
+  ride.syncSoon = true;
+  queueMicrotask(() => {
+    ride.syncSoon = false;
+    if (!ride.closed) {
+      flush(ctx, recorder, ride);
+      sync(ctx, recorder, ride);
+    }
+  });
 }
 
 function startRide(
@@ -195,6 +226,7 @@ function startRide(
     finishing: false,
     closed: false,
     failed: false,
+    syncSoon: false,
   };
   recorder.ride = ride;
   for (const { section, message } of failedSections) {
@@ -205,7 +237,9 @@ function startRide(
     );
   }
   flush(ctx, recorder, ride);
+  sync(ctx, recorder, ride);
   ride.timer = setInterval(() => flush(ctx, recorder, ride), RECORDING_DEFAULTS.flushIntervalMs);
+  ride.syncTimer = setInterval(() => sync(ctx, recorder, ride), RECORDING_DEFAULTS.syncIntervalMs);
 }
 
 /** The physics distance of the last `physics.state` of a recording. */
@@ -238,6 +272,7 @@ async function seal(
 async function closeRide(ctx: PluginContext, recorder: Recorder, ride: Ride): Promise<void> {
   ride.closed = true;
   clearInterval(ride.timer);
+  clearInterval(ride.syncTimer);
   ride.pending.push(ride.writer.footer('complete', ride.endedAt ?? ctx.clock.now()));
   flush(ctx, recorder, ride);
   await ride.writes;
@@ -321,6 +356,9 @@ function onEvent(ctx: PluginContext, recorder: Recorder, envelope: EventEnvelope
     if (!ride.failed) {
       ride.pending.push(ride.writer.event(serialized, false));
     }
+    if (envelope.type === activityStateChangedEvent.id && !ride.finishing) {
+      syncSoon(ctx, recorder, ride);
+    }
     if (envelope.type === physicsStateEvent.id) {
       const state = envelope.payload as PhysicsState;
       if (state.sessionId === ride.sessionId) {
@@ -394,7 +432,9 @@ export default definePlugin({
       // The host stops mid-ride: what was observed goes to the open file, recovered next start.
       ride.closed = true;
       clearInterval(ride.timer);
+      clearInterval(ride.syncTimer);
       flush(ctx, recorder, ride);
+      sync(ctx, recorder, ride);
     }
     recorders.delete(ctx);
   },

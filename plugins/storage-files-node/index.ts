@@ -45,6 +45,15 @@ export function createNodeAppFiles(root: string): AppFiles {
       }
       await rename(temporary, file);
     },
+    async sync(path) {
+      // fsync: on macOS not a full flush, which Node does not offer (ADR 0055).
+      const handle = await open(resolvePath(path), 'a');
+      try {
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+    },
     async read(path) {
       return new Uint8Array(await readFile(resolvePath(path)));
     },
