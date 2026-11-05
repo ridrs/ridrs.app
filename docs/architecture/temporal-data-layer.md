@@ -153,3 +153,7 @@ The Phase 4 open questions are answered:
 - **Strategy and horizon:** `metric-power` keeps `damped-trend` with its defaults. At 4 Hz the trend is extrapolated up to 3 T ≈ 750 ms and then held; the series becomes stale 2 s after the last packet.
 - **Stale threshold:** the physics needs no strategy, horizon or threshold of its own. Two seconds of held power before coasting is acceptable for a rider who stops pedalling and rides through short BLE gaps. To be revisited with real rides.
 - A step observes its planned time and knows the inputs accepted before it, however late it runs ([time-and-scheduling.md](time-and-scheduling.md)): wake timing never changes its value. The physics never writes into a series. Writes into a series happen only inside a turn (`outside-turn` otherwise).
+
+## Phase 8: a series that never goes stale
+
+A writer may ask for `stale: 'never'` (only with `hold`): the last value holds until the next one and the series stays `fresh`, without `delayed` or `stale`. It is for a state the rider sets, not for a sensor: the virtual gear (`drivetrain.virtual-gear`, written by `control-virtual-gears`, read by `physics-trainer-load`; [ADR 0055](../decisions/0055-virtual-gears-and-never-stale-series.md)). A disconnect break still applies. A series of an `optionalRequires` capability may be read; without a writer it answers `no-source`.

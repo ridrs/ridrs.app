@@ -34,7 +34,8 @@
         "measurement.power",
         "measurement.heart-rate",
         "controller.buttons-changed",
-        "bridge.state-changed"
+        "bridge.state-changed",
+        "trainer.control-changed"
       ],
       "publish": [
         "device.connect-requested",

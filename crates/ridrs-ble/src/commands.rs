@@ -201,22 +201,48 @@ pub async fn ble_subscribe(
         .map_err(err)
 }
 
-/// Write Without Response (a command); `data` arrives as a JSON number array.
+/// A write; `data` arrives as a JSON number array. Without response (a command) unless
+/// `with_response` asks for a Write With Response, which returns after the peripheral's write
+/// response and fails on a GATT error (ADR 0052).
 #[tauri::command]
 pub async fn ble_write(
     peripheral_id: String,
     service_uuid: String,
     characteristic_uuid: String,
     data: Vec<u8>,
+    with_response: Option<bool>,
 ) -> Result<(), String> {
     let handler = get_handler().map_err(err)?;
+    let write_type = if with_response.unwrap_or(false) {
+        WriteType::WithResponse
+    } else {
+        WriteType::WithoutResponse
+    };
     handler
         .send_data_to(
             &peripheral_id,
             parse_uuid(&characteristic_uuid)?,
             Some(parse_uuid(&service_uuid)?),
             &data,
-            WriteType::WithoutResponse,
+            write_type,
+        )
+        .await
+        .map_err(err)
+}
+
+/// Reads a characteristic; the bytes return as a JSON number array.
+#[tauri::command]
+pub async fn ble_read(
+    peripheral_id: String,
+    service_uuid: String,
+    characteristic_uuid: String,
+) -> Result<Vec<u8>, String> {
+    get_handler()
+        .map_err(err)?
+        .recv_data_from(
+            &peripheral_id,
+            parse_uuid(&characteristic_uuid)?,
+            Some(parse_uuid(&service_uuid)?),
         )
         .await
         .map_err(err)

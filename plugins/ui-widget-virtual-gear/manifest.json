@@ -1,0 +1,24 @@
+{
+  "id": "ui-widget-virtual-gear",
+  "name": "Virtual Gear Widget",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "virtual-gear",
+        "extensionPoint": "hud/widget",
+        "export": "VirtualGearWidget",
+        "order": 7
+      }
+    ],
+    "events": {
+      "subscribe": ["drivetrain.gear-changed"],
+      "publish": []
+    }
+  }
+}

@@ -14,6 +14,21 @@ export const FTMS_SERVICE_UUID = '1826';
  */
 export const INDOOR_BIKE_DATA_CHARACTERISTIC_UUID = '2ad2';
 
+/**
+ * FTMS Fitness Machine Feature (0x2ACC), read once per connection: two little-endian uint32,
+ * the machine features and the target setting features (FTMS 1.0, 4.3).
+ */
+export const FITNESS_MACHINE_FEATURE_CHARACTERISTIC_UUID = '2acc';
+
+/** FTMS Supported Power Range (0x2AD8): minimum and maximum sint16 W, increment uint16 W. */
+export const SUPPORTED_POWER_RANGE_CHARACTERISTIC_UUID = '2ad8';
+
+/**
+ * FTMS Fitness Machine Control Point (0x2AD9): written with response, answered by an indication
+ * `80 <op code> <result>` (FTMS 1.0, 4.16).
+ */
+export const FITNESS_MACHINE_CONTROL_POINT_CHARACTERISTIC_UUID = '2ad9';
+
 /** Canonical 16-bit UUID for the Bluetooth Heart Rate Service (0x180D). */
 export const HEART_RATE_SERVICE_UUID = '180d';
 
@@ -100,14 +115,29 @@ export interface BleCharacteristicTarget {
   readonly characteristicUuid: string;
 }
 
+export interface BleWriteOptions {
+  /**
+   * A Write With Response: resolves after the peripheral's write response and rejects on a GATT
+   * error. Absent or false: a Write Without Response, resolved once it was sent.
+   */
+  readonly withResponse?: boolean;
+}
+
 export interface BleConnection {
   readonly peripheralId: string;
+  /** Notifications and indications alike: the central enables whichever the characteristic has. */
   subscribe(
     characteristic: BleCharacteristicTarget,
     onNotification: (data: Uint8Array) => void,
   ): Promise<() => void>;
-  /** Writes `data` as a Write Without Response (a command); resolves once it was sent. */
-  write(characteristic: BleCharacteristicTarget, data: Uint8Array): Promise<void>;
+  /** Writes `data`, without response unless asked for. */
+  write(
+    characteristic: BleCharacteristicTarget,
+    data: Uint8Array,
+    options?: BleWriteOptions,
+  ): Promise<void>;
+  /** Reads the characteristic's value. */
+  read(characteristic: BleCharacteristicTarget): Promise<Uint8Array>;
   onDisconnected(listener: () => void): () => void;
   disconnect(): Promise<void>;
 }

@@ -1,0 +1,10 @@
+{
+  "id": "physics-trainer-load",
+  "name": "Trainer Load",
+  "version": "0.1.0",
+  "types": ["physics"],
+  "provides": ["physics.trainer-load"],
+  "requires": ["physics.bicycle", "physics.rider", "physics.environment"],
+  "optionalRequires": ["drivetrain.virtual-gear"],
+  "entry": "index.ts"
+}

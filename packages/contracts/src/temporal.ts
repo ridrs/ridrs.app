@@ -86,6 +86,17 @@ export interface TemporalSeriesReader {
   onFreshnessChange(handler: (freshness: Freshness, at: number) => void): () => void;
 }
 
+export interface TemporalWriterOptions {
+  readonly strategy: EstimationStrategy;
+  readonly min?: number;
+  /**
+   * `never`: the series holds its last value until the next one, however long, and stays `fresh`:
+   * for a state the rider sets (a virtual gear), not for a sensor that should keep sending.
+   * Only with `hold`. Absent: stale after silence, as learned from the sampling interval.
+   */
+  readonly stale?: 'never';
+}
+
 /**
  * The temporal data layer as seen by one plugin. A series is identified by a capability: only
  * the plugin providing it may write (during `initialize`), readers need it in `requires`.
@@ -94,7 +105,7 @@ export interface TemporalSeriesReader {
 export interface PluginTemporalContext {
   writer(
     capability: CapabilityContract<unknown, CapabilityCardinality>,
-    options: { readonly strategy: EstimationStrategy; readonly min?: number },
+    options: TemporalWriterOptions,
   ): TemporalSeriesWriter;
   reader(capability: CapabilityContract<unknown, CapabilityCardinality>): TemporalSeriesReader;
   /** One snapshot per accepted measurement of any of the series, at that measurement's time. */

@@ -6,6 +6,8 @@ import type {
   PhysicsSample,
   PhysicsState,
   PhysicsStateBatch,
+  TrainerLoadCapability,
+  TrainerLoadSample,
 } from '@ridrs/contracts';
 
 export const ENGINE_DEFAULTS = Object.freeze({
@@ -32,7 +34,11 @@ export interface SimulationOutputs {
   batch(batch: PhysicsStateBatch): void;
 }
 
-function sampleOf(step: number, result: MotionResult): PhysicsSample {
+function sampleOf(
+  step: number,
+  result: MotionResult,
+  trainerLoad: TrainerLoadSample | undefined,
+): PhysicsSample {
   return {
     step,
     at: result.at,
@@ -40,6 +46,7 @@ function sampleOf(step: number, result: MotionResult): PhysicsSample {
     distance: result.distance,
     acceleration: result.acceleration,
     gradient: result.road.gradient,
+    ...(trainerLoad ? { trainerLoad } : {}),
   };
 }
 
@@ -50,6 +57,8 @@ function sampleOf(step: number, result: MotionResult): PhysicsSample {
  */
 export class RideSimulation {
   private current: MotionResult;
+  /** The trainer load of the current state, when a trainer load is installed. */
+  private currentLoad: TrainerLoadSample | undefined;
   private step = 0;
   private lastPublishedStep = -1;
   /** Samples computed since the previous batch. */
@@ -60,9 +69,11 @@ export class RideSimulation {
     readonly startedAt: number,
     private readonly motion: MotionCapability,
     private readonly outputs: SimulationOutputs,
+    private readonly trainerLoad?: TrainerLoadCapability,
   ) {
     this.current = motion.initial(startedAt);
-    this.pending.push(sampleOf(0, this.current));
+    this.currentLoad = trainerLoad?.load(this.current);
+    this.pending.push(sampleOf(0, this.current, this.currentLoad));
     this.emit();
     this.flush();
   }
@@ -76,8 +87,10 @@ export class RideSimulation {
   advanceUntil(until: number, limit = Number.POSITIVE_INFINITY): boolean {
     for (let done = 0; done < limit && this.nextDueAt() <= until; done += 1) {
       this.current = this.motion.advance(this.current, this.nextDueAt());
+      // After the motion, from its result: the load never feeds back into the motion.
+      this.currentLoad = this.trainerLoad?.load(this.current);
       this.step += 1;
-      this.pending.push(sampleOf(this.step, this.current));
+      this.pending.push(sampleOf(this.step, this.current, this.currentLoad));
       if (this.step % ENGINE_DEFAULTS.publishEverySteps === 0) {
         this.emit();
       }
@@ -104,7 +117,12 @@ export class RideSimulation {
 
   private emit(): void {
     this.lastPublishedStep = this.step;
-    this.outputs.state({ ...this.current, sessionId: this.sessionId, step: this.step });
+    this.outputs.state({
+      ...this.current,
+      sessionId: this.sessionId,
+      step: this.step,
+      ...(this.currentLoad ? { trainerLoad: this.currentLoad } : {}),
+    });
   }
 
   private flush(): void {

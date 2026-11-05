@@ -7,6 +7,7 @@ import {
   type BleConnection,
   type BleDiscoveredPeripheral,
   type BleScanOptions,
+  type BleWriteOptions,
   FTMS_SERVICE_UUID,
   HEART_RATE_MEASUREMENT_CHARACTERISTIC_UUID,
   HEART_RATE_SERVICE_UUID,
@@ -16,6 +17,7 @@ import {
   ZWIFT_RIDE_NOTIFY_CHARACTERISTIC_UUID,
   ZWIFT_RIDE_SERVICE_UUID,
 } from '@ridrs/contracts';
+import { type SimulatedFtmsControlOptions, SimulatedFtmsControlPoint } from './ftms-control.ts';
 
 export interface SimulatedPeripheralOptions {
   readonly peripheralId?: string;
@@ -36,9 +38,17 @@ export interface SimulatedPeripheralOptions {
   readonly nameLater?: boolean;
 }
 
+/**
+ * What a peripheral does with a write to one characteristic: a GATT error rejects the write (and
+ * the peripheral never received it), anything else accepts it.
+ */
+export type SimulatedWriteHandler = (data: Uint8Array) => { readonly error?: string } | undefined;
+
 /** One write a central made, with what it listened to at that moment. */
 export interface SimulatedWrite {
   readonly data: Uint8Array;
+  /** Whether the central asked for a write response. */
+  readonly withResponse: boolean;
   /** `service:characteristic` keys with an active subscription when the write arrived. */
   readonly subscribed: readonly string[];
 }
@@ -78,6 +88,13 @@ export class SimulatedPeripheral {
   private readonly connectedListeners = new Set<() => void>();
   private readonly notificationListeners = new Map<string, Set<(data: Uint8Array) => void>>();
   private readonly writeLog = new Map<string, SimulatedWrite[]>();
+  /** Values a central can read, by characteristic. */
+  private readonly values = new Map<string, Uint8Array>();
+  private readonly writeHandlers = new Map<string, SimulatedWriteHandler>();
+  /** The characteristics its GATT table has; undefined: any a central asks for. */
+  private characteristics?: Set<string>;
+  /** The FTMS control point model, on a trainer that has one. */
+  ftmsControl?: SimulatedFtmsControlPoint;
   private readonly connectAttemptTimes: number[] = [];
   private lastDisconnectTime?: number;
   private readonly reconnectAttemptTimes: number[] = [];
@@ -243,6 +260,37 @@ export class SimulatedPeripheral {
     );
   }
 
+  /** A value a central can read from the characteristic from now on. */
+  setValue(serviceUuid: string, characteristicUuid: string, bytesOrHex: Uint8Array | string): void {
+    this.values.set(characteristicKey(serviceUuid, characteristicUuid), toBytes(bytesOrHex));
+  }
+
+  /** The peripheral handles every write to the characteristic. */
+  onWrite(serviceUuid: string, characteristicUuid: string, handler: SimulatedWriteHandler): void {
+    this.writeHandlers.set(characteristicKey(serviceUuid, characteristicUuid), handler);
+  }
+
+  /** Its GATT table has exactly these `service:characteristic` pairs from now on. */
+  setCharacteristics(targets: readonly BleCharacteristicTarget[]): void {
+    this.characteristics = new Set(
+      targets.map((t) => characteristicKey(t.serviceUuid, t.characteristicUuid)),
+    );
+  }
+
+  /** Its GATT table loses the characteristic. */
+  removeCharacteristic(serviceUuid: string, characteristicUuid: string): void {
+    const key = characteristicKey(serviceUuid, characteristicUuid);
+    this.characteristics?.delete(key);
+    this.values.delete(key);
+    this.writeHandlers.delete(key);
+  }
+
+  private assertCharacteristic(key: string): void {
+    if (this.characteristics && !this.characteristics.has(key)) {
+      throw new Error(`Peripheral "${this.name}" has no characteristic ${key}`);
+    }
+  }
+
   /** Every write to this characteristic, over all connections, oldest first. */
   getWrites(serviceUuid: string, characteristicUuid: string): readonly SimulatedWrite[] {
     return [...(this.writeLog.get(characteristicKey(serviceUuid, characteristicUuid)) ?? [])];
@@ -311,6 +359,7 @@ export class SimulatedPeripheral {
           characteristic.serviceUuid,
           characteristic.characteristicUuid,
         );
+        this.assertCharacteristic(key);
         let set = this.notificationListeners.get(key);
         if (!set) {
           set = new Set();
@@ -321,7 +370,11 @@ export class SimulatedPeripheral {
           set?.delete(onNotification);
         };
       },
-      write: async (characteristic: BleCharacteristicTarget, data: Uint8Array): Promise<void> => {
+      write: async (
+        characteristic: BleCharacteristicTarget,
+        data: Uint8Array,
+        options?: BleWriteOptions,
+      ): Promise<void> => {
         if (!this.connected) {
           throw new Error(`Peripheral "${this.name}" is disconnected`);
         }
@@ -329,12 +382,32 @@ export class SimulatedPeripheral {
           characteristic.serviceUuid,
           characteristic.characteristicUuid,
         );
+        this.assertCharacteristic(key);
+        const handled = this.writeHandlers.get(key)?.(data.slice());
+        if (handled?.error) {
+          throw new Error(handled.error);
+        }
         const subscribed = [...this.notificationListeners]
           .filter(([, listeners]) => listeners.size > 0)
           .map(([k]) => k);
         const log = this.writeLog.get(key) ?? [];
-        log.push({ data: data.slice(), subscribed });
+        log.push({ data: data.slice(), withResponse: options?.withResponse ?? false, subscribed });
         this.writeLog.set(key, log);
+      },
+      read: async (characteristic: BleCharacteristicTarget): Promise<Uint8Array> => {
+        if (!this.connected) {
+          throw new Error(`Peripheral "${this.name}" is disconnected`);
+        }
+        const key = characteristicKey(
+          characteristic.serviceUuid,
+          characteristic.characteristicUuid,
+        );
+        this.assertCharacteristic(key);
+        const value = this.values.get(key);
+        if (!value) {
+          throw new Error(`Characteristic ${key} of "${this.name}" is not readable`);
+        }
+        return value.slice();
       },
       onDisconnected: (listener: () => void): (() => void) => {
         this.disconnectListeners.add(listener);
@@ -391,6 +464,10 @@ export class BleSimulator implements BleCentral {
     return peripheral;
   }
 
+  /**
+   * An FTMS trainer: a sensor that sends Indoor Bike Data, and with `control` one that also has a
+   * Feature characteristic and a control point (`peripheral.ftmsControl`).
+   */
   addFtmsTrainer(
     name: string,
     options?: {
@@ -400,9 +477,10 @@ export class BleSimulator implements BleCentral {
       readonly nameLater?: boolean;
       readonly manufacturerData?: BleAdvertisedData;
       readonly serviceData?: BleAdvertisedData;
+      readonly control?: SimulatedFtmsControlOptions;
     },
   ): SimulatedPeripheral {
-    return this.addPeripheral({
+    const trainer = this.addPeripheral({
       peripheralId: options?.peripheralId,
       name,
       serviceUuids: [FTMS_SERVICE_UUID],
@@ -412,6 +490,10 @@ export class BleSimulator implements BleCentral {
       manufacturerData: options?.manufacturerData,
       serviceData: options?.serviceData,
     });
+    if (options?.control) {
+      trainer.ftmsControl = new SimulatedFtmsControlPoint(trainer, options.control);
+    }
+    return trainer;
   }
 
   addHeartRateSensor(

@@ -6,6 +6,7 @@ import {
   type BleConnection,
   type BridgeMessage,
   type BridgeSocket,
+  bytesToHex,
   encodeBridgeFrame,
   hexToBytes,
   normalizeBleUuid,
@@ -107,6 +108,9 @@ class ClientSession {
         return;
       case 'write':
         void this.write(message);
+        return;
+      case 'read':
+        void this.read(message);
         return;
       case 'bye':
         this.server.byeFromClient(this, message.reason);
@@ -258,9 +262,31 @@ class ClientSession {
       await connection.write(
         { serviceUuid: message.serviceUuid, characteristicUuid: message.characteristicUuid },
         hexToBytes(message.data),
+        { withResponse: message.withResponse ?? false },
       );
       if (!this.closed) {
         sendMessage(this.socket, { type: 'written', requestId });
+      }
+    } catch (error) {
+      if (!this.closed) {
+        sendMessage(this.socket, { type: 'failed', requestId, message: errorMessage(error) });
+      }
+    }
+  }
+
+  private async read(message: Extract<BridgeMessage, { type: 'read' }>): Promise<void> {
+    const { requestId, peripheralId } = message;
+    const connection = this.connections.get(peripheralId);
+    try {
+      if (!connection) {
+        throw new Error(`Peripheral "${peripheralId}" is not connected`);
+      }
+      const data = await connection.read({
+        serviceUuid: message.serviceUuid,
+        characteristicUuid: message.characteristicUuid,
+      });
+      if (!this.closed) {
+        sendMessage(this.socket, { type: 'read-result', requestId, data: bytesToHex(data) });
       }
     } catch (error) {
       if (!this.closed) {

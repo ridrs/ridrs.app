@@ -47,6 +47,7 @@ pub fn run() {
             ble::ble_subscribe,
             ble::ble_unsubscribe,
             ble::ble_write,
+            ble::ble_read,
             bridge::bridge_browse,
             bridge::bridge_stop_browse,
             bridge::bridge_open,

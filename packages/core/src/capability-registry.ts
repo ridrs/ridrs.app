@@ -34,7 +34,7 @@ export class CapabilityRegistry {
   createPluginCapabilitiesContext(manifest: Readonly<PluginManifest>): PluginCapabilitiesContext {
     const pluginId = manifest.id;
     const declaredProvides = new Set(manifest.provides);
-    const declaredRequires = new Set(manifest.requires);
+    const declaredRequires = new Set([...manifest.requires, ...(manifest.optionalRequires ?? [])]);
 
     return {
       provide: <TImpl>(
@@ -78,6 +78,17 @@ export class CapabilityRegistry {
           );
         }
         return first.implementation as TImpl;
+      },
+
+      find: <TImpl>(contract: CapabilityContract<TImpl, 'single'>): TImpl | undefined => {
+        if (!declaredRequires.has(contract.id)) {
+          throw new RidrsError(
+            'undeclared-capability',
+            `Plugin "${pluginId}" tried to access undeclared capability "${contract.id}"`,
+            { pluginId },
+          );
+        }
+        return this.providers.get(contract.id)?.[0]?.implementation as TImpl | undefined;
       },
 
       getAll: <TImpl>(contract: CapabilityContract<TImpl, 'multiple'>): readonly TImpl[] => {

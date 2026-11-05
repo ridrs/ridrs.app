@@ -85,6 +85,8 @@ export class SimulatedTauriBridge {
         return undefined;
       case 'ble_write':
         return this.write(args);
+      case 'ble_read':
+        return this.read(args);
       case 'ble_disconnect':
         return this.disconnect(String(args.peripheralId));
       default:
@@ -171,7 +173,22 @@ export class SimulatedTauriBridge {
         characteristicUuid: String(args.characteristicUuid),
       },
       Uint8Array.from(args.data as number[]),
+      { withResponse: args.withResponse === true },
     );
+  }
+
+  private async read(args: Args): Promise<number[]> {
+    const peripheralId = String(args.peripheralId);
+    const connection = this.connections.get(peripheralId);
+    if (!connection) {
+      throw new Error(`Peripheral "${peripheralId}" is not connected`);
+    }
+    // Like the Rust command, the bytes return as a JSON number array.
+    const data = await connection.read({
+      serviceUuid: String(args.serviceUuid),
+      characteristicUuid: String(args.characteristicUuid),
+    });
+    return Array.from(data);
   }
 
   private async disconnect(peripheralId: string): Promise<void> {

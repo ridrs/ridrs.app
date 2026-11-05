@@ -1,0 +1,9 @@
+{
+  "id": "control-virtual-gears",
+  "name": "Virtual Gears",
+  "version": "0.1.0",
+  "types": ["control"],
+  "provides": ["drivetrain.virtual-gear", "config.snapshot"],
+  "requires": [],
+  "entry": "index.ts"
+}

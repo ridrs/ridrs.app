@@ -1,0 +1,9 @@
+{
+  "id": "control-erg",
+  "name": "ERG Target",
+  "version": "0.1.0",
+  "types": ["control", "transport"],
+  "provides": ["config.snapshot"],
+  "requires": [],
+  "entry": "index.ts"
+}

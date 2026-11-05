@@ -31,6 +31,8 @@ interface Entry extends TemporalMeasurement {
 export interface TemporalSeriesOptions {
   readonly strategy: EstimationStrategy;
   readonly min?: number;
+  /** `never`: the last value holds and stays fresh until the next one (ADR 0055). */
+  readonly stale?: 'never';
 }
 
 export interface FreshnessTransition {
@@ -78,6 +80,8 @@ function constantPiece(from: number, to: number, value: number, quality: Tempora
 export class TemporalSeries {
   readonly strategy: EstimationStrategy;
   readonly min: number;
+  /** Whether the series never goes stale nor delayed: a state, not a stream of samples. */
+  readonly neverStale: boolean;
   private entries: Entry[] = [];
   /** Disconnect marks; nothing is interpolated or extrapolated across one. */
   private breaks: number[] = [];
@@ -88,6 +92,10 @@ export class TemporalSeries {
   constructor(options: TemporalSeriesOptions) {
     this.strategy = options.strategy;
     this.min = options.min ?? TEMPORAL_DEFAULTS.minValue;
+    this.neverStale = options.stale === 'never';
+    if (this.neverStale && this.strategy !== 'hold') {
+      throw new Error('Only a series that holds its value can be never stale');
+    }
   }
 
   get samplingInterval(): number | undefined {
@@ -145,7 +153,7 @@ export class TemporalSeries {
       sourceId: measurement.sourceId,
       gapBefore,
       interval,
-      staleAfter: staleAfterFor(interval),
+      staleAfter: this.neverStale ? Number.POSITIVE_INFINITY : staleAfterFor(interval),
       slope: this.trendSlope(measurement, interval, gapBefore),
     };
     this.entries.push(entry);
@@ -185,7 +193,11 @@ export class TemporalSeries {
       return 'stale';
     }
     const interval = this.intervals.interval;
-    if (interval !== undefined && elapsed >= TEMPORAL_DEFAULTS.delayedAfterIntervals * interval) {
+    if (
+      !this.neverStale &&
+      interval !== undefined &&
+      elapsed >= TEMPORAL_DEFAULTS.delayedAfterIntervals * interval
+    ) {
       return 'delayed';
     }
     return 'fresh';
@@ -195,7 +207,7 @@ export class TemporalSeries {
   nextTransition(now: number): FreshnessTransition | undefined {
     const last = this.entries.at(-1);
     const current = this.freshnessAt(now);
-    if (!last || this.lastReceivedAt === undefined) {
+    if (!last || this.lastReceivedAt === undefined || this.neverStale) {
       return undefined;
     }
     const staleAt = this.lastReceivedAt + last.staleAfter;

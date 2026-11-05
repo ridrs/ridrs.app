@@ -4434,8 +4434,6 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-blec"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b0300f2b0e709ea8b20db6202ae166a92c1c78d1a74ff0f9035a0a7c20b2714"
 dependencies = [
  "blec",
  "tauri",

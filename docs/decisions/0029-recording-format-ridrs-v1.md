@@ -26,5 +26,5 @@ Phase 9 records every ride: every bus envelope, every diagnostic, the raw device
 ## Consequences
 
 - Every event payload must be JSON-serializable without loss; a Vitest test round-trips every event definition of the contracts.
-- Phase 8's trainer commands fit as new event types (`device.raw-write`, `trainer.command`) without a format change.
+- Phase 8's trainer commands fit as new event types (`device.raw-write`, `trainer.command`) without a format change. (2026-11-05: they are real, with `device.raw-read` and `device.raw-write-failed` as inputs; [ADR 0056](0056-ftms-trainer-control.md).)
 - The file size per 10 minutes is to be measured in the manual check (the estimate is dominated by `physics.state-batch`, 20 events/s).

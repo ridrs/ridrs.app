@@ -38,5 +38,7 @@ export interface PluginCapabilitiesContext {
     implementation: TImpl,
   ): void;
   get<TImpl>(contract: CapabilityContract<TImpl, 'single'>): TImpl;
+  /** A capability of `optionalRequires` (or `requires`): its provider, or undefined without one. */
+  find<TImpl>(contract: CapabilityContract<TImpl, 'single'>): TImpl | undefined;
   getAll<TImpl>(contract: CapabilityContract<TImpl, 'multiple'>): readonly TImpl[];
 }

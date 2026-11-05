@@ -33,3 +33,8 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+# Indications on Android (ADR 0052): a copy of tauri-plugin-blec 0.18.0 that enables them for a
+# characteristic that only indicates (the FTMS control point), until upstream does.
+[patch.crates-io]
+tauri-plugin-blec = { path = "../../../crates/vendor/tauri-plugin-blec" }

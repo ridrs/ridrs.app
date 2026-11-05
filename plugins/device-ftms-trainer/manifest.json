@@ -3,7 +3,7 @@
   "name": "FTMS Smart Trainer",
   "version": "0.1.0",
   "types": ["device"],
-  "provides": [],
+  "provides": ["config.snapshot"],
   "requires": ["ble.central"],
   "entry": "index.ts"
 }
