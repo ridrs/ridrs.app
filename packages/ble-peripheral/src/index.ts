@@ -7,4 +7,5 @@ export {
   type BlePeripheralLinkOptions,
   startBlePeripheralLink,
 } from './link.ts';
+export { type DeviceMemory, loadDeviceMemory } from './memory.ts';
 export { type NativeScan, SharedBleScan, type StartNativeScan } from './shared-scan.ts';

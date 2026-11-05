@@ -276,6 +276,11 @@ export class RidrsWorld extends World {
   readonly tapped: EventEnvelope[] = [];
   /** Phase 9: the files of `fixture-storage-memory`; they survive host restarts. */
   memoryFiles?: MemoryAppFiles;
+  /** ADR 0054: the files behind `ctx.settings`; they survive host restarts. */
+  readonly settingsFiles = new MemoryAppFiles();
+  /** ADR 0054: what the settings probe does when it starts, and what it read. */
+  settingsProbe?: { readonly write?: { name: string; value: string }; readonly read?: string };
+  settingsProbeValue?: string;
   /** Phase 9: the file a step named last ("that file"). */
   lastRecordingFile?: string;
   /** Phase 9: the recording's lines as replay steps changed them. */
@@ -522,6 +527,7 @@ export class RidrsWorld extends World {
         timeSource: this.clock,
         capabilities: this.capabilityContracts.values(),
         events: this.eventDefinitions.values(),
+        settingsFiles: this.settingsFiles,
       });
       if (this.uiEnabled) {
         this.uiBridge = createInProcessUiBridge(this.host, PHASE_3_EVENTS);
@@ -627,6 +633,7 @@ export class RidrsWorld extends World {
     createEntry?: boolean;
     module?: string;
     ui?: Record<string, unknown>;
+    persistence?: string[];
   }): Promise<void> {
     const folderPath = join(this.tempPluginDir, options.folder);
     await mkdir(folderPath, { recursive: true });
@@ -640,6 +647,7 @@ export class RidrsWorld extends World {
       requires: options.requires ?? [],
       entry: 'index.ts',
       ...(options.ui ? { ui: options.ui } : {}),
+      ...(options.persistence ? { persistence: options.persistence } : {}),
     };
 
     if (typeof options.ui?.client === 'string') {

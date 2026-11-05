@@ -33,6 +33,8 @@ export {
   hexByService,
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
   normalizeBleUuid,
+  type RememberedDevice,
+  rememberedDeviceSchema,
   SUPPORTED_POWER_RANGE_CHARACTERISTIC_UUID,
   ZWIFT_RIDE_CONTROL_POINT_CHARACTERISTIC_UUID,
   ZWIFT_RIDE_NOTIFY_CHARACTERISTIC_UUID,
@@ -156,8 +158,10 @@ export {
   hostPermissionSchema,
   type ManifestValidationResult,
   manifestSchema,
+  PERSISTENCE_TYPES,
   type PluginManifest,
   parseManifestJson,
+  persistenceScopeSchema,
   pluginIdPattern,
   pluginIdSchema,
 } from './manifest.ts';
@@ -260,6 +264,12 @@ export {
   recordingRecordSchema,
   recordingSnapshotSchema,
 } from './recording.ts';
+export type {
+  PersistenceScope,
+  PluginSettingsContext,
+  ScopedSettings,
+  SettingsDocument,
+} from './settings.ts';
 export {
   type PluginSpatialContext,
   type SpatialChannels,

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+mod app_files;
 mod keep_awake;
 
 use ridrs_ble::commands as ble;
@@ -57,6 +58,8 @@ pub fn run() {
             bridge::bridge_send_text,
             bridge::bridge_close,
             keep_awake::keep_awake,
+            app_files::app_file_replace,
+            app_files::app_file_sync,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,

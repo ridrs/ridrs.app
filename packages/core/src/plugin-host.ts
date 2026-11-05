@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type AppFiles,
   type CapabilityContract,
   type Clock,
   type Diagnostic,
@@ -19,6 +20,7 @@ import {
   type PluginManifest,
   type PluginState,
   RidrsError,
+  storageAppFilesCapability,
   type TaskId,
   type TimeSource,
   type UiRegistry,
@@ -33,6 +35,7 @@ import { type DiscoveredPlugin, discoverPlugins, type PluginSource } from './dis
 import { EventBus } from './event-bus.ts';
 import { createSilentLogger } from './logger.ts';
 import { resolveCapabilities } from './resolution.ts';
+import { createPluginSettings } from './settings-service.ts';
 import { SpatialService } from './spatial-service.ts';
 import { TemporalService } from './temporal-service.ts';
 import { computeUiRegistry } from './ui-registry.ts';
@@ -56,6 +59,11 @@ export interface PluginHostOptions {
   readonly events?: Iterable<EventDefinition>;
   /** Who runs the host, for `describe()` (recordings name it). */
   readonly platform?: HostPlatform;
+  /**
+   * Where `ctx.settings` keeps its documents (ADR 0054): the provider of `storage.app-files` by
+   * default, so a replay (no storage plugin) reads no settings. Tests pass their own.
+   */
+  readonly settingsFiles?: AppFiles;
 }
 
 /** For hosts whose composition root does not say (tests, tools). */
@@ -125,11 +133,13 @@ export class PluginHost {
   private uiRegistry: UiRegistry = EMPTY_UI_REGISTRY;
   private readonly reportedUiProblems = new Set<string>();
   private readonly platform: HostPlatform;
+  private readonly settingsFiles: AppFiles | undefined;
   private readonly hostObservations = new Map<string, Set<EventSubscription>>();
 
   constructor(options: PluginHostOptions) {
     this.sources = options.sources;
     this.platform = options.platform ?? UNKNOWN_PLATFORM;
+    this.settingsFiles = options.settingsFiles;
     this.disabledPlugins = new Set(options.disabledPlugins ?? []);
     this.replayMode = options.replay !== undefined;
     this.clock = options.replay
@@ -787,6 +797,15 @@ export class PluginHost {
       signal,
       ui: Object.freeze({ registry: () => this.uiRegistry }),
       host: this.createHostAccess(managed),
+      settings: createPluginSettings(
+        manifest,
+        () =>
+          this.settingsFiles ??
+          (this.capabilityRegistry.providersOf(storageAppFilesCapability.id)[0]?.implementation as
+            | AppFiles
+            | undefined),
+        (diagnostic) => this.diagnostics.report(diagnostic),
+      ),
       reportDiagnostic: (
         code: DiagnosticCode,
         message: string,

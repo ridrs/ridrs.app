@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { appendFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
   type AppFileEntry,
@@ -32,6 +32,18 @@ export function createNodeAppFiles(root: string): AppFiles {
     },
     async write(path, bytes) {
       await writeFile(await withDirectory(path), bytes);
+    },
+    async replace(path, bytes) {
+      const file = await withDirectory(path);
+      const temporary = `${file}.tmp`;
+      const handle = await open(temporary, 'w');
+      try {
+        await handle.writeFile(bytes);
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      await rename(temporary, file);
     },
     async read(path) {
       return new Uint8Array(await readFile(resolvePath(path)));

@@ -150,6 +150,24 @@ export const bleRouteSchema = z.enum(['local', 'companion']);
 
 export type BleRoute = z.infer<typeof bleRouteSchema>;
 
+/**
+ * What a device plugin's link remembers on this machine (ADR 0054): the device it connected last,
+ * by its link and its id on that link, or that the rider forgot the device.
+ */
+export const rememberedDeviceSchema = z.discriminatedUnion('state', [
+  z
+    .object({
+      state: z.literal('chosen'),
+      route: bleRouteSchema,
+      peripheralId: z.string().min(1),
+      name: z.string(),
+    })
+    .strict(),
+  z.object({ state: z.literal('forgotten') }).strict(),
+]);
+
+export type RememberedDevice = z.infer<typeof rememberedDeviceSchema>;
+
 export interface BleCentral {
   /** The link this central stands for; `local` when absent. */
   readonly route?: BleRoute;

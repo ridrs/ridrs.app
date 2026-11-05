@@ -9,7 +9,11 @@ import {
   measurementHeartRateEvent,
   type PluginContext,
 } from '@ridrs/contracts';
-import { type BlePeripheralLink, startBlePeripheralLink } from '@ridrs/ble-peripheral';
+import {
+  type BlePeripheralLink,
+  loadDeviceMemory,
+  startBlePeripheralLink,
+} from '@ridrs/ble-peripheral';
 import { parseHeartRateMeasurement } from './parser.ts';
 
 const links = new WeakMap<PluginContext, BlePeripheralLink>();
@@ -45,7 +49,8 @@ function handleHeartRateMeasurement(
 }
 
 export default definePlugin({
-  start(ctx) {
+  async start(ctx) {
+    const memory = await loadDeviceMemory(ctx, 'device-heart-rate');
     links.set(
       ctx,
       startBlePeripheralLink({
@@ -57,6 +62,7 @@ export default definePlugin({
         },
         label: 'heart-rate sensor',
         kind: 'heart-rate',
+        memory,
         onNotification: (peripheral, packet) =>
           handleHeartRateMeasurement(ctx, peripheral, packet),
       }),
