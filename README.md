@@ -138,7 +138,7 @@ In ridrs, press **Use a companion phone** on the main screen; the app restarts w
 
 On Android the companion keeps the screen on and must stay open: with the screen off, Android cuts the app off the network. It asks for "Nearby devices" (Bluetooth) and for local network access.
 
-**Developer companion with dummy devices**: the developer build adds simulated FTMS trainers next to real Bluetooth, for manual tests of ridrs without hardware. Profiles: `steady` (220 W, 92 rpm), `ramp` (100 W, +10 W every 3 s), `dropout` (link lost after 20 s for 5 s), `malformed` (every 10th packet truncated). Release builds contain none of this code.
+**Developer companion with dummy devices**: the developer build adds simulated FTMS trainers next to real Bluetooth, for manual tests of ridrs without hardware. Profiles: `steady` (220 W, 92 rpm), `ramp` (100 W, +10 W every 3 s), `dropout` (link lost after 20 s for 5 s), `malformed` (every 10th packet truncated). Each dummy's power can be set by hand in the panel (slider and ±10 W), overriding its profile's power. Release builds contain none of this code.
 
 ```bash
 pnpm --filter @ridrs/companion tauri android build --apk --debug --target aarch64 \

@@ -21,6 +21,17 @@ Feature: Dummy devices in the developer companion
     And 31 seconds pass
     Then the latest "metric.power" is 200 W from the trainer "KICKR SIM (dummy)"
 
+  Scenario: The developer sets the power of a dummy trainer
+    Setting the power overrides the profile's power until the dummy is removed.
+
+    Given the developer added a dummy FTMS trainer with the profile "ramp"
+    And 2 seconds pass
+    When the developer sets the dummy trainer "KICKR SIM (dummy)" to 350 W
+    And 1 seconds pass
+    Then the latest "metric.power" is 350 W from the trainer "KICKR SIM (dummy)"
+    When 30 seconds pass
+    Then the latest "metric.power" is 350 W from the trainer "KICKR SIM (dummy)"
+
   Scenario: A dummy dropout is seen as a real connection loss
     Given the developer added a dummy FTMS trainer with the profile "dropout"
     When 21 seconds pass

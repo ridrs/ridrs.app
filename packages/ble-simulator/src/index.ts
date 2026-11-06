@@ -11,6 +11,7 @@ export {
 } from './ble-simulator.ts';
 export {
   DUMMY_PROFILES,
+  DUMMY_WATTS_RANGE,
   type DummyDevice,
   DummyDevices,
   type DummyProfile,

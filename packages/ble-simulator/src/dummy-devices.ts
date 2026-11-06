@@ -26,7 +26,12 @@ export interface DummyDevice {
   readonly peripheralId: string;
   readonly name: string;
   readonly profile: DummyProfile;
+  /** Power set by the developer; overrides the profile's power while set. */
+  readonly watts?: number;
 }
+
+/** The power a developer can set a dummy to; FTMS Indoor Bike Data carries it as sint16. */
+export const DUMMY_WATTS_RANGE = Object.freeze({ min: 0, max: 2000 });
 
 /** FTMS Indoor Bike Data with instantaneous cadence (0.5 rpm units) and power, no speed. */
 function indoorBikeData(watts: number, rpm: number): Uint8Array {
@@ -35,7 +40,7 @@ function indoorBikeData(watts: number, rpm: number): Uint8Array {
 }
 
 interface Running {
-  readonly device: DummyDevice;
+  device: DummyDevice;
   readonly timers: Array<ReturnType<typeof setTimeout>>;
 }
 
@@ -89,12 +94,27 @@ export class DummyDevices {
         trainer.notifyIndoorBikeData(indoorBikeData(220, 92).subarray(0, 3));
         return;
       }
-      const watts = profile === 'ramp' ? Math.min(300, 100 + 10 * Math.floor(t / 3000)) : 220;
+      const set = this.running.get(device.peripheralId)?.device.watts;
+      const watts =
+        set ?? (profile === 'ramp' ? Math.min(300, 100 + 10 * Math.floor(t / 3000)) : 220);
       trainer.notifyIndoorBikeData(indoorBikeData(watts, profile === 'ramp' ? 90 : 92));
     };
     timers.push(setInterval(tick, PACKET_INTERVAL_MS));
     this.changed();
     return device;
+  }
+
+  /** Sets the power the dummy reports from its next packet on, in place of its profile's. */
+  setWatts(peripheralId: string, watts: number): void {
+    const running = this.running.get(peripheralId);
+    if (!running) {
+      return;
+    }
+    const clamped = Math.round(
+      Math.min(DUMMY_WATTS_RANGE.max, Math.max(DUMMY_WATTS_RANGE.min, watts)),
+    );
+    running.device = { ...running.device, watts: clamped };
+    this.changed();
   }
 
   remove(peripheralId: string): void {
