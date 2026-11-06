@@ -756,6 +756,18 @@ When(
   },
 );
 
+When(
+  'the developer sets the dummy trainer {string} to {int} W',
+  async function (this: RidrsWorld, name: string, watts: number) {
+    const device = dummies(this)
+      .list()
+      .find((d) => d.name === name);
+    assert.ok(device, `Expected a dummy trainer "${name}"`);
+    dummies(this).setWatts(device.peripheralId, watts);
+    await this.settle();
+  },
+);
+
 // ---- Pairing by QR code --------------------------------------------------------------------
 
 function latestOfferUri(world: RidrsWorld): string | null | undefined {
