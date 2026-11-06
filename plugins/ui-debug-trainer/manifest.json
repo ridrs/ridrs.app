@@ -1,0 +1,29 @@
+{
+  "id": "ui-debug-trainer",
+  "name": "Trainer Debug HUD",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "debug-trainer",
+        "extensionPoint": "activity/hud",
+        "export": "TrainerDebugHud",
+        "order": 1
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "trainer.control-changed",
+        "trainer.command",
+        "drivetrain.gear-changed",
+        "physics.state"
+      ],
+      "publish": []
+    }
+  }
+}
