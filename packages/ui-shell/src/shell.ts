@@ -41,14 +41,26 @@ interface Mounted {
 /** A slot keeps one extension point's contributions mounted in a container. */
 interface Slot {
   readonly point: string;
+  /** The one contribution the slot holds, by key; every contribution of the point without it. */
+  readonly only?: string;
   readonly container: HTMLElement;
   readonly mounted: Map<string, { readonly wrapper: HTMLElement; readonly handle: Mounted }>;
 }
 
 const keyOf = (entry: Entry) => `${entry.pluginId}/${entry.id}`;
 
+/** The same screen of the same plugin, whichever registry revision it comes from. */
+const sameScreen = (a: UiRegistryScreen | undefined, b: UiRegistryScreen | undefined) =>
+  a === b ||
+  (a !== undefined &&
+    b !== undefined &&
+    a.pluginId === b.pluginId &&
+    a.id === b.id &&
+    a.export === b.export);
+
 /**
- * Renders exactly one screen of the UI registry at a time into `root`, mounts contributions into
+ * Renders one screen of the UI registry at a time into `root` (or into the outlet of the screen in
+ * `root`, which stays mounted around it, when that screen takes it over), mounts contributions into
  * the slots screens and contributions open, and keeps everything in sync with registry changes.
  * Owns the one frame clock that components reach through `ctx.frames`. Knows no screen,
  * extension point or plugin by name.
@@ -84,8 +96,25 @@ export function mountShell(
   const backHandlers: (() => void)[] = [];
   const back = () => backHandlers.at(-1)?.();
   let registry = bridge.registry();
+  /** The screen in `root`: the shown screen, or the screen around the shown one. */
   let active: { readonly screen: UiRegistryScreen; readonly handle: Mounted } | undefined;
+  /** The shown screen while it is in the outlet of `active`. */
+  let wanted: UiRegistryScreen | undefined;
+  let outlet:
+    | { readonly container: HTMLElement; readonly screens: ReadonlySet<string> }
+    | undefined;
+  let framed:
+    | {
+        readonly screen: UiRegistryScreen;
+        readonly container: HTMLElement;
+        readonly wrapper: HTMLElement;
+        readonly handle: Mounted;
+      }
+    | undefined;
+  const navigated = new Set<(screen: string) => void>();
+  let announced: string | undefined;
   let disposed = false;
+  const shownScreen = () => wanted ?? active?.screen;
 
   const loadModule = (pluginId: string) => {
     let module = modules.get(pluginId);
@@ -148,7 +177,8 @@ export function mountShell(
           bridge.publish(def.id, payload);
         },
       },
-      slot: (point, slotContainer) => own(openSlot(point, slotContainer)),
+      slot: (point, slotContainer, slotOptions) =>
+        own(openSlot(point, slotContainer, slotOptions?.contribution)),
       frames: {
         onFrame: (handler) => own(frames.onFrame(handler, entry.pluginId)),
       },
@@ -161,6 +191,21 @@ export function mountShell(
         // Deferred so a component may navigate from inside its own render or event handler.
         queueMicrotask(() => navigate(path));
       },
+      onNavigated: (handler) => {
+        const entryHandler = (screen: string) => handler(screen);
+        navigated.add(entryHandler);
+        const shown = shownScreen();
+        if (shown) {
+          handler(shown.id);
+        }
+        return own(() => navigated.delete(entryHandler));
+      },
+      // The host's one settings access of the plugin, the same object for all its components.
+      get settings() {
+        return bridge.settings(entry.pluginId);
+      },
+      outlet: (outletContainer, outletOptions) =>
+        own(openOutlet(entry, outletContainer, outletOptions.screens)),
     };
 
     const fail = (reason: unknown) => {
@@ -215,7 +260,9 @@ export function mountShell(
   };
 
   const syncSlot = (slot: Slot) => {
-    const wanted = registry.contributions.filter((c) => c.extensionPoint === slot.point);
+    const wanted = registry.contributions.filter(
+      (c) => c.extensionPoint === slot.point && (slot.only === undefined || keyOf(c) === slot.only),
+    );
     const wantedKeys = new Set(wanted.map(keyOf));
     for (const [key, { wrapper, handle }] of [...slot.mounted]) {
       if (!wantedKeys.has(key)) {
@@ -238,8 +285,12 @@ export function mountShell(
     }
   };
 
-  const openSlot = (point: string, container: HTMLElement): Unsubscribe => {
-    const slot: Slot = { point, container, mounted: new Map() };
+  const openSlot = (point: string, container: HTMLElement, only?: string): Unsubscribe => {
+    const other = only && registry.contributions.find((c) => keyOf(c) === only);
+    if (other && other.extensionPoint !== point) {
+      logger.warn(`"${only}" contributes to "${other.extensionPoint}", not to "${point}"`);
+    }
+    const slot: Slot = { point, container, only, mounted: new Map() };
     slots.add(slot);
     syncSlot(slot);
     return () => {
@@ -252,17 +303,87 @@ export function mountShell(
     };
   };
 
-  const show = (screen: UiRegistryScreen | undefined) => {
+  /** Mounts the wanted screen into the outlet, or unmounts it when either is gone or changed. */
+  const syncFramed = () => {
+    const fits = wanted !== undefined && outlet?.screens.has(wanted.id) === true;
+    if (
+      framed &&
+      (!fits || !sameScreen(framed.screen, wanted) || framed.container !== outlet?.container)
+    ) {
+      framed.handle.unmount();
+      framed.wrapper.remove();
+      framed = undefined;
+    }
+    if (wanted && outlet && fits && !framed) {
+      const wrapper = document.createElement('div');
+      wrapper.dataset.screen = wanted.id;
+      outlet.container.appendChild(wrapper);
+      framed = {
+        screen: wanted,
+        container: outlet.container,
+        wrapper,
+        handle: mountComponent(wanted, wrapper),
+      };
+    }
+  };
+
+  const openOutlet = (
+    entry: Entry,
+    container: HTMLElement,
+    screens: readonly string[],
+  ): Unsubscribe => {
+    if (entry !== active?.screen) {
+      logger.warn(`"${keyOf(entry)}" is not the screen in the root; its outlet stays empty`);
+      return () => {};
+    }
+    const opened = { container, screens: new Set(screens) };
+    outlet = opened;
+    syncFramed();
+    return () => {
+      if (outlet === opened) {
+        outlet = undefined;
+        syncFramed();
+      }
+    };
+  };
+
+  const announce = () => {
+    const shown = shownScreen()?.id;
+    if (shown !== undefined && shown !== announced) {
+      announced = shown;
+      for (const handler of [...navigated]) {
+        handler(shown);
+      }
+    }
+  };
+
+  const mountRoot = (screen: UiRegistryScreen | undefined) => {
     active?.handle.unmount();
     root.replaceChildren();
     active = undefined;
-    if (!screen) {
-      return;
+    if (screen) {
+      const wrapper = document.createElement('div');
+      wrapper.dataset.screen = screen.id;
+      root.appendChild(wrapper);
+      active = { screen, handle: mountComponent(screen, wrapper) };
     }
-    const wrapper = document.createElement('div');
-    wrapper.dataset.screen = screen.id;
-    root.appendChild(wrapper);
-    active = { screen, handle: mountComponent(screen, wrapper) };
+  };
+
+  /**
+   * Shows a screen: in the outlet of the screen in the root when that one took it over, otherwise
+   * in the root. The screen in the root stays mounted when it is shown again.
+   */
+  const show = (screen: UiRegistryScreen | undefined) => {
+    if (screen && !sameScreen(active?.screen, screen) && outlet?.screens.has(screen.id)) {
+      wanted = screen;
+    } else {
+      wanted = undefined;
+      if (!sameScreen(active?.screen, screen)) {
+        mountRoot(screen);
+      }
+    }
+    syncFramed();
+    announce();
   };
 
   const defaultScreen = () =>
@@ -270,7 +391,7 @@ export function mountShell(
     [...registry.screens].sort((a, b) => a.id.localeCompare(b.id))[0];
 
   function navigate(path: string): void {
-    if (disposed || active?.screen.id === path) {
+    if (disposed || shownScreen()?.id === path) {
       return;
     }
     const screen = registry.screens.find((s) => s.id === path);
@@ -290,12 +411,24 @@ export function mountShell(
         modules.delete(pluginId);
       }
     }
-    const current = active && next.screens.find((s) => s.id === active?.screen.id);
-    if (
-      !current ||
-      current.pluginId !== active?.screen.pluginId ||
-      current.export !== active.screen.export
-    ) {
+    // Keeps what is unchanged mounted. A restarted screen around the outlet gets the screen in it
+    // back once it opens its outlet again; without it, that screen is shown on its own.
+    const around = active && next.screens.find((s) => s.id === active?.screen.id);
+    const inside = wanted && next.screens.find((s) => s.id === wanted?.id);
+    if (around && wanted) {
+      if (!sameScreen(around, active?.screen)) {
+        mountRoot(around);
+      }
+      wanted = inside;
+      syncFramed();
+      announce();
+    } else {
+      const shown = shownScreen();
+      const current = next.screens.find((s) => s.id === shown?.id);
+      if (!around) {
+        wanted = undefined;
+        mountRoot(undefined);
+      }
       show(current ?? defaultScreen());
     }
     for (const slot of [...slots]) {

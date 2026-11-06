@@ -17,22 +17,67 @@ function isTextEntry(target: EventTarget | null): boolean {
   );
 }
 
-/**
- * The ERG button: Enter turns ERG on at the default target and off again; it shows "150 W" or
- * "Off". Keyboard first (AGENTS.md rule 12): in ERG, ↑ and ↓ change the target while it has the
- * focus (← and → still move the focus), + and - anywhere on the screen; Back leaves ERG while it
- * has the focus. The button only asks (`trainer.erg-requested`); the ERG driver sets the target.
- */
-function TargetPowerWidgetView({ ctx }: { readonly ctx: UiContext }) {
+/** The target in force; `null` without ERG. */
+function useTarget(ctx: UiContext): number | null {
   const [watts, setWatts] = useState<number | null>(null);
-  const [focused, setFocused] = useState(false);
   useEffect(
     () => ctx.events.subscribe(trainerTargetPowerEvent, ({ payload }) => setWatts(payload.watts)),
     [ctx],
   );
+  return watts;
+}
 
+/**
+ * The ERG toggle: Enter turns ERG on at the default target and off again; it says "On" or "Off",
+ * nothing more. The target shows where the gear was (`hud/erg-on`). It only asks
+ * (`trainer.erg-requested`); the ERG driver sets the target.
+ */
+function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
+  const erg = useTarget(ctx) !== null;
+  const [focused, setFocused] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label="ERG"
+      aria-pressed={erg}
+      data-testid="widget-erg"
+      data-status={erg ? 'available' : 'unavailable'}
+      onClick={() => ctx.events.publish(trainerErgRequestedEvent, { change: erg ? 'leave' : 'enter' })}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        pointerEvents: 'auto',
+        minWidth: 110,
+        padding: '12px 18px',
+        borderRadius: 14,
+        border: 'none',
+        textAlign: 'left',
+        background: erg ? 'rgba(10, 70, 90, 0.85)' : 'rgba(16, 20, 24, 0.72)',
+        color: '#fff',
+        fontFamily: 'system-ui, sans-serif',
+        // The focus is always clearly visible.
+        outline: focused ? '3px solid #ffd60a' : 'none',
+        outlineOffset: 2,
+      }}
+    >
+      <div style={{ fontSize: 14, opacity: 0.8 }}>ERG</div>
+      <div data-testid="value" style={{ fontSize: 28, fontWeight: 700, minHeight: 53, lineHeight: '53px' }}>
+        {erg ? 'On' : 'Off'}
+      </div>
+    </button>
+  );
+}
+
+/**
+ * The ERG target, in the place of the gear while ERG is on. Keyboard first (AGENTS.md rule 12):
+ * ↑ and ↓ change it by 5 W while it has the focus (← and → still move the focus), + and -
+ * anywhere on the screen; Back leaves ERG while it has the focus.
+ */
+function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
+  const watts = useTarget(ctx);
+  const [focused, setFocused] = useState(false);
   const erg = watts !== null;
-  // Back leaves ERG only while the button has the focus; otherwise the screen's Back holds.
+
   useEffect(
     () =>
       erg && focused
@@ -41,7 +86,6 @@ function TargetPowerWidgetView({ ctx }: { readonly ctx: UiContext }) {
     [ctx, erg, focused],
   );
 
-  // In ERG, + and - are the target's, wherever the focus is; otherwise they shift the gear.
   useEffect(() => {
     if (!erg) {
       return undefined;
@@ -65,36 +109,36 @@ function TargetPowerWidgetView({ ctx }: { readonly ctx: UiContext }) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [ctx, erg]);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (!erg || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) {
+  if (!erg) {
+    return null;
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
       return;
     }
     // The arrows change the target here instead of moving the focus.
     event.preventDefault();
-    ctx.events.publish(trainerErgRequestedEvent, {
-      change: event.key === 'ArrowUp' ? 'up' : 'down',
-    });
+    ctx.events.publish(trainerErgRequestedEvent, { change: event.key === 'ArrowUp' ? 'up' : 'down' });
   };
 
   return (
-    <button
-      type="button"
-      aria-label="ERG"
-      aria-pressed={erg}
+    <section
       data-testid="widget-target-power"
-      data-status={erg ? 'available' : 'unavailable'}
-      onClick={() => ctx.events.publish(trainerErgRequestedEvent, { change: erg ? 'leave' : 'enter' })}
+      data-status="available"
+      role="spinbutton"
+      tabIndex={0}
+      aria-label="Target power"
+      aria-valuenow={watts}
       onKeyDown={onKeyDown}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={{
         pointerEvents: 'auto',
-        minWidth: 140,
+        minWidth: 110,
         padding: '12px 18px',
         borderRadius: 14,
-        border: 'none',
-        textAlign: 'left',
-        background: erg ? 'rgba(10, 70, 90, 0.85)' : 'rgba(16, 20, 24, 0.72)',
+        background: 'rgba(10, 70, 90, 0.85)',
         color: '#fff',
         fontFamily: 'system-ui, sans-serif',
         // The focus is always clearly visible.
@@ -102,24 +146,27 @@ function TargetPowerWidgetView({ ctx }: { readonly ctx: UiContext }) {
         outlineOffset: 2,
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>ERG</div>
-      <div
-        data-testid="value"
-        style={{ fontSize: erg ? 44 : 28, fontWeight: 700, minHeight: 53, lineHeight: '53px' }}
-      >
-        {erg ? `${watts} W` : 'Off'}
+      <div style={{ fontSize: 14, opacity: 0.8 }}>Target</div>
+      <div data-testid="value" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.1 }}>
+        {`${watts} W`}
       </div>
-      {focused && erg && (
+      {focused && (
         <div data-testid="keys" style={{ fontSize: 13, opacity: 0.8 }}>
           ↑ ↓ target
         </div>
       )}
-    </button>
+    </section>
   );
 }
 
+export const ErgToggle: UiComponent = (container, ctx) => {
+  const root = createRoot(container);
+  root.render(<ErgToggleView ctx={ctx} />);
+  return () => root.unmount();
+};
+
 export const TargetPowerWidget: UiComponent = (container, ctx) => {
   const root = createRoot(container);
-  root.render(<TargetPowerWidgetView ctx={ctx} />);
+  root.render(<TargetPowerView ctx={ctx} />);
   return () => root.unmount();
 };

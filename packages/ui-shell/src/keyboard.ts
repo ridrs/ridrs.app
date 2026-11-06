@@ -31,13 +31,25 @@ function ownsArrows(element: Element): boolean {
   );
 }
 
-/** The child of `root` an element is in (the screen, as the shell mounts one), if not itself. */
+/**
+ * The screen an element is in: the innermost `[data-screen]` (a framed screen sits inside its
+ * frame), else the child of `root` it is in, if not itself.
+ */
 function screenOf(root: HTMLElement, element: Element): Element | null {
+  const marked = element.parentElement?.closest('[data-screen]');
+  if (marked && marked !== root && root.contains(marked)) {
+    return marked;
+  }
   let node: Element | null = element;
   while (node && node.parentElement !== root) {
     node = node.parentElement;
   }
   return node === element ? null : node;
+}
+
+/** Still in `root` and not replaced by a screen shown inside it. */
+function isShown(root: HTMLElement, screen: Element): boolean {
+  return screen.isConnected && root.contains(screen) && !screen.querySelector('[data-screen]');
 }
 
 /** Where the focus was last: to go on from there when its element disappears. */
@@ -59,6 +71,7 @@ interface LastFocus {
  * The arrows never start over at the top by surprise: when the focused element disappears (a
  * device connected, a list changed), the next arrow goes on from its place on the same screen,
  * and from an element outside the order (`tabindex="-1"`, disabled meanwhile) to its neighbours.
+ * When a screen shown inside another one replaced the focused element, they start at its first.
  */
 export function keyboardNavigation(
   root: HTMLElement,
@@ -89,13 +102,16 @@ export function keyboardNavigation(
       return focusable[forward ? Math.min(at, focusable.length - 1) : Math.max(at - 1, 0)];
     }
     // The focused element disappeared: go on from its place on the same screen.
-    if (
-      last &&
-      !last.element.isConnected &&
-      (last.screen === null || last.screen.parentElement === root)
-    ) {
+    if (last && !last.element.isConnected && (last.screen === null || isShown(root, last.screen))) {
       const at = Math.min(last.index, focusable.length);
       return focusable[forward ? Math.min(at, focusable.length - 1) : Math.max(at - 1, 0)];
+    }
+    // Another screen took its place: inside a screen that stays around it (beside a menu and
+    // actions that keep their place), the arrows start at the new screen's first control.
+    const shown = [...root.querySelectorAll('[data-screen]')].at(-1);
+    if (last && !last.element.isConnected && shown && shown.parentElement !== root) {
+      const first = focusable.find((element) => shown.contains(element));
+      if (first) return first;
     }
     return focusable[0];
   };

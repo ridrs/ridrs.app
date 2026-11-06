@@ -121,12 +121,24 @@ function recordingContext(id: string) {
 }
 
 describe('physics contributors', () => {
-  it.each(CONTRIBUTORS)('%s publishes nothing and listens to nothing', async (id) => {
-    const definition = await definitionOf(id);
-    const { ctx, used } = recordingContext(id);
+  it.each(CONTRIBUTORS.filter((id) => id !== 'physics-bicycle'))(
+    '%s publishes nothing and listens to nothing',
+    async (id) => {
+      const definition = await definitionOf(id);
+      const { ctx, used } = recordingContext(id);
+      await definition.initialize?.(ctx);
+      await definition.start?.(ctx);
+      expect(used).toEqual([]);
+    },
+  );
+
+  // ADR 0060: the bicycle's mass is the one frozen for the ride, from a lifecycle event.
+  it('physics-bicycle publishes nothing and listens only to the bicycle frozen for the ride', async () => {
+    const definition = await definitionOf('physics-bicycle');
+    const { ctx, used } = recordingContext('physics-bicycle');
     await definition.initialize?.(ctx);
     await definition.start?.(ctx);
-    expect(used).toEqual([]);
+    expect(used).toEqual(['subscribe activity.equipment']);
   });
 });
 

@@ -1,0 +1,13 @@
+{
+  "id": "fixture-ui-extra-tile",
+  "name": "Extra Tile (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "contributions": [{ "id": "extra", "extensionPoint": "main/tile", "export": "ExtraTile" }]
+  }
+}

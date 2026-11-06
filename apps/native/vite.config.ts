@@ -25,6 +25,7 @@ export default defineConfig({
       '@ridrs/presentation': workspace('packages/presentation/src/index.ts'),
       '@ridrs/recording': workspace('packages/recording/src/index.ts'),
       '@ridrs/ui-bridge': workspace('packages/ui-bridge/src/index.ts'),
+      '@ridrs/ui-preview': workspace('packages/ui-preview/src/index.ts'),
       '@ridrs/ui-sdk': workspace('packages/ui-sdk/src/index.ts'),
       '@ridrs/ui-shell': workspace('packages/ui-shell/src/index.ts'),
     },

@@ -113,6 +113,24 @@ describe('keyboardNavigation', () => {
     expect(document.activeElement).toBe(after.firstElementChild);
   });
 
+  it('starts at the first control of a screen shown inside the one that had the focus', () => {
+    const frame = document.createElement('div');
+    frame.dataset.screen = 'frame';
+    root.replaceChildren(frame);
+    const menu = frame.appendChild(document.createElement('button'));
+    const home = frame.appendChild(document.createElement('div'));
+    const tiles = ['a', 'b', 'c'].map(() => home.appendChild(document.createElement('button')));
+    tiles[2]?.focus();
+    const framed = document.createElement('div');
+    framed.dataset.screen = 'framed';
+    framed.append(...['a', 'b', 'c', 'd'].map(() => document.createElement('button')));
+    home.replaceWith(framed);
+    tiles[2]?.blur();
+    press(document.body, 'ArrowDown');
+    expect(document.activeElement).toBe(framed.firstElementChild);
+    expect(menu.isConnected).toBe(true);
+  });
+
   it('moves from an element outside the order to its neighbours', () => {
     const marker = root.insertBefore(document.createElement('div'), choice);
     marker.tabIndex = -1;

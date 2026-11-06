@@ -157,6 +157,39 @@ const SAMPLES: Record<string, unknown> = {
     reason: 'ATT error 0xFD',
   },
   'drivetrain.gear-changed': { index: 13, ratio: 2.2713704592830495, count: 24 },
+  'equipment.bicycle-changed': {
+    name: 'My bike',
+    mass: 8.4,
+    drivetrain: {
+      id: 'shimano-di2-2x12-50-34-11-34',
+      chainrings: [34, 50],
+      sprockets: [34, 30, 27, 24, 21, 19, 17, 15, 14, 13, 12, 11],
+      shifting: {
+        mode: 'full-synchro',
+        semiSynchroCompensation: 2,
+        fullSynchro: { toLarge: { fromRear: 7, toRear: 5 }, toSmall: { fromRear: 2, toRear: 4 } },
+      },
+      startGear: { front: 1, rear: 7 },
+    },
+  },
+  'activity.equipment': {
+    sessionId: 's-1',
+    bicycle: {
+      name: 'My bike',
+      mass: 8.4,
+      drivetrain: {
+        id: 'shimano-di2-2x12-50-34-11-34',
+        chainrings: [34, 50],
+        sprockets: [34, 30, 27, 24, 21, 19, 17, 15, 14, 13, 12, 11],
+        shifting: {
+          mode: 'full-synchro',
+          semiSynchroCompensation: 2,
+          fullSynchro: { toLarge: { fromRear: 7, toRear: 5 }, toSmall: { fromRear: 2, toRear: 4 } },
+        },
+        startGear: { front: 1, rear: 7 },
+      },
+    },
+  },
   'export.fit-written': { sessionId: 's-1', file: 'recordings/a.fit', bytes: 10, records: 11 },
   'measurement.power': {
     deviceId: 'd',

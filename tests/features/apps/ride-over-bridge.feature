@@ -13,7 +13,7 @@ Feature: Ride with the trainer connected to a companion
   Scenario: Pair, then ride
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-companion"
     When I start the ridrs app with these options
-    And I open the device indicator
+    And I open the device setup from the main screen
     And I open the "Companion App" in the device setup
     Then the pairing offers "Scan the QR code" or "Enter the code"
     And a pairing QR code is shown
@@ -34,7 +34,7 @@ Feature: Ride with the trainer connected to a companion
   Scenario: This device's Bluetooth and the companion at once
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-trainer, tests/fixtures/plugins/simulated-companion"
     When I start the ridrs app with these options
-    And I open the device indicator
+    And I open the device setup from the main screen
     And I open the "Companion App" in the device setup
     And I enter the pairing code "482913" for "Pixel 8"
     Then the companion is shown as connected to "Pixel 8"
@@ -50,7 +50,7 @@ Feature: Ride with the trainer connected to a companion
   Scenario: Forgetting the companion shows the pairing again
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-companion"
     When I start the ridrs app with these options
-    And I open the device indicator
+    And I open the device setup from the main screen
     And I open the "Companion App" in the device setup
     And I enter the pairing code "482913" for "Pixel 8"
     Then the companion is shown as connected to "Pixel 8"

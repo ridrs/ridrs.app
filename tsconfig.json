@@ -17,6 +17,7 @@
       "@ridrs/temporal": ["./packages/temporal/src/index.ts"],
       "@ridrs/testing": ["./packages/testing/src/index.ts"],
       "@ridrs/ui-bridge": ["./packages/ui-bridge/src/index.ts"],
+      "@ridrs/ui-preview": ["./packages/ui-preview/src/index.ts"],
       "@ridrs/ui-sdk": ["./packages/ui-sdk/src/index.ts"],
       "@ridrs/ui-shell": ["./packages/ui-shell/src/index.ts"]
     }
@@ -26,6 +27,7 @@
     "apps/**/*.ts",
     "apps/**/*.tsx",
     "packages/**/*.ts",
+    "packages/**/*.tsx",
     "plugins/**/*.ts",
     "plugins/**/*.tsx",
     "tests/**/*.ts",

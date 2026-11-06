@@ -3,6 +3,7 @@
 import {
   type AppFiles,
   type Diagnostic,
+  type PersistenceScope,
   type PluginManifest,
   type PluginSettingsContext,
   RidrsError,
@@ -32,8 +33,9 @@ async function readText(files: AppFiles, path: string): Promise<string | undefin
 }
 
 /**
- * `ctx.settings` (ADR 0054): JSON documents at `config/machine/<plugin id>/<name>.json` in the
- * host's app files, looked up on every call. Without files (a replay), nothing is read or written.
+ * `ctx.settings` (ADR 0054, ADR 0059): JSON documents at `config/<scope>/<plugin id>/<name>.json`
+ * in the host's app files, looked up on every call. Without files (a replay), nothing is read or
+ * written.
  */
 export function createPluginSettings(
   manifest: Readonly<PluginManifest>,
@@ -43,11 +45,11 @@ export function createPluginSettings(
   /** Writes of one document run one after another. */
   const chains = new Map<string, Promise<void>>();
 
-  const machine = <T>(document: SettingsDocument<T>): ScopedSettings<T> => {
-    if (!manifest.persistence?.includes('machine')) {
+  const scoped = <T>(scope: PersistenceScope, document: SettingsDocument<T>): ScopedSettings<T> => {
+    if (!manifest.persistence?.includes(scope)) {
       throw new RidrsError(
         'permission-denied',
-        `Plugin "${manifest.id}" called "ctx.settings.machine" without "persistence": ["machine"] in its manifest`,
+        `Plugin "${manifest.id}" called "ctx.settings.${scope}" without "persistence": ["${scope}"] in its manifest`,
         { pluginId: manifest.id },
       );
     }
@@ -56,7 +58,7 @@ export function createPluginSettings(
         pluginId: manifest.id,
       });
     }
-    const path = `config/machine/${manifest.id}/${document.name}.json`;
+    const path = `config/${scope}/${manifest.id}/${document.name}.json`;
     const invalid = (message: string): undefined => {
       report({
         code: 'settings-invalid',
@@ -128,5 +130,8 @@ export function createPluginSettings(
     });
   };
 
-  return Object.freeze({ machine });
+  return Object.freeze({
+    machine: <T>(document: SettingsDocument<T>) => scoped('machine', document),
+    user: <T>(document: SettingsDocument<T>) => scoped('user', document),
+  });
 }

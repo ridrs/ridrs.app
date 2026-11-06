@@ -1,8 +1,10 @@
 {
   "id": "ui-widget-target-power",
-  "name": "Target Power Widget",
+  "name": "ERG and Target Power Widgets",
   "version": "0.1.0",
-  "types": ["ui"],
+  "types": [
+    "ui"
+  ],
   "provides": [],
   "requires": [],
   "entry": "index.ts",
@@ -10,15 +12,24 @@
     "client": "client/index.tsx",
     "contributions": [
       {
-        "id": "target-power",
+        "id": "erg",
         "extensionPoint": "hud/widget",
-        "export": "TargetPowerWidget",
+        "export": "ErgToggle",
         "order": 8
+      },
+      {
+        "id": "target-power",
+        "extensionPoint": "hud/erg-on",
+        "export": "TargetPowerWidget"
       }
     ],
     "events": {
-      "subscribe": ["trainer.target-power"],
-      "publish": ["trainer.erg-requested"]
+      "subscribe": [
+        "trainer.target-power"
+      ],
+      "publish": [
+        "trainer.erg-requested"
+      ]
     }
   }
 }

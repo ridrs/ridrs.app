@@ -24,6 +24,8 @@ After({ tags: '@ui' }, async function (this: RidrsWorld) {
   await this.disposeHost();
   await happyDom().waitUntilComplete();
   document.body.replaceChildren();
+  // Scenarios may resize the window; the next one starts at happy-dom's default width again.
+  happyDom().setViewport({ width: 1024, height: 768 });
 });
 
 AfterAll(async () => {
@@ -32,6 +34,11 @@ AfterAll(async () => {
   }
 });
 
-function happyDom(): { waitUntilComplete(): Promise<void> } {
-  return (globalThis as unknown as { happyDOM: { waitUntilComplete(): Promise<void> } }).happyDOM;
+interface HappyDom {
+  waitUntilComplete(): Promise<void>;
+  setViewport(viewport: { width: number; height: number }): void;
+}
+
+function happyDom(): HappyDom {
+  return (globalThis as unknown as { happyDOM: HappyDom }).happyDOM;
 }

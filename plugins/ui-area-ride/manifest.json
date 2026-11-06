@@ -1,0 +1,42 @@
+{
+  "id": "ui-area-ride",
+  "name": "Ride Area",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "ride",
+        "export": "RideArea"
+      }
+    ],
+    "contributions": [
+      {
+        "id": "menu-item",
+        "extensionPoint": "menu/item",
+        "export": "RideMenuEntry",
+        "order": 10
+      },
+      {
+        "id": "ride-again",
+        "extensionPoint": "main/tile",
+        "export": "RideAgainTile"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": [
+        "activity.start-requested"
+      ]
+    }
+  }
+}

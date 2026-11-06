@@ -15,21 +15,18 @@
         "id": "main",
         "export": "MainScreen",
         "extensionPoints": [
-          "main/status",
-          "main/panel"
+          "main/menu",
+          "main/top-bar",
+          "main/action",
+          "main/tile"
         ]
       }
     ],
     "events": {
       "subscribe": [
-        "activity.state-changed",
-        "recording.completed",
-        "recording.failed",
-        "export.fit-written"
+        "activity.state-changed"
       ],
-      "publish": [
-        "activity.start-requested"
-      ]
+      "publish": []
     }
   }
 }

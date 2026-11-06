@@ -14,9 +14,8 @@
     "contributions": [
       {
         "id": "interrupted-ride",
-        "extensionPoint": "main/panel",
-        "export": "InterruptedRide",
-        "order": 0
+        "extensionPoint": "main/tile",
+        "export": "InterruptedRide"
       }
     ],
     "events": {

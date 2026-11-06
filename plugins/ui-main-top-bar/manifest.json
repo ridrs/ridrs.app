@@ -1,0 +1,21 @@
+{
+  "id": "ui-main-top-bar",
+  "name": "Main Top Bar",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "top-bar",
+        "extensionPoint": "main/top-bar",
+        "export": "TopBar"
+      }
+    ]
+  }
+}

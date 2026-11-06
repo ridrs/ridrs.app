@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  activityEquipmentEvent,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
   activityPauseRequestedEvent,
@@ -36,6 +37,7 @@ import {
   drivetrainVirtualGearCapability,
   type EventDefinition,
   type EventSubscription,
+  equipmentBicycleChangedEvent,
   exportFitWrittenEvent,
   type HostPlatform,
   measurementCadenceEvent,
@@ -130,6 +132,8 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   deviceRawWriteFailedEvent,
   drivetrainGearChangedEvent,
   drivetrainShiftRequestedEvent,
+  equipmentBicycleChangedEvent,
+  activityEquipmentEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,

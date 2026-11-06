@@ -9,7 +9,7 @@ Feature: Composing the activity screen from independent plugins
   visual result is part of the manual check of apps/native.
 
   Background:
-    Given the ridrs plugins "activity-session, metric-power, metric-cadence, ui-main-screen, ui-activity-screen, ui-landscape-demo, ui-hud, ui-widget-power, ui-widget-cadence" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, metric-power, metric-cadence, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-hud, ui-widget-power, ui-widget-cadence" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 

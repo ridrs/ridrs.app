@@ -372,6 +372,21 @@ importers:
         specifier: workspace:*
         version: link:../ui-sdk
 
+  packages/ui-preview:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+
   packages/ui-sdk:
     dependencies:
       '@ridrs/contracts':
@@ -694,6 +709,90 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
 
+  plugins/ui-area-events:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  plugins/ui-area-me:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  plugins/ui-area-ride:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  plugins/ui-area-training:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   plugins/ui-bridge-pairing:
     dependencies:
       '@ridrs/contracts':
@@ -726,6 +825,27 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+
+  plugins/ui-garage:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   plugins/ui-hud:
     dependencies:
@@ -760,7 +880,40 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
 
+  plugins/ui-main-menu:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+
   plugins/ui-main-screen:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  plugins/ui-main-top-bar:
     dependencies:
       '@ridrs/contracts':
         specifier: workspace:*
@@ -776,6 +929,63 @@ importers:
         version: 19.3.1(react@19.3.1)
 
   plugins/ui-ride-recovery:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+
+  plugins/ui-search:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  plugins/ui-settings:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  plugins/ui-tile-ride-start:
     dependencies:
       '@ridrs/contracts':
         specifier: workspace:*
@@ -806,6 +1016,21 @@ importers:
         version: 19.3.1(react@19.3.1)
 
   plugins/ui-widget-cadence:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+
+  plugins/ui-widget-erg-dispatch:
     dependencies:
       '@ridrs/contracts':
         specifier: workspace:*

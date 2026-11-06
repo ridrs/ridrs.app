@@ -158,24 +158,44 @@ When(
   },
 );
 
-When('I open the device indicator', async function (this: RidrsWorld) {
-  fireEvent.click(await within(ui(this)).findByTestId('device-indicator'));
+When('I open the device setup from the main screen', async function (this: RidrsWorld) {
+  fireEvent.click(await within(ui(this)).findByTestId('devices-open'));
   await this.settle();
 });
 
-Then('the device indicator says {string}', async function (this: RidrsWorld, text: string) {
-  const indicator = await within(ui(this)).findByTestId('device-indicator');
-  await waitFor(() => assert.equal(indicator.textContent, text));
+When(
+  'I open the {string} row of the devices tile',
+  async function (this: RidrsWorld, label: string) {
+    const tile = await within(ui(this)).findByTestId('devices-tile');
+    const row = await waitFor(() => {
+      const found = within(tile)
+        .getAllByTestId('devices-tile-row')
+        .find(
+          (candidate) => within(candidate).getByTestId('devices-tile-label').textContent === label,
+        );
+      assert.ok(found, `No "${label}" row`);
+      return found;
+    });
+    fireEvent.click(row);
+    await this.settle();
+  },
+);
+
+Then('the devices tile says {string}', async function (this: RidrsWorld, text: string) {
+  const open = await within(ui(this)).findByTestId('devices-open');
+  await waitFor(() => assert.equal(open.textContent, text));
 });
 
-Then('the device indicator shows:', async function (this: RidrsWorld, table: DataTable) {
-  const indicator = await within(ui(this)).findByTestId('device-indicator');
+Then('the devices tile shows:', async function (this: RidrsWorld, table: DataTable) {
+  const tile = await within(ui(this)).findByTestId('devices-tile');
   await waitFor(() => {
-    const dots = [...indicator.querySelectorAll<HTMLElement>('[data-kind]')].map((dot) => ({
-      device: dot.textContent ?? '',
-      state: dot.dataset.state ?? '',
-    }));
-    assert.deepEqual(dots, table.hashes());
+    const rows = within(tile)
+      .queryAllByTestId('devices-tile-row')
+      .map((row) => ({
+        device: within(row).getByTestId('devices-tile-label').textContent ?? '',
+        state: row.dataset.state ?? '',
+      }));
+    assert.deepEqual(rows, table.hashes());
   });
 });
 

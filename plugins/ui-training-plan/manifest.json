@@ -20,9 +20,8 @@
     "contributions": [
       {
         "id": "next-workout",
-        "extensionPoint": "main/panel",
-        "export": "NextWorkout",
-        "order": 10
+        "extensionPoint": "main/tile",
+        "export": "NextWorkout"
       }
     ],
     "events": {

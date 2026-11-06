@@ -4,7 +4,7 @@ Feature: The rider pauses and resumes a ride on the activity screen
   and offers Resume (ADR 0056). Both work with the arrow keys and Enter (AGENTS.md rule 12).
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-activity-screen" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, ui-activity-screen" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
     And I press "Start ride"

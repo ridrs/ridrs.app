@@ -247,7 +247,7 @@ module.exports = {
         'Client modules, the shell and the client contract run in a WebView: no node builtins, no packages/core, no apps or tests.',
       severity: 'error',
       from: {
-        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/|packages/presentation/|packages/contracts/)',
+        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/|packages/ui-preview/|packages/presentation/|packages/contracts/)',
         pathNot: '\\.test\\.ts$',
       },
       to: { path: '^(node:|packages/core/|packages/testing/|apps/|tests/)' },
@@ -257,10 +257,25 @@ module.exports = {
       comment: 'Node builtins (dependency type "core") are not available to browser code.',
       severity: 'error',
       from: {
-        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/)',
+        path: '^(plugins/[^/]+/client/|packages/ui-shell/|packages/ui-sdk/|packages/ui-preview/)',
         pathNot: '\\.test\\.ts$',
       },
       to: { dependencyTypes: ['core'] },
+    },
+    {
+      name: 'ui-preview-imports-contracts-sdk-and-react-only',
+      comment:
+        'packages/ui-preview is the kit of the clickable preview (ADR 0059): contracts and ui-sdk types and React, nothing else of ridrs.',
+      severity: 'error',
+      from: { path: '^packages/ui-preview/' },
+      to: { path: '^(packages/(?!contracts/|ui-sdk/|ui-preview/)|plugins/|apps/|tests/)' },
+    },
+    {
+      name: 'only-ui-clients-use-the-preview-kit',
+      comment: 'Only the client modules of UI plugins draw with packages/ui-preview (ADR 0059).',
+      severity: 'error',
+      from: { pathNot: '^(plugins/ui-[^/]+/client/|packages/ui-preview/)' },
+      to: { path: '^packages/ui-preview/' },
     },
     {
       name: 'ui-shell-imports-sdk-and-contracts-only',
@@ -343,7 +358,10 @@ module.exports = {
       comment:
         'React is an implementation detail of UI plugin clients, the native app entry and the companion app UI.',
       severity: 'error',
-      from: { pathNot: '^(plugins/ui-[^/]+/client/|apps/(native|companion)/src/|tests/)' },
+      from: {
+        pathNot:
+          '^(plugins/ui-[^/]+/client/|packages/ui-preview/src/|apps/(native|companion)/src/|tests/)',
+      },
       to: { path: '(^|/)node_modules/.*/(react|react-dom)/' },
     },
     {

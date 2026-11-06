@@ -18,6 +18,7 @@ import {
   type PluginDefinition,
   type PluginLogger,
   type PluginManifest,
+  type PluginSettingsContext,
   type PluginState,
   RidrsError,
   storageAppFilesCapability,
@@ -133,6 +134,7 @@ export class PluginHost {
   private readonly temporal: TemporalService;
   private readonly spatial: SpatialService;
   private readonly plugins = new Map<string, ManagedPlugin>();
+  private readonly pluginSettings = new Map<string, PluginSettingsContext>();
   private dependencyGraph?: DepGraph<string>;
   private startOrder: string[] = [];
   private initializedOrder: string[] = [];
@@ -455,6 +457,36 @@ export class PluginHost {
     return this.uiRegistry;
   }
 
+  /**
+   * The settings documents of a plugin that is currently in the UI registry, for its client code
+   * (ADR 0059): the same documents, permissions and write order as its own `ctx.settings`.
+   */
+  getClientSettings(pluginId: string): PluginSettingsContext {
+    const managed = this.plugins.get(pluginId);
+    if (managed?.state !== 'started' || managed.discovered.manifest.ui?.client === undefined) {
+      throw new Error(`Plugin "${pluginId}" has no client module in the UI registry`);
+    }
+    return this.settingsOf(managed.discovered.manifest);
+  }
+
+  /** One settings access per plugin, so its writes keep one order from wherever they come. */
+  private settingsOf(manifest: Readonly<PluginManifest>): PluginSettingsContext {
+    let settings = this.pluginSettings.get(manifest.id);
+    if (!settings) {
+      settings = createPluginSettings(
+        manifest,
+        () =>
+          this.settingsFiles ??
+          (this.capabilityRegistry.providersOf(storageAppFilesCapability.id)[0]?.implementation as
+            | AppFiles
+            | undefined),
+        (diagnostic) => this.diagnostics.report(diagnostic),
+      );
+      this.pluginSettings.set(manifest.id, settings);
+    }
+    return settings;
+  }
+
   /** Loads the client module of a plugin that is currently in the UI registry. */
   async loadClientModule(pluginId: string): Promise<unknown> {
     const managed = this.plugins.get(pluginId);
@@ -468,6 +500,7 @@ export class PluginHost {
   async discover(): Promise<readonly PluginManifest[]> {
     const discoveredList = await discoverPlugins(this.sources, this.diagnostics);
     this.plugins.clear();
+    this.pluginSettings.clear();
     for (const item of discoveredList) {
       this.plugins.set(item.manifest.id, {
         discovered: item,
@@ -853,15 +886,7 @@ export class PluginHost {
       signal,
       ui: Object.freeze({ registry: () => this.uiRegistry }),
       host: this.createHostAccess(managed),
-      settings: createPluginSettings(
-        manifest,
-        () =>
-          this.settingsFiles ??
-          (this.capabilityRegistry.providersOf(storageAppFilesCapability.id)[0]?.implementation as
-            | AppFiles
-            | undefined),
-        (diagnostic) => this.diagnostics.report(diagnostic),
-      ),
+      settings: this.settingsOf(manifest),
       reportDiagnostic: (
         code: DiagnosticCode,
         message: string,

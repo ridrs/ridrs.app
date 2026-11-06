@@ -27,8 +27,9 @@ The virtual gradient and speed drive the trainer's resistance, the Zwift Ride sh
 | `control-virtual-gears` | control | 24 virtual gears from any controller's shift buttons and the rider's shifts in the activity screen (`drivetrain.shift-requested`, an input from the UI); series `drivetrain.virtual-gear`, event `drivetrain.gear-changed` ([ADR 0055](../decisions/0055-virtual-gears-and-never-stale-series.md)) |
 | `control-erg` | control, transport (a driver) | the rider's ERG target from the activity screen and the power-up buttons, as the input `trainer.target-power` |
 | `device-ftms-trainer` | device | reads the Feature, takes control, chooses and sends the commands ([ADR 0056](../decisions/0056-ftms-trainer-control.md)) |
-| `ui-widget-virtual-gear` | ui | "12 / 24" in the HUD; ↑/↓ shift while focused, + and - anywhere on the screen without ERG |
-| `ui-widget-target-power` | ui | the ERG button: "150 W" or "Off"; Enter turns ERG on and off, in ERG ↑/↓ ±5 W while focused and + and - anywhere on the screen, Back leaves ERG while focused |
+| `ui-widget-erg-dispatch` | ui | one place in the HUD (`hud/widget`, order 7): shows `hud/erg-off` (the gear) while ERG is off and `hud/erg-on` (the target) while it is on; knows neither widget |
+| `ui-widget-virtual-gear` | ui | in `hud/erg-off`: "12 / 24", or with a bicycle's drivetrain the gear large and "50 × 17" below (ADR 0060); ↑/↓ shift while focused, + and - anywhere on the screen without ERG |
+| `ui-widget-target-power` | ui | the ERG toggle (`hud/widget`, order 8): "On" or "Off", Enter turns ERG on and off; and the target (`hud/erg-on`): "150 W", ↑/↓ ±5 W while focused, + and - anywhere on the screen, Back leaves ERG while focused |
 
 `ui-devices` shows the trainer's control state in its details: "Control: simulation", "ERG 150 W", "refused", "lost"; a trainer ridrs cannot control shows no control line.
 

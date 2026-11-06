@@ -21,10 +21,14 @@
     ],
     "contributions": [
       {
-        "id": "device-indicator",
-        "extensionPoint": "main/status",
-        "export": "DeviceIndicator",
-        "order": 0
+        "id": "devices",
+        "extensionPoint": "main/tile",
+        "export": "DevicesTile"
+      },
+      {
+        "id": "status",
+        "extensionPoint": "main/action",
+        "export": "DevicesAction"
       }
     ],
     "events": {

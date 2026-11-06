@@ -1,0 +1,45 @@
+{
+  "id": "ui-area-me",
+  "name": "Me Area",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "me",
+        "export": "MeArea"
+      }
+    ],
+    "contributions": [
+      {
+        "id": "menu-item",
+        "extensionPoint": "menu/item",
+        "export": "MeMenuEntry",
+        "order": 40
+      },
+      {
+        "id": "weekly-goal",
+        "extensionPoint": "main/tile",
+        "export": "WeeklyGoalTile"
+      },
+      {
+        "id": "profile",
+        "extensionPoint": "main/action",
+        "export": "ProfileAction"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": []
+    }
+  }
+}

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { EventDefinition, EventEnvelope, UiRegistry } from '@ridrs/contracts';
+import type {
+  EventDefinition,
+  EventEnvelope,
+  PluginSettingsContext,
+  UiRegistry,
+} from '@ridrs/contracts';
 
 export type Unsubscribe = () => void;
 
@@ -12,6 +17,16 @@ export interface UiFrame {
   readonly index: number;
   /** The host clock (epoch ms) at the frame: render time is on the simulation's time axis. */
   readonly time: number;
+}
+
+export interface OutletOptions {
+  /** The ids of the screens shown in the outlet instead of on their own. */
+  readonly screens: readonly string[];
+}
+
+export interface SlotOptions {
+  /** The one contribution to mount, as `<pluginId>/<contributionId>`; all of them without it. */
+  readonly contribution?: string;
 }
 
 /**
@@ -31,8 +46,11 @@ export interface UiContext {
     /** Throws `undeclared-event` unless the event is in the plugin's own `ui.events.publish`. */
     publish<T>(def: EventDefinition<T>, payload: T): void;
   };
-  /** Mounts every contribution of the extension point into `container` and keeps it in sync. */
-  slot(extensionPoint: string, container: HTMLElement): Unsubscribe;
+  /**
+   * Mounts every contribution of the extension point into `container` and keeps it in sync. With
+   * `contribution` (`<pluginId>/<contributionId>`), only that one, once it targets the point.
+   */
+  slot(extensionPoint: string, container: HTMLElement, options?: SlotOptions): Unsubscribe;
   /**
    * Handles Back (Escape, Backspace, the platform's back button) while the component is mounted.
    * The handler registered last wins; without one, Back does nothing.
@@ -40,6 +58,23 @@ export interface UiContext {
   onBack(handler: () => void): Unsubscribe;
   /** Switches the active screen; unknown paths are logged and ignored. */
   navigate(path: string): void;
+  /**
+   * The plugin's settings documents (ADR 0059): the same as its host side's `ctx.settings`, with
+   * the same permissions (`persistence` in the manifest). A write is kept once it resolves. The
+   * same object for every component of the plugin while its host runs.
+   */
+  readonly settings: PluginSettingsContext;
+  /**
+   * Called with the shown screen's id at once and after every navigation. With a screen shown in
+   * an outlet, that is the screen in the outlet, not the screen around it.
+   */
+  onNavigated(handler: (screen: string) => void): Unsubscribe;
+  /**
+   * Takes over the screens named in `options`: navigating to one of them while this screen is
+   * shown mounts it into `container` and keeps this screen mounted around it. Elsewhere they are
+   * shown on their own. Only for a screen's own component; the outlet opened last counts.
+   */
+  outlet(container: HTMLElement, options: OutletOptions): Unsubscribe;
   /** The shell's one render clock, at the display's refresh rate. Read-only: frames drive nothing. */
   readonly frames: {
     /** Called once per frame while subscribed. Only while the component is mounted. */
@@ -71,6 +106,8 @@ export interface UiBridge {
   publish(eventId: string, payload: unknown): void;
   loadModule(pluginId: string): Promise<Record<string, unknown>>;
   reportClientError(pluginId: string, message: string): void;
+  /** The settings documents of a plugin in the registry; throws for any other. */
+  settings(pluginId: string): PluginSettingsContext;
   /** The host clock (epoch ms). Exact in-process; a remote bridge would need clock sync. */
   now(): number;
 }

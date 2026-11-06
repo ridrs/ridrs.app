@@ -1,0 +1,24 @@
+{
+  "id": "ui-main-menu",
+  "name": "Main Menu",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "menu",
+        "extensionPoint": "main/menu",
+        "export": "MainMenu",
+        "extensionPoints": [
+          "menu/item"
+        ]
+      }
+    ]
+  }
+}

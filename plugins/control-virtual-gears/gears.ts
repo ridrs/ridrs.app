@@ -58,3 +58,16 @@ export function shifted(
 ): number {
   return Math.min(count, Math.max(1, gear + shift));
 }
+
+/** The shifts of the newly pressed buttons, per side, in the order they were pressed. */
+export function pressesOf(
+  before: readonly ControllerButton[],
+  now: readonly ControllerButton[],
+): readonly { readonly side: 'left' | 'right'; readonly direction: 'harder' | 'easier' }[] {
+  return now
+    .filter((button) => !before.includes(button) && (HARDER.has(button) || EASIER.has(button)))
+    .map((button) => ({
+      side: button.endsWith('-left') ? 'left' : 'right',
+      direction: HARDER.has(button) ? 'harder' : 'easier',
+    }));
+}

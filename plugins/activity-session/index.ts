@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  activityEquipmentEvent,
   type ActivityState,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
@@ -8,7 +9,9 @@ import {
   activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  type Bicycle,
   definePlugin,
+  equipmentBicycleChangedEvent,
   type PluginContext,
 } from '@ridrs/contracts';
 
@@ -30,12 +33,18 @@ function reject(ctx: PluginContext, request: string, current: ActivityState): vo
 
 /**
  * Ride lifecycle `idle -> running <-> paused -> finished`, driven by request events (ADR 0056).
- * Knows nothing about any UI.
+ * Knows nothing about any UI. Freezes the latest bicycle (`equipment.bicycle-changed`) for every
+ * new session and announces it as `activity.equipment` right before the session runs; pause,
+ * resume and a continued ride keep it (ADR 0060). Without a bicycle it announces none.
  */
 export default definePlugin({
   start(ctx) {
     transition(ctx, { state: 'idle' });
     const current = (): ActivityState => states.get(ctx) ?? { state: 'idle' };
+    let bicycle: Bicycle | undefined;
+    ctx.events.subscribe(equipmentBicycleChangedEvent, ({ payload }) => {
+      bicycle = payload;
+    });
 
     ctx.events.subscribe(activityStartRequestedEvent, () => {
       const state = current();
@@ -43,9 +52,13 @@ export default definePlugin({
         reject(ctx, 'start', state);
         return;
       }
+      const sessionId = ctx.ids.next();
+      if (bicycle) {
+        ctx.events.publish(activityEquipmentEvent, { sessionId, bicycle });
+      }
       transition(ctx, {
         state: 'running',
-        sessionId: ctx.ids.next(),
+        sessionId,
         startedAt: ctx.clock.now(),
       });
     });

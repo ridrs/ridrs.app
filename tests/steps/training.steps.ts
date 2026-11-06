@@ -38,12 +38,18 @@ function ui(world: RidrsWorld): HTMLElement {
   return view.root;
 }
 
-async function mainPanel(world: RidrsWorld): Promise<HTMLElement> {
-  return within(ui(world)).findByTestId('slot-main-panel');
+async function trainingTile(world: RidrsWorld): Promise<HTMLElement> {
+  return await waitFor(() => {
+    const tile = ui(world).querySelector<HTMLElement>(
+      '[data-tile="ui-training-plan/next-workout"]',
+    );
+    assert.ok(tile, 'No training tile on the main screen');
+    return tile;
+  });
 }
 
 async function card(world: RidrsWorld): Promise<HTMLElement> {
-  return within(await mainPanel(world)).findByTestId('next-workout');
+  return within(await trainingTile(world)).findByTestId('next-workout');
 }
 
 /** Local midnight of `date` plus `time`: "today" is the rider's local date (ADR 0048). */
@@ -361,16 +367,19 @@ Then('no app file contains the intervals.icu token', async function (this: Ridrs
   );
 });
 
-// ---- The main panel and the card ---------------------------------------------------------
+// ---- The training tile and the card ---------------------------------------------------------
 
-Then('the main panel shows {string}', async function (this: RidrsWorld, text: string) {
-  const panel = await mainPanel(this);
+Then('the training tile shows {string}', async function (this: RidrsWorld, text: string) {
+  const panel = await trainingTile(this);
   await waitFor(() => assert.ok(textOf(panel).includes(text), `"${textOf(panel)}"`));
 });
 
-Then('the main panel offers a {string} button', async function (this: RidrsWorld, label: string) {
-  await within(await mainPanel(this)).findByRole('button', { name: label });
-});
+Then(
+  'the training tile offers a {string} button',
+  async function (this: RidrsWorld, label: string) {
+    await within(await trainingTile(this)).findByRole('button', { name: label });
+  },
+);
 
 Then('the next workout card shows:', async function (this: RidrsWorld, table: DataTable) {
   for (const [field, expected] of table.raw()) {

@@ -30,6 +30,12 @@ export const drivetrainGearChangedEvent = defineEvent(
     index: z.number().int().positive(),
     ratio: z.number().positive(),
     count: z.number().int().positive(),
+    /** Teeth of the chainring and the sprocket, with a bicycle's drivetrain (ADR 0060). */
+    chainring: z.number().int().positive().optional(),
+    sprocket: z.number().int().positive().optional(),
+    /** Gear positions, with a bicycle's drivetrain: chainring 1 the smallest, sprocket 1 the largest. */
+    front: z.number().int().positive().optional(),
+    rear: z.number().int().positive().optional(),
   }),
 );
 
@@ -41,7 +47,11 @@ export type DrivetrainGearChangedPayload = z.infer<typeof drivetrainGearChangedE
  */
 export const drivetrainShiftRequestedEvent = defineEvent(
   'drivetrain.shift-requested',
-  z.object({ change: z.enum(['up', 'down']) }),
+  z.object({
+    change: z.enum(['up', 'down']),
+    /** The derailleur, with a bicycle's drivetrain (ADR 0060); the rear without one. */
+    derailleur: z.enum(['front', 'rear']).optional(),
+  }),
 );
 
 export type DrivetrainShiftRequestedPayload = z.infer<typeof drivetrainShiftRequestedEvent.schema>;
