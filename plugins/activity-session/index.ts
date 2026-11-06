@@ -31,11 +31,15 @@ function reject(ctx: PluginContext, request: string, current: ActivityState): vo
   );
 }
 
+/** The world of a ride, kept from its start to its end; none for a free ride. */
+const worldOf = (state: ActivityState) => ('world' in state && state.world ? { world: state.world } : {});
+
 /**
  * Ride lifecycle `idle -> running <-> paused -> finished`, driven by request events (ADR 0056).
  * Knows nothing about any UI. Freezes the latest bicycle (`equipment.bicycle-changed`) for every
  * new session and announces it as `activity.equipment` right before the session runs; pause,
- * resume and a continued ride keep it (ADR 0060). Without a bicycle it announces none.
+ * resume and a continued ride keep it (ADR 0060). Without a bicycle it announces none. The world a
+ start asks for (a landscape and its route) stays with the ride in every state until it ends.
  */
 export default definePlugin({
   start(ctx) {
@@ -46,7 +50,7 @@ export default definePlugin({
       bicycle = payload;
     });
 
-    ctx.events.subscribe(activityStartRequestedEvent, () => {
+    ctx.events.subscribe(activityStartRequestedEvent, ({ payload }) => {
       const state = current();
       if (state.state === 'running' || state.state === 'paused') {
         reject(ctx, 'start', state);
@@ -60,6 +64,7 @@ export default definePlugin({
         state: 'running',
         sessionId,
         startedAt: ctx.clock.now(),
+        ...(payload.world ? { world: payload.world } : {}),
       });
     });
 
@@ -75,6 +80,7 @@ export default definePlugin({
         startedAt: state.startedAt,
         pausedAt: ctx.clock.now(),
         reason,
+        ...worldOf(state),
       });
     };
     ctx.events.subscribe(activityPauseRequestedEvent, () => pause('pause', 'rider'));
@@ -91,6 +97,7 @@ export default definePlugin({
         sessionId: state.sessionId,
         startedAt: state.startedAt,
         resumedAt: ctx.clock.now(),
+        ...worldOf(state),
       });
     });
 
@@ -105,6 +112,7 @@ export default definePlugin({
         sessionId: state.sessionId,
         startedAt: state.startedAt,
         endedAt: ctx.clock.now(),
+        ...worldOf(state),
       });
     });
   },

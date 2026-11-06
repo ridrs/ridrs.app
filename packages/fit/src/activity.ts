@@ -12,6 +12,8 @@ import {
   type RecordingEvent,
   type RecordingFooter,
   type RecordingHeader,
+  type WorldPosition,
+  worldPositionEvent,
 } from '@ridrs/contracts';
 
 /** What an activity is built from: the parts of a ridrs recording it needs. */
@@ -35,6 +37,12 @@ export interface ActivityRecord {
   readonly speed?: number;
   /** m */
   readonly distance?: number;
+  /** Degrees north, where the world put the rider. */
+  readonly latitude?: number;
+  /** Degrees east. */
+  readonly longitude?: number;
+  /** m above sea level. */
+  readonly altitude?: number;
 }
 
 export interface ActivitySummary {
@@ -118,6 +126,12 @@ function sampleSeries(
     .sort((a, b) => a.at - b.at);
 }
 
+function positionSeries(events: readonly RecordingEvent[]): Timed<WorldPosition>[] {
+  return events
+    .filter((e) => e.envelope.type === worldPositionEvent.id)
+    .map((e) => ({ at: e.envelope.timestamp, value: e.envelope.payload as WorldPosition }));
+}
+
 function mean(values: readonly number[]): number | undefined {
   return values.length === 0 ? undefined : values.reduce((a, b) => a + b, 0) / values.length;
 }
@@ -155,7 +169,8 @@ function defined<T>(values: readonly (T | undefined)[]): T[] {
 /**
  * The activity of a recorded ride, from its events (the pre-roll excluded): a record at every whole
  * second `t_k ≤ endedAt` with the latest power, cadence and heart rate published at or before
- * `t_k` and the speed and distance of the latest physics sample at or before `t_k`.
+ * `t_k`, the speed and distance of the latest physics sample at or before `t_k` and the latest
+ * position a world gave (`world.position`) at or before `t_k`; a ride without a world has none.
  */
 export function buildActivity(recording: ActivitySource): ActivityModel {
   const { startedAt } = recording.header;
@@ -166,6 +181,7 @@ export function buildActivity(recording: ActivitySource): ActivityModel {
   const cadence = new Cursor(metricSeries(ride, metricCadenceEvent.id));
   const heartRate = new Cursor(metricSeries(ride, metricHeartRateEvent.id));
   const samples = new Cursor(sampleSeries(ride));
+  const positions = new Cursor(positionSeries(ride));
 
   const pauses = pausesOf(ride, endedAt);
   const paused = (at: number) => pauses.some((p) => at > p.from && at < p.to);
@@ -177,6 +193,7 @@ export function buildActivity(recording: ActivitySource): ActivityModel {
       continue;
     }
     const sample = samples.at(at);
+    const place = positions.at(at);
     records.push({
       at,
       power: power.at(at),
@@ -184,6 +201,9 @@ export function buildActivity(recording: ActivitySource): ActivityModel {
       heartRate: heartRate.at(at),
       speed: sample?.speed,
       distance: sample?.distance,
+      latitude: place?.latitude,
+      longitude: place?.longitude,
+      altitude: place?.altitude,
     });
   }
 

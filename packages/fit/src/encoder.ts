@@ -59,6 +59,10 @@ class Output {
     this.reserve(4).setUint32(0, value, true);
   }
 
+  s32(value: number): void {
+    this.reserve(4).setInt32(0, value, true);
+  }
+
   result(): Uint8Array {
     return this.bytes.slice(0, this.length);
   }
@@ -93,10 +97,14 @@ class MessageWriter {
       const scaled =
         value === undefined || !Number.isFinite(value)
           ? field.type.invalid
-          : Math.round(value * (field.scale ?? 1));
+          : Math.round((value + (field.offset ?? 0)) * (field.scale ?? 1));
+      const signed = field.type.name === 'sint32';
       // Out of range is not representable: invalid, never wrapped or clamped into a wrong value.
-      const raw = scaled >= 0 && scaled < field.type.invalid ? scaled : field.type.invalid;
-      if (field.type.size === 1) {
+      const lowest = signed ? -field.type.invalid : 0;
+      const raw = scaled >= lowest && scaled < field.type.invalid ? scaled : field.type.invalid;
+      if (signed) {
+        this.out.s32(raw);
+      } else if (field.type.size === 1) {
         this.out.u8(raw);
       } else if (field.type.size === 2) {
         this.out.u16(raw);
@@ -107,9 +115,17 @@ class MessageWriter {
   }
 }
 
+/** FIT positions: 2³¹ semicircles are 180°. */
+const semicircles = (degrees: number | undefined) =>
+  degrees === undefined ? undefined : (degrees * 2 ** 31) / 180;
+
 function recordValues(record: ActivityRecord): FieldValues {
   return {
     timestamp: fitTimestamp(record.at),
+    positionLat: semicircles(record.latitude),
+    positionLong: semicircles(record.longitude),
+    altitude: record.altitude,
+    enhancedAltitude: record.altitude,
     heartRate: record.heartRate,
     cadence: record.cadence,
     distance: record.distance,

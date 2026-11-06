@@ -9,6 +9,8 @@ export {
   activityStartRequestedEvent,
   activityStateChangedEvent,
   activityStateSchema,
+  type RideWorld,
+  rideWorldSchema,
 } from './activity.ts';
 export {
   authBrowserSignInCapability,
@@ -400,6 +402,10 @@ export {
   type TerrainSample,
   type TerrainSurface,
   terrainPreviewSchema,
+  uiPositionObservedEvent,
   uiTerrainObservedEvent,
+  type WorldPosition,
+  worldPositionEvent,
+  worldPositionSchema,
   worldTerrainPreviewEvent,
 } from './world.ts';

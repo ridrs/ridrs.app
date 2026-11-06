@@ -76,7 +76,13 @@ function decode(bytes: Uint8Array) {
   return messages;
 }
 
-type ProfileField = { num: number; name: string; baseType: string; scale: number | number[] };
+type ProfileField = {
+  num: number;
+  name: string;
+  baseType: string;
+  scale: number | number[];
+  offset: number | number[];
+};
 type ProfileMessage = { num: number; name: string; fields: Record<string, ProfileField> };
 
 describe('the FIT CRC-16', () => {
@@ -105,6 +111,10 @@ describe('the FIT profile subset', () => {
         expect(scale, `${message.name}.${field.name} scale`).toBe(
           'scale' in field ? field.scale : 1,
         );
+        const offset = [officialField?.offset].flat()[0] ?? 0;
+        expect(offset, `${message.name}.${field.name} offset`).toBe(
+          'offset' in field ? field.offset : 0,
+        );
       }
     },
   );
@@ -126,6 +136,7 @@ describe('the FIT profile subset', () => {
     expect(BASE_TYPES.uint8.invalid).toBe(0xff);
     expect(BASE_TYPES.uint16.invalid).toBe(0xffff);
     expect(BASE_TYPES.uint32.invalid).toBe(0xffffffff);
+    expect(BASE_TYPES.sint32.invalid).toBe(0x7fffffff);
   });
 });
 
@@ -188,6 +199,48 @@ describe('buildActivity', () => {
   });
 });
 
+function position(
+  at: number,
+  distance: number,
+  [latitude, longitude, altitude]: readonly [number, number, number?],
+  preroll = false,
+): RecordingEvent {
+  const place = { distance, latitude, longitude, ...(altitude === undefined ? {} : { altitude }) };
+  return event('world.position', at, place, preroll);
+}
+
+describe('buildActivity with a world position', () => {
+  it('takes the latest position at or before each record, and none before the first', () => {
+    const activity = buildActivity({
+      header,
+      events: [
+        position(T0 - 500, 0, [44.1, 5.1, 400], true),
+        position(T0 + 500, 1, [44.2, 5.2, 401.5]),
+        position(T0 + 2000, 5, [44.3, 5.3]),
+      ],
+      footer: {
+        kind: 'footer',
+        status: 'complete',
+        endedAt: T0 + 2000,
+        lastSeq: 3,
+        counts: { events: 3, diagnostics: 0, byType: {} },
+      },
+    });
+    expect(
+      activity.records.map(({ latitude, longitude, altitude }) => [latitude, longitude, altitude]),
+    ).toEqual([
+      [undefined, undefined, undefined],
+      [44.2, 5.2, 401.5],
+      [44.3, 5.3, undefined],
+    ]);
+  });
+
+  it('has no position in a ride without a world', () => {
+    const activity = buildActivity({ header, events: [batch(T0, 1, 5, 0)] });
+    expect(activity.records[0]?.latitude).toBeUndefined();
+  });
+});
+
 describe('encodeActivity', () => {
   const model: ActivityModel = {
     startedAt: T0,
@@ -197,7 +250,15 @@ describe('encodeActivity', () => {
     pauses: [],
     records: [
       { at: T0, power: 200, heartRate: 150, speed: 0, distance: 0 },
-      { at: T0 + 1000, power: 201, speed: 1.2345, distance: 0.5 },
+      {
+        at: T0 + 1000,
+        power: 201,
+        speed: 1.2345,
+        distance: 0.5,
+        latitude: 44.660217,
+        longitude: -5.420908,
+        altitude: 498.13,
+      },
       { at: T0 + 2000 },
     ],
     summary: {
@@ -231,5 +292,17 @@ describe('encodeActivity', () => {
     expect(records[1]?.speed).toBeCloseTo(1.235, 3);
     expect(records[2]?.power).toBeUndefined();
     expect(records[2]?.distance).toBeUndefined();
+    expect(records[0]?.positionLat).toBeUndefined();
+    expect(records[0]?.enhancedAltitude).toBeUndefined();
+  });
+
+  it('writes the position in semicircles and the altitude', () => {
+    const record = (decode(encodeActivity(model)).recordMesgs ?? [])[1];
+    const degrees = (semicircles: number | undefined) =>
+      ((semicircles ?? Number.NaN) * 180) / 2 ** 31;
+    expect(degrees(record?.positionLat)).toBeCloseTo(44.660217, 6);
+    expect(degrees(record?.positionLong)).toBeCloseTo(-5.420908, 6);
+    // FIT stores the altitude in steps of 0.2 m.
+    expect(Math.abs((record?.enhancedAltitude ?? 0) - 498.13)).toBeLessThanOrEqual(0.1);
   });
 });

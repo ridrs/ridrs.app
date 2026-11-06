@@ -54,3 +54,18 @@ Feature: Activity session
     When "test-ui" publishes "activity.start-requested"
     Then the latest "activity.state-changed" event has the state "running"
     And the host reported no problems
+
+  Scenario: A ride in a world keeps its world until it ends
+    When "test-ui" asks to start a ride on the landscape "ui-world-video/landscape" along the route "FR_Col_de_Pennes"
+    Then the latest "activity.state-changed" event has the state "running"
+    And the ride takes place on the landscape "ui-world-video/landscape" along the route "FR_Col_de_Pennes"
+    When "test-ui" publishes "activity.pause-requested"
+    Then the ride takes place on the landscape "ui-world-video/landscape" along the route "FR_Col_de_Pennes"
+    When "test-ui" publishes "activity.resume-requested"
+    Then the ride takes place on the landscape "ui-world-video/landscape" along the route "FR_Col_de_Pennes"
+    When "test-ui" publishes "activity.finish-requested"
+    Then the ride takes place on the landscape "ui-world-video/landscape" along the route "FR_Col_de_Pennes"
+
+  Scenario: A free ride has no world
+    When "test-ui" publishes "activity.start-requested"
+    Then the ride has no world

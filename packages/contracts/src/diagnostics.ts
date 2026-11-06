@@ -28,6 +28,7 @@ export type DiagnosticCode =
   | 'physics-step-failed'
   | 'terrain-preview-missing'
   | 'terrain-preview-rejected'
+  | 'position-rejected'
   | 'recording-failed'
   | 'recording-recovered'
   | 'fit-export-failed'

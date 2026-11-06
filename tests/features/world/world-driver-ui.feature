@@ -35,6 +35,20 @@ Feature: The UI landscape's terrain enters through a driver
     Then a "terrain-preview-rejected" diagnostic says "origin-ahead-of-rider" for revision 1
     And "world-driver-ui" accepted no "world.terrain-preview"
 
+  Scenario: Every ride's landscape counts its windows from 1 again
+    The landscape is mounted anew for every ride and numbers its windows from 1. The driver
+    checks a sensor's revisions within a ride and numbers what it accepts on its own, so the
+    spatial layer sees them ascend across rides.
+    Given "test-physics" published "activity.start-requested"
+    And the UI observed revision 1 of the terrain from 0 m, 1 m apart, with the gradients "0, 0" % on "asphalt, asphalt"
+    And the UI observed revision 2 of the terrain from 0 m, 1 m apart, with the gradients "0, 0" % on "asphalt, asphalt"
+    And "test-physics" published "activity.finish-requested"
+    And "test-physics" published "activity.start-requested"
+    When the UI observes revision 1 of the terrain from 0 m, 1 m apart, with the gradients "5, 5" % on "gravel, gravel"
+    Then "world-driver-ui" accepted the input "world.terrain-preview" with revision 3 from 0 m
+    And "test-physics" reads at 1 m a gradient of 5 % on "gravel" ("sampled")
+    And no "terrain-preview-rejected" diagnostic was reported
+
   Scenario Outline: An invalid window is dropped: <case>
     Given "test-physics" published "activity.start-requested"
     And "test-physics" reports the odometer at 12.5 m in a "physics.state-batch"

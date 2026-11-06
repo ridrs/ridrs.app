@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { TERRAIN_SURFACES, type TerrainPreview, type TerrainSurface } from '@ridrs/contracts';
+import {
+  TERRAIN_SURFACES,
+  type TerrainPreview,
+  type TerrainSurface,
+  type WorldPosition,
+} from '@ridrs/contracts';
 
 /** The steepest gradient a window may carry, either way: rise over run. */
 export const MAX_GRADIENT = 0.3;
@@ -62,4 +67,51 @@ export function validateTerrainWindow(
     return reject('revision-not-ascending');
   }
   return { valid: true, preview: window as TerrainPreview };
+}
+
+export type PositionRejection =
+  | 'invalid-distance'
+  | 'distance-ahead-of-rider'
+  | 'invalid-latitude'
+  | 'invalid-longitude'
+  | 'invalid-altitude';
+
+/** The raw position as a sensor published it: shape-checked only. */
+export interface ObservedPosition {
+  readonly distance: number;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly altitude?: number;
+}
+
+export type PositionValidation =
+  | { readonly valid: true; readonly position: WorldPosition }
+  | { readonly valid: false; readonly reason: PositionRejection };
+
+/**
+ * Whether an observed position can become the rider's: at or behind the rider (`odometer`, 0
+ * between rides) like a terrain window, on the earth, and with a finite altitude if it has one.
+ */
+export function validatePosition(
+  position: ObservedPosition,
+  { odometer }: { readonly odometer: number },
+): PositionValidation {
+  const reject = (reason: PositionRejection) => ({ valid: false, reason }) as const;
+  const { distance, latitude, longitude, altitude } = position;
+  if (!(Number.isFinite(distance) && distance >= 0)) {
+    return reject('invalid-distance');
+  }
+  if (distance > odometer) {
+    return reject('distance-ahead-of-rider');
+  }
+  if (!(Number.isFinite(latitude) && Math.abs(latitude) <= 90)) {
+    return reject('invalid-latitude');
+  }
+  if (!(Number.isFinite(longitude) && Math.abs(longitude) <= 180)) {
+    return reject('invalid-longitude');
+  }
+  if (altitude !== undefined && !Number.isFinite(altitude)) {
+    return reject('invalid-altitude');
+  }
+  return { valid: true, position: position as WorldPosition };
 }

@@ -67,3 +67,40 @@ export const uiTerrainObservedEvent = defineEvent(
     samples: z.array(z.object({ gradient: z.number(), surface: z.string().optional() })),
   }),
 );
+
+/**
+ * Where the rider is on the earth at the physics odometer reading `distance`: WGS 84 degrees and
+ * metres above sea level. A world that knows the real place of its route tells it; a ride without
+ * one has no position. Recorded as an input and exported to the activity file.
+ */
+export interface WorldPosition {
+  /** m, the physics odometer reading the position belongs to. */
+  readonly distance: number;
+  /** Degrees north, -90 … 90. */
+  readonly latitude: number;
+  /** Degrees east, -180 … 180. */
+  readonly longitude: number;
+  /** m above sea level; absent when the world does not know it. */
+  readonly altitude?: number;
+}
+
+export const worldPositionSchema: z.ZodType<WorldPosition> = z.object({
+  distance: z.number().nonnegative(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  altitude: z.number().optional(),
+});
+
+/** The rider's position, accepted by a world driver as an external input. */
+export const worldPositionEvent = defineEvent('world.position', worldPositionSchema);
+
+/** Where a UI landscape shows the rider, raw: checked only for its shape, like the terrain. */
+export const uiPositionObservedEvent = defineEvent(
+  'ui.position-observed',
+  z.object({
+    distance: z.number(),
+    latitude: z.number(),
+    longitude: z.number(),
+    altitude: z.number().optional(),
+  }),
+);
