@@ -8,6 +8,7 @@ import {
   configSnapshotCapability,
   drivetrainVirtualGearCapability,
   measurementPowerEvent,
+  metricCadenceCapability,
   metricPowerCapability,
   type PhysicsState,
   type PluginContext,
@@ -121,7 +122,7 @@ function recordingContext(id: string) {
 }
 
 describe('physics contributors', () => {
-  it.each(CONTRIBUTORS.filter((id) => id !== 'physics-bicycle'))(
+  it.each(CONTRIBUTORS.filter((id) => id !== 'physics-bicycle' && id !== 'physics-virtual-speed'))(
     '%s publishes nothing and listens to nothing',
     async (id) => {
       const definition = await definitionOf(id);
@@ -139,6 +140,16 @@ describe('physics contributors', () => {
     await definition.initialize?.(ctx);
     await definition.start?.(ctx);
     expect(used).toEqual(['subscribe activity.equipment']);
+  });
+
+  // A ride with a world stands still until the world's first window: the ride's world, from a
+  // lifecycle event.
+  it('physics-virtual-speed publishes nothing and listens only to the ride lifecycle', async () => {
+    const definition = await definitionOf('physics-virtual-speed');
+    const { ctx, used } = recordingContext('physics-virtual-speed');
+    await definition.initialize?.(ctx);
+    await definition.start?.(ctx);
+    expect(used).toEqual(['subscribe activity.state-changed']);
   });
 });
 
@@ -213,6 +224,7 @@ describe('physics engine on the real host', () => {
       logger: createSilentLogger(),
       capabilities: [
         metricPowerCapability,
+        metricCadenceCapability,
         physicsBicycleCapability,
         physicsRiderCapability,
         physicsEnvironmentCapability,

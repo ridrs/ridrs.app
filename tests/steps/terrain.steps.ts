@@ -40,13 +40,22 @@ async function addMockWorld(
   world: RidrsWorld,
   probeId: string,
   window: Omit<TerrainPreview, 'revision'>,
+  delayMs = 0,
 ): Promise<void> {
   world.getBehavior(probeId).onStart.push((ctx) => {
     let revision = 0;
+    const feed = () => {
+      revision += 1;
+      ctx.inputs.accept(worldTerrainPreviewEvent, { revision, ...window });
+    };
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-      if (payload.state === 'running') {
-        revision += 1;
-        ctx.inputs.accept(worldTerrainPreviewEvent, { revision, ...window });
+      if (payload.state === 'running' && payload.resumedAt === undefined) {
+        if (delayMs === 0) {
+          feed();
+        } else {
+          // A world that loads first, like a video route: its first window comes later.
+          ctx.clock.scheduleAt(payload.startedAt + delayMs, feed);
+        }
       }
     });
   });
@@ -75,6 +84,18 @@ Given(
       this,
       probeId,
       sampled(WHOLE_RIDE, () => percent / 100),
+    );
+  },
+);
+
+Given(
+  'a mock world {string} feeds the terrain ahead with a constant gradient of {float} % {float} s after the ride starts',
+  async function (this: RidrsWorld, probeId: string, percent: number, seconds: number) {
+    await addMockWorld(
+      this,
+      probeId,
+      sampled(WHOLE_RIDE, () => percent / 100),
+      seconds * 1000,
     );
   },
 );

@@ -81,6 +81,7 @@ SI units everywhere. Resistance forces are signed along the direction of travel:
 | Valid gradient | finite and within ±0.30 | `physics-virtual-speed` (`VIRTUAL_SPEED_DEFAULTS`), and `world-driver-ui` before a window becomes an input |
 | Powertrain efficiency η | 1.0 | `physics-powertrain` (`POWERTRAIN_DEFAULTS`) |
 | Minimum drive speed `v_min` | 1 m/s | `physics-virtual-speed` (`VIRTUAL_SPEED_DEFAULTS`) |
+| Start threshold | 30 W or 20 rpm | `physics-virtual-speed` (`VIRTUAL_SPEED_DEFAULTS`) |
 
 There is no configuration, persistence or settings UI.
 
@@ -114,7 +115,8 @@ There is no configuration, persistence or settings UI.
 - **Writing a world:** see [world-plugins.md](world-plugins.md).
 - **Demo landscape.** Until routes exist, `ui-landscape-demo` owns a fixed landscape by ride distance: 2 km flat, 1 km at 5 %, 500 m flat, 1 km at −5 %, then flat; asphalt and gravel alternating every 500 m. The course is piecewise constant (a segment starts exactly at its `from`); the windows sample it every metre on a fixed grid (from the whole metre at or before the presented position), so the physics sees each boundary as a 1 m ramp: from 1999 to 2000 m the gradient goes from 0 to 5 %. Physics tests replace the landscape with mock worlds that feed the same inputs.
 - **Uphill with power:** the speed settles where drive equals resistance, about 14.9 km/h at 200 W on 5 % (34.2 km/h on the flat, 32.2 km/h on flat gravel).
-- **Downhill without power:** at standstill gravity is negative and rolling resistance 0, so the rider starts rolling; drag and rolling resistance bound the speed (about 50.3 km/h at −5 %). With 200 W it reaches about 57.9 km/h.
+- **Ride start:** a ride with a world (`world` in the running state, e.g. a video route) holds the rider at rest until that world's first terrain window of the ride arrives - a window left from an earlier ride (same source, no higher revision) does not count; a free ride needs no window. Then the rider stays at rest until pedalling starts: rider power ≥ 30 W or cadence ≥ 20 rpm (`startPower`, `startCadence`; cadence when `metric.cadence` is installed, optional). From then on the ride rolls, pedalling or not; the latch resets with each ride.
+- **Downhill without power:** once the ride rolls, at standstill gravity is negative and rolling resistance 0, so the rider rolls on; drag and rolling resistance bound the speed (about 50.3 km/h at −5 %). With 200 W it reaches about 57.9 km/h. Before the first pedal stroke the rider waits at the top.
 - **Uphill without power:** the net force is negative and the clamp keeps the speed at 0. The rider comes to rest and stays there. Known simplification ("brakes held"): no reverse motion, no rolling back.
 
 ## Boundary to the temporal data layer

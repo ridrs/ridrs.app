@@ -3,11 +3,28 @@
 /**
  * Below `minimumDriveSpeed` the drive force is bounded: 200 W at standstill push with 200 N.
  * A road sample is valid while its gradient is finite and within ±`maximumGradient` (±30 %).
+ * A ride starts rolling once the rider pedals: at least `startPower` W or `startCadence` rpm.
  */
-export const VIRTUAL_SPEED_DEFAULTS = Object.freeze({ minimumDriveSpeed: 1, maximumGradient: 0.3 });
+export const VIRTUAL_SPEED_DEFAULTS = Object.freeze({
+  minimumDriveSpeed: 1,
+  maximumGradient: 0.3,
+  startPower: 30,
+  startCadence: 20,
+});
 
 export function isValidGradient(gradient: number): boolean {
   return Number.isFinite(gradient) && Math.abs(gradient) <= VIRTUAL_SPEED_DEFAULTS.maximumGradient;
+}
+
+/**
+ * Whether the rider pedals significantly: enough power or enough cadence, whichever is measured.
+ * Missing values count as no activity.
+ */
+export function isPedalling(power: number | undefined, cadence: number | undefined): boolean {
+  return (
+    (power ?? 0) >= VIRTUAL_SPEED_DEFAULTS.startPower ||
+    (cadence ?? 0) >= VIRTUAL_SPEED_DEFAULTS.startCadence
+  );
 }
 
 export interface IntegratorStep {

@@ -20,13 +20,44 @@ Feature: Same power, different speed on a gradient
       | 5        | 14.90 |
       | -5       | 57.48 |
 
-  Scenario: Rolling down without pedalling
+  Scenario: On a descent the rider waits at rest until pedalling starts
     Given a mock world "test-road" feeds the terrain ahead with a constant gradient of -5 % when the ride starts
     And the host has started
     And "test-ui" published "activity.start-requested"
     When 60 s pass
+    Then the virtual speed at "+10 s" is 0.00 km/h
+    And the virtual speed at "+60 s" is 0.00 km/h
+    And the virtual distance at "+60 s" is 0.00 m
+
+  Scenario: A few pedal strokes start the roll down
+    Given a mock world "test-road" feeds the terrain ahead with a constant gradient of -5 % when the ride starts
+    And the host has started
+    And "test-ui" published "activity.start-requested"
+    When "test-device" delivers only power 200 W every 0.25 s for 2 seconds
+    And 58 seconds pass
+    Then the virtual speed at "+10 s" is 26.96 km/h
+    And the virtual speed at "+60 s" is 49.13 km/h
+
+  Scenario: Cadence alone starts the roll down
+    Given a mock world "test-road" feeds the terrain ahead with a constant gradient of -5 % when the ride starts
+    And the host has started
+    And "test-ui" published "activity.start-requested"
+    When "test-device" delivers only cadence 60 rpm every 0.25 s for 2 seconds
+    And 58 seconds pass
     Then the virtual speed at "+10 s" is 15.69 km/h
-    And the virtual speed at "+60 s" is 48.27 km/h
+
+  Scenario Outline: Too little activity keeps the rider at rest on a descent: <power> W, <cadence> rpm
+    Given a mock world "test-road" feeds the terrain ahead with a constant gradient of -5 % when the ride starts
+    And the host has started
+    And "test-ui" published "activity.start-requested"
+    When "test-device" delivers power <power> W and cadence <cadence> rpm every 0.25 s for 10 seconds
+    Then the virtual speed at "+10 s" is 0.00 km/h
+    And the virtual distance at "+10 s" is 0.00 m
+
+    Examples:
+      | power | cadence |
+      | 0     | 0       |
+      | 29    | 19      |
 
   Scenario: Without pedalling on a climb the rider stays at rest
     Given a mock world "test-road" feeds the terrain ahead with a constant gradient of 5 % when the ride starts
