@@ -22,8 +22,8 @@ export const hostPermissionSchema = z.enum(['observe-host']);
 
 export type HostPermission = z.infer<typeof hostPermissionSchema>;
 
-/** Settings scopes a plugin may keep documents in (ADR 0054). */
-export const persistenceScopeSchema = z.enum(['machine']);
+/** Settings scopes a plugin may keep documents in (ADR 0054, `user` since ADR 0059). */
+export const persistenceScopeSchema = z.enum(['machine', 'user']);
 
 /**
  * Plugin types on the input side that may keep settings: what they read only decides which

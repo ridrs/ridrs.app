@@ -26,7 +26,8 @@ export const SURFACE_ROLLING_FACTORS: Readonly<Record<TerrainSurface, number>> =
 });
 
 /** Where a parameter value comes from. There is no configuration yet, so everything is a default. */
-export type PhysicsParameterOrigin = 'default';
+/** `equipment`: from the bicycle frozen for the ride (ADR 0060). */
+export type PhysicsParameterOrigin = 'default' | 'equipment';
 
 export interface PhysicsParameter {
   readonly value: number;

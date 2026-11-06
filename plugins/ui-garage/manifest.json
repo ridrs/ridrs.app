@@ -1,0 +1,40 @@
+{
+  "id": "ui-garage",
+  "name": "Garage",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "garage",
+        "export": "GarageScreen"
+      }
+    ],
+    "contributions": [
+      {
+        "id": "menu-item",
+        "extensionPoint": "menu/item",
+        "export": "GarageMenuEntry",
+        "order": 50
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "equipment.bicycle-changed",
+        "activity.state-changed"
+      ],
+      "publish": [
+        "equipment.bicycle-changed"
+      ]
+    }
+  }
+}

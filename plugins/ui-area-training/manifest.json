@@ -1,0 +1,35 @@
+{
+  "id": "ui-area-training",
+  "name": "Training Area",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "training",
+        "export": "TrainingArea"
+      }
+    ],
+    "contributions": [
+      {
+        "id": "menu-item",
+        "extensionPoint": "menu/item",
+        "export": "TrainingMenuEntry",
+        "order": 20
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": []
+    }
+  }
+}

@@ -8,26 +8,15 @@ import type { RowKind } from './devices.ts';
  * Animations and pseudo elements need a style sheet; class names carry the plugin's prefix.
  */
 const CSS = `
-.rd-indicator { display: flex; align-items: center; gap: 14px; margin: 0 auto; padding: 10px 16px;
-  border: 1.5px solid #1f3447; border-radius: 999px; background: #0a1520; color: #fff;
-  font: italic 500 14px system-ui, sans-serif; }
-.rd-indicator::after { content: '›'; color: #8b9db2; font-style: normal; }
-.rd-indicator:hover { border-color: #27c8ff; }
 .rd-row:hover, .rd-back:hover, .rd-continue:hover { border-color: #27c8ff !important; }
 .rd-line:hover { background: #27c8ff14 !important; }
-.rd-row:focus-visible,.rd-indicator:focus-visible, .rd-back:focus-visible,
+.rd-row:focus-visible, .rd-back:focus-visible,
 .rd-continue:focus-visible { outline: 2px solid #8dff2a; outline-offset: 2px; }
-.rd-dot { display: inline-flex; align-items: center; gap: 6px; color: #8b9db2; font-style: normal; }
-.rd-dot i { width: 10px; height: 10px; border-radius: 50%; background: #8b9db2; }
-.rd-dot.ok i { background: #8dff2a; box-shadow: 0 0 8px #8dff2a; }
-.rd-dot.busy i { background: #27c8ff; animation: rd-pulse 1s infinite; }
-.rd-dot.warn i { background: #ffb62e; }
 .rd-spin { display: inline-block; flex: none; vertical-align: middle;
   width: 16px; height: 16px; border-radius: 50%; border: 2px solid #27c8ff40;
   border-top-color: #27c8ff; animation: rd-spin 1s linear infinite; }
-@keyframes rd-pulse { 50% { opacity: .3; } }
 @keyframes rd-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .rd-dot.busy i, .rd-spin { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rd-spin { animation: none; } }
 `;
 
 export function DeviceStyles() {

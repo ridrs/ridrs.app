@@ -99,6 +99,18 @@ export {
   type RidrsErrorCode,
 } from './diagnostics.ts';
 export {
+  type ActivityEquipmentPayload,
+  activityEquipmentEvent,
+  type Bicycle,
+  bicycleSchema,
+  type Drivetrain,
+  drivetrainSchema,
+  type EquipmentBicycleChangedPayload,
+  equipmentBicycleChangedEvent,
+  type ShiftMode,
+  shiftModeSchema,
+} from './equipment.ts';
+export {
   type ControllerButton,
   type ControllerButtonsChangedPayload,
   controllerButtonSchema,

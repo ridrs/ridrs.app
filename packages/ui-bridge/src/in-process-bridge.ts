@@ -105,6 +105,8 @@ export function createInProcessUiBridge(
 
     now: () => host.now(),
 
+    settings: (pluginId) => host.getClientSettings(pluginId),
+
     dispose(): void {
       for (const subscription of busSubscriptions.splice(0)) {
         subscription.unsubscribe();

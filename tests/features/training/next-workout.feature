@@ -10,7 +10,7 @@ Feature: The next planned workout on the main screen
   Here intervals.icu, the browser and the secret store are simulated.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And the secret store holds a token for intervals.icu
     And the local time is "2026-11-04 08:00"
@@ -56,7 +56,7 @@ Feature: The next planned workout on the main screen
       | 2026-11-05 | Run  | Easy Run | 40m      | 30   |
     When the host has started
     And the ridrs UI is shown
-    Then the main panel shows "No workout planned"
+    Then the training tile shows "No workout planned"
 
   Scenario: A workout with steps shows its power profile
     Given intervals.icu plans "Sweet Spot 3x12" on "2026-11-04" with the steps:
@@ -142,4 +142,4 @@ Feature: The next planned workout on the main screen
     When the ridrs UI is shown
     Then the next workout card shows:
       | name | Tempo 40 |
-    And the main panel shows "Offline"
+    And the training tile shows "Offline"

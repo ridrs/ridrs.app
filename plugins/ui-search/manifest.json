@@ -1,0 +1,34 @@
+{
+  "id": "ui-search",
+  "name": "Search",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "search",
+        "export": "SearchScreen"
+      }
+    ],
+    "contributions": [
+      {
+        "id": "search",
+        "extensionPoint": "main/action",
+        "export": "SearchAction"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": []
+    }
+  }
+}

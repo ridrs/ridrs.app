@@ -1,0 +1,32 @@
+{
+  "id": "ui-tile-ride-start",
+  "name": "Ride Start Tile",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "ride-start",
+        "extensionPoint": "main/tile",
+        "export": "RideStartTile"
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "recording.completed",
+        "recording.failed",
+        "export.fit-written",
+        "equipment.bicycle-changed"
+      ],
+      "publish": [
+        "activity.start-requested"
+      ]
+    }
+  }
+}

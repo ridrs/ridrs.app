@@ -11,6 +11,7 @@ import {
   type Diagnostic,
   definePlugin,
   deviceConnectionChangedEvent,
+  equipmentBicycleChangedEvent,
   type EventEnvelope,
   type HostDescription,
   type PhysicsState,
@@ -88,6 +89,8 @@ interface Recorder {
   buffer: Buffered[];
   /** The latest connection state per device that fell out of the pre-roll window. */
   readonly connections: Map<string, Buffered>;
+  /** The latest bicycle that fell out of the pre-roll window: the next ride freezes it (ADR 0060). */
+  bicycle?: Buffered;
   ride?: Ride;
   /** The interrupted ride on offer (ADR 0057): continued by the composition root or finished. */
   offered?: { readonly openPath: string };
@@ -108,7 +111,10 @@ function reason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Drops buffered events older than `from`, keeping the latest connection state per device. */
+/**
+ * Drops buffered events older than `from`, keeping the latest connection state per device and the
+ * latest bicycle.
+ */
 function prune(recorder: Recorder, from: number): void {
   let drop = 0;
   for (const item of recorder.buffer) {
@@ -119,6 +125,8 @@ function prune(recorder: Recorder, from: number): void {
       const payload = (JSON.parse(item.envelope.json) as { payload: DeviceConnectionChangedPayload })
         .payload;
       recorder.connections.set(payload.deviceId, item);
+    } else if (item.envelope.type === equipmentBicycleChangedEvent.id) {
+      recorder.bicycle = item;
     }
     drop += 1;
   }
@@ -200,7 +208,9 @@ function startRide(
     }
   }
   const preroll = [
-    ...[...recorder.connections.values()].sort((a, b) => a.index - b.index),
+    ...[...recorder.connections.values(), ...(recorder.bicycle ? [recorder.bicycle] : [])].sort(
+      (a, b) => a.index - b.index,
+    ),
     ...recorder.buffer.slice(0, split),
   ];
   const live = recorder.buffer.slice(split);

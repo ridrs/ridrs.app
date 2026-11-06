@@ -3,10 +3,11 @@
 import type { z } from 'zod';
 
 /**
- * Where a plugin's settings belong (ADR 0054). Only `machine` today: configuration of this
- * installation (devices, links), never synchronized. User settings come with their use case.
+ * Where a plugin's settings belong (ADR 0054). `machine`: configuration of this installation
+ * (devices, links), never synchronized. `user` (ADR 0059): the rider's preferences and choices
+ * (favourites, the calendar, settings), on this machine until the athlete profile (P7).
  */
-export type PersistenceScope = 'machine';
+export type PersistenceScope = 'machine' | 'user';
 
 /** A versioned settings document a plugin owns; its name is unique within the plugin. */
 export interface SettingsDocument<T> {
@@ -34,4 +35,6 @@ export interface ScopedSettings<T> {
 export interface PluginSettingsContext {
   /** Throws `permission-denied` without `"persistence": ["machine"]` in the manifest. */
   machine<T>(document: SettingsDocument<T>): ScopedSettings<T>;
+  /** Throws `permission-denied` without `"persistence": ["user"]` in the manifest. */
+  user<T>(document: SettingsDocument<T>): ScopedSettings<T>;
 }

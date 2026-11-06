@@ -1,0 +1,113 @@
+{
+  "id": "shimano-di2-2x12-50-34-11-34",
+  "name": "Shimano Di2 2 × 12, 50-34 / 11-34",
+  "examples": [
+    "Ultegra Di2 (FC-R8100 50-34, CS-R8100-12 11-34)",
+    "105 Di2 (FC-R7100 50-34, CS-R7101 11-34)"
+  ],
+  "drivetrain": {
+    "speeds": {
+      "front": 2,
+      "rear": 12
+    },
+    "chainrings": {
+      "order": "gear 1 first: the smallest chainring, as Shimano numbers the front gears",
+      "teeth": [
+        34,
+        50
+      ]
+    },
+    "cassette": {
+      "order": "gear 1 first: the largest sprocket, as Shimano numbers the rear gears",
+      "teeth": [
+        34,
+        30,
+        27,
+        24,
+        21,
+        19,
+        17,
+        15,
+        14,
+        13,
+        12,
+        11
+      ]
+    }
+  },
+  "shifting": {
+    "system": "di2",
+    "shifters": {
+      "left": "front derailleur in manual mode; in synchro modes it stays on the front by default (one forum report; can be remapped in E-TUBE)",
+      "right": "rear derailleur"
+    },
+    "modes": {
+      "manual": "Each shifter moves its own derailleur; nothing shifts by itself.",
+      "semi-synchro": "Shift mode S1 by default. The rider shifts the front; the rear derailleur shifts by itself by the compensation, so the gear does not jump.",
+      "full-synchro": "Shift mode S2 by default. The rider shifts the rear only; at the shift points the front derailleur shifts by itself and the rear compensates."
+    },
+    "defaultMode": "manual",
+    "semiSynchro": {
+      "rearCompensation": {
+        "sprockets": 2,
+        "whenFrontShiftsToLarge": "rear shifts 2 sprockets easier (larger)",
+        "whenFrontShiftsToSmall": "rear shifts 2 sprockets harder (smaller)",
+        "range": [
+          1,
+          3
+        ],
+        "evidence": "default 2: rund-ums-rad.info (50-34 test bike), a Weight Weenies post ('default is 2'), bettershifting; range 1-3 per rund-ums-rad.info, up to 4 per bettershifting"
+      }
+    },
+    "fullSynchro": {
+      "shiftPoints": {
+        "toLargeChainring": {
+          "onChainring": 1,
+          "fromRearGear": 7,
+          "shift": "harder",
+          "toRearGear": 5
+        },
+        "toSmallChainring": {
+          "onChainring": 2,
+          "fromRearGear": 2,
+          "shift": "easier",
+          "toRearGear": 4
+        }
+      },
+      "resultFor50-34/11-34": {
+        "toLargeChainring": "34 x 17 (2.00) -> 50 x 21 (2.38)",
+        "toSmallChainring": "50 x 30 (1.67) -> 34 x 24 (1.42)"
+      },
+      "evidence": "Shimano dealer's manual DM-RARD010-03 (text excerpt via search): the front switches when the rear is at 7th gear on the small ring and at 2nd gear on the large ring, counted from the largest sprocket. rund-ums-rad.info measured the default on 50-34 / 11-28 (11-speed): 2.27 -> 2.63 (34x15 -> 50x19) and 2.0 -> 1.62 (50x25 -> 34x21), which are exactly these gear positions with 2 sprockets of compensation. Not confirmed for 12-speed: applied here by gear position."
+    },
+    "unconfirmed": [
+      "fullSynchro.shiftPoints: the gear positions are the 11-speed default (DM-RARD010-03, measured by rund-ums-rad.info); that 12-speed R8100/R7100 uses the same positions is not confirmed",
+      "semiSynchro range: 1-3 or up to 4",
+      "the left shifter's default in full synchro (one forum report: still the front derailleur)",
+      "multiple shift defaults (start delay, interval, maximum)",
+      "no blocked combinations on 12-speed (one guide)"
+    ],
+    "multipleShift": {
+      "holdingShifts": "several gears while the button is held",
+      "settings": "start delay, interval and maximum number of gears in E-TUBE",
+      "defaults": null,
+      "evidence": "ctyeh.com guide (settings exist, recommends 300-500 ms and 3-4 gears, not Shimano's defaults); rund-ums-rad.info (keeps shifting while held, at most 3 steps)"
+    },
+    "blockedCombinations": {
+      "combinations": [],
+      "evidence": "bettershifting: Gear Position Control is not enabled on 12-speed Ultegra/105 Di2 rear derailleurs, so the smallest sprockets can be used on the small ring; the 'no 11/12 on 34' lock reported for older 11-speed systems does not apply"
+    }
+  },
+  "sources": [
+    "https://www.sjscycles.co.uk/cassettes/shimano-ultegra-csr8100-12-speed-cassette-1134t",
+    "https://morebikes.ca/products/shimano-cassette-sprocket-cs-r8100-ultegra-12-speed-11-12-13-14-15-17-19-21-24-27-30-34t",
+    "https://si.shimano.com/en/pdfs/dm/RARD010/DM-RARD010-03-ENG.pdf",
+    "https://www.rund-ums-rad.info/shimano-di2-synchronized-shift-selbst-einstellen/",
+    "https://www.rennrad-news.de/forum/threads/di2-schaltmodus-nutzt-jemand-synchro-shift.183236/",
+    "https://weightweenies.starbike.com/forum/viewtopic.php?t=149349",
+    "https://bettershifting.com/di2-synchronized-shifting-the-complete-guide/",
+    "https://bettershifting.com/di2-cant-shift-to-smallest-cogs-in-small-ring-adjust-gpc/",
+    "https://ctyeh.com/articles/656?lang=en",
+    "https://forum.slowtwitch.com/t/di2-12-speed-ultegra-manual-shift-question/830038"
+  ]
+}

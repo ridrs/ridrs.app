@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { setWorldConstructor, World } from '@cucumber/cucumber';
 import type { BridgeSession } from '@ridrs/ble-bridge';
 import {
+  activityEquipmentEvent,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
   activityPauseRequestedEvent,
@@ -49,6 +50,7 @@ import {
   type EventDefinition,
   type EventEnvelope,
   type EventSubscription,
+  equipmentBicycleChangedEvent,
   exportFitWrittenEvent,
   type Freshness,
   measurementCadenceEvent,
@@ -205,6 +207,8 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   deviceRawWriteFailedEvent,
   drivetrainGearChangedEvent,
   drivetrainShiftRequestedEvent,
+  equipmentBicycleChangedEvent,
+  activityEquipmentEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
@@ -237,6 +241,8 @@ const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   deviceRawWriteFailedEvent,
   drivetrainGearChangedEvent,
   drivetrainShiftRequestedEvent,
+  equipmentBicycleChangedEvent,
+  activityEquipmentEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,

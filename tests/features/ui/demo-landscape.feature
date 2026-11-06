@@ -7,7 +7,7 @@ Feature: The demo landscape draws the road it reports
   scenario need not ride that far.
 
   Background:
-    Given the ridrs plugins "activity-session, world-driver-ui, spatial-terrain, ui-main-screen, ui-activity-screen, ui-landscape-demo" together with a probe plugin "test-physics" that reads the spatial series "spatial.terrain"
+    Given the ridrs plugins "activity-session, world-driver-ui, spatial-terrain, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo" together with a probe plugin "test-physics" that reads the spatial series "spatial.terrain"
     And the host has started
     And the ridrs UI is shown
     And I press "Start ride"

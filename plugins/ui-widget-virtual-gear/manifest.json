@@ -11,9 +11,8 @@
     "contributions": [
       {
         "id": "virtual-gear",
-        "extensionPoint": "hud/widget",
-        "export": "VirtualGearWidget",
-        "order": 7
+        "extensionPoint": "hud/erg-off",
+        "export": "VirtualGearWidget"
       }
     ],
     "events": {

@@ -15,8 +15,10 @@ export const COLORS = {
 } as const;
 
 const CSS = `
-.rt-panel { display: flex; flex-direction: column; align-items: center; gap: 10px;
-  font: 500 14px system-ui, sans-serif; color: #fff; }
+.rt-panel { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; height: 100%;
+  padding: 20px; border: 1px solid var(--ridrs-line, ${COLORS.line}); border-radius: var(--ridrs-radius, 16px);
+  background: var(--ridrs-surface, ${COLORS.panel}); font: 500 14px system-ui, sans-serif;
+  color: var(--ridrs-text, #fff); }
 .rt-caption { display: inline-flex; align-items: center; gap: 8px; color: ${COLORS.muted}; font-size: 13px; }
 .rt-hint { color: ${COLORS.muted}; font-size: 13px; }
 .rt-warn { color: ${COLORS.amber}; }
@@ -25,7 +27,7 @@ const CSS = `
   background: ${COLORS.panel}; color: #fff; font: 600 15px system-ui, sans-serif; cursor: pointer; }
 .rt-quiet { color: ${COLORS.muted}; }
 .rt-card { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 4px 14px;
-  width: 360px; padding: 14px 18px; border: 1.5px solid ${COLORS.line}; border-radius: 16px;
+  width: 100%; padding: 14px 18px; border: 1.5px solid ${COLORS.line}; border-radius: 16px;
   background: ${COLORS.panel}; color: #fff; text-align: left; font: 500 14px system-ui, sans-serif;
   cursor: pointer; }
 .rt-card .rt-day { color: ${COLORS.cyan}; font-weight: 700; text-transform: uppercase; font-size: 12px;

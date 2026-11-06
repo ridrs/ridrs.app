@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export type {
+  OutletOptions,
+  SlotOptions,
   UiBridge,
   UiComponent,
   UiContext,

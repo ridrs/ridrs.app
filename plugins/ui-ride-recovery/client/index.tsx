@@ -11,8 +11,9 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const CSS = `
-.rr-card { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 360px;
-  padding: 14px 18px; border: 1.5px solid #ffb62e; border-radius: 16px; background: #0a1520;
+.rr-card { display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  padding: 18px 24px; border: 1.5px solid var(--ridrs-warn, #ffb62e); border-radius: var(--ridrs-radius, 16px);
+  background: var(--ridrs-surface, #0a1520);
   color: #fff; font: 500 14px system-ui, sans-serif; }
 .rr-title { font-size: 18px; font-weight: 700; }
 .rr-facts { color: #8b9db2; }

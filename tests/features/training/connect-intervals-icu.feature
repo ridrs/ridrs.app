@@ -9,14 +9,14 @@ Feature: Connecting intervals.icu
   port 53682.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And the local time is "2026-11-04 08:00"
 
   Scenario: Without an account the main screen offers to connect
     Given the host has started
     And the ridrs UI is shown
-    Then the main panel offers a "Connect intervals.icu" button
+    Then the training tile offers a "Connect intervals.icu" button
     And no request reached intervals.icu
 
   Scenario: Connecting signs in with PKCE as a public client
@@ -29,19 +29,19 @@ Feature: Connecting intervals.icu
       | code_challenge_method | S256                                  |
       | redirect_uri          | http://127.0.0.1:53682/oauth/callback |
     And the sign-in asked for a code challenge and a state
-    And the main panel shows "Connecting to intervals.icu…"
+    And the training tile shows "Connecting to intervals.icu…"
     When the athlete approves the sign-in
     Then the code was exchanged with the verifier of the challenge and without a client secret
     And the secret store holds the intervals.icu token
-    And the main panel shows "Connected as Alex Rider"
+    And the training tile shows "Connected as Alex Rider"
 
   Scenario: Declining the sign-in leaves the rider disconnected
     Given the host has started
     And the ridrs UI is shown
     When I press "Connect intervals.icu"
     And the athlete declines the sign-in
-    Then the main panel shows "Sign-in cancelled"
-    And the main panel offers a "Connect intervals.icu" button
+    Then the training tile shows "Sign-in cancelled"
+    And the training tile offers a "Connect intervals.icu" button
     And the secret store holds no intervals.icu token
 
   Scenario: An answer with a different state is rejected
@@ -50,7 +50,7 @@ Feature: Connecting intervals.icu
     When I press "Connect intervals.icu"
     And the browser returns a code with a different state
     Then no code was exchanged
-    And the main panel shows "Sign-in failed"
+    And the training tile shows "Sign-in failed"
     And the secret store holds no intervals.icu token
 
   Scenario: The token stays secret
@@ -65,7 +65,7 @@ Feature: Connecting intervals.icu
     Given the secret store holds a token for intervals.icu
     When the host has started
     And the ridrs UI is shown
-    Then the main panel shows "Connected as Alex Rider"
+    Then the training tile shows "Connected as Alex Rider"
     And the browser was not opened
 
   Scenario: A rejected token asks the rider to reconnect
@@ -73,7 +73,7 @@ Feature: Connecting intervals.icu
     And intervals.icu rejects the token
     When the host has started
     And the ridrs UI is shown
-    Then the main panel offers a "Reconnect intervals.icu" button
+    Then the training tile offers a "Reconnect intervals.icu" button
     And the secret store holds no intervals.icu token
 
   Scenario: Disconnecting revokes the token
@@ -85,4 +85,4 @@ Feature: Connecting intervals.icu
     Then intervals.icu received "DELETE /api/v1/disconnect-app" with the token
     And the secret store holds no intervals.icu token
     And the "main" screen is shown
-    And the main panel offers a "Connect intervals.icu" button
+    And the training tile offers a "Connect intervals.icu" button

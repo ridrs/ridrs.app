@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  activityEquipmentEvent,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
   activityPauseRequestedEvent,
@@ -24,6 +25,7 @@ import {
   drivetrainShiftRequestedEvent,
   drivetrainVirtualGearCapability,
   type EventDefinition,
+  equipmentBicycleChangedEvent,
   exportFitWrittenEvent,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -121,6 +123,8 @@ const EVENTS: readonly EventDefinition[] = [
   deviceRawWriteFailedEvent,
   drivetrainGearChangedEvent,
   drivetrainShiftRequestedEvent,
+  equipmentBicycleChangedEvent,
+  activityEquipmentEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,

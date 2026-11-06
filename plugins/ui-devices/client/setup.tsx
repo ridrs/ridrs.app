@@ -15,6 +15,7 @@ import {
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
+import { takeRequestedDetails } from './details-request.ts';
 import {
   BUTTON_FACES,
   type BridgeStatus,
@@ -1033,9 +1034,10 @@ export function DeviceSetupView({
   /** The companion bridge, when its transport runs. */
   readonly bridge?: BridgeStatus;
 }) {
-  const [open, setOpen] = useState<Open>();
+  // The devices tile may have asked for the details of a kind.
+  const [open, setOpen] = useState<Open | undefined>(takeRequestedDetails);
   // The row whose details were open last gets the focus back when they close.
-  const opened = useRef<Open>(undefined);
+  const opened = useRef<Open | undefined>(open);
   // A thought on the heart, another each time the details open; the UI only, never the ride.
   const [thought, setThought] = useState(0);
   const show = (row: Open) => {

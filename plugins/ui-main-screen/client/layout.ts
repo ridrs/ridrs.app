@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import { uiPathSchema } from '@ridrs/contracts';
+import { z } from 'zod';
+
+/** `<pluginId>/<contributionId>`, the key the shell gives every mounted contribution. */
+const contributionKey = z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'Expected "<pluginId>/<contributionId>"');
+
+const span = z.number().int().min(1).max(12);
+
+/**
+ * Which contribution fills the menu, the top bar, which global actions sit beside the top bar and
+ * which tiles, in which order and how wide, and which screens the content area shows instead of
+ * the tiles, beside the menu and the actions (ADR 0058). The layout is configuration: the screen's
+ * code never names a contribution or another screen.
+ */
+export const layoutSchema = z
+  .strictObject({
+    version: z.literal(1),
+    menu: contributionKey.optional(),
+    topBar: contributionKey.optional(),
+    actions: z.array(contributionKey).default([]),
+    tiles: z.array(
+      z.strictObject({
+        contribution: contributionKey,
+        columns: z.strictObject({ wide: span, medium: span.optional() }),
+      }),
+    ),
+    screens: z.array(uiPathSchema).default([]),
+  })
+  .superRefine(({ tiles, actions, screens }, issues) => {
+    actions.forEach((action, index) => {
+      if (actions.indexOf(action) !== index) {
+        issues.addIssue({
+          code: 'custom',
+          path: ['actions', index],
+          message: `"${action}" is placed twice`,
+        });
+      }
+    });
+    const seen = new Set<string>();
+    tiles.forEach(({ contribution }, index) => {
+      if (seen.has(contribution)) {
+        issues.addIssue({
+          code: 'custom',
+          path: ['tiles', index, 'contribution'],
+          message: `"${contribution}" is placed twice`,
+        });
+      }
+      seen.add(contribution);
+    });
+    screens.forEach((screen, index) => {
+      if (screens.indexOf(screen) !== index) {
+        issues.addIssue({
+          code: 'custom',
+          path: ['screens', index],
+          message: `"${screen}" is named twice`,
+        });
+      }
+    });
+  });
+
+export type Layout = z.infer<typeof layoutSchema>;
+export type Tile = Layout['tiles'][number];
+
+export type Breakpoint = 'wide' | 'medium' | 'compact';
+
+/** The smallest width of each breakpoint, widest first. */
+export const BREAKPOINTS: readonly (readonly [Breakpoint, number])[] = [
+  ['wide', 1200],
+  ['medium', 768],
+  ['compact', 0],
+];
+
+export function breakpointAt(width: number): Breakpoint {
+  return BREAKPOINTS.find(([, from]) => width >= from)?.[0] ?? 'compact';
+}
+
+/** The columns of 12 a tile spans: compact stacks every tile, medium falls back to wide. */
+export function columnsAt(tile: Tile, breakpoint: Breakpoint): number {
+  if (breakpoint === 'compact') {
+    return 12;
+  }
+  return breakpoint === 'medium' ? (tile.columns.medium ?? tile.columns.wide) : tile.columns.wide;
+}

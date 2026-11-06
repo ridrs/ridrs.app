@@ -45,7 +45,7 @@ Feature: Start a ride and see power and cadence
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
-    And I open the device indicator
+    And I open the device setup from the main screen
     And I press the platform's back button
     Then the "main" screen is shown
     When I close the ridrs app

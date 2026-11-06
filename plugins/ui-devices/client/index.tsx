@@ -12,9 +12,9 @@ import {
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { BridgeStatus, Readings } from './devices.ts';
-import { DeviceIndicatorView } from './indicator.tsx';
+import { type BridgeStatus, describeDevices, type Readings } from './devices.ts';
 import { DeviceSetupView } from './setup.tsx';
+import { DevicesTileView, overall } from './tile.tsx';
 
 /**
  * The latest device status; the bridge replays it to every component that mounts later. A layout
@@ -72,8 +72,34 @@ function useBridge(ctx: UiContext): BridgeStatus | undefined {
   return bridge;
 }
 
-function Indicator({ ctx }: { readonly ctx: UiContext }) {
-  return <DeviceIndicatorView ctx={ctx} devices={useDevices(ctx)} />;
+function Tile({ ctx }: { readonly ctx: UiContext }) {
+  return <DevicesTileView ctx={ctx} devices={useDevices(ctx)} />;
+}
+
+/** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
+const BLUETOOTH = new URL('./assets/icons/bluetooth.svg', import.meta.url).href;
+
+/**
+ * The device status among the global actions (`main/action`, ADR 0059): opens the device setup,
+ * its dot in the tone of the device that needs the rider most.
+ */
+function StatusAction({ ctx }: { readonly ctx: UiContext }) {
+  const [shown, setShown] = useState<string>();
+  useEffect(() => ctx.onNavigated(setShown), [ctx]);
+  const devices = useDevices(ctx);
+  const tone = devices.length === 0 ? 'none' : overall(describeDevices(devices).filter((row) => row !== undefined));
+  return (
+    <button
+      type="button"
+      data-action
+      aria-label="Devices"
+      aria-current={shown === 'setup' ? 'page' : undefined}
+      onClick={() => ctx.navigate('setup')}
+    >
+      <span data-action-icon aria-hidden="true" style={{ '--icon': `url("${BLUETOOTH}")` } as object} />
+      <span data-action-tone={tone} aria-hidden="true" />
+    </button>
+  );
 }
 
 function Setup({ ctx }: { readonly ctx: UiContext }) {
@@ -97,9 +123,15 @@ function Setup({ ctx }: { readonly ctx: UiContext }) {
   );
 }
 
-export const DeviceIndicator: UiComponent = (container, ctx) => {
+export const DevicesTile: UiComponent = (container, ctx) => {
   const root = createRoot(container);
-  root.render(<Indicator ctx={ctx} />);
+  root.render(<Tile ctx={ctx} />);
+  return () => root.unmount();
+};
+
+export const DevicesAction: UiComponent = (container, ctx) => {
+  const root = createRoot(container);
+  root.render(<StatusAction ctx={ctx} />);
   return () => root.unmount();
 };
 

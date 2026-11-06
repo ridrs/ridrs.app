@@ -38,6 +38,6 @@ Feature: Pedal and see the virtual speed
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
-    Then the slot "hud/widget" contains the contributions "ui-widget-power/power, ui-widget-cadence/cadence, ui-widget-heart-rate/heart-rate, ui-widget-power-heart-rate-ratio/power-heart-rate-ratio, ui-widget-virtual-speed/virtual-speed, ui-widget-virtual-distance/virtual-distance, ui-widget-gradient/gradient, ui-widget-virtual-gear/virtual-gear, ui-widget-target-power/target-power" in this order
+    Then the slot "hud/widget" contains the contributions "ui-widget-power/power, ui-widget-cadence/cadence, ui-widget-heart-rate/heart-rate, ui-widget-power-heart-rate-ratio/power-heart-rate-ratio, ui-widget-virtual-speed/virtual-speed, ui-widget-virtual-distance/virtual-distance, ui-widget-gradient/gradient, ui-widget-erg-dispatch/erg-dispatch, ui-widget-target-power/erg" in this order
     When I close the ridrs app
     Then the app reported no lifecycle problems

@@ -140,23 +140,60 @@ Then(
   },
 );
 
+/** With a bicycle's drivetrain (ADR 0060): the gear as front × rear, the teeth below, no "of 24". */
+Then(
+  'eventually the virtual gear widget shows gear {string} in {string}',
+  EVENTUALLY_STEP,
+  async function (this: RidrsWorld, gear: string, teeth: string) {
+    const element = await widget('virtual-gear');
+    await waitFor(() => {
+      assert.equal(within(element).getByTestId('value').textContent, gear);
+      assert.equal(within(element).getByTestId('teeth').textContent, teeth);
+      assert.equal(within(element).queryByTestId('unit'), null);
+      assert.ok(!element.textContent?.includes(' of '), element.textContent ?? '');
+    }, EVENTUALLY);
+  },
+);
+
 Then('the virtual gear widget shows {string}', async function (this: RidrsWorld, gear: string) {
   const element = await widget('virtual-gear');
   await waitFor(() => assert.equal(within(element).getByTestId('value').textContent, gear));
 });
 
-Then('the ERG button is on at {string}', async function (this: RidrsWorld, target: string) {
-  const element = await widget('target-power');
+Then('the ERG button is on', async function (this: RidrsWorld) {
+  const element = await widget('erg');
   await waitFor(() => {
     assert.equal(element.getAttribute('aria-pressed'), 'true');
-    assert.equal(within(element).getByTestId('value').textContent, target);
+    assert.equal(within(element).getByTestId('value').textContent, 'On');
   });
 });
 
 Then('the ERG button is off', async function (this: RidrsWorld) {
-  const element = await widget('target-power');
+  const element = await widget('erg');
   await waitFor(() => {
     assert.equal(element.getAttribute('aria-pressed'), 'false');
     assert.equal(within(element).getByTestId('value').textContent, 'Off');
   });
+});
+
+Then(
+  'eventually the target power widget shows {string}',
+  EVENTUALLY_STEP,
+  async function (this: RidrsWorld, target: string) {
+    const element = await widget('target-power');
+    await waitFor(
+      () => assert.equal(within(element).getByTestId('value').textContent, target),
+      EVENTUALLY,
+    );
+  },
+);
+
+Then('the target power widget is not shown', async function (this: RidrsWorld) {
+  await this.settle();
+  assert.equal(document.querySelector('[data-testid="widget-target-power"]'), null);
+});
+
+Then('the virtual gear widget is not shown', async function (this: RidrsWorld) {
+  await this.settle();
+  assert.equal(document.querySelector('[data-testid="widget-virtual-gear"]'), null);
 });

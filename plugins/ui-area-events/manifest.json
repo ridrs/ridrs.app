@@ -1,0 +1,40 @@
+{
+  "id": "ui-area-events",
+  "name": "Events Area",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "events",
+        "export": "EventsArea"
+      }
+    ],
+    "contributions": [
+      {
+        "id": "menu-item",
+        "extensionPoint": "menu/item",
+        "export": "EventsMenuEntry",
+        "order": 30
+      },
+      {
+        "id": "next-event",
+        "extensionPoint": "main/tile",
+        "export": "NextEventTile"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": []
+    }
+  }
+}

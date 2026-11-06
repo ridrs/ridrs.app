@@ -24,8 +24,50 @@ function isTextEntry(target: EventTarget | null): boolean {
   );
 }
 
+/** Teeth: the gear of a bicycle's drivetrain (ADR 0060), a pair of focusable values. */
+function Teeth({
+  label,
+  value,
+  onShift,
+}: {
+  readonly label: string;
+  readonly value: number;
+  readonly onShift: (change: 'up' | 'down') => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <span
+      role="spinbutton"
+      tabIndex={0}
+      aria-label={label}
+      aria-valuenow={value}
+      onKeyDown={(event) => {
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+          return;
+        }
+        event.preventDefault();
+        onShift(event.key === 'ArrowUp' ? 'up' : 'down');
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        padding: '0 4px',
+        borderRadius: 8,
+        // The focus is always clearly visible.
+        outline: focused ? '3px solid #ffd60a' : 'none',
+        outlineOffset: 2,
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 /**
- * The virtual gear: "12" of 24; an en dash until a gear source names one. Keyboard first
+ * The virtual gear: "12" of 24; an en dash until a gear source names one. With a bicycle's
+ * drivetrain (ADR 0060) the gear large as its positions, front × rear, "1×1" to "2×12", and the
+ * chainring and the sprocket below, "50 × 17", each focusable: ↑ ↓ on the chainring shift
+ * the front, on the sprocket the rear. Keyboard first
  * (AGENTS.md rule 12): once there is a gear it takes the focus, and ↑ shifts one gear harder and
  * ↓ one easier while it has it (← and → still move the focus); + and - shift anywhere on the
  * screen, except in ERG, where they are the target's. It only asks (`drivetrain.shift-requested`).
@@ -45,6 +87,15 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
   );
 
   const shifts = gear !== undefined;
+  const teeth =
+    gear?.chainring !== undefined &&
+    gear.sprocket !== undefined &&
+    gear.front !== undefined &&
+    gear.rear !== undefined
+      ? { chainring: gear.chainring, sprocket: gear.sprocket, front: gear.front, rear: gear.rear }
+      : undefined;
+  const shiftOn = (derailleur: 'front' | 'rear') => (change: 'up' | 'down') =>
+    ctx.events.publish(drivetrainShiftRequestedEvent, { change, derailleur });
   useEffect(() => {
     if (!shifts || erg) {
       return undefined;
@@ -78,6 +129,35 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
       change: event.key === 'ArrowUp' ? 'up' : 'down',
     });
   };
+
+  if (teeth) {
+    return (
+      <section
+        data-testid="widget-virtual-gear"
+        data-status="available"
+        aria-label="Gear"
+        style={{
+          pointerEvents: 'auto',
+          minWidth: 110,
+          padding: '12px 18px',
+          borderRadius: 14,
+          background: 'rgba(16, 20, 24, 0.72)',
+          color: '#fff',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <div style={{ fontSize: 14, opacity: 0.8 }}>Gear</div>
+        <div data-testid="value" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.1 }}>
+          {`${teeth.front}×${teeth.rear}`}
+        </div>
+        <div data-testid="teeth" style={{ fontSize: 18, fontWeight: 600, opacity: 0.9 }}>
+          <Teeth label="Chainring" value={teeth.chainring} onShift={shiftOn('front')} />
+          {' × '}
+          <Teeth label="Sprocket" value={teeth.sprocket} onShift={shiftOn('rear')} />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

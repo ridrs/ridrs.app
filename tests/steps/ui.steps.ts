@@ -47,13 +47,15 @@ function contributionsIn(slot: HTMLElement): string[] {
 
 async function screenShown(root: HTMLElement, screenId: string): Promise<void> {
   await waitFor(() => {
+    // A framed screen is shown inside its frame: the screens form one chain, the innermost shown.
     const screens = [...root.querySelectorAll<HTMLElement>('[data-screen]')];
-    assert.deepEqual(
-      screens.map((s) => s.dataset.screen),
-      [screenId],
-    );
+    for (const [index, inner] of screens.slice(1).entries()) {
+      assert.ok(screens[index]?.contains(inner));
+    }
+    const shown = screens.at(-1);
+    assert.equal(shown?.dataset.screen, screenId);
     // A screen counts as shown once its component rendered something.
-    assert.ok(screens[0]?.childElementCount, `Screen "${screenId}" rendered nothing`);
+    assert.ok(shown?.childElementCount, `Screen "${screenId}" rendered nothing`);
   });
 }
 

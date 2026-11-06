@@ -30,7 +30,7 @@ class Files implements AppFiles {
   }
 }
 
-const manifest = (persistence?: ['machine']): PluginManifest => ({
+const manifest = (persistence?: ('machine' | 'user')[]): PluginManifest => ({
   id: 'device-probe',
   name: 'Probe',
   version: '1.0.0',
@@ -108,5 +108,29 @@ describe('ctx.settings.machine', () => {
     );
     await settings.machine(v2).write({ id: 'KICKR' });
     expect(await settings.machine(v2).read()).toBeUndefined();
+  });
+});
+
+describe('ctx.settings.user', () => {
+  it('keeps the document under config/user, apart from the machine scope', async () => {
+    const files = new Files();
+    const settings = createPluginSettings(
+      manifest(['user']),
+      () => files,
+      () => undefined,
+    );
+    await settings.user(v2).write({ id: 'favourite' });
+    expect([...files.files.keys()]).toEqual(['config/user/device-probe/choice.json']);
+    expect(await settings.user(v2).read()).toEqual({ id: 'favourite' });
+    expect(() => settings.machine(v2)).toThrow(/"persistence": \["machine"\]/);
+  });
+
+  it('refuses plugins without the declaration', () => {
+    const machineOnly = createPluginSettings(
+      manifest(['machine']),
+      () => new Files(),
+      () => undefined,
+    );
+    expect(() => machineOnly.user(v2)).toThrow(/"persistence": \["user"\]/);
   });
 });

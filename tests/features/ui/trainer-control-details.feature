@@ -5,14 +5,14 @@ Feature: The trainer's control state in its details
   trainer ridrs cannot control at all says nothing about control.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
     And "test-device" reported its "trainer" "KICKR CORE 1234" as "connected"
 
   Scenario Outline: The details name the control: <control>, <mode>
     Given "test-device" reported the control "<control>" of its trainer in the mode "<mode>"
-    And I open the device indicator
+    And I open the device setup from the main screen
     When I open the "Smart Trainer" in the device setup
     Then the details show the fact "Control" "<shown>"
 
@@ -25,11 +25,11 @@ Feature: The trainer's control state in its details
 
   Scenario: A trainer ridrs cannot control shows no control line
     Given "test-device" reported the control "unsupported" of its trainer in the mode "none"
-    And I open the device indicator
+    And I open the device setup from the main screen
     When I open the "Smart Trainer" in the device setup
     Then the details show no fact "Control"
 
   Scenario: Without a control state the details show no control line
-    Given I open the device indicator
+    Given I open the device setup from the main screen
     When I open the "Smart Trainer" in the device setup
     Then the details show no fact "Control"
