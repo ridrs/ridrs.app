@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  activityStateChangedEvent,
   configSnapshotCapability,
   definePlugin,
+  metricCadenceCapability,
   type MotionResult,
   type MotionState,
   type PhysicsParameter,
@@ -16,9 +18,17 @@ import {
   type RoadSample,
   type SpatialSeriesReader,
   spatialTerrainCapability,
+  type TemporalSeriesReader,
+  type TemporalValue,
   type TerrainPoint,
 } from '@ridrs/contracts';
-import { driveForce, integrate, isValidGradient, VIRTUAL_SPEED_DEFAULTS } from './integrator.ts';
+import {
+  driveForce,
+  integrate,
+  isPedalling,
+  isValidGradient,
+  VIRTUAL_SPEED_DEFAULTS,
+} from './integrator.ts';
 
 /** A ride starts at 0 m on flat asphalt. */
 const FLAT_ASPHALT: RoadSample = Object.freeze({
@@ -33,11 +43,39 @@ interface Terrain {
   last: RoadSample;
   /** Whether this ride got its first window: the gap before it is expected, not reported. */
   started: boolean;
+  /**
+   * The newest window at 0 m when the ride started: left from an earlier ride, so it does not
+   * count as this ride's first window.
+   */
+  before?: { readonly sourceId: string; readonly revision: number };
   /** Whether a gap was reported and has not ended yet: one diagnostic per gap. */
   inGap: boolean;
 }
 
 const terrains = new WeakMap<PluginContext, Terrain>();
+
+interface Start {
+  /** Cadence, when a plugin provides it; without one, power alone starts the ride. */
+  readonly cadence: TemporalSeriesReader;
+  /** Whether the rider pedalled in this ride: until then the rider stays at rest. */
+  rolling: boolean;
+  /** Whether the ride has a world, which is ready with its first window of the ride. */
+  awaitsWorld: boolean;
+}
+
+const starts = new WeakMap<PluginContext, Start>();
+
+function startOf(ctx: PluginContext): Start {
+  const start = starts.get(ctx);
+  if (!start) {
+    throw new Error('virtual speed is not initialized');
+  }
+  return start;
+}
+
+function valueOf(value: TemporalValue): number | undefined {
+  return value.status === 'available' ? value.value : undefined;
+}
 
 function terrainOf(ctx: PluginContext): Terrain {
   const terrain = terrains.get(ctx);
@@ -104,7 +142,10 @@ function roadAt(ctx: PluginContext, at: number, distance: number): RoadSample {
     });
   }
   terrain.last = { gradient, surface, origin: 'default' };
-  if (read.quality !== 'held') {
+  const { before } = terrain;
+  const fresh =
+    before === undefined || read.sourceId !== before.sourceId || read.revision > before.revision;
+  if (read.quality !== 'held' && fresh) {
     terrain.started = true;
   }
   if (read.quality === 'held') {
@@ -148,6 +189,11 @@ export default definePlugin({
       started: false,
       inGap: false,
     });
+    starts.set(ctx, {
+      cadence: ctx.temporal.reader(metricCadenceCapability),
+      rolling: false,
+      awaitsWorld: false,
+    });
     // `minimumDriveSpeed` is v_min of docs/architecture/physics.md.
     ctx.capabilities.provide(configSnapshotCapability, {
       section: ctx.manifest.id,
@@ -160,6 +206,7 @@ export default definePlugin({
         terrain.last = FLAT_ASPHALT;
         terrain.started = false;
         terrain.inGap = false;
+        startOf(ctx).rolling = false;
         const { mass, power, road, resistance } = forcesAt(ctx, at, 0, 0);
         return {
           at,
@@ -182,6 +229,27 @@ export default definePlugin({
           previous.speed,
           previous.distance,
         );
+        // Until the ride's world is ready and the rider pedals, the ride stands still - also on
+        // a descent, where gravity alone would start it rolling, and while the rider pedals into
+        // a world that still loads. Once it rolls, it rolls on, pedalling or not.
+        const start = startOf(ctx);
+        const ready = !start.awaitsWorld || terrainOf(ctx).started;
+        start.rolling ||=
+          ready && isPedalling(valueOf(power.riderPower), valueOf(start.cadence.valueAt(at)));
+        if (!start.rolling) {
+          return {
+            at,
+            speed: 0,
+            distance: previous.distance,
+            acceleration: 0,
+            mass,
+            riderPower: power.riderPower,
+            wheelPower: power.wheelPower,
+            driveForce: assertFinite(ctx, 'drive force', driveForce(power.wheelPower, 0)),
+            resistance,
+            road,
+          };
+        }
         const next = integrate({
           speed: previous.speed,
           distance: previous.distance,
@@ -207,4 +275,22 @@ export default definePlugin({
     });
   },
 
+  /**
+   * A ride with a world waits for that world's first window; what the terrain already holds then
+   * is an earlier ride's. Runs in the turn that started the ride, before its step 0.
+   */
+  start(ctx) {
+    ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
+      if (payload.state !== 'running' || payload.resumedAt !== undefined) {
+        return;
+      }
+      const terrain = terrainOf(ctx);
+      const read = terrain.reader.valueAt(0);
+      terrain.before =
+        read.status === 'available'
+          ? { sourceId: read.sourceId, revision: read.revision }
+          : undefined;
+      startOf(ctx).awaitsWorld = payload.world !== undefined;
+    });
+  },
 });

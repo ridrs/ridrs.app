@@ -31,6 +31,7 @@ export const TOLERANCE = 0.005;
 const PHYSICS_PLUGINS = [
   'activity-session',
   'metric-power',
+  'metric-cadence',
   'physics-engine',
   'physics-bicycle',
   'physics-rider',

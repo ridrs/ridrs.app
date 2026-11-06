@@ -617,7 +617,7 @@ When(
 );
 
 interface Delivery {
-  readonly kind: 'power' | 'heart-rate';
+  readonly kind: 'power' | 'cadence' | 'heart-rate';
   readonly device: string;
   readonly value: number;
   readonly everyMs: number;
@@ -708,6 +708,48 @@ for (const verb of ['delivers', 'delivered']) {
     },
   );
 }
+
+When(
+  '{string} delivers only cadence {float} rpm every {float} s for {float} second(s)',
+  async function (
+    this: RidrsWorld,
+    plugin: string,
+    cadence: number,
+    every: number,
+    seconds: number,
+  ) {
+    await deliver(
+      this,
+      plugin,
+      [{ kind: 'cadence', device: 'trainer-1', value: cadence, everyMs: every * 1000 }],
+      seconds,
+      false,
+    );
+  },
+);
+
+When(
+  '{string} delivers power {float} W and cadence {float} rpm every {float} s for {float} second(s)',
+  async function (
+    this: RidrsWorld,
+    plugin: string,
+    power: number,
+    cadence: number,
+    every: number,
+    seconds: number,
+  ) {
+    await deliver(
+      this,
+      plugin,
+      [
+        { kind: 'power', device: 'trainer-1', value: power, everyMs: every * 1000 },
+        { kind: 'cadence', device: 'trainer-1', value: cadence, everyMs: every * 1000 },
+      ],
+      seconds,
+      false,
+    );
+  },
+);
 
 When(
   '{string} delivers only power {float} W every {float} s for {float} more second(s)',

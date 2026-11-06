@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { driveForce, integrate, isValidGradient } from './integrator.ts';
+import { driveForce, integrate, isPedalling, isValidGradient } from './integrator.ts';
 
 const dt = 0.01;
 
@@ -87,5 +87,18 @@ describe('integrate on a climb', () => {
     const gravity = 85 * 9.81 * Math.sin(Math.atan(-0.05));
     const next = integrate({ speed: 0, distance: 0, mass: 85, wheelPower: 0, resistance: gravity, dt });
     expect(next.speed).toBeGreaterThan(0);
+  });
+});
+
+describe('isPedalling', () => {
+  it('starts with 30 W or 20 rpm, either one alone', () => {
+    expect(isPedalling(30, undefined)).toBe(true);
+    expect(isPedalling(undefined, 20)).toBe(true);
+    expect(isPedalling(0, 90)).toBe(true);
+  });
+
+  it('ignores less activity and missing values', () => {
+    expect(isPedalling(29, 19)).toBe(false);
+    expect(isPedalling(undefined, undefined)).toBe(false);
   });
 });

@@ -16,5 +16,8 @@
     "physics.total-resistance",
     "spatial.terrain"
   ],
+  "optionalRequires": [
+    "metric.cadence"
+  ],
   "entry": "index.ts"
 }
