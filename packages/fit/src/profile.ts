@@ -12,7 +12,7 @@ export const FIT_PROTOCOL_VERSION = 0x10;
 export const FIT_EPOCH_OFFSET_S = 631_065_600;
 
 export interface BaseType {
-  readonly name: 'enum' | 'uint8' | 'uint16' | 'uint32';
+  readonly name: 'enum' | 'uint8' | 'uint16' | 'uint32' | 'sint32';
   /** The base type byte of a field definition. */
   readonly id: number;
   readonly size: number;
@@ -24,6 +24,7 @@ export const BASE_TYPES = {
   uint8: { name: 'uint8', id: 0x02, size: 1, invalid: 0xff },
   uint16: { name: 'uint16', id: 0x84, size: 2, invalid: 0xffff },
   uint32: { name: 'uint32', id: 0x86, size: 4, invalid: 0xffff_ffff },
+  sint32: { name: 'sint32', id: 0x85, size: 4, invalid: 0x7fff_ffff },
 } as const satisfies Record<string, BaseType>;
 
 export interface FieldDefinition {
@@ -31,8 +32,10 @@ export interface FieldDefinition {
   readonly name: string;
   readonly num: number;
   readonly type: BaseType;
-  /** Stored value = round(value · scale); 1 when absent. */
+  /** Stored value = round((value + offset) · scale); 1 when absent. */
   readonly scale?: number;
+  /** 0 when absent. */
+  readonly offset?: number;
 }
 
 export interface MessageDefinition {
@@ -41,7 +44,7 @@ export interface MessageDefinition {
   readonly fields: readonly FieldDefinition[];
 }
 
-const { enum: ENUM, uint8: U8, uint16: U16, uint32: U32 } = BASE_TYPES;
+const { enum: ENUM, uint8: U8, uint16: U16, uint32: U32, sint32: S32 } = BASE_TYPES;
 
 /** Every message ridrs writes, with the fields it writes, in write order. */
 export const MESSAGES = {
@@ -74,12 +77,16 @@ export const MESSAGES = {
     num: 20,
     fields: [
       { name: 'timestamp', num: 253, type: U32 },
+      { name: 'positionLat', num: 0, type: S32 },
+      { name: 'positionLong', num: 1, type: S32 },
+      { name: 'altitude', num: 2, type: U16, scale: 5, offset: 500 },
       { name: 'heartRate', num: 3, type: U8 },
       { name: 'cadence', num: 4, type: U8 },
       { name: 'distance', num: 5, type: U32, scale: 100 },
       { name: 'speed', num: 6, type: U16, scale: 1000 },
       { name: 'power', num: 7, type: U16 },
       { name: 'enhancedSpeed', num: 73, type: U32, scale: 1000 },
+      { name: 'enhancedAltitude', num: 78, type: U32, scale: 5, offset: 500 },
     ],
   },
   lap: {

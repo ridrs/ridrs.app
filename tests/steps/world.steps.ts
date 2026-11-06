@@ -5,7 +5,10 @@ import { Given, Then, When } from '@cucumber/cucumber';
 import {
   type EventEnvelope,
   type TerrainPreview,
+  uiPositionObservedEvent,
   uiTerrainObservedEvent,
+  type WorldPosition,
+  worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
 import type { RidrsWorld } from '../support/world.ts';
@@ -51,13 +54,37 @@ When(
   },
 );
 
+// Without "… m above sea level" the position names no altitude.
+When(
+  /^the UI observes the rider at (-?[\d.]+) m on (-?[\d.]+)° N, (-?[\d.]+)° E(?:, (-?[\d.]+) m above sea level)?$/,
+  async function (
+    this: RidrsWorld,
+    distance: string,
+    latitude: string,
+    longitude: string,
+    altitude: string | null,
+  ) {
+    this.ensureHost().publishEvent(UI_BRIDGE, uiPositionObservedEvent, {
+      distance: Number(distance),
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      ...(altitude === null ? {} : { altitude: Number(altitude) }),
+    });
+    await this.settle();
+  },
+);
+
 // ---- The driver ------------------------------------------------------------------------------
 
-function accepted(world: RidrsWorld, pluginId: string): EventEnvelope<TerrainPreview>[] {
+function accepted<T = TerrainPreview>(
+  world: RidrsWorld,
+  pluginId: string,
+  eventId: string = worldTerrainPreviewEvent.id,
+): EventEnvelope<T>[] {
   return (
     world.hostObserved.filter(
-      (e) => e.type === worldTerrainPreviewEvent.id && e.source === pluginId,
-    ) as EventEnvelope<TerrainPreview>[]
+      (e) => e.type === eventId && e.source === pluginId,
+    ) as EventEnvelope<T>[]
   ).map((e) => {
     assert.equal(e.input, true, `"${e.type}" from "${e.source}" is not an input`);
     return e;
@@ -80,8 +107,40 @@ Then(
 Then(
   /^"([^"]+)" accepted (no|\d+) "([^"]+)"$/,
   function (this: RidrsWorld, pluginId: string, count: string, eventId: string) {
-    assert.equal(eventId, worldTerrainPreviewEvent.id);
-    assert.equal(accepted(this, pluginId).length, count === 'no' ? 0 : Number(count));
+    assert.ok([worldTerrainPreviewEvent.id, worldPositionEvent.id].some((id) => id === eventId));
+    assert.equal(accepted(this, pluginId, eventId).length, count === 'no' ? 0 : Number(count));
+  },
+);
+
+Then(
+  /^"([^"]+)" accepted the input "world\.position" at (-?[\d.]+) m on (-?[\d.]+)° N, (-?[\d.]+)° E(?:, (-?[\d.]+) m above sea level)?$/,
+  function (
+    this: RidrsWorld,
+    pluginId: string,
+    distance: string,
+    latitude: string,
+    longitude: string,
+    altitude: string | null,
+  ) {
+    const latest = accepted<WorldPosition>(this, pluginId, worldPositionEvent.id).at(-1);
+    assert.ok(latest, `"${pluginId}" accepted no "world.position"`);
+    assert.deepEqual(latest.payload, {
+      distance: Number(distance),
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      ...(altitude === null ? {} : { altitude: Number(altitude) }),
+    });
+  },
+);
+
+Then(
+  'a {string} diagnostic says {string}',
+  function (this: RidrsWorld, code: string, reason: string) {
+    const found = this.ensureHost()
+      .getDiagnostics()
+      .filter((d) => d.code === code);
+    assert.equal(found.length, 1, JSON.stringify(found));
+    assert.equal(found[0]?.details?.reason, reason);
   },
 );
 

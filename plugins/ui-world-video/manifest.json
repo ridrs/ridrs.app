@@ -1,0 +1,37 @@
+{
+  "id": "ui-world-video",
+  "name": "Video World",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "landscape",
+        "extensionPoint": "activity/landscape",
+        "export": "VideoLandscape"
+      },
+      {
+        "id": "video-rides",
+        "extensionPoint": "main/tile",
+        "export": "VideoRidesTile"
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "activity.state-changed",
+        "physics.state-batch"
+      ],
+      "publish": [
+        "activity.start-requested",
+        "ui.terrain-observed",
+        "ui.position-observed"
+      ]
+    }
+  }
+}

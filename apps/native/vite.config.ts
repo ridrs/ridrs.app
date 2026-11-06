@@ -4,17 +4,21 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { videoLibrary } from './video-library.ts';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const host = process.env.TAURI_DEV_HOST;
 const workspace = (path: string) => `${repoRoot}${path}`;
+/** The video rides' library: RIDRS_VIDEO_DIR, or `videos` next to the repository. */
+const videoDir =
+  process.env.RIDRS_VIDEO_DIR ?? fileURLToPath(new URL('../../../videos', import.meta.url));
 const ridrsVersion = (
   JSON.parse(readFileSync(workspace('package.json'), 'utf8')) as { version: string }
 ).version;
 
 export default defineConfig({
   clearScreen: false,
-  plugins: [react()],
+  plugins: [react(), videoLibrary(videoDir)],
   resolve: {
     alias: {
       '@ridrs/ble-bridge': workspace('packages/ble-bridge/src/index.ts'),

@@ -30,6 +30,7 @@
     "packages/**/*.tsx",
     "plugins/**/*.ts",
     "plugins/**/*.tsx",
+    "scripts/check-video-routes.ts",
     "tests/**/*.ts",
     "vitest.config.ts"
   ],

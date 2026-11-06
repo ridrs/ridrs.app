@@ -63,7 +63,9 @@ const state = {
 
 /** A valid payload for every event of the contracts: the recording stores them all verbatim. */
 const SAMPLES: Record<string, unknown> = {
-  'activity.start-requested': {},
+  'activity.start-requested': {
+    world: { landscape: 'ui-world-video/landscape', route: 'FR_Col_de_Pennes' },
+  },
   'activity.finish-requested': {},
   'recording.continue-requested': { file: 'recordings/r.ridrs.jsonl' },
   'recording.finish-requested': { file: 'recordings/r.ridrs.jsonl' },
@@ -264,6 +266,13 @@ const SAMPLES: Record<string, unknown> = {
       { gradient: 0, surface: 'gravel' },
     ],
   },
+  'ui.position-observed': {
+    distance: 12.5,
+    latitude: 44.660217,
+    longitude: 5.420908,
+    altitude: 498.13,
+  },
+  'world.position': { distance: 12.5, latitude: 44.660217, longitude: 5.420908, altitude: 498.13 },
   'world.terrain-preview': {
     revision: 3,
     originDistance: 1999,

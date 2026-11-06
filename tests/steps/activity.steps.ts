@@ -2,7 +2,11 @@
 
 import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
-import { type ActivityState, activityStateChangedEvent } from '@ridrs/contracts';
+import {
+  type ActivityState,
+  activityStartRequestedEvent,
+  activityStateChangedEvent,
+} from '@ridrs/contracts';
 import type { RidrsWorld } from '../support/world.ts';
 
 /** "10:00:00.250" means that time on 2026-11-01 UTC. */
@@ -59,6 +63,28 @@ Given(
     await publishFrom(this, pluginId, eventId);
   },
 );
+
+When(
+  '{string} asks to start a ride on the landscape {string} along the route {string}',
+  async function (this: RidrsWorld, pluginId: string, landscape: string, route: string) {
+    const ctx = this.ensureHost().getPluginContext(pluginId);
+    assert.ok(ctx, `Expected plugin "${pluginId}" to be running`);
+    ctx.inputs.accept(activityStartRequestedEvent, { world: { landscape, route } });
+    await this.settle();
+  },
+);
+
+Then(
+  'the ride takes place on the landscape {string} along the route {string}',
+  function (this: RidrsWorld, landscape: string, route: string) {
+    const state = withSession(latest(this));
+    assert.deepEqual(state.world, { landscape, route });
+  },
+);
+
+Then('the ride has no world', function (this: RidrsWorld) {
+  assert.equal(withSession(latest(this)).world, undefined);
+});
 
 Given('the ride is running', function (this: RidrsWorld) {
   assert.equal(latest(this).state, 'running');

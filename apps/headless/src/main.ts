@@ -59,7 +59,9 @@ import {
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  uiPositionObservedEvent,
   uiTerrainObservedEvent,
+  worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
 import { PluginHost, type PluginHostOptions } from '@ridrs/core';
@@ -138,7 +140,9 @@ const EVENTS: readonly EventDefinition[] = [
   metricPowerHeartRateRatioEvent,
   physicsStateEvent,
   physicsStateBatchEvent,
+  uiPositionObservedEvent,
   uiTerrainObservedEvent,
+  worldPositionEvent,
   worldTerrainPreviewEvent,
   recordingCompletedEvent,
   recordingFailedEvent,

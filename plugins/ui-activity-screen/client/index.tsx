@@ -22,22 +22,27 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   const hud = useRef<HTMLDivElement>(null);
   const finish = useRef<HTMLButtonElement>(null);
   const [paused, setPaused] = useState(false);
+  // The landscape of the ride's world; null for a free ride, undefined until the state is known.
+  const [world, setWorld] = useState<string | null>();
 
   // Back never ends a ride by accident: it offers Finish ride, which Enter then confirms.
   useEffect(() => ctx.onBack(() => finish.current?.focus()), [ctx]);
 
-  // The screen only offers extension points; it never knows who contributes to them.
+  // The screen only offers extension points; it never knows who contributes to them. The ride's
+  // world names its landscape; a free ride shows every landscape there is.
   useEffect(() => {
-    if (!landscape.current || !hud.current) {
+    if (!hud.current) {
       return undefined;
     }
-    const closeLandscape = ctx.slot('activity/landscape', landscape.current);
-    const closeHud = ctx.slot('activity/hud', hud.current);
-    return () => {
-      closeHud();
-      closeLandscape();
-    };
+    return ctx.slot('activity/hud', hud.current);
   }, [ctx]);
+
+  useEffect(() => {
+    if (!landscape.current || world === undefined) {
+      return undefined;
+    }
+    return ctx.slot('activity/landscape', landscape.current, world ? { contribution: world } : undefined);
+  }, [ctx, world]);
 
   useEffect(
     () =>
@@ -45,6 +50,7 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         // A paused ride stays here (ADR 0056); a finished one goes back to the main screen.
         if (payload.state === 'paused' || payload.state === 'running') {
           setPaused(payload.state === 'paused');
+          setWorld(payload.world?.landscape ?? null);
         } else {
           ctx.navigate('main');
         }
