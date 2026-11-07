@@ -46,6 +46,7 @@ const MOUNTAIN = new URL('./assets/icons/mountain.svg', import.meta.url).href;
 const VIDEO = new URL('./assets/icons/video.svg', import.meta.url).href;
 const DOWNLOAD = new URL('./assets/icons/download.svg', import.meta.url).href;
 const CANCEL = new URL('./assets/icons/x.svg', import.meta.url).href;
+const ON_DEVICE = new URL('./assets/icons/check.svg', import.meta.url).href;
 
 /** What the rider changed in this area, kept at once (ADR 0059). */
 const useRide = userDocument(
@@ -94,22 +95,91 @@ const PICTURE = { width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', bord
  */
 const FULL_HEIGHT_GRADE = 0.03;
 
+/** How long the glowing dot takes to ride a card's profile from start to end. */
+const TRACE_MS = 1600;
+
+const TRACE_DOT = {
+  position: 'absolute',
+  width: 7,
+  height: 7,
+  margin: '-3.5px 0 0 -3.5px',
+  borderRadius: '50%',
+  background: '#fff',
+  boxShadow: '0 0 6px 2px var(--ridrs-accent, #b8f53b), 0 0 16px 5px rgb(184 245 59 / .55)',
+  opacity: 0,
+  pointerEvents: 'none',
+} as const;
+
+/**
+ * Rides a glowing dot once along the profile, from start to end, when the pointer enters the card
+ * (or the keyboard focuses it); it is gone at once when the pointer or the focus leaves. The
+ * profile is stretched to the card, so the dot moves over the points in percent of the box instead
+ * of inside the SVG, where it would be stretched too.
+ */
+function useTrace(points: readonly (readonly [number, number])[]) {
+  const box = useRef<HTMLDivElement>(null);
+  const dot = useRef<HTMLSpanElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the points follow the offer, which keys the card.
+  useEffect(() => {
+    const card = box.current?.closest('.pv-teaser');
+    const element = dot.current;
+    if (!card || !element || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+    let running: Animation | undefined;
+    const ride = () => {
+      if (running?.playState === 'running') return;
+      running = element.animate?.(
+        points.map(([x, y], i) => ({
+          left: `${x}%`,
+          top: `${(y / 32) * 100}%`,
+          opacity: i === 0 || i === points.length - 1 ? 0 : 1,
+        })),
+        { duration: TRACE_MS, easing: 'ease-in-out' },
+      );
+    };
+    const stop = () => running?.cancel();
+    card.addEventListener('mouseenter', ride);
+    card.addEventListener('focusin', ride);
+    card.addEventListener('mouseleave', stop);
+    card.addEventListener('focusout', stop);
+    return () => {
+      card.removeEventListener('mouseenter', ride);
+      card.removeEventListener('focusin', ride);
+      card.removeEventListener('mouseleave', stop);
+      card.removeEventListener('focusout', stop);
+      stop();
+    };
+  }, []);
+  return { box, dot };
+}
+
 /**
  * The route's elevations as a hill: a filled area from start to end under a line, from its lowest
- * point up. On a card it rises behind the title.
+ * point up. On a card it rises behind the title, and a glowing dot rides it once on hover.
  */
-function Profile({ offer, height }: { readonly offer: RouteOffer; readonly height?: number }) {
-  const elevations = offer.sparkline;
-  if (!elevations || elevations.length < 2) {
-    return null;
-  }
+function Profile({
+  offer,
+  height,
+  trace,
+}: {
+  readonly offer: RouteOffer;
+  readonly height?: number;
+  readonly trace?: boolean;
+}) {
+  const elevations = offer.sparkline ?? [];
   const low = Math.min(...elevations);
   const range = Math.max(Math.max(...elevations) - low, offer.distance * FULL_HEIGHT_GRADE, 1);
-  const line = elevations
-    .map((elevation, i) => `${(i / (elevations.length - 1)) * 100},${(1 - (elevation - low) / range) * 30 + 2}`)
-    .join(' ');
+  const points = elevations.map(
+    (elevation, i) => [(i / (elevations.length - 1)) * 100, (1 - (elevation - low) / range) * 30 + 2] as const,
+  );
+  const { box, dot } = useTrace(points);
+  if (points.length < 2) {
+    return null;
+  }
+  const line = points.map(([x, y]) => `${x},${y}`).join(' ');
   const fill = `area-${offer.id.replace(/[^A-Za-z0-9-]/g, '-')}`;
-  return (
+  const svg = (
     <svg
       role="img"
       aria-label={`Elevation profile of ${offer.title}`}
@@ -134,6 +204,14 @@ function Profile({ offer, height }: { readonly offer: RouteOffer; readonly heigh
         vectorEffect="non-scaling-stroke"
       />
     </svg>
+  );
+  return trace ? (
+    <div ref={box} style={{ position: 'relative' }}>
+      {svg}
+      <span ref={dot} style={TRACE_DOT} />
+    </div>
+  ) : (
+    svg
   );
 }
 
@@ -183,18 +261,26 @@ const facts = (offer: RouteOffer): CardFact[] => [
   { icon: ASCENT, text: formatAscent(offer) },
 ];
 
-/** A corner badge for a route that is not ready: its size, the download's progress, a failure. */
+/**
+ * A corner badge for a route that needs a download: the download's progress, a failure, or an icon
+ * once it is on this device. A route still to download shows only its Download button.
+ */
 function DownloadBadge({ offer }: { readonly offer: RouteOffer }) {
   const { availability } = offer;
   switch (availability.state) {
     case 'fetchable':
-      return <Badge>{formatSize(availability.size)}</Badge>;
+      return null;
     case 'fetching':
       return <Badge tone="busy">{Math.floor((availability.received / availability.size) * 100)} %</Badge>;
     case 'failed':
       return <Badge tone="warn">Download failed</Badge>;
     case 'ready':
-      return null;
+      // Only a downloaded route can be removed; a world's route is always here and needs no icon.
+      return availability.removable ? (
+        <Badge tone="done" label="On this device">
+          <span className="pv-glyph" aria-hidden="true" style={iconStyle(ON_DEVICE)} />
+        </Badge>
+      ) : null;
   }
 }
 
@@ -211,7 +297,7 @@ function DownloadTool({ ctx, offer }: { readonly ctx: UiContext; readonly offer:
     setRefusal(undefined);
     run().catch((error: unknown) => setRefusal(reasonOf(error)));
   };
-  if (availability.state === 'ready') return null;
+  if (availability.state === 'ready') return <DownloadBadge offer={offer} />;
   const fetching = availability.state === 'fetching';
   return (
     <>
@@ -248,7 +334,7 @@ function RouteCard({
       title={offer.title}
       details={facts(offer)}
       image={offer.thumbnail}
-      backdrop={<Profile offer={offer} />}
+      backdrop={<Profile offer={offer} trace />}
       tools={
         <>
           <DownloadTool ctx={ctx} offer={offer} />

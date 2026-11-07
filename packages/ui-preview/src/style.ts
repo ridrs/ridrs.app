@@ -54,12 +54,14 @@ export const PREVIEW_CSS = `
   border: 1px solid var(--ridrs-line, #24324d); border-radius: var(--ridrs-radius, 16px);
   background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa);
   font: 15px/1.4 system-ui, sans-serif; }
-.pv-teaser[data-media] { min-height: 0; aspect-ratio: 16 / 10; border-color: transparent;
+.pv-teaser[data-media] { min-height: 0; aspect-ratio: 16 / 10; padding: 18px 20px 12px 14px;
+  border-color: transparent;
   background: radial-gradient(120% 90% at 85% 0%, #2a4a78 0%, transparent 60%),
     linear-gradient(160deg, #1b2d4d, #0d1626); }
 .pv-teaser[data-media]::before { content: ""; position: absolute; inset: 0; z-index: -1;
-  background: linear-gradient(to top, rgb(6 10 20 / .92) 0%, rgb(6 10 20 / .6) 38%,
-    rgb(6 10 20 / 0) 70%), linear-gradient(to bottom, rgb(6 10 20 / .45), rgb(6 10 20 / 0) 30%); }
+  background: radial-gradient(85% 55% at 0% 100%, rgb(6 10 20 / .7), rgb(6 10 20 / 0) 100%),
+    linear-gradient(to top, rgb(6 10 20 / .95) 0%, rgb(6 10 20 / .72) 38%, rgb(6 10 20 / 0) 75%),
+    linear-gradient(to bottom, rgb(6 10 20 / .45), rgb(6 10 20 / 0) 30%); }
 .pv-teaser-image { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%;
   object-fit: cover; transition: transform .4s ease; }
 .pv-teaser:has(.pv-teaser-open:hover) .pv-teaser-image { transform: scale(1.04); }
@@ -99,4 +101,6 @@ export const PREVIEW_CSS = `
   backdrop-filter: blur(6px); }
 .pv-badge[data-tone="busy"] { background: var(--ridrs-info, #2aa8ff); color: #fff; }
 .pv-badge[data-tone="warn"] { background: var(--ridrs-warn, #ffb62e); color: #0b1220; }
+.pv-badge[data-tone="done"] { display: inline-flex; padding: 9px; background: rgb(11 18 32 / .55); }
+.pv-badge .pv-glyph { width: 16px; height: 16px; }
 `;

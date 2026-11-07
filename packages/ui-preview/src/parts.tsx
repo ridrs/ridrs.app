@@ -241,15 +241,22 @@ export function Card({
   );
 }
 
-/** A small label in a card's corner, e.g. `11.2 GB` for a route still to download. */
+/** A small label in a card's corner, e.g. `45 %` for a download on its way, or a named icon. */
 export function Badge({
   tone,
+  label,
   children,
 }: {
-  readonly tone?: 'busy' | 'warn';
+  readonly tone?: 'busy' | 'warn' | 'done';
+  /** Names a badge that shows only an icon. */
+  readonly label?: string;
   readonly children: ReactNode;
 }) {
-  return (
+  return label ? (
+    <span className="pv-badge" data-tone={tone} role="img" aria-label={label}>
+      {children}
+    </span>
+  ) : (
     <span className="pv-badge" data-tone={tone}>
       {children}
     </span>

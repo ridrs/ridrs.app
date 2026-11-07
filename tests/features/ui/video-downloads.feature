@@ -83,16 +83,16 @@ Feature: Downloading a video route
     And the route details offer a "Download" button
     And the media storage holds no route "video-source-vangestel/col-de-pennes"
 
-  Scenario: The route card downloads, shows the progress and cancels
+  Scenario: The route card downloads, shows the progress, cancels and shows a downloaded route
     Given the simulated downloads stop halfway
     When I press "Ride"
-    Then the route "Col de Pennes - Climb it twice!" reads "11.2 GB"
+    Then the route "Col de Pennes - Climb it twice!" does not read "GB"
+    And the route "Col de Pennes - Climb it twice!" shows no status "On this device"
     When I press "Download Col de Pennes - Climb it twice!"
     Then the route "Col de Pennes - Climb it twice!" reads "50 %"
     When I press "Cancel download of Col de Pennes - Climb it twice!"
-    Then the route "Col de Pennes - Climb it twice!" reads "11.2 GB"
-    And the route "Col de Pennes - Climb it twice!" does not read "%"
+    Then the route "Col de Pennes - Climb it twice!" does not read "%"
     When I press "Download Col de Pennes - Climb it twice!"
     And the simulated download goes on
-    Then the route "Col de Pennes - Climb it twice!" does not read "GB"
+    Then the route "Col de Pennes - Climb it twice!" shows the status "On this device"
     And the route card "Col de Pennes - Climb it twice!" offers no download

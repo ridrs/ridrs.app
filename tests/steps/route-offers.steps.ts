@@ -134,3 +134,19 @@ Then(
     );
   },
 );
+
+Then(
+  'the route {string} shows the status {string}',
+  async function (this: RidrsWorld, title: string, status: string) {
+    await waitFor(() => within(card(this, title)).getByRole('img', { name: status }));
+  },
+);
+
+Then(
+  'the route {string} shows no status {string}',
+  async function (this: RidrsWorld, title: string, status: string) {
+    await waitFor(() =>
+      assert.equal(within(card(this, title)).queryByRole('img', { name: status }), null),
+    );
+  },
+);
