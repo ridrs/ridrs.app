@@ -5,6 +5,8 @@ import { type AppFileEntry, type AppFiles, assertAppFilePath } from '@ridrs/cont
 /** `storage.app-files` in memory: the files outlive the plugin, so a host can restart over them. */
 export class MemoryAppFiles implements AppFiles {
   readonly files = new Map<string, Uint8Array>();
+  /** How often each file was written whole (`write`, `replace`). */
+  readonly writes = new Map<string, number>();
   /** While set, every append and write rejects. */
   failWrites = false;
   /** How many bytes of each file are on the "disk": appended bytes count once synced. */
@@ -21,9 +23,29 @@ export class MemoryAppFiles implements AppFiles {
     this.files.set(path, next);
   }
 
+  /** While set, whole-file writes wait for `release()`: a slow disk, e.g. for a FIT export. */
+  private held: { promise: Promise<void>; release: () => void } | undefined;
+
+  hold(): void {
+    if (!this.held) {
+      let release = () => {};
+      const promise = new Promise<void>((done) => {
+        release = done;
+      });
+      this.held = { promise, release };
+    }
+  }
+
+  release(): void {
+    this.held?.release();
+    this.held = undefined;
+  }
+
   async write(path: string, bytes: Uint8Array): Promise<void> {
+    await this.held?.promise;
     this.assertWritable(path);
     this.files.set(path, bytes.slice());
+    this.writes.set(path, (this.writes.get(path) ?? 0) + 1);
     // Whole files count as on the disk at once: only appends wait for a sync.
     this.synced.set(path, bytes.length);
   }

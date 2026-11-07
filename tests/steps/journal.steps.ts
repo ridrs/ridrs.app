@@ -4,14 +4,13 @@ import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
 import {
   type ActivityState,
-  type EventEnvelope,
   type PhysicsState,
   type PhysicsStateBatch,
   physicsStateBatchEvent,
   physicsStateEvent,
   type RecoverableRide,
-  recordingFinishRequestedEvent,
-  recordingRecoverableChangedEvent,
+  recordingFinishService,
+  recordingRecoverableState,
 } from '@ridrs/contracts';
 import {
   OPEN_RECORDING_EXTENSION,
@@ -92,12 +91,13 @@ Given('ridrs started again', async function (this: RidrsWorld) {
   await this.waitForIo(() => offered(this) !== undefined || closedOffer(this), 'the start-up');
 });
 
-function offers(world: RidrsWorld): EventEnvelope[] {
-  return world.tapped.filter((e) => e.type === recordingRecoverableChangedEvent.id);
+/** Every write of the app state `recording.recoverable` (ADR 0069): offers and their removal. */
+function offers(world: RidrsWorld) {
+  return world.stateOf(recordingRecoverableState.id);
 }
 
 function offered(world: RidrsWorld): RecoverableRide | undefined {
-  return (offers(world).at(-1)?.payload as { ride?: RecoverableRide } | undefined)?.ride;
+  return offers(world).at(-1)?.value as RecoverableRide | undefined;
 }
 
 function closedOffer(world: RidrsWorld): boolean {
@@ -126,7 +126,7 @@ Then('the memory storage still holds its open recording', function (this: RidrsW
   assert.ok(this.interruptedFile && this.memoryFiles?.files.has(this.interruptedFile));
 });
 
-/** What the composition root does on `recording.continue-requested`. */
+/** What the composition root does when `recording.continue` is called. */
 async function continueInterruptedRide(world: RidrsWorld): Promise<void> {
   const file = offered(world)?.file;
   assert.ok(file && world.memoryFiles, 'Expected an interrupted ride on offer');
@@ -149,9 +149,13 @@ for (const verb of ['continues', 'continued']) {
 }
 
 When('the rider finishes the interrupted ride', async function (this: RidrsWorld) {
-  const file = offered(this)?.file;
-  assert.ok(file, 'Expected an interrupted ride on offer');
-  this.ensureHost().publishEvent('ui-bridge', recordingFinishRequestedEvent, { file });
+  const sessionId = offered(this)?.sessionId;
+  assert.ok(sessionId, 'Expected an interrupted ride on offer');
+  await this.ensureHost().callService(
+    recordingFinishService.id,
+    { key: sessionId },
+    { pluginId: 'ui-bridge' },
+  );
   await this.waitForIo(() => offered(this) === undefined, 'the ride to be sealed');
 });
 

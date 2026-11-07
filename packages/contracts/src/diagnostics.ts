@@ -35,7 +35,11 @@ export type DiagnosticCode =
   | 'config-snapshot-failed'
   | 'trainer-command-failed'
   | 'trainer-control-lost'
-  | 'settings-invalid';
+  | 'settings-invalid'
+  | 'unknown-state'
+  | 'unknown-service'
+  | 'ambiguous-service'
+  | 'state-feedback';
 
 export type RidrsErrorCode =
   | DiagnosticCode
@@ -48,7 +52,18 @@ export type RidrsErrorCode =
   | 'invalid-path'
   | 'sign-in-cancelled'
   | 'invalid-recording'
-  | 'recording-unsupported-version';
+  | 'recording-unsupported-version'
+  | 'state-key-owned'
+  | 'undeclared-state'
+  | 'invalid-state-value'
+  | 'undeclared-service'
+  | 'service-unavailable'
+  | 'unknown-key'
+  | 'invalid-request'
+  | 'invalid-response'
+  | 'service-failed'
+  | 'state-not-allowed'
+  | 'call-not-allowed';
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;

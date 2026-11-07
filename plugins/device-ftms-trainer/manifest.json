@@ -2,9 +2,29 @@
   "id": "device-ftms-trainer",
   "name": "FTMS Smart Trainer",
   "version": "0.1.0",
-  "types": ["device"],
-  "provides": ["config.snapshot"],
-  "requires": ["ble.central"],
+  "types": [
+    "device"
+  ],
+  "provides": [
+    "config.snapshot"
+  ],
+  "requires": [
+    "ble.central"
+  ],
   "entry": "index.ts",
-  "persistence": ["machine"]
+  "persistence": [
+    "machine"
+  ],
+  "state": {
+    "owns": [
+      "device.status"
+    ]
+  },
+  "services": {
+    "provides": [
+      "device.connect",
+      "device.forget",
+      "device.discover"
+    ]
+  }
 }

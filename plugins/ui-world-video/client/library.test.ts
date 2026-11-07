@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // @vitest-environment happy-dom
 
-import { describe, expect, it } from 'vitest';
-import { parseControlFile, parseGpx } from './library.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { loadDownloadedRoute, parseControlFile, parseGpx } from './library.ts';
 
 const CONTROL = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <gpx-import>
@@ -59,5 +59,58 @@ describe('parseGpx', () => {
       { latitude: 44.659966, longitude: 5.41993, elevation: 459.71, time: 5 },
       { latitude: 44.659843, longitude: 5.419851, elevation: 459.41, time: 11 },
     ]);
+  });
+});
+
+describe('loadDownloadedRoute', () => {
+  /** As Tauri's `convertFileSrc` makes them: the whole path is one encoded segment. */
+  const asset = (path: string) => `asset://localhost/${encodeURIComponent(path)}`;
+  const folder = '/Users/rider/Library/Application Support/org.ridrs.app/media/videos/source/pennes';
+  const files = {
+    'route.json': asset(`${folder}/route.json`),
+    'video.mp4': asset(`${folder}/video.mp4`),
+    'track.gpx': asset(`${folder}/track.gpx`),
+  };
+  const route = {
+    format: 'ridrs-video-route',
+    version: 1,
+    title: 'Col de Pennes',
+    source: { name: 'Van Gestel', author: 'Fred Van Gestel', url: 'https://example.org/', license: 'CC BY-NC-SA 4.0' },
+    notes: [],
+    segments: [],
+    video: { file: 'video.mp4', framerate: 30, startFrame: 12 },
+    track: { file: 'track.gpx' },
+    imported: { by: 'video-import-incyclist', version: '1' },
+  };
+
+  it('takes the URL of every file from the offer, never one built from another', async () => {
+    const fetched: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      fetched.push(url);
+      return new Response(JSON.stringify(route));
+    });
+    try {
+      expect(await loadDownloadedRoute('source/pennes', files)).toEqual({
+        id: 'source/pennes',
+        title: 'Col de Pennes',
+        videoUrl: files['video.mp4'],
+        gpxUrl: files['track.gpx'],
+        framerate: 30,
+        startFrame: 12,
+      });
+      expect(fetched).toEqual([files['route.json']]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('says which file the offer does not name', async () => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify(route)));
+    try {
+      const { 'track.gpx': _, ...withoutTrack } = files;
+      await expect(loadDownloadedRoute('source/pennes', withoutTrack)).rejects.toThrow('has no file "track.gpx"');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

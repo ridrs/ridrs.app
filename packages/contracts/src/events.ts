@@ -136,66 +136,8 @@ export const deviceCandidateSchema = z.object({
 
 export type DeviceCandidate = z.infer<typeof deviceCandidateSchema>;
 
-/**
- * Every device of a kind that a device plugin found in this run, in the order found; the one it
- * connects is among them. A device seen over both links is listed once per link.
- */
-export const deviceCandidatesChangedEvent = defineEvent(
-  'device.candidates-changed',
-  z.object({ kind: deviceKindSchema, devices: z.array(deviceCandidateSchema) }),
-);
-
-export type DeviceCandidatesChangedPayload = z.infer<typeof deviceCandidatesChangedEvent.schema>;
-
-/**
- * The rider connects a device of a kind: another one found, or the same one again after it was
- * forgotten. The choice lasts for this run.
- */
-export const deviceConnectRequestedEvent = defineEvent(
-  'device.connect-requested',
-  z.object({ kind: deviceKindSchema, deviceId: z.string().min(1) }),
-);
-
-/**
- * The rider forgets the device of a kind: it is let go and no device of the kind connects on its
- * own until a device setup opens again; then the best device found connects.
- */
-export const deviceForgetRequestedEvent = defineEvent(
-  'device.forget-requested',
-  z.object({ kind: deviceKindSchema }),
-);
-
-/**
- * The device setup is open (`active`) or closed: while it is open the device plugins keep
- * looking for devices, so devices switched on later are listed too.
- */
-export const deviceDiscoveryRequestedEvent = defineEvent(
-  'device.discovery-requested',
-  z.object({ active: z.boolean() }),
-);
-
-/**
- * The links over which a device plugin looks for devices of a kind right now, in the order it
- * started them; empty: it looks for none. A search that failed (Bluetooth off) is not named.
- */
-export const deviceScanChangedEvent = defineEvent(
-  'device.scan-changed',
-  z.object({ kind: deviceKindSchema, routes: z.array(bleRouteSchema) }),
-);
-
-export type DeviceScanChangedPayload = z.infer<typeof deviceScanChangedEvent.schema>;
-
 /** A battery level in percent, 0 to 100. */
 const batteryLevelSchema = z.number().int().min(0).max(100);
-
-/**
- * The battery level of a connected device, as its Battery Service tells it: read on every
- * connection and again on every notification. A device without the service never tells it.
- */
-export const deviceBatteryChangedEvent = defineEvent(
-  'device.battery-changed',
-  z.object({ deviceId: z.string().min(1), kind: deviceKindSchema, level: batteryLevelSchema }),
-);
 
 export const deviceStatusSchema = z.object({
   kind: deviceKindSchema,
@@ -216,14 +158,6 @@ export const deviceStatusSchema = z.object({
 });
 
 export type DeviceStatus = z.infer<typeof deviceStatusSchema>;
-
-/** The latest connection state of every kind that a device plugin reported, in kind order. */
-export const deviceStatusChangedEvent = defineEvent(
-  'device.status-changed',
-  z.object({ devices: z.array(deviceStatusSchema) }),
-);
-
-export type DeviceStatusChangedPayload = z.infer<typeof deviceStatusChangedEvent.schema>;
 
 /**
  * Buttons of a handlebar controller pair: the d-pad on the left, A/B/Y/Z on the right, and on

@@ -1,0 +1,9 @@
+{
+  "id": "data-archive-tauri",
+  "name": "Archives (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["data.archive"],
+  "requires": [],
+  "entry": "index.ts"
+}

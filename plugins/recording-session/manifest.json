@@ -2,9 +2,28 @@
   "id": "recording-session",
   "name": "Recording Session",
   "version": "0.1.0",
-  "types": ["recording"],
+  "types": [
+    "recording"
+  ],
   "provides": [],
-  "requires": ["storage.app-files", "config.snapshot"],
-  "permissions": ["observe-host"],
-  "entry": "index.ts"
+  "requires": [
+    "storage.app-files",
+    "config.snapshot"
+  ],
+  "permissions": [
+    "observe-host"
+  ],
+  "entry": "index.ts",
+  "state": {
+    "owns": [
+      "recording.ride",
+      "recording.recoverable"
+    ]
+  },
+  "services": {
+    "provides": [
+      "recording.finish",
+      "recording.delete"
+    ]
+  }
 }

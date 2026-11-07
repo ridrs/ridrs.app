@@ -2,8 +2,29 @@
   "id": "transport-ble-bridge",
   "name": "BLE Transport (Companion Bridge)",
   "version": "0.1.0",
-  "types": ["transport"],
-  "provides": ["ble.central"],
-  "requires": ["ble-bridge.connector"],
-  "entry": "index.ts"
+  "types": [
+    "transport"
+  ],
+  "provides": [
+    "ble.central"
+  ],
+  "requires": [
+    "ble-bridge.connector"
+  ],
+  "entry": "index.ts",
+  "state": {
+    "owns": [
+      "bridge.state",
+      "bridge.companions",
+      "bridge.pairing"
+    ]
+  },
+  "services": {
+    "provides": [
+      "bridge.pair",
+      "bridge.connect",
+      "bridge.disconnect",
+      "bridge.forget"
+    ]
+  }
 }

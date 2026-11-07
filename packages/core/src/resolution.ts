@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { CapabilityContract } from '@ridrs/contracts';
+import type { CapabilityContract, ServiceDefinition } from '@ridrs/contracts';
 import { DepGraph, DepGraphCycleError } from 'dependency-graph';
 import type { DiagnosticCollector } from './diagnostics.ts';
 import type { DiscoveredPlugin } from './discovery.ts';
@@ -19,13 +19,87 @@ function dependenciesOf(plugin: DiscoveredPlugin): readonly string[] {
   return [...plugin.manifest.requires, ...(plugin.manifest.optionalRequires ?? [])];
 }
 
+/** The registered app state topics and services (ADR 0068), checked like capabilities. */
+export interface AppChannels {
+  readonly states: ReadonlySet<string>;
+  readonly services: ReadonlyMap<string, ServiceDefinition>;
+}
+
+const NO_CHANNELS: AppChannels = { states: new Set(), services: new Map() };
+
+/**
+ * App state and services a plugin names must be registered; a service without a key has one
+ * provider, or both are blocked like the providers of a `single` capability. A service in
+ * `calls` without a provider blocks nobody: the call rejects.
+ */
+function resolveAppChannels(
+  plugins: readonly DiscoveredPlugin[],
+  channels: AppChannels,
+  diagnostics: DiagnosticCollector,
+  blocked: Set<string>,
+): void {
+  const providers = new Map<string, string[]>();
+  for (const { manifest } of plugins) {
+    const topics = [
+      ...(manifest.state?.owns ?? []),
+      ...(manifest.state?.watches ?? []),
+      ...(manifest.ui?.state ?? []),
+    ];
+    for (const topic of new Set(topics)) {
+      if (!channels.states.has(topic)) {
+        diagnostics.report({
+          code: 'unknown-state',
+          pluginId: manifest.id,
+          message: `Plugin "${manifest.id}" references unregistered app state "${topic}"`,
+          details: { topic },
+        });
+        blocked.add(manifest.id);
+      }
+    }
+    const services = [
+      ...(manifest.services?.provides ?? []),
+      ...(manifest.services?.calls ?? []),
+      ...(manifest.ui?.calls ?? []),
+    ];
+    for (const service of new Set(services)) {
+      if (!channels.services.has(service)) {
+        diagnostics.report({
+          code: 'unknown-service',
+          pluginId: manifest.id,
+          message: `Plugin "${manifest.id}" references unregistered service "${service}"`,
+          details: { service },
+        });
+        blocked.add(manifest.id);
+      }
+    }
+    for (const service of manifest.services?.provides ?? []) {
+      providers.set(service, [...(providers.get(service) ?? []), manifest.id]);
+    }
+  }
+  for (const [service, ids] of providers) {
+    const definition = channels.services.get(service);
+    if (definition && !definition.keyedBy && ids.length > 1) {
+      diagnostics.report({
+        code: 'ambiguous-service',
+        message: `Service "${service}" has several providers (${ids.join(', ')}) but no key to route by`,
+        details: { service, plugins: ids },
+      });
+      for (const id of ids) {
+        blocked.add(id);
+      }
+    }
+  }
+}
+
 export function resolveCapabilities(
   plugins: readonly DiscoveredPlugin[],
   contracts: ReadonlyMap<string, CapabilityContract>,
   diagnostics: DiagnosticCollector,
+  channels: AppChannels = NO_CHANNELS,
 ): ResolutionResult {
   const sortedPlugins = [...plugins].sort((a, b) => a.manifest.id.localeCompare(b.manifest.id));
   const blocked = new Set<string>();
+  resolveAppChannels(sortedPlugins, channels, diagnostics, blocked);
 
   // 1. Validate that all referenced capabilities have registered contracts.
   for (const plugin of sortedPlugins) {

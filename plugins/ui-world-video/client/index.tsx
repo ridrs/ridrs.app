@@ -4,15 +4,17 @@ import {
   type ActivityState,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  routeOfferState,
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
 } from '@ridrs/contracts';
 import { createPhysicsPresentation } from '@ridrs/presentation';
+import { Card } from '@ridrs/ui-preview';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type FrameDecoder, FramePlayer } from './frame-player.ts';
-import { loadLibrary, parseGpx, type VideoRoute } from './library.ts';
+import { loadDownloadedRoute, loadLibrary, parseGpx, type VideoRoute } from './library.ts';
 import { buildVideoTime, type VideoTime, videoTimeAt } from './playback.ts';
 import { plausibleTrack, type Repair } from './plausible-track.ts';
 import type { Track } from './track.ts';
@@ -68,13 +70,23 @@ function webCodecsDecoder(video: VideoIndex) {
   };
 }
 
-async function loadRoute(
-  id: string,
-): Promise<{ route: VideoRoute; track: Track; repairs: readonly Repair[]; videoTime: VideoTime; video: VideoIndex }> {
+/** A downloaded route from its `route.json`, else a route of the dev server's library. */
+async function findRoute(id: string, files: Readonly<Record<string, string>> | undefined): Promise<VideoRoute> {
+  if (files) {
+    return loadDownloadedRoute(id, files);
+  }
   const route = (await loadLibrary()).find((candidate) => candidate.id === id);
   if (!route) {
     throw new Error(`The video library has no route "${id}"`);
   }
+  return route;
+}
+
+async function loadRoute(
+  id: string,
+  files: Readonly<Record<string, string>> | undefined,
+): Promise<{ route: VideoRoute; track: Track; repairs: readonly Repair[]; videoTime: VideoTime; video: VideoIndex }> {
+  const route = await findRoute(id, files);
   const [{ track, repairs }, video] = await Promise.all([
     fetch(route.gpxUrl).then(async (response) => plausibleTrack(parseGpx(await response.text()))),
     readVideoIndex(httpRangeReader(route.videoUrl)),
@@ -85,21 +97,55 @@ async function loadRoute(
   return { route, track, repairs, videoTime: buildVideoTime(track), video };
 }
 
+/** What the app state said last about the files of a route; none before its first delivery. */
+interface RouteFiles {
+  readonly route: string;
+  readonly files: Readonly<Record<string, string>> | undefined;
+}
+
+/**
+ * The file URLs of the downloaded offer whose world names the route (ADR 0068): from the app state
+ * `route.offer`, read anew only when that offer's key changed, not for another download's
+ * progress.
+ */
+function useRouteFiles(ctx: UiContext, id: string | undefined): RouteFiles | undefined {
+  const [files, setFiles] = useState<RouteFiles>();
+  useEffect(() => {
+    if (id === undefined) {
+      return undefined;
+    }
+    let first = true;
+    let key: string | undefined;
+    return ctx.state.watch(routeOfferState, ({ entries, changed }) => {
+      key = [...entries].find(([, offer]) => offer.world.route === id)?.[0] ?? key;
+      if (!first && (key === undefined || !changed.includes(key))) {
+        return;
+      }
+      first = false;
+      const availability = key === undefined ? undefined : entries.get(key)?.availability;
+      setFiles({ route: id, files: availability?.state === 'ready' ? availability.files : undefined });
+    });
+  }, [ctx, id]);
+  return files;
+}
+
 /** The ride's route, once the activity state names one, its track and its video time. */
 function useRoute(ctx: UiContext): { readonly id: string | undefined; readonly loaded: Loaded } {
   const [id, setId] = useState<string>();
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
+  const routeFiles = useRouteFiles(ctx, id);
   useEffect(
     () => ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => setId(routeOf(ctx, payload))),
     [ctx],
   );
   useEffect(() => {
-    if (id === undefined) {
+    // Not before the app state told about this route's files.
+    if (id === undefined || routeFiles?.route !== id) {
       return undefined;
     }
     let current = true;
     setLoaded({ status: 'loading' });
-    loadRoute(id).then(
+    loadRoute(id, routeFiles.files).then(
       ({ repairs, ...route }) => {
         if (repairs.length > 0) {
           ctx.logger.info(`Video route "${id}": ${repairs.length} implausible GPS points repaired`, repairs);
@@ -118,7 +164,7 @@ function useRoute(ctx: UiContext): { readonly id: string | undefined; readonly l
     return () => {
       current = false;
     };
-  }, [ctx, id]);
+  }, [ctx, id, routeFiles]);
   return { id, loaded };
 }
 
@@ -268,19 +314,12 @@ const TILE_CSS = `
   background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa); }
 .vr-eyebrow { margin: 0; color: var(--ridrs-text-muted, #93a1b8); font-size: 14px; font-weight: 600;
   letter-spacing: .08em; text-transform: uppercase; }
-.vr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;
+.vr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;
   margin: 0; padding: 0; list-style: none; }
-.vr-route { display: flex; flex-direction: column; gap: 6px; width: 100%; height: 100%; padding: 16px;
-  border: 1px solid var(--ridrs-line, #24324d); border-radius: 12px; cursor: pointer; text-align: left;
-  background: var(--ridrs-surface-raised, #1a2540); color: inherit; font: inherit; }
-.vr-route:hover { border-color: var(--ridrs-accent, #b8f53b); }
-.vr-route:focus-visible { outline: 3px solid var(--ridrs-focus, #fff); outline-offset: 2px; }
-.vr-title { font-size: 18px; font-weight: 700; }
-.vr-summary { color: var(--ridrs-text-muted, #93a1b8); font-size: 14px; }
-.vr-go { margin-top: auto; color: var(--ridrs-accent, #b8f53b); font-weight: 700; }
+.vr-list .pv-teaser { background: var(--ridrs-surface-raised, #1a2540); }
 `;
 
-/** The routes of the video library, each a button that starts a ride along it. */
+/** The routes of the video library, each a card that starts a ride along it. */
 function VideoRidesView({ ctx }: { readonly ctx: UiContext }) {
   const [routes, setRoutes] = useState<readonly VideoRoute[]>([]);
   useEffect(() => {
@@ -304,20 +343,18 @@ function VideoRidesView({ ctx }: { readonly ctx: UiContext }) {
       <ul className="vr-list">
         {routes.map((route) => (
           <li key={route.id}>
-            <button
-              type="button"
-              className="vr-route"
-              data-testid={`ride-video-${route.id}`}
-              onClick={() =>
+            <Card
+              testId={`ride-video-${route.id}`}
+              label={`Ride ${route.title}`}
+              classifier="Video"
+              title={route.title}
+              details={[route.summary]}
+              onOpen={() =>
                 ctx.events.publish(activityStartRequestedEvent, {
                   world: { landscape: `${ctx.pluginId}/${LANDSCAPE}`, route: route.id },
                 })
               }
-            >
-              <span className="vr-title">{route.title}</span>
-              {route.summary ? <span className="vr-summary">{route.summary}</span> : null}
-              <span className="vr-go">Ride this video</span>
-            </button>
+            />
           </li>
         ))}
       </ul>

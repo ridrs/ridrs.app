@@ -67,30 +67,10 @@ const SAMPLES: Record<string, unknown> = {
     world: { landscape: 'ui-world-video/landscape', route: 'FR_Col_de_Pennes' },
   },
   'activity.finish-requested': {},
-  'recording.continue-requested': { file: 'recordings/r.ridrs.jsonl' },
-  'recording.finish-requested': { file: 'recordings/r.ridrs.jsonl' },
-  'recording.recoverable-changed': {
-    ride: {
-      sessionId: 's-1',
-      file: 'recordings/r.ridrs.jsonl',
-      startedAt: T,
-      lastRecordAt: T + 1,
-      distance: 1.5,
-    },
-  },
   'activity.pause-requested': {},
   'activity.resume-requested': {},
   'activity.interrupted': {},
   'activity.state-changed': { state: 'finished', sessionId: 's-1', startedAt: T, endedAt: T + 1 },
-  'bridge.companions-changed': {
-    companions: [{ companionId: 'c', name: 'Phone', address: '10.0.0.2:4711', paired: true }],
-  },
-  'bridge.connect-requested': {},
-  'bridge.disconnect-requested': {},
-  'bridge.forget-requested': {},
-  'bridge.pair-requested': { address: '10.0.0.2:4711', code: '123456' },
-  'bridge.pairing-offer': { uri: null },
-  'bridge.state-changed': { state: 'disconnected', companionName: 'Phone', reason: 'by-ridrs' },
   'core.host.started': { startedPlugins: ['a', 'b'] },
   'core.ui-registry.changed': { revision: 3 },
   'device.connection-changed': {
@@ -101,30 +81,7 @@ const SAMPLES: Record<string, unknown> = {
     reason: 'lost',
     route: 'companion',
   },
-  'device.candidates-changed': {
-    kind: 'heart-rate',
-    devices: [{ deviceId: 'sim-hr', deviceName: 'HRM', routes: ['local', 'companion'], rssi: -58 }],
-  },
-  'device.connect-requested': { kind: 'heart-rate', deviceId: 'sim-hr' },
-  'device.forget-requested': { kind: 'heart-rate' },
-  'device.discovery-requested': { active: true },
-  'device.scan-changed': { kind: 'heart-rate', routes: ['local', 'companion'] },
-  'device.battery-changed': { deviceId: 'sim-hr', kind: 'heart-rate', level: 80 },
   'controller.buttons-changed': { deviceId: 'sim-ride', buttons: ['a', 'shift-up-right'] },
-  'device.status-changed': {
-    devices: [
-      {
-        kind: 'trainer',
-        deviceId: 'sim-1',
-        deviceName: 'SIM',
-        state: 'connected',
-        route: 'local',
-        candidates: [{ deviceId: 'sim-1', deviceName: 'SIM', routes: ['local'] }],
-        scanning: ['local'],
-      },
-      { kind: 'heart-rate', deviceId: '', deviceName: '', state: 'searching' },
-    ],
-  },
   'device.raw-notification': {
     deviceId: 'sim-1',
     deviceName: 'SIM KICKR',
@@ -192,7 +149,6 @@ const SAMPLES: Record<string, unknown> = {
       },
     },
   },
-  'export.fit-written': { sessionId: 's-1', file: 'recordings/a.fit', bytes: 10, records: 11 },
   'measurement.power': {
     deviceId: 'd',
     value: 200,
@@ -234,15 +190,6 @@ const SAMPLES: Record<string, unknown> = {
       },
     ],
   },
-  'recording.completed': {
-    sessionId: 's-1',
-    file: 'recordings/a.ridrs',
-    bytes: 1000,
-    events: 42,
-    distance: 41.94,
-    durationMs: 10_000,
-  },
-  'recording.failed': { sessionId: 's-1', reason: 'disk full' },
   'trainer.command': {
     deviceId: 'sim-1',
     command: { kind: 'simulation', windSpeed: 0, gradient: -0.0123, crr: 0.004, cw: 0.39 },
@@ -280,49 +227,16 @@ const SAMPLES: Record<string, unknown> = {
     // Without a surface (absent = asphalt) and with one.
     samples: [{ gradient: 0 }, { gradient: 0.05 }, { gradient: 0.05, surface: 'gravel' }],
   },
-  'training.connect-requested': {},
-  'training.disconnect-requested': {},
-  'training.refresh-requested': {},
-  'training.account-changed': { service: 'intervals.icu', state: 'connected', athleteName: 'Alex' },
-  'training.plan-changed': {
-    service: 'intervals.icu',
-    fetchedAt: T,
-    offline: false,
-    athlete: { name: 'Alex', ftp: 250, weight: 72.5 },
-    workouts: [
-      {
-        id: '90001',
-        date: '2026-11-04',
-        name: 'Sweet Spot',
-        sport: 'ride',
-        durationSeconds: 3600,
-        trainingLoad: 70,
-        // A ramp, and a repeat of two intervals.
-        steps: [
-          {
-            kind: 'interval',
-            durationSeconds: 600,
-            phase: 'warm-up',
-            power: { low: 50, high: 75, lowWatts: 125, highWatts: 188 },
-          },
-          {
-            kind: 'repeat',
-            reps: 3,
-            steps: [
-              { kind: 'interval', durationSeconds: 720, power: { low: 90, high: 90 } },
-              { kind: 'interval', durationSeconds: 240, cadence: { low: 85, high: 95 } },
-            ],
-          },
-        ],
-      },
-    ],
-  },
 };
 
-const events = (Object.values(contracts) as unknown[]).filter(
-  (value): value is EventDefinition =>
-    typeof value === 'object' && value !== null && 'schema' in value && 'id' in value,
-);
+// By name: app state topics have an id and a schema too, but never enter a recording (ADR 0068).
+const events = Object.entries(contracts as Record<string, unknown>)
+  .filter(([name]) => name.endsWith('Event'))
+  .map(([, value]) => value)
+  .filter(
+    (value): value is EventDefinition =>
+      typeof value === 'object' && value !== null && 'schema' in value && 'id' in value,
+  );
 
 describe('event payloads are JSON without loss', () => {
   it('has a sample for every event of the contracts', () => {

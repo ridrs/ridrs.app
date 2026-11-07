@@ -20,5 +20,11 @@ export {
 export { EventBus } from './event-bus.ts';
 export { createConsoleLogger, createSilentLogger } from './logger.ts';
 export { PluginHost, type PluginHostOptions } from './plugin-host.ts';
-export { type ResolutionResult, resolveCapabilities } from './resolution.ts';
+export { type AppChannels, type ResolutionResult, resolveCapabilities } from './resolution.ts';
+export {
+  type ServiceCallObserver,
+  type ServiceCallRecord,
+  ServiceRegistry,
+} from './service-registry.ts';
+export { type StateObserver, StateStore } from './state-store.ts';
 export { computeUiRegistry, type UiRegistryInput, type UiRegistryResult } from './ui-registry.ts';

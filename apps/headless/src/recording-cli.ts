@@ -8,6 +8,8 @@ import {
   type HostDescription,
   type PhysicsState,
   physicsStateEvent,
+  type ServiceDefinition,
+  type StateDefinition,
 } from '@ridrs/contracts';
 import { createFileSystemPluginSource } from '@ridrs/core/node';
 import { buildActivity, encodeActivity } from '@ridrs/fit';
@@ -20,6 +22,9 @@ const EXIT = { ok: 0, different: 1, error: 2 } as const;
 export interface RecordingCliContext {
   readonly capabilities: readonly CapabilityContract[];
   readonly events: readonly EventDefinition[];
+  /** App state topics and services the device plugins own and provide in a replay (ADR 0069). */
+  readonly states: readonly StateDefinition[];
+  readonly services: readonly ServiceDefinition[];
   readonly resolvePluginDir: (dir: string) => string;
   /** Resolves file arguments against the caller's directory. */
   readonly resolveFile: (file: string) => string;
@@ -154,6 +159,8 @@ export async function runRecordingCommand(
       sources: dirs.map(context.resolvePluginDir).map(createFileSystemPluginSource),
       capabilities: context.capabilities,
       events: context.events,
+      states: context.states,
+      services: context.services,
     });
     if (values.json) {
       context.out(JSON.stringify(result, null, 2));

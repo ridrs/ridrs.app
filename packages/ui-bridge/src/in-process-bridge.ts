@@ -8,7 +8,7 @@ import {
   uiRegistryChangedEvent,
 } from '@ridrs/contracts';
 import type { PluginHost } from '@ridrs/core';
-import type { UiBridge, Unsubscribe } from '@ridrs/ui-sdk';
+import type { StateUpdate, UiBridge, Unsubscribe } from '@ridrs/ui-sdk';
 
 export interface InProcessUiBridge extends UiBridge {
   dispose(): void;
@@ -33,6 +33,7 @@ export function createInProcessUiBridge(
   const latest = new Map<string, EventEnvelope>();
   const listeners = new Map<string, Set<(envelope: EventEnvelope) => void>>();
   const busSubscriptions: EventSubscription[] = [];
+  const stateWatches = new Set<EventSubscription>();
 
   for (const definition of events) {
     definitions.set(definition.id, definition);
@@ -91,6 +92,45 @@ export function createInProcessUiBridge(
       host.publishEvent(BRIDGE_SOURCE, definition, payload);
     },
 
+    watchState(topicId, listener): Unsubscribe {
+      if (!host.getUiRegistry().state.includes(topicId)) {
+        throw new RidrsError(
+          'state-not-allowed',
+          `No started UI plugin declares the right to watch "${topicId}"`,
+        );
+      }
+      let snapshot = true;
+      const watch = host.watchState(BRIDGE_SOURCE, topicId, ({ entries, changed }) => {
+        const values: Record<string, unknown> = {};
+        const removed: string[] = [];
+        for (const key of changed) {
+          if (entries.has(key)) {
+            values[key] = entries.get(key);
+          } else {
+            removed.push(key);
+          }
+        }
+        const update: StateUpdate = { snapshot, values, removed };
+        snapshot = false;
+        listener(update);
+      });
+      stateWatches.add(watch);
+      return () => {
+        stateWatches.delete(watch);
+        watch.unsubscribe();
+      };
+    },
+
+    async call(serviceId, request) {
+      if (!host.getUiRegistry().calls.includes(serviceId)) {
+        throw new RidrsError(
+          'call-not-allowed',
+          `No started UI plugin declares the right to call "${serviceId}"`,
+        );
+      }
+      return host.callService(serviceId, request, { pluginId: BRIDGE_SOURCE });
+    },
+
     async loadModule(pluginId) {
       return (await host.loadClientModule(pluginId)) as Record<string, unknown>;
     },
@@ -111,6 +151,10 @@ export function createInProcessUiBridge(
       for (const subscription of busSubscriptions.splice(0)) {
         subscription.unsubscribe();
       }
+      for (const watch of stateWatches) {
+        watch.unsubscribe();
+      }
+      stateWatches.clear();
       listeners.clear();
       latest.clear();
     },

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  APP_CHANNEL_TYPES,
   type AppFiles,
   type CapabilityContract,
   type Clock,
@@ -18,9 +19,16 @@ import {
   type PluginDefinition,
   type PluginLogger,
   type PluginManifest,
+  type PluginServicesContext,
   type PluginSettingsContext,
   type PluginState,
+  type PluginStateContext,
   RidrsError,
+  type ServiceCaller,
+  type ServiceDefinition,
+  type ServiceHandler,
+  type StateDefinition,
+  type StateView,
   storageAppFilesCapability,
   type TaskId,
   type TimeSource,
@@ -36,8 +44,10 @@ import { type DiscoveredPlugin, discoverPlugins, type PluginSource } from './dis
 import { EventBus } from './event-bus.ts';
 import { createSilentLogger } from './logger.ts';
 import { resolveCapabilities } from './resolution.ts';
+import { type ServiceCallObserver, ServiceRegistry } from './service-registry.ts';
 import { createPluginSettings } from './settings-service.ts';
 import { SpatialService } from './spatial-service.ts';
+import { type StateObserver, StateStore } from './state-store.ts';
 import { TemporalService } from './temporal-service.ts';
 import { computeUiRegistry } from './ui-registry.ts';
 
@@ -64,6 +74,10 @@ export interface PluginHostOptions {
   readonly capabilities?: Iterable<CapabilityContract>;
   /** Event definitions the host can resolve by id (for bridges that only know ids). */
   readonly events?: Iterable<EventDefinition>;
+  /** App state topics plugins may own and watch (ADR 0068); the core knows no concrete one. */
+  readonly states?: Iterable<StateDefinition>;
+  /** Services plugins may provide and call (ADR 0068); the core knows no concrete one. */
+  readonly services?: Iterable<ServiceDefinition>;
   /** Who runs the host, for `describe()` (recordings name it). */
   readonly platform?: HostPlatform;
   /**
@@ -108,6 +122,8 @@ const EMPTY_UI_REGISTRY: UiRegistry = Object.freeze({
   screens: [],
   contributions: [],
   events: { subscribe: [], publish: [] },
+  state: [],
+  calls: [],
   plugins: [],
 });
 
@@ -133,6 +149,8 @@ export class PluginHost {
   private readonly eventBus: EventBus;
   private readonly temporal: TemporalService;
   private readonly spatial: SpatialService;
+  private readonly stateStore: StateStore;
+  private readonly serviceRegistry: ServiceRegistry;
   private readonly plugins = new Map<string, ManagedPlugin>();
   private readonly pluginSettings = new Map<string, PluginSettingsContext>();
   private dependencyGraph?: DepGraph<string>;
@@ -209,6 +227,12 @@ export class PluginHost {
       isPluginActive: (pluginId) => this.plugins.get(pluginId)?.state === 'started',
       mayWrite: () => this.inTurn(),
     });
+    this.stateStore = new StateStore({
+      report: (diagnostic) => this.diagnostics.report(diagnostic),
+    });
+    this.stateStore.register(options.states ?? []);
+    this.serviceRegistry = new ServiceRegistry({ store: this.stateStore });
+    this.serviceRegistry.register(options.services ?? []);
   }
 
   registerCapability(contract: CapabilityContract): void {
@@ -530,6 +554,10 @@ export class PluginHost {
       enabledDiscoveredList,
       this.capabilityRegistry.getContracts(),
       this.diagnostics,
+      {
+        states: new Set(this.stateStore.topicIds()),
+        services: this.serviceRegistry.definitionsById(),
+      },
     );
 
     this.dependencyGraph = resolution.dependencyGraph;
@@ -590,6 +618,7 @@ export class PluginHost {
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
         this.spatial.releasePlugin(pluginId);
+        this.releaseAppChannels(pluginId);
         this.failPluginAndBlockDependents(pluginId);
         continue;
       }
@@ -612,6 +641,7 @@ export class PluginHost {
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
         this.spatial.releasePlugin(pluginId);
+        this.releaseAppChannels(pluginId);
         this.failPluginAndBlockDependents(pluginId);
         continue;
       }
@@ -650,6 +680,7 @@ export class PluginHost {
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
         this.spatial.releasePlugin(pluginId);
+        this.releaseAppChannels(pluginId);
         this.failPluginAndBlockDependents(pluginId);
       }
     }
@@ -716,6 +747,7 @@ export class PluginHost {
       this.releasePluginTasks(pluginId);
       this.temporal.releasePlugin(pluginId);
       this.spatial.releasePlugin(pluginId);
+      this.releaseAppChannels(pluginId);
       this.failPluginAndBlockDependents(pluginId);
     }
     this.refreshUiRegistry();
@@ -772,6 +804,7 @@ export class PluginHost {
         this.releasePluginTasks(pluginId);
         this.temporal.releasePlugin(pluginId);
         this.spatial.releasePlugin(pluginId);
+        this.releaseAppChannels(pluginId);
       }
     }
     if (this.clock instanceof LiveClock) {
@@ -847,7 +880,164 @@ export class PluginHost {
       this.releasePluginTasks(pluginId);
       this.temporal.releasePlugin(pluginId);
       this.spatial.releasePlugin(pluginId);
+      this.releaseAppChannels(pluginId);
     }
+  }
+
+  /** A stopped plugin's app state keys go, and so do its watches and services (ADR 0068). */
+  private releaseAppChannels(pluginId: string): void {
+    this.stateStore.releasePlugin(pluginId);
+    this.serviceRegistry.releasePlugin(pluginId);
+  }
+
+  /** The current entries of an app state topic (composition roots, tests). */
+  getState(topicId: string): ReadonlyMap<string, unknown> {
+    return this.stateStore.entries(topicId);
+  }
+
+  /** Calls a service for a composition root or a bridge; `ui-bridge` calls for UI clients. */
+  callService(
+    serviceId: string,
+    request: unknown,
+    caller: ServiceCaller = { pluginId: 'core.host' },
+  ): Promise<unknown> {
+    return this.serviceRegistry.call(serviceId, request, caller);
+  }
+
+  /**
+   * A service the composition root provides itself (ADR 0069), e.g. continuing a ride, which only
+   * the root can do. Kept until the host is disposed; a second provider of a service without a
+   * key is refused (`ambiguous-service`).
+   */
+  provideService<Req, Res>(
+    owner: string,
+    service: ServiceDefinition<Req, Res>,
+    handler: ServiceHandler<Req, Res>,
+  ): void {
+    this.serviceRegistry.provide(owner, service, handler);
+  }
+
+  /** Every app state write as it happens, read-only (composition roots, tests). */
+  observeState(owner: string, observer: StateObserver): EventSubscription {
+    return this.stateStore.observe(owner, observer);
+  }
+
+  /** Every finished service call with its answer or error, read-only (composition roots, tests). */
+  observeCalls(_owner: string, observer: ServiceCallObserver): EventSubscription {
+    return this.serviceRegistry.observe(observer);
+  }
+
+  /** A topic's snapshot, then its changed keys, coalesced: what a UI bridge forwards. */
+  watchState(
+    owner: string,
+    topicId: string,
+    listener: (view: StateView<unknown>) => void,
+  ): EventSubscription {
+    return this.stateStore.watch(owner, topicId, listener);
+  }
+
+  /** `ctx.state` and `ctx.services`: input-side types only, as the manifest declares. */
+  private createAppChannels(managed: ManagedPlugin): Pick<PluginContext, 'state' | 'services'> {
+    const manifest = managed.discovered.manifest;
+    const pluginId = manifest.id;
+    const denied = (call: string): RidrsError | undefined =>
+      manifest.types.some((type) => APP_CHANNEL_TYPES.includes(type))
+        ? undefined
+        : new RidrsError(
+            'permission-denied',
+            `Plugin "${pluginId}" called "${call}": only plugins of the types ${APP_CHANNEL_TYPES.join(', ')} use app state and services`,
+            { pluginId },
+          );
+    const assertState = (call: string, topicId: string, declared: readonly string[]): void => {
+      const error = denied(`ctx.state.${call}`);
+      if (error) {
+        throw error;
+      }
+      if (!declared.includes(topicId)) {
+        throw new RidrsError(
+          'undeclared-state',
+          `Plugin "${pluginId}" did not declare "${topicId}" for "ctx.state.${call}" in its manifest`,
+          { pluginId },
+        );
+      }
+    };
+    // A stopped plugin's keys are gone; late work of it (a download) cannot bring them back.
+    const assertStarted = (call: string, topicId: string): void => {
+      if (managed.state !== 'started') {
+        throw new RidrsError(
+          'plugin-not-active',
+          `Plugin "${pluginId}" cannot call "ctx.state.${call}" on "${topicId}" because it is not started`,
+          { pluginId },
+        );
+      }
+    };
+    const owns = manifest.state?.owns ?? [];
+    const readable = [...owns, ...(manifest.state?.watches ?? [])];
+    const state: PluginStateContext = Object.freeze({
+      set: <T>(topic: StateDefinition<T>, key: string, value: T): void => {
+        assertState('set', topic.id, owns);
+        assertStarted('set', topic.id);
+        this.stateStore.set(pluginId, topic.id, key, value);
+      },
+      remove: (topic: StateDefinition, key: string): void => {
+        assertState('remove', topic.id, owns);
+        assertStarted('remove', topic.id);
+        this.stateStore.remove(pluginId, topic.id, key);
+      },
+      get: <T>(topic: StateDefinition<T>, key: string): T | undefined => {
+        assertState('get', topic.id, readable);
+        return this.stateStore.get(topic.id, key) as T | undefined;
+      },
+      entries: <T>(topic: StateDefinition<T>): ReadonlyMap<string, T> => {
+        assertState('entries', topic.id, readable);
+        return this.stateStore.entries(topic.id) as ReadonlyMap<string, T>;
+      },
+      watch: <T>(
+        topic: StateDefinition<T>,
+        listener: (view: StateView<T>) => void,
+      ): EventSubscription => {
+        assertState('watch', topic.id, manifest.state?.watches ?? []);
+        return this.stateStore.watch(
+          pluginId,
+          topic.id,
+          listener as (view: StateView<unknown>) => void,
+        );
+      },
+    });
+    const undeclared = (call: string, serviceId: string, field: string): RidrsError =>
+      new RidrsError(
+        'undeclared-service',
+        `Plugin "${pluginId}" did not declare "${serviceId}" in services.${field} for "ctx.services.${call}"`,
+        { pluginId },
+      );
+    const services: PluginServicesContext = Object.freeze({
+      provide: <Req, Res>(
+        service: ServiceDefinition<Req, Res>,
+        handler: ServiceHandler<Req, Res>,
+      ): void => {
+        const error =
+          denied('ctx.services.provide') ??
+          (manifest.services?.provides.includes(service.id)
+            ? undefined
+            : undeclared('provide', service.id, 'provides'));
+        if (error) {
+          throw error;
+        }
+        this.serviceRegistry.provide(pluginId, service, handler);
+      },
+      call: async <Req, Res>(service: ServiceDefinition<Req, Res>, request: Req): Promise<Res> => {
+        const error =
+          denied('ctx.services.call') ??
+          (manifest.services?.calls.includes(service.id)
+            ? undefined
+            : undeclared('call', service.id, 'calls'));
+        if (error) {
+          throw error;
+        }
+        return (await this.serviceRegistry.call(service.id, request, { pluginId })) as Res;
+      },
+    });
+    return { state, services };
   }
 
   private createPluginContext(managed: ManagedPlugin, signal: AbortSignal): PluginContext {
@@ -887,6 +1077,7 @@ export class PluginHost {
       ui: Object.freeze({ registry: () => this.uiRegistry }),
       host: this.createHostAccess(managed),
       settings: this.settingsOf(manifest),
+      ...this.createAppChannels(managed),
       reportDiagnostic: (
         code: DiagnosticCode,
         message: string,
@@ -1029,6 +1220,7 @@ export class PluginHost {
         this.releasePluginTasks(depId);
         this.temporal.releasePlugin(depId);
         this.spatial.releasePlugin(depId);
+        this.releaseAppChannels(depId);
         this.logger.warn({ pluginId: depId, state: 'blocked' }, `Plugin "${depId}" is blocked`);
       }
     }

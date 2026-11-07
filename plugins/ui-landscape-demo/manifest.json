@@ -8,6 +8,11 @@
   "provides": [],
   "requires": [],
   "entry": "index.ts",
+  "state": {
+    "owns": [
+      "route.offer"
+    ]
+  },
   "ui": {
     "client": "client/index.tsx",
     "contributions": [

@@ -7,6 +7,7 @@
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
     "@ridrs/presentation": "workspace:*",
+    "@ridrs/ui-preview": "workspace:*",
     "@ridrs/ui-sdk": "workspace:*",
     "mp4box": "2.4.1",
     "react": "19.3.1",

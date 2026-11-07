@@ -13,7 +13,7 @@ export interface HttpRequest {
   readonly method: string;
   readonly url: string;
   readonly headers?: Readonly<Record<string, string>>;
-  readonly body?: string;
+  readonly body?: string | Uint8Array<ArrayBuffer>;
 }
 
 export interface HttpResponse {
@@ -45,6 +45,13 @@ export interface PlannedEvent {
   workout_doc?: { steps: unknown[] };
 }
 
+/** An activity file as `POST /api/v1/athlete/{id}/activities` received it. */
+export interface UploadedActivity {
+  readonly externalId: string | null;
+  readonly fileName: string;
+  readonly bytes: Uint8Array;
+}
+
 const API = 'https://intervals.icu';
 export const LOOPBACK_PORT = 53682;
 const ISSUED_TOKEN = 'simulated-token-7f3a9c';
@@ -54,6 +61,11 @@ export class SimulatedIntervalsIcu {
   athlete = { id: 'i4711', name: 'Athlete', ftp: 200, weight: 70 };
   events: PlannedEvent[] = [];
   reachable = true;
+  /** Uploads fail as if the network were gone, while everything else answers. */
+  uploadsReachable = true;
+  /** The status of the next uploads; 201 creates the activity. */
+  uploadStatus = 201;
+  readonly uploads: UploadedActivity[] = [];
   /** The token the API accepts; `undefined` rejects every token. */
   validToken: string | undefined = ISSUED_TOKEN;
   readonly token = ISSUED_TOKEN;
@@ -117,6 +129,9 @@ export class SimulatedIntervalsIcu {
           }),
         );
       }
+      if (request.method === 'POST' && url.pathname === '/api/v1/athlete/0/activities') {
+        return this.upload(request, url);
+      }
       if (request.method === 'DELETE' && url.pathname === '/api/v1/disconnect-app') {
         this.validToken = undefined;
         return json(200, {});
@@ -124,6 +139,32 @@ export class SimulatedIntervalsIcu {
       return json(404, { error: `No route ${request.method} ${url.pathname}` });
     },
   };
+
+  /** Multipart with the activity in `file`, as the API takes it; a token without the scope gets 403. */
+  private async upload(request: HttpRequest, url: URL): Promise<HttpResponse> {
+    if (!this.uploadsReachable) {
+      throw new Error('connect ETIMEDOUT intervals.icu');
+    }
+    if (this.uploadStatus !== 201) {
+      return json(this.uploadStatus, { error: 'Upload refused' });
+    }
+    const contentType = Object.entries(request.headers ?? {}).find(
+      ([name]) => name.toLowerCase() === 'content-type',
+    )?.[1];
+    const form = await new Response(request.body, {
+      headers: contentType ? { 'content-type': contentType } : {},
+    }).formData();
+    const file = form.get('file');
+    if (!(file instanceof Blob)) {
+      return json(422, { error: 'No file' });
+    }
+    this.uploads.push({
+      externalId: url.searchParams.get('external_id'),
+      fileName: file instanceof File ? file.name : '',
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    });
+    return json(201, [{ icu_athlete_id: this.athlete.id, id: `i${90_000 + this.uploads.length}` }]);
+  }
 
   private authorized(request: HttpRequest): boolean {
     const header = Object.entries(request.headers ?? {}).find(
@@ -136,7 +177,7 @@ export class SimulatedIntervalsIcu {
   readonly exchanges: Array<{ readonly fields: URLSearchParams; readonly accepted: boolean }> = [];
 
   private exchange(request: HttpRequest): HttpResponse {
-    const fields = new URLSearchParams(request.body ?? '');
+    const fields = new URLSearchParams(typeof request.body === 'string' ? request.body : '');
     const challenge = this.lastAuthorization?.searchParams.get('code_challenge');
     const verifier = fields.get('code_verifier') ?? '';
     const accepted =

@@ -32,6 +32,9 @@
         "ui.terrain-observed",
         "ui.position-observed"
       ]
-    }
+    },
+    "state": [
+      "route.offer"
+    ]
   }
 }

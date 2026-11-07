@@ -1,9 +1,0 @@
-{
-  "id": "device-registry",
-  "name": "Device Registry",
-  "version": "0.1.0",
-  "types": ["device-registry"],
-  "provides": [],
-  "requires": [],
-  "entry": "index.ts"
-}

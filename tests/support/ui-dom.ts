@@ -11,7 +11,11 @@ import type { RidrsWorld } from './world.ts';
 // cucumber.mjs runs these scenarios in their own process, apart from Node-only scenarios.
 Before({ tags: '@ui' }, function (this: RidrsWorld) {
   if (!GlobalRegistrator.isRegistered) {
+    // happy-dom brings its own WritableStream and TransformStream but keeps Node's ReadableStream:
+    // a pipe across the two breaks (zip.js in the media plugins). A WebView has one set; so do we.
+    const { WritableStream, TransformStream } = globalThis;
     GlobalRegistrator.register({ url: 'http://localhost/' });
+    Object.assign(globalThis, { WritableStream, TransformStream });
     // The simulated trainer plays in real time; its steady state arrives after about two seconds.
     configure({ asyncUtilTimeout: 5000 });
   }

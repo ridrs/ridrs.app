@@ -15,7 +15,7 @@ const CSS = `
 .ms-root { --ridrs-bg: #0b1220; --ridrs-surface: #131c2e; --ridrs-surface-raised: #1a2540;
   --ridrs-line: #24324d; --ridrs-text: #f2f5fa; --ridrs-text-muted: #93a1b8;
   --ridrs-accent: #b8f53b; --ridrs-accent-text: #0b1220; --ridrs-info: #2aa8ff;
-  --ridrs-ok: #3ddc84; --ridrs-warn: #ffb62e; --ridrs-focus: #ffffff;
+  --ridrs-ok: #3ddc84; --ridrs-warn: #ffb62e; --ridrs-favourite: #ffd60a; --ridrs-focus: #ffffff;
   --ridrs-radius: 16px; --ridrs-gap: 16px;
   box-sizing: border-box; display: grid; height: 100%; min-height: 100vh;
   grid-template-columns: 200px minmax(0, 1fr); grid-template-areas: "menu main";

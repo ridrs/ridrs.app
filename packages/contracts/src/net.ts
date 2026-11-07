@@ -15,7 +15,8 @@ export interface HttpRequest {
   readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   readonly url: string;
   readonly headers?: Readonly<Record<string, string>>;
-  readonly body?: string;
+  /** Text, or bytes such as a multipart upload. */
+  readonly body?: string | Uint8Array<ArrayBuffer>;
 }
 
 export interface HttpResponse {

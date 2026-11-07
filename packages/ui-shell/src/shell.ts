@@ -4,8 +4,12 @@ import {
   type EventDefinition,
   type EventEnvelope,
   RidrsError,
+  type ServiceDefinition,
+  type StateDefinition,
+  type StateView,
   type UiRegistry,
   type UiRegistryContribution,
+  type UiRegistryPlugin,
   type UiRegistryScreen,
 } from '@ridrs/contracts';
 import { FrameClock, type FrameSource } from '@ridrs/presentation';
@@ -125,8 +129,14 @@ export function mountShell(
     return module;
   };
 
-  const eventsOf = (pluginId: string) =>
-    registry.plugins.find((p) => p.pluginId === pluginId)?.events ?? { subscribe: [], publish: [] };
+  const listsOf = (pluginId: string): UiRegistryPlugin =>
+    registry.plugins.find((p) => p.pluginId === pluginId) ?? {
+      pluginId,
+      events: { subscribe: [], publish: [] },
+      state: [],
+      calls: [],
+    };
+  const eventsOf = (pluginId: string) => listsOf(pluginId).events;
 
   /** Mounts one component; everything it obtains through its context is released on unmount. */
   const mountComponent = (entry: Entry, container: HTMLElement): Mounted => {
@@ -177,6 +187,52 @@ export function mountShell(
           bridge.publish(def.id, payload);
         },
       },
+      state: {
+        watch<T>(topic: StateDefinition<T>, listener: (view: StateView<T>) => void) {
+          if (!listsOf(entry.pluginId).state.includes(topic.id)) {
+            throw new RidrsError(
+              'undeclared-state',
+              `Plugin "${entry.pluginId}" did not declare "${topic.id}" in ui.state`,
+              { pluginId: entry.pluginId },
+            );
+          }
+          // The client's own copy of the topic, rebuilt from the bridge's messages.
+          const entries = new Map<string, T>();
+          return own(
+            bridge.watchState(topic.id, (update) => {
+              if (update.snapshot) {
+                entries.clear();
+              }
+              const changed = [...update.removed];
+              for (const key of update.removed) {
+                entries.delete(key);
+              }
+              for (const [key, value] of Object.entries(update.values)) {
+                const parsed = topic.schema.safeParse(value);
+                if (!parsed.success) {
+                  logger.warn(`Dropped an invalid "${topic.id}" value for "${entry.pluginId}"`);
+                  continue;
+                }
+                entries.set(key, parsed.data);
+                changed.push(key);
+              }
+              listener({ entries: new Map(entries), changed });
+            }),
+          );
+        },
+      },
+      call<Req, Res>(service: ServiceDefinition<Req, Res>, request: Req): Promise<Res> {
+        if (!listsOf(entry.pluginId).calls.includes(service.id)) {
+          return Promise.reject(
+            new RidrsError(
+              'undeclared-service',
+              `Plugin "${entry.pluginId}" did not declare "${service.id}" in ui.calls`,
+              { pluginId: entry.pluginId },
+            ),
+          );
+        }
+        return bridge.call(service.id, request) as Promise<Res>;
+      },
       slot: (point, slotContainer, slotOptions) =>
         own(openSlot(point, slotContainer, slotOptions?.contribution)),
       frames: {
@@ -191,6 +247,7 @@ export function mountShell(
         // Deferred so a component may navigate from inside its own render or event handler.
         queueMicrotask(() => navigate(path));
       },
+      hasScreen: (path) => registry.screens.some((s) => s.id === path),
       onNavigated: (handler) => {
         const entryHandler = (screen: string) => handler(screen);
         navigated.add(entryHandler);

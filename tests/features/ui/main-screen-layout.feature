@@ -14,7 +14,7 @@ Feature: The main screen's layout
   layout observes and read the spans the layout declares.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-devices, ui-ride-recovery" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-devices, ui-ride-recovery" together with a test device plugin "test-device"
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown

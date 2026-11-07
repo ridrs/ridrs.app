@@ -256,6 +256,7 @@ Record the power per gear, the ERG settle times and anything the KICKR CORE refu
 
 - `pnpm test` runs Vitest and Cucumber. Cucumber runs twice: Node-only scenarios, then the `@ui` scenarios (profile `ui`), which render the real shell and UI plugins into a headless DOM (happy-dom). No browser and no Rust toolchain are needed.
 - `cargo test` in `crates/ridrs-ble` and `crates/ridrs-bridge` runs the Rust unit tests of the native BLE layer and the bridge network.
+- `cargo test` in `crates/ridrs-media` runs the Rust tests of media storage, resumable downloads and ZIP extraction (ADR 0067).
 
 ## Web Application
 

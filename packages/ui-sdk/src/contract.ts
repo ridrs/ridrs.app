@@ -4,6 +4,9 @@ import type {
   EventDefinition,
   EventEnvelope,
   PluginSettingsContext,
+  ServiceDefinition,
+  StateDefinition,
+  StateView,
   UiRegistry,
 } from '@ridrs/contracts';
 
@@ -46,6 +49,20 @@ export interface UiContext {
     /** Throws `undeclared-event` unless the event is in the plugin's own `ui.events.publish`. */
     publish<T>(def: EventDefinition<T>, payload: T): void;
   };
+  /** App state beside the bus (ADR 0068): the topics of the plugin's own `ui.state`. */
+  readonly state: {
+    /**
+     * Calls `listener` with every entry first, then with the keys changed since, coalesced per
+     * tick. Throws `undeclared-state` unless the topic is in the plugin's own `ui.state`.
+     */
+    watch<T>(topic: StateDefinition<T>, listener: (view: StateView<T>) => void): Unsubscribe;
+  };
+  /**
+   * Calls a service of the plugin's own `ui.calls` (ADR 0068). Rejects with a RidrsError:
+   * `undeclared-service`, `service-unavailable`, `unknown-key`, `invalid-request`, or the reason
+   * of the plugin that answers.
+   */
+  call<Req, Res>(service: ServiceDefinition<Req, Res>, request: Req): Promise<Res>;
   /**
    * Mounts every contribution of the extension point into `container` and keeps it in sync. With
    * `contribution` (`<pluginId>/<contributionId>`), only that one, once it targets the point.
@@ -58,6 +75,8 @@ export interface UiContext {
   onBack(handler: () => void): Unsubscribe;
   /** Switches the active screen; unknown paths are logged and ignored. */
   navigate(path: string): void;
+  /** Whether a screen with this id is there to navigate to: a screen of a plugin that may be absent. */
+  hasScreen(path: string): boolean;
   /**
    * The plugin's settings documents (ADR 0059): the same as its host side's `ctx.settings`, with
    * the same permissions (`persistence` in the manifest). A write is kept once it resolves. The
@@ -91,6 +110,17 @@ export interface UiContext {
 export type UiComponent = (container: HTMLElement, ctx: UiContext) => void | Unsubscribe;
 
 /**
+ * One message of a state watch (ADR 0068), shaped so a remote bridge can send it as it is: the
+ * first is the snapshot, later ones carry the keys changed since, each with its last value.
+ */
+export interface StateUpdate {
+  /** The first update of a watch: `values` holds every entry. */
+  readonly snapshot: boolean;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly removed: readonly string[];
+}
+
+/**
  * Port between the shell and the host. The native app implements it in-process; a remote
  * implementation (e.g. a WebSocket gateway) can be added without changing the shell.
  */
@@ -104,6 +134,10 @@ export interface UiBridge {
   subscribe(eventId: string, listener: (envelope: EventEnvelope) => void): Unsubscribe;
   /** Throws `event-not-allowed` or `invalid-event-payload`; nothing is published then. */
   publish(eventId: string, payload: unknown): void;
+  /** The snapshot of the topic, then its changes. Throws `state-not-allowed` outside `registry().state`. */
+  watchState(topicId: string, listener: (update: StateUpdate) => void): Unsubscribe;
+  /** The service's answer or its error; rejects `call-not-allowed` outside `registry().calls`. */
+  call(serviceId: string, request: unknown): Promise<unknown>;
   loadModule(pluginId: string): Promise<Record<string, unknown>>;
   reportClientError(pluginId: string, message: string): void;
   /** The settings documents of a plugin in the registry; throws for any other. */

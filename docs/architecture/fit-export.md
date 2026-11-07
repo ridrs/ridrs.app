@@ -2,7 +2,7 @@
 
 # FIT Export (Phase 9)
 
-Every saved ride is exported as a FIT activity file next to its recording, by `export-fit` on `recording.completed` (and by `ridrs-headless recording export-fit`, byte-identical). ridrs writes FIT with its own encoder; the official Garmin FIT SDK only validates it in tests ([ADR 0034](../decisions/0034-fit-own-encoder-sdk-validation-only.md)).
+Every saved ride is exported as a FIT activity file next to its recording, by `export-fit`, which reconciles the app state `recording.ride` ([ADR 0069](../decisions/0069-recording-devices-and-bridge-beside-the-bus.md): a saved ride whose FIT file is not there yet is exported, a deleted ride's FIT file removed; a restart writes nothing again; the export is the app state `export.fit`) (and by `ridrs-headless recording export-fit`, byte-identical). ridrs writes FIT with its own encoder; the official Garmin FIT SDK only validates it in tests ([ADR 0034](../decisions/0034-fit-own-encoder-sdk-validation-only.md)).
 
 ## The activity model (`buildActivity`, pure)
 

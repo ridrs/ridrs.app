@@ -1,0 +1,9 @@
+{
+  "id": "data-fetch-node",
+  "name": "Downloads (Node)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["data.fetch"],
+  "requires": ["storage.media"],
+  "entry": "index.ts"
+}

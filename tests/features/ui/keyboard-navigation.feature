@@ -13,7 +13,7 @@ Feature: Using the UI with arrow keys, Enter and Back
   browser does; the step checks that the focus is on a real button.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 

@@ -17,11 +17,12 @@ import {
   type PhysicsState,
   type PluginContext,
   physicsStateEvent,
-  recordingCompletedEvent,
-  recordingFailedEvent,
-  recordingFinishRequestedEvent,
-  recordingRecoverableChangedEvent,
   storageAppFilesCapability,
+  type RecordingRide,
+  recordingDeleteService,
+  recordingFinishService,
+  recordingRecoverableState,
+  recordingRideState,
 } from '@ridrs/contracts';
 import {
   buildConfigSnapshot,
@@ -32,6 +33,7 @@ import {
   lastRecordTime,
   OPEN_RECORDING_EXTENSION,
   openRecordingPath,
+  RECORDING_EXTENSION,
   RECORDINGS_DIRECTORY,
   type Recording,
   RecordingWriter,
@@ -93,7 +95,7 @@ interface Recorder {
   bicycle?: Buffered;
   ride?: Ride;
   /** The interrupted ride on offer (ADR 0057): continued by the composition root or finished. */
-  offered?: { readonly openPath: string };
+  offered?: { readonly openPath: string; readonly sessionId: string };
   /**
    * A continuing host (ADR 0057): the journal to go on with. Until its `activity.interrupted`
    * input everything is the rebuilt past; from it on, envelopes wait here while the file is
@@ -148,8 +150,13 @@ function fail(ctx: PluginContext, ride: Ride, error: unknown): void {
     `The recording of ride ${ride.sessionId} failed: ${reason(error)}`,
     { sessionId: ride.sessionId, file: ride.openPath },
   );
+  setRide(ctx, { sessionId: ride.sessionId, state: 'failed', reason: reason(error) });
+}
+
+/** A ride's state for the app (ADR 0069): not on the bus, so never in a journal. */
+function setRide(ctx: PluginContext, ride: RecordingRide): void {
   if (!ctx.signal.aborted) {
-    ctx.events.publish(recordingFailedEvent, { sessionId: ride.sessionId, reason: reason(error) });
+    ctx.state.set(recordingRideState, ride.sessionId, ride);
   }
 }
 
@@ -309,11 +316,9 @@ async function closeRide(ctx: PluginContext, recorder: Recorder, ride: Ride): Pr
   try {
     const open = new TextDecoder().decode(await recorder.storage.read(ride.openPath));
     const { bytes } = await seal(recorder.storage, ride.openPath, ride.path, open);
-    if (ctx.signal.aborted) {
-      return;
-    }
-    ctx.events.publish(recordingCompletedEvent, {
+    setRide(ctx, {
       sessionId: ride.sessionId,
+      state: 'saved',
       file: ride.path,
       bytes,
       events: ride.writer.eventCount(),
@@ -343,12 +348,10 @@ async function sealOrphan(
       status: recording.footer?.status,
       ...(why ? { notContinued: why } : {}),
     });
-    if (ctx.signal.aborted) {
-      return;
-    }
     const distance = distanceOf(recording);
-    ctx.events.publish(recordingCompletedEvent, {
+    setRide(ctx, {
       sessionId: recording.header.sessionId,
+      state: 'saved',
       file: path,
       bytes,
       events: recording.events.length,
@@ -432,27 +435,51 @@ async function recoverOrphans(ctx: PluginContext, recorder: Recorder): Promise<v
   }
   const { openPath, journal } = newest;
   const distance = distanceOf(journal.recording);
-  recorder.offered = { openPath };
-  ctx.events.publish(recordingRecoverableChangedEvent, {
-    ride: {
-      sessionId: journal.recording.header.sessionId,
-      file: openPath,
-      startedAt: journal.recording.header.startedAt,
-      lastRecordAt: journal.lastRecordAt,
-      ...(distance !== undefined ? { distance } : {}),
-    },
+  const sessionId = journal.recording.header.sessionId;
+  recorder.offered = { openPath, sessionId };
+  ctx.state.set(recordingRecoverableState, sessionId, {
+    sessionId,
+    file: openPath,
+    startedAt: journal.recording.header.startedAt,
+    lastRecordAt: journal.lastRecordAt,
+    ...(distance !== undefined ? { distance } : {}),
   });
 }
 
-/** The rider finishes the interrupted ride on offer: it is completed as `recovered`. */
-async function finishOffered(ctx: PluginContext, recorder: Recorder, file: string): Promise<void> {
-  if (recorder.offered?.openPath !== file) {
+/**
+ * The rider deletes a saved ride (`recording.delete`). Only the completed recording of that
+ * session is removed: nothing else in the app files may go with it. Rejects with the reason.
+ */
+async function deleteRecording(ctx: PluginContext, recorder: Recorder, sessionId: string): Promise<void> {
+  const ride = ctx.state.get(recordingRideState, sessionId);
+  const file = ride?.file;
+  const completed =
+    ride?.state === 'saved' &&
+    file !== undefined &&
+    file.startsWith(`${RECORDINGS_DIRECTORY}/`) &&
+    fileNameOf(file).endsWith(`-${sessionId.slice(0, 8)}${RECORDING_EXTENSION}`);
+  if (!completed) {
+    throw new Error(`Ride ${sessionId} has no saved recording to delete`);
+  }
+  try {
+    await recorder.storage.remove(file);
+  } catch (error) {
+    ctx.logger.warn({ file, error: reason(error) }, 'recording: the recording could not be deleted');
+    throw new Error(`The recording of ride ${sessionId} could not be deleted: ${reason(error)}`);
+  }
+  setRide(ctx, { ...ride, state: 'deleted' });
+}
+
+/** The rider finishes the interrupted ride on offer (`recording.finish`): it is completed as `recovered`. */
+async function finishOffered(ctx: PluginContext, recorder: Recorder, sessionId: string): Promise<void> {
+  const offered = recorder.offered;
+  if (offered?.sessionId !== sessionId) {
     return;
   }
   recorder.offered = undefined;
-  await sealOrphan(ctx, recorder, file);
+  await sealOrphan(ctx, recorder, offered.openPath);
   if (!ctx.signal.aborted) {
-    ctx.events.publish(recordingRecoverableChangedEvent, {});
+    ctx.state.remove(recordingRecoverableState, sessionId);
   }
 }
 
@@ -614,8 +641,14 @@ export default definePlugin({
   start(ctx) {
     // A restarted plugin has a fresh context (and no initialize): it observes from here.
     const recorder = observeHost(ctx);
-    ctx.events.subscribe(recordingFinishRequestedEvent, ({ payload }) => {
-      void finishOffered(ctx, recorder, payload.file);
+    // App commands are services (ADR 0069): never in a journal, never done again.
+    ctx.services.provide(recordingFinishService, async ({ key }) => {
+      await finishOffered(ctx, recorder, key);
+      return {};
+    });
+    ctx.services.provide(recordingDeleteService, async ({ key }) => {
+      await deleteRecording(ctx, recorder, key);
+      return {};
     });
     void recoverOrphans(ctx, recorder).catch((error: unknown) =>
       ctx.reportDiagnostic(

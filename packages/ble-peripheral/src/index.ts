@@ -9,3 +9,4 @@ export {
 } from './link.ts';
 export { type DeviceMemory, loadDeviceMemory } from './memory.ts';
 export { type NativeScan, SharedBleScan, type StartNativeScan } from './shared-scan.ts';
+export { type DeviceLinkCommands, DeviceStatusBoard, registerDeviceLink } from './status.ts';

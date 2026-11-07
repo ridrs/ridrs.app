@@ -27,6 +27,9 @@ Feature: Continue an interrupted ride in the app
     Then the power widget shows "220" "W"
     When 2 seconds pass in real time
     And I press "Finish ride"
+    Then the "debriefing" screen is shown
+    And the debriefing offers "Save" and "Delete"
+    When I press "Save"
     Then the "main" screen is shown
     And eventually the "ride-saved" panel shows a recording file and a FIT file
     When I run "ridrs-headless recording replay" on the saved recording

@@ -31,7 +31,8 @@ Feature: Device details in the device setup
   status shows no warning icon, in its row and in its card.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, metric-power, metric-heart-rate, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, metric-power, metric-heart-rate, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    And a stand-in "test-bridge" for the companion bridge
     And the host has started
     And the ridrs UI is shown
 

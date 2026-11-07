@@ -3,13 +3,14 @@
 import {
   activityStateChangedEvent,
   type PlannedWorkout,
+  type ServiceDefinition,
   type TrainingAccount,
   type TrainingPlan,
-  trainingAccountChangedEvent,
-  trainingConnectRequestedEvent,
-  trainingDisconnectRequestedEvent,
-  trainingPlanChangedEvent,
-  trainingRefreshRequestedEvent,
+  trainingAccountState,
+  trainingConnectService,
+  trainingDisconnectService,
+  trainingPlanState,
+  trainingRefreshService,
 } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useLayoutEffect, useState } from 'react';
@@ -28,9 +29,12 @@ import { COLORS, TrainingStyles } from './theme.tsx';
 const MAIN = 'main';
 const DETAILS = 'training-workout';
 
+/** The service whose account and plan this plugin shows: its key in the app state. */
+const SERVICE = 'intervals.icu';
+
 /**
- * The latest account state and plan; the bridge replays both to every component that mounts
- * later. Layout effects take the replayed values before the first paint, so nothing flashes.
+ * The account and the plan, from the app state `training.account` and `training.plan` (ADR
+ * 0068): every component that mounts gets both as they are now, then their changes.
  */
 function useTraining(ctx: UiContext): {
   readonly account?: TrainingAccount;
@@ -40,14 +44,21 @@ function useTraining(ctx: UiContext): {
   const [plan, setPlan] = useState<TrainingPlan>();
   useLayoutEffect(() => {
     const subscriptions = [
-      ctx.events.subscribe(trainingAccountChangedEvent, ({ payload }) => setAccount(payload)),
-      ctx.events.subscribe(trainingPlanChangedEvent, ({ payload }) => setPlan(payload)),
+      ctx.state.watch(trainingAccountState, ({ entries }) => setAccount(entries.get(SERVICE))),
+      ctx.state.watch(trainingPlanState, ({ entries }) => setPlan(entries.get(SERVICE))),
     ];
     return () => {
       for (const unsubscribe of subscriptions) unsubscribe();
     };
   }, [ctx]);
   return { account, plan };
+}
+
+/** Calls a service of the account; the planner answers once the work started, its state follows. */
+function callAccount(ctx: UiContext, service: ServiceDefinition<{ readonly key: string }, unknown>): void {
+  ctx.call(service, { key: SERVICE }).catch((error: unknown) =>
+    ctx.logger.warn(`intervals.icu: "${service.id}" was refused`, error),
+  );
 }
 
 /** "Today" is the rider's calendar day; the UI reads the wall clock, never drives anything with it. */
@@ -81,6 +92,24 @@ function PowerProfile({ workout }: { readonly workout: PlannedWorkout }) {
   );
 }
 
+/** After a rejected token the rider connects again; else for the first time. */
+const connectLabel = (account: TrainingAccount): string =>
+  account.reason === 'token-rejected' ? 'Reconnect intervals.icu' : 'Connect intervals.icu';
+
+/** While the sign-in runs in the system browser. */
+function Connecting({ testId }: { readonly testId: string }) {
+  return (
+    <section className="rt-panel" data-testid={testId}>
+      <TrainingStyles />
+      <span className="rt-caption">
+        <span className="rt-spin" aria-hidden="true" />
+        Connecting to intervals.icu…
+      </span>
+      <span className="rt-hint">Finish the sign-in in your browser.</span>
+    </section>
+  );
+}
+
 function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
   const { account, plan } = useTraining(ctx);
   if (!account) {
@@ -88,22 +117,11 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
   }
 
   if (account.state === 'connecting') {
-    return (
-      <section className="rt-panel" data-testid="training-account">
-        <TrainingStyles />
-        <span className="rt-caption">
-          <span className="rt-spin" aria-hidden="true" />
-          Connecting to intervals.icu…
-        </span>
-        <span className="rt-hint">Finish the sign-in in your browser.</span>
-      </section>
-    );
+    return <Connecting testId="training-account" />;
   }
 
   if (account.state !== 'connected') {
     const message = accountMessage(account);
-    const label =
-      account.reason === 'token-rejected' ? 'Reconnect intervals.icu' : 'Connect intervals.icu';
     return (
       <section className="rt-panel" data-testid="training-account">
         <TrainingStyles />
@@ -111,9 +129,9 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
         <button
           type="button"
           className="rt-button"
-          onClick={() => ctx.events.publish(trainingConnectRequestedEvent, {})}
+          onClick={() => callAccount(ctx, trainingConnectService)}
         >
-          {label}
+          {connectLabel(account)}
         </button>
         <span className="rt-hint">Your planned workouts on the main screen.</span>
       </section>
@@ -130,7 +148,6 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
   return (
     <section className="rt-panel" data-testid="training-account">
       <TrainingStyles />
-      <span className="rt-caption">intervals.icu · {caption}</span>
       <button
         type="button"
         className="rt-card"
@@ -144,15 +161,14 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
         }
         onClick={() => ctx.navigate(DETAILS)}
       >
+        <span className="rt-classifier">Next workout</span>
         {workout ? (
           <>
-            <span className="rt-day" data-testid="next-workout-day">
-              {dayLabel(workout.date, Date.now())}
-            </span>
             <span className="rt-name" data-testid="next-workout-name">
               {workout.name}
             </span>
             <span className="rt-facts">
+              <span data-testid="next-workout-day">{dayLabel(workout.date, Date.now())}</span>
               {workout.durationSeconds !== undefined ? (
                 <span data-testid="next-workout-duration">{durationLabel(workout.durationSeconds)}</span>
               ) : null}
@@ -166,6 +182,7 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
           <span className="rt-name rt-muted">{plan ? 'No workout planned' : 'Loading your plan…'}</span>
         )}
       </button>
+      <span className="rt-caption">intervals.icu · {caption}</span>
     </section>
   );
 }
@@ -255,22 +272,59 @@ function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
         <button
           type="button"
           className="rt-button"
-          onClick={() => ctx.events.publish(trainingRefreshRequestedEvent, {})}
+          onClick={() => callAccount(ctx, trainingRefreshService)}
         >
           Refresh
         </button>
-        <button
-          type="button"
-          className="rt-button rt-quiet"
-          onClick={() => {
-            ctx.events.publish(trainingDisconnectRequestedEvent, {});
-            ctx.navigate(MAIN);
-          }}
-        >
-          Disconnect intervals.icu
-        </button>
       </footer>
     </main>
+  );
+}
+
+/** The account in the Me area: its state, Connect or Reconnect, and Disconnect. */
+function IntervalsConnectionView({ ctx }: { readonly ctx: UiContext }) {
+  const { account } = useTraining(ctx);
+  if (!account) {
+    return null;
+  }
+
+  if (account.state === 'connecting') {
+    return <Connecting testId="intervals-connection" />;
+  }
+
+  if (account.state !== 'connected') {
+    const message = accountMessage(account);
+    return (
+      <section className="rt-panel" data-testid="intervals-connection">
+        <TrainingStyles />
+        <span className="rt-caption">intervals.icu · Not connected</span>
+        {message ? <span className="rt-hint rt-warn">{message}</span> : null}
+        <button
+          type="button"
+          className="rt-button"
+          onClick={() => callAccount(ctx, trainingConnectService)}
+        >
+          {connectLabel(account)}
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rt-panel" data-testid="intervals-connection">
+      <TrainingStyles />
+      <span className="rt-caption">
+        intervals.icu · {account.athleteName ? `Connected as ${account.athleteName}` : 'Connected'}
+      </span>
+      <span className="rt-hint">Your planned workouts come from here.</span>
+      <button
+        type="button"
+        className="rt-button rt-quiet"
+        onClick={() => callAccount(ctx, trainingDisconnectService)}
+      >
+        Disconnect intervals.icu
+      </button>
+    </section>
   );
 }
 
@@ -283,5 +337,11 @@ export const NextWorkout: UiComponent = (container, ctx) => {
 export const WorkoutDetails: UiComponent = (container, ctx) => {
   const root = createRoot(container);
   root.render(<WorkoutDetailsView ctx={ctx} />);
+  return () => root.unmount();
+};
+
+export const IntervalsConnection: UiComponent = (container, ctx) => {
+  const root = createRoot(container);
+  root.render(<IntervalsConnectionView ctx={ctx} />);
   return () => root.unmount();
 };

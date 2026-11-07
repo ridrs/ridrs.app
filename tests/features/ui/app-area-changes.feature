@@ -6,24 +6,24 @@ Feature: Changes in the app's areas take effect at once and are kept
   the card can be hidden on Today and shown again in its area.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-devices, ui-area-ride, ui-area-training, ui-area-events, ui-area-me, ui-search, ui-settings" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-devices, ui-area-ride, ui-area-training, ui-area-events, ui-area-me, ui-search, ui-settings" together with a test device plugin "test-device"
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
 
   Scenario: A favourite route is kept
     When I press "Ride"
-    And I press "Favourite Alpine Loop"
-    Then the button "Favourite Alpine Loop" is on
+    And I press "Favourite Demo course"
+    Then the button "Favourite Demo course" is on
     When ridrs restarted
     And I reload the UI
     And I press "Ride"
-    Then the button "Favourite Alpine Loop" is on
+    Then the button "Favourite Demo course" is on
     And the user settings hold the file "config/user/ui-area-ride/preview.json"
 
   Scenario: Two clicks from a route to the ride
     When I press "Ride"
-    And I press "Alpine Loop"
+    And I press "Demo course"
     And I press "Go"
     Then the "activity" screen is shown
 

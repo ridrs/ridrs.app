@@ -11,6 +11,7 @@ import {
   userDocument,
 } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
@@ -84,9 +85,14 @@ function Stepper({
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+/** Where services such as a training planner are connected and disconnected: other plugins contribute them. */
+const CONNECTION_SLOT = 'me/connection';
+
 function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
   const [state, change] = useMe(ctx);
+  const connections = useRef<HTMLDivElement>(null);
   useBack(ctx);
+  useEffect(() => (connections.current ? ctx.slot(CONNECTION_SLOT, connections.current) : undefined), [ctx]);
   const wattsPerKg = (state.ftp / state.weight).toFixed(2);
   return (
     <AreaPage title="Me" intro="Your rides, your progress and your account.">
@@ -139,6 +145,10 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
         </div>
       </section>
       <section className="pv-section">
+        <h2>Connected services</h2>
+        <div ref={connections} data-testid="slot-me-connection" />
+      </section>
+      <section className="pv-section">
         <h2>On Today</h2>
         <div className="pv-row">
           <Toggle
@@ -158,10 +168,13 @@ function WeeklyGoalView({ ctx }: { readonly ctx: UiContext }) {
   if (!state.showOnToday) return null;
   const share = Math.min(1, RIDDEN_HOURS / state.weeklyHours);
   return (
-    <TodayCard title="Weekly goal" onHide={() => change((s) => ({ ...s, showOnToday: false }))}>
-      <strong>
-        {RIDDEN_HOURS} of {state.weeklyHours} h
-      </strong>
+    <TodayCard
+      classifier="Weekly goal"
+      icon={USER}
+      title={`${RIDDEN_HOURS} of ${state.weeklyHours} h`}
+      details={[`${Math.round(share * 100)} % of this week's goal`]}
+      onHide={() => change((s) => ({ ...s, showOnToday: false }))}
+    >
       <div role="progressbar" aria-label="Weekly goal" aria-valuenow={Math.round(share * 100)} style={BAR}>
         <i style={{ ...FILL, width: `${share * 100}%` }} />
       </div>

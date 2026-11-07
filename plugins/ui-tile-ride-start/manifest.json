@@ -19,14 +19,15 @@
     ],
     "events": {
       "subscribe": [
-        "recording.completed",
-        "recording.failed",
-        "export.fit-written",
         "equipment.bicycle-changed"
       ],
       "publish": [
         "activity.start-requested"
       ]
-    }
+    },
+    "state": [
+      "export.fit",
+      "recording.ride"
+    ]
   }
 }

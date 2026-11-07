@@ -18,31 +18,32 @@ import {
   type BleCentral,
   bleBridgeConnectorCapability,
   bleCentralCapability,
-  bridgeCompanionsChangedEvent,
-  bridgeConnectRequestedEvent,
-  bridgeDisconnectRequestedEvent,
-  bridgeForgetRequestedEvent,
-  bridgePairingOfferEvent,
-  bridgePairRequestedEvent,
-  bridgeStateChangedEvent,
+  bridgeCompanionsState,
+  bridgeConnectService,
+  bridgeDisconnectService,
+  bridgeForgetService,
+  bridgeLinkState,
+  bridgePairingState,
+  bridgePairService,
   type CapabilityCardinality,
   type CapabilityContract,
   configSnapshotCapability,
   controllerButtonsChangedEvent,
+  dataArchiveCapability,
+  dataFetchCapability,
   defineCapability,
   defineEvent,
-  deviceBatteryChangedEvent,
-  deviceCandidatesChangedEvent,
+  defineService,
+  defineState,
   deviceConnectionChangedEvent,
-  deviceConnectRequestedEvent,
-  deviceDiscoveryRequestedEvent,
-  deviceForgetRequestedEvent,
+  deviceConnectService,
+  deviceDiscoverService,
+  deviceForgetService,
   deviceRawNotificationEvent,
   deviceRawReadEvent,
   deviceRawWriteEvent,
   deviceRawWriteFailedEvent,
-  deviceScanChangedEvent,
-  deviceStatusChangedEvent,
+  deviceStatusState,
   drivetrainGearChangedEvent,
   drivetrainShiftRequestedEvent,
   drivetrainVirtualGearCapability,
@@ -51,7 +52,7 @@ import {
   type EventEnvelope,
   type EventSubscription,
   equipmentBicycleChangedEvent,
-  exportFitWrittenEvent,
+  exportFitState,
   type Freshness,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -77,15 +78,23 @@ import {
   physicsTotalResistanceCapability,
   physicsTrainerLoadCapability,
   type ResistanceBreakdown,
-  recordingCompletedEvent,
-  recordingContinueRequestedEvent,
-  recordingFailedEvent,
-  recordingFinishRequestedEvent,
-  recordingRecoverableChangedEvent,
+  recordingContinueService,
+  recordingDeleteService,
+  recordingFinishService,
+  recordingRecoverableState,
+  recordingRideState,
+  routeCancelService,
+  routeFetchService,
+  routeOfferState,
+  routeRemoveService,
+  type ServiceDefinition,
   type SpatialSeriesWriter,
   type SpatialWriteResult,
+  type StateDefinition,
+  type StateView,
   spatialTerrainCapability,
   storageAppFilesCapability,
+  storageMediaCapability,
   storageSecretsCapability,
   type TemporalRecordResult,
   type TemporalSeriesWriter,
@@ -96,14 +105,17 @@ import {
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
-  trainingAccountChangedEvent,
-  trainingConnectRequestedEvent,
-  trainingDisconnectRequestedEvent,
-  trainingPlanChangedEvent,
-  trainingRefreshRequestedEvent,
+  trainingAccountState,
+  trainingConnectService,
+  trainingDisconnectService,
+  trainingPlanState,
+  trainingRefreshService,
+  trainingUploadService,
+  trainingUploadState,
   uiPositionObservedEvent,
   uiRegistryChangedEvent,
   uiTerrainObservedEvent,
+  videoImporterCapability,
   worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
@@ -129,6 +141,7 @@ import { createInProcessUiBridge, type InProcessUiBridge } from '@ridrs/ui-bridg
 import type FakeTimers from '@sinonjs/fake-timers';
 import type { ResultPromise } from 'execa';
 import { z } from 'zod';
+import { TEST_DEVICE_CHANNELS } from './device-links.ts';
 
 const REAL_PLUGINS_DIR = resolve(import.meta.dirname, '../../plugins');
 
@@ -189,22 +202,8 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   measurementCadenceEvent,
   measurementHeartRateEvent,
   deviceConnectionChangedEvent,
-  deviceCandidatesChangedEvent,
-  deviceConnectRequestedEvent,
-  deviceDiscoveryRequestedEvent,
-  deviceScanChangedEvent,
-  deviceBatteryChangedEvent,
-  deviceForgetRequestedEvent,
-  deviceStatusChangedEvent,
   controllerButtonsChangedEvent,
   uiRegistryChangedEvent,
-  bridgeCompanionsChangedEvent,
-  bridgeConnectRequestedEvent,
-  bridgeDisconnectRequestedEvent,
-  bridgeForgetRequestedEvent,
-  bridgePairingOfferEvent,
-  bridgePairRequestedEvent,
-  bridgeStateChangedEvent,
   deviceRawNotificationEvent,
   deviceRawReadEvent,
   deviceRawWriteEvent,
@@ -217,23 +216,62 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
-  recordingCompletedEvent,
-  recordingFailedEvent,
-  recordingRecoverableChangedEvent,
-  recordingContinueRequestedEvent,
-  recordingFinishRequestedEvent,
-  exportFitWrittenEvent,
-  trainingConnectRequestedEvent,
-  trainingDisconnectRequestedEvent,
-  trainingRefreshRequestedEvent,
-  trainingAccountChangedEvent,
-  trainingPlanChangedEvent,
+];
+
+/** App state topics of ridrs and of the scenarios of ADR 0068; `test.nowhere` stays unregistered. */
+const testOfferSchema = z
+  .object({ title: z.string(), progress: z.number().min(0).max(1).optional() })
+  .strict();
+const testOfferState = defineState('test.offer', testOfferSchema);
+const TEST_STATES: readonly StateDefinition[] = [
+  routeOfferState,
+  bridgeLinkState,
+  bridgeCompanionsState,
+  bridgePairingState,
+  deviceStatusState,
+  recordingRideState,
+  recordingRecoverableState,
+  exportFitState,
+  trainingAccountState,
+  trainingPlanState,
+  trainingUploadState,
+  testOfferState,
+  defineState('test.other', testOfferSchema),
+];
+
+/** Services of ridrs and of the scenarios of ADR 0068. */
+const TEST_SERVICES: readonly ServiceDefinition[] = [
+  routeFetchService,
+  routeCancelService,
+  bridgePairService,
+  bridgeConnectService,
+  bridgeDisconnectService,
+  bridgeForgetService,
+  deviceConnectService,
+  deviceForgetService,
+  deviceDiscoverService,
+  recordingContinueService,
+  recordingFinishService,
+  recordingDeleteService,
+  routeRemoveService,
+  trainingConnectService,
+  trainingDisconnectService,
+  trainingRefreshService,
+  trainingUploadService,
+  defineService('test.fetch', {
+    request: z.object({ key: z.string() }).strict(),
+    response: z.object({}).strict(),
+    keyedBy: testOfferState,
+  }),
+  defineService('test.ping', {
+    request: z.object({ text: z.string() }).strict(),
+    response: z.object({ echo: z.string() }).strict(),
+  }),
 ];
 
 /** Events the World records from the bus directly (host-level), independent of any plugin. */
 const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   uiRegistryChangedEvent,
-  deviceStatusChangedEvent,
   controllerButtonsChangedEvent,
   activityStateChangedEvent,
   physicsStateEvent,
@@ -253,14 +291,7 @@ const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
-  bridgeCompanionsChangedEvent,
-  bridgePairingOfferEvent,
-  bridgeStateChangedEvent,
   // What the rider asks for in the device setup.
-  deviceConnectRequestedEvent,
-  deviceForgetRequestedEvent,
-  bridgeConnectRequestedEvent,
-  bridgeDisconnectRequestedEvent,
 ];
 
 const ACTIVE_WORLD_SYMBOL = Symbol.for('ridrs.test.activeWorld');
@@ -308,6 +339,32 @@ export class RidrsWorld extends World {
   readonly hostObserved: EventEnvelope[] = [];
   /** Phase 9: every envelope of every host, in global publish order (the recorder's tap). */
   readonly tapped: EventEnvelope[] = [];
+  /** ADR 0068: every app state write of every host, in order (`PluginHost.observeState`). */
+  readonly stateWrites: Array<{
+    readonly topic: string;
+    readonly key: string;
+    readonly value: unknown;
+    readonly owner: string;
+  }> = [];
+  /** ADR 0068: every service call of every host, with its answer or error (`observeCalls`). */
+  readonly serviceTraffic: Array<{
+    readonly service: string;
+    readonly caller: string;
+    readonly request: unknown;
+    readonly response?: unknown;
+    readonly error?: string;
+  }> = [];
+  /** ADR 0068: what each probe watcher received, per topic. */
+  readonly stateDeliveries = new Map<string, Array<{ topic: string; view: StateView<unknown> }>>();
+  /** ADR 0068: the service calls each probe provider handled. */
+  readonly serviceCalls = new Map<string, Array<{ service: string; request: unknown }>>();
+  /** ADR 0068: what the last state write threw, and how the last call ended. */
+  lastStateError?: unknown;
+  lastCall?:
+    | { readonly resolved: true; readonly value: unknown }
+    | { readonly resolved: false; readonly error: unknown };
+  readonly stateDefinitions = new Map<string, StateDefinition>();
+  readonly serviceDefinitions = new Map<string, ServiceDefinition>();
   /** Phase 9: the files of `fixture-storage-memory`; they survive host restarts. */
   memoryFiles?: MemoryAppFiles;
   /** ADR 0054: the files behind `ctx.settings`; they survive host restarts. */
@@ -430,12 +487,40 @@ export class RidrsWorld extends World {
       netHttpCapability,
       authBrowserSignInCapability,
       storageSecretsCapability,
+      storageMediaCapability,
+      dataFetchCapability,
+      dataArchiveCapability,
+      videoImporterCapability,
     ]) {
       this.capabilityContracts.set(contract.id, contract);
     }
     for (const event of PHASE_3_EVENTS) {
       this.eventDefinitions.set(event.id, event);
     }
+    for (const topic of TEST_STATES) {
+      this.stateDefinitions.set(topic.id, topic);
+    }
+    for (const service of TEST_SERVICES) {
+      this.serviceDefinitions.set(service.id, service);
+    }
+  }
+
+  /** Lets the app state's coalesced deliveries and pending service calls run. */
+  async flushState(): Promise<void> {
+    await this.settle();
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  /** ADR 0069: the values set in one topic so far, in order (removals left out). */
+  stateValues<T = Record<string, unknown>>(topicId: string): T[] {
+    return this.stateOf(topicId)
+      .filter((write) => write.value !== undefined)
+      .map((write) => write.value as T);
+  }
+
+  /** ADR 0068: the writes of one topic so far, in order. */
+  stateOf(topicId: string): RidrsWorld['stateWrites'] {
+    return this.stateWrites.filter((write) => write.topic === topicId);
   }
 
   /** Real plugin folders under plugins/ that this scenario did not ask for. */
@@ -496,10 +581,12 @@ export class RidrsWorld extends World {
 
   /**
    * Lets storage, compression and promise chains run without moving the clock: compression
-   * streams finish on real I/O turns. Resolves once `done()` holds.
+   * streams finish on real I/O turns. Resolves once `done()` holds. A 35-s ride with ERG needs
+   * about 600 turns on its own and came near 2000 late in the full suite (2026-11-07, ADR 0069):
+   * the limit leaves room for that.
    */
   async waitForIo(done: () => boolean, what: string): Promise<void> {
-    for (let turn = 0; turn < 2000; turn += 1) {
+    for (let turn = 0; turn < 5000; turn += 1) {
       if (done()) {
         return;
       }
@@ -567,6 +654,8 @@ export class RidrsWorld extends World {
       timeSource: this.clock,
       capabilities: [...this.capabilityContracts.values()],
       events: [...this.eventDefinitions.values()],
+      states: [...this.stateDefinitions.values()],
+      services: [...this.serviceDefinitions.values()],
       settingsFiles: this.settingsFiles,
     };
   }
@@ -583,6 +672,10 @@ export class RidrsWorld extends World {
       });
     }
     host.observe('test-world', { onEvent: (envelope) => this.tapped.push(envelope) });
+    host.observeState('test-world', (topic, key, value, owner) =>
+      this.stateWrites.push({ topic, key, value, owner }),
+    );
+    host.observeCalls('test-world', (call) => this.serviceTraffic.push(call));
   }
 
   ensureHost(): PluginHost {
@@ -684,10 +777,17 @@ export class RidrsWorld extends World {
     module?: string;
     ui?: Record<string, unknown>;
     persistence?: string[];
+    state?: { owns?: string[]; watches?: string[] };
+    services?: { provides?: string[]; calls?: string[] };
   }): Promise<void> {
     const folderPath = join(this.tempPluginDir, options.folder);
     await mkdir(folderPath, { recursive: true });
 
+    // A device probe keeps device links like a real device plugin (ADR 0069).
+    const deviceChannels =
+      options.types?.includes('device') && !options.state && !options.services
+        ? TEST_DEVICE_CHANNELS
+        : {};
     const manifest = {
       id: options.id,
       name: `Plugin ${options.id}`,
@@ -698,6 +798,9 @@ export class RidrsWorld extends World {
       entry: 'index.ts',
       ...(options.ui ? { ui: options.ui } : {}),
       ...(options.persistence ? { persistence: options.persistence } : {}),
+      ...deviceChannels,
+      ...(options.state ? { state: options.state } : {}),
+      ...(options.services ? { services: options.services } : {}),
     };
 
     if (typeof options.ui?.client === 'string') {

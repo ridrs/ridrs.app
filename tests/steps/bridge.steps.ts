@@ -13,15 +13,13 @@ import {
   type BleCentral,
   type BleDiscoveredPeripheral,
   type BridgeState,
-  bridgeCompanionsChangedEvent,
-  bridgeConnectRequestedEvent,
-  bridgeDisconnectRequestedEvent,
-  bridgeForgetRequestedEvent,
-  bridgePairingOfferEvent,
-  bridgePairRequestedEvent,
-  bridgeStateChangedEvent,
-  deviceDiscoveryRequestedEvent,
-  type EventDefinition,
+  bridgeCompanionsState,
+  bridgeConnectService,
+  bridgeDisconnectService,
+  bridgeForgetService,
+  bridgeLinkState,
+  bridgePairingState,
+  bridgePairService,
   FTMS_SERVICE_UUID,
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
   parsePairingUri,
@@ -32,6 +30,7 @@ import {
   SimulatedCompanion,
   SimulatedNetwork,
 } from '@ridrs/testing';
+import { riderDiscovers } from '../support/device-links.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import {
   latestMetric,
@@ -119,21 +118,22 @@ function rejectedWith(result: Attempt | undefined, reason: string): void {
   assert.equal(error.reason, reason);
 }
 
+/** The bridge's state as the app shows it (ADR 0069: the app state `bridge.state`). */
 function latestBridgeState(world: RidrsWorld) {
-  const payload = world.hostObserved
-    .filter((e) => e.type === bridgeStateChangedEvent.id)
-    .map((e) => e.payload as { state: BridgeState; reason?: string })
+  const payload = world
+    .stateValues<{ state: BridgeState; reason?: string }>(bridgeLinkState.id)
     .at(-1);
-  assert.ok(payload, 'Expected a "bridge.state-changed" event');
+  assert.ok(payload, 'Expected a "bridge.state" value');
   return payload;
 }
 
 function listedCompanions(world: RidrsWorld) {
-  const payload = world.hostObserved
-    .filter((e) => e.type === bridgeCompanionsChangedEvent.id)
-    .map((e) => e.payload as { companions: { name: string; address: string; paired: boolean }[] })
+  const payload = world
+    .stateValues<{ companions: { name: string; address: string; paired: boolean }[] }>(
+      bridgeCompanionsState.id,
+    )
     .at(-1);
-  assert.ok(payload, 'Expected a "bridge.companions-changed" event');
+  assert.ok(payload, 'Expected a "bridge.companions" value');
   return payload.companions;
 }
 
@@ -165,11 +165,12 @@ async function runOverNetwork(
   await world.settle();
 }
 
+/** The rider pairs, as the UI does: a call of `bridge.pair` (ADR 0069). */
 async function requestPairing(world: RidrsWorld, address: string, code: string): Promise<void> {
-  const ctx = world.ensureHost().getPluginContext('test-bridge-ui');
-  assert.ok(ctx, 'Expected the test UI plugin to be running');
-  ctx.inputs.accept(bridgePairRequestedEvent, { address, code });
-  await world.settle();
+  await world
+    .ensureHost()
+    .callService(bridgePairService.id, { address, code }, { pluginId: 'ui-bridge' });
+  await world.flushState();
 }
 
 // ---- Companion setup -----------------------------------------------------------------------
@@ -288,13 +289,10 @@ When(
       address: this.companion.address,
       token: this.companion.authority.issueToken('ridrs'),
     });
-    await runOverNetwork(this, 'device-registry, transport-ble-bridge, device-ftms-trainer', {
+    await runOverNetwork(this, 'transport-ble-bridge, device-ftms-trainer', {
       local: true,
     });
-    this.ensureHost()
-      .getPluginContext('test-observer')
-      ?.inputs.accept(deviceDiscoveryRequestedEvent, { active: true });
-    await this.settle();
+    await riderDiscovers(this, true);
     // A device only the companion saw waits for the direct link this long.
     assert.ok(this.fakeClock, 'Expected a @fake-timers scenario');
     await this.fakeClock.tickAsync(2000);
@@ -771,10 +769,9 @@ When(
 // ---- Pairing by QR code --------------------------------------------------------------------
 
 function latestOfferUri(world: RidrsWorld): string | null | undefined {
-  return world.hostObserved
-    .filter((e) => e.type === bridgePairingOfferEvent.id)
-    .map((e) => (e.payload as { uri: string | null }).uri)
-    .at(-1);
+  // The last write of `bridge.pairing`: an offer, or its removal.
+  const last = world.stateOf(bridgePairingState.id).at(-1);
+  return last ? ((last.value as { uri: string } | undefined)?.uri ?? null) : undefined;
 }
 
 Given('ridrs offers a pairing QR code', function (this: RidrsWorld) {
@@ -823,14 +820,10 @@ Given(
 
 // ---- Connection control on both devices ----------------------------------------------------
 
-async function requestInRidrs<TId extends string>(
-  world: RidrsWorld,
-  event: EventDefinition<Record<string, never>, TId>,
-) {
-  const ctx = world.ensureHost().getPluginContext('test-bridge-ui');
-  assert.ok(ctx, 'Expected the test UI plugin to be running');
-  ctx.inputs.accept(event, {});
-  await world.settle();
+/** The rider asks the bridge, as the UI does: a service call (ADR 0069). */
+async function requestInRidrs(world: RidrsWorld, service: { readonly id: string }) {
+  await world.ensureHost().callService(service.id, {}, { pluginId: 'ui-bridge' });
+  await world.flushState();
 }
 
 function phonePairing(world: RidrsWorld) {
@@ -840,19 +833,19 @@ function phonePairing(world: RidrsWorld) {
 }
 
 When('the rider disconnects in ridrs', async function (this: RidrsWorld) {
-  await requestInRidrs(this, bridgeDisconnectRequestedEvent);
+  await requestInRidrs(this, bridgeDisconnectService);
 });
 
 Given('the rider disconnected in ridrs', async function (this: RidrsWorld) {
-  await requestInRidrs(this, bridgeDisconnectRequestedEvent);
+  await requestInRidrs(this, bridgeDisconnectService);
 });
 
 When('the rider connects in ridrs', async function (this: RidrsWorld) {
-  await requestInRidrs(this, bridgeConnectRequestedEvent);
+  await requestInRidrs(this, bridgeConnectService);
 });
 
 When('the rider forgets the companion in ridrs', async function (this: RidrsWorld) {
-  await requestInRidrs(this, bridgeForgetRequestedEvent);
+  await requestInRidrs(this, bridgeForgetService);
 });
 
 When('the rider disconnects on the phone', async function (this: RidrsWorld) {
@@ -917,7 +910,7 @@ AfterStep({ tags: '@consistent' }, async function (this: RidrsWorld) {
   if (!this.host || !this.companion) {
     return;
   }
-  const states = this.hostObserved.filter((e) => e.type === bridgeStateChangedEvent.id);
+  const states = this.stateValues(bridgeLinkState.id);
   if (states.length === 0) {
     return;
   }

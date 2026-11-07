@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
+import { defineState } from './app-state.ts';
 import { defineCapability } from './capabilities.ts';
-import { defineEvent } from './events.ts';
+import { defineService } from './services.ts';
 
 /**
  * The BLE bridge: a companion app on a phone holds the Bluetooth link and forwards raw GATT
@@ -253,8 +254,12 @@ export const bridgeStateSchema = z.enum([
 ]);
 export type BridgeState = z.infer<typeof bridgeStateSchema>;
 
-export const bridgeCompanionsChangedEvent = defineEvent(
-  'bridge.companions-changed',
+/**
+ * The companions found in this network, as one list (ADR 0069: app state, key: the bridge
+ * plugin's id). Never in a journal.
+ */
+export const bridgeCompanionsState = defineState(
+  'bridge.companions',
   z
     .object({
       companions: z.array(
@@ -271,11 +276,17 @@ export const bridgeCompanionsChangedEvent = defineEvent(
     .strict(),
 );
 
-/** The rider entered the code shown on the phone, for a listed companion or a typed address. */
-export const bridgePairRequestedEvent = defineEvent(
-  'bridge.pair-requested',
-  z.object({ address: z.string().min(1), code: z.string().min(1) }).strict(),
-);
+const done = z.object({}).strict();
+
+/**
+ * The rider entered the code shown on the phone, for a listed companion or a typed address. A
+ * service (ADR 0069): the code never enters a journal, and a continued ride never pairs again.
+ * Answers once pairing started; how it goes is the bridge's state.
+ */
+export const bridgePairService = defineService('bridge.pair', {
+  request: z.object({ address: z.string().min(1), code: z.string().min(1) }).strict(),
+  response: done,
+});
 
 /** URI in the pairing QR code ridrs shows: `ridrs://pair?v=1&s=<secret>&n=<ridrs name>`. */
 export interface PairingOffer {
@@ -306,36 +317,40 @@ export function parsePairingUri(text: string): PairingOffer | undefined {
 }
 
 /** The rider asks to connect to the paired companion (after a disconnect, or to retry now). */
-export const bridgeConnectRequestedEvent = defineEvent(
-  'bridge.connect-requested',
-  z.object({}).strict(),
-);
+export const bridgeConnectService = defineService('bridge.connect', {
+  request: done,
+  response: done,
+});
 
 /** The rider asks to disconnect from the paired companion, keeping the pairing. */
-export const bridgeDisconnectRequestedEvent = defineEvent(
-  'bridge.disconnect-requested',
-  z.object({}).strict(),
-);
+export const bridgeDisconnectService = defineService('bridge.disconnect', {
+  request: done,
+  response: done,
+});
 
 /** The rider asks to forget the paired companion, on both devices. */
-export const bridgeForgetRequestedEvent = defineEvent(
-  'bridge.forget-requested',
-  z.object({}).strict(),
+export const bridgeForgetService = defineService('bridge.forget', {
+  request: done,
+  response: done,
+});
+
+/**
+ * ridrs is not paired and shows this QR code; no key: nothing to show. It holds the pairing
+ * secret: app state only (ADR 0069), never on the bus, never in a journal.
+ */
+export const bridgePairingState = defineState(
+  'bridge.pairing',
+  z.object({ uri: z.string().min(1) }).strict(),
 );
 
-/** ridrs is not paired and shows this QR code (`uri: null`: nothing to show). */
-export const bridgePairingOfferEvent = defineEvent(
-  'bridge.pairing-offer',
-  z.object({ uri: z.string().nullable() }).strict(),
-);
+export const bridgeLinkSchema = z
+  .object({
+    state: bridgeStateSchema,
+    companionName: z.string().optional(),
+    reason: z.string().optional(),
+  })
+  .strict();
+export type BridgeLinkState = z.infer<typeof bridgeLinkSchema>;
 
-export const bridgeStateChangedEvent = defineEvent(
-  'bridge.state-changed',
-  z
-    .object({
-      state: bridgeStateSchema,
-      companionName: z.string().optional(),
-      reason: z.string().optional(),
-    })
-    .strict(),
-);
+/** The link to the companion (ADR 0069: app state, key: the bridge plugin's id). */
+export const bridgeLinkState = defineState('bridge.state', bridgeLinkSchema);

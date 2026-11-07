@@ -1,0 +1,677 @@
+{
+  "source": {
+    "id": "vangestel",
+    "name": "Van Gestel – Cycling pages",
+    "url": "https://cycling.vangestel.online/indoor/videos/",
+    "author": "Fred Van Gestel",
+    "license": {
+      "id": "CC-BY-NC-SA-4.0",
+      "name": "CC BY-NC-SA 4.0",
+      "url": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+    }
+  },
+  "route": {
+    "id": "col-de-grimone-2",
+    "title": "Grimone - 2 - Col de Grimone, Ascent",
+    "page": "https://cycling.vangestel.online/indoor/videos/france/col-de-grimone-2/",
+    "tour": {
+      "name": "Grimone",
+      "part": 2
+    },
+    "country": "France",
+    "level": "Moderate",
+    "trackType": "Tour-Segment",
+    "bikeType": "Road bike",
+    "added": "Nov 22",
+    "distance": 8616,
+    "ascent": 428,
+    "duration": 2738,
+    "elevation": {
+      "min": 894,
+      "max": 1322
+    },
+    "start": {
+      "latitude": 44.69237,
+      "longitude": 5.59958
+    },
+    "sparkline": [
+      894,
+      900,
+      904,
+      907,
+      911,
+      914,
+      918,
+      926,
+      934,
+      941,
+      949,
+      957,
+      967,
+      974,
+      982,
+      989,
+      997,
+      1005,
+      1012,
+      1020,
+      1028,
+      1036,
+      1046,
+      1055,
+      1061,
+      1070,
+      1078,
+      1087,
+      1097,
+      1106,
+      1115,
+      1121,
+      1123,
+      1129,
+      1137,
+      1147,
+      1155,
+      1162,
+      1170,
+      1176,
+      1183,
+      1190,
+      1198,
+      1205,
+      1213,
+      1221,
+      1230,
+      1238,
+      1246,
+      1254,
+      1262,
+      1271,
+      1279,
+      1287,
+      1296,
+      1300,
+      1304,
+      1306,
+      1309,
+      1311,
+      1314,
+      1316,
+      1319,
+      1321
+    ],
+    "stated": {
+      "distance": 8600,
+      "ascent": 428,
+      "duration": 2700,
+      "size": 920000000
+    },
+    "thumbnail": "col-de-grimone-2/thumbnail.jpg",
+    "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Col_de_Grimone_Part_2-Trailer.mp4",
+    "download": {
+      "url": "https://cycling.vangestel.online/rlv/FR_Col_de_Grimone_Part_2.zip",
+      "format": "incyclist-gpx-import",
+      "size": 924258467,
+      "etag": "\"63a6ea88-371710a3\"",
+      "lastModified": "Sat, 24 Dec 2022 12:03:20 GMT",
+      "files": [
+        {
+          "name": "FR_Col_de_Grimone_Part_2.xml",
+          "size": 2762
+        },
+        {
+          "name": "FR_Col_de_Grimone_Part_2.mp4",
+          "size": 924230094
+        },
+        {
+          "name": "FR_Col_de_Grimone_Part_2.gpx",
+          "size": 862351
+        }
+      ]
+    },
+    "video": {
+      "file": "FR_Col_de_Grimone_Part_2.mp4",
+      "incyclistId": "40f3b90a-3993-41e6-85ba-5e75436a28b1",
+      "next": "4a20ee89-6332-4e9b-90b2-07d026a44f24",
+      "codec": "AV1",
+      "framerate": 30,
+      "startFrame": 1,
+      "endFrame": 82149
+    },
+    "heading": "Grimone part 2 - Col de Grimone, ascent (Vercors, Drôme department)",
+    "description": "The second video is the actual climb of the Col de Grimone. From Glandage we cycle another 8.6 kilometres and 428 altitude metres to the summit.",
+    "bounds": {
+      "south": 44.69134,
+      "west": 5.59958,
+      "north": 44.70155,
+      "east": 5.65406
+    },
+    "notes": [
+      {
+        "distance": 20,
+        "text": {
+          "de": "Col de Grimone - Teil 2 - Anstieg\nLänge: 8,6 km - Gesamtanstieg: 428 hm\nSchwierigkeitsgrad: Mittel",
+          "en": "Col de Grimone - Part 2 - Ascent\nLength: 8.6 km - Total ascent: 428 hm\nDifficulty: Moderate"
+        }
+      },
+      {
+        "distance": 90,
+        "text": {
+          "de": "cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)",
+          "en": "cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"
+        }
+      },
+      {
+        "distance": 1585,
+        "text": {
+          "de": "7 Km bis bis oben\nKommender Km ca. 4,6% Steigung\n953 Meter über dem Meeresspiegel",
+          "en": "7 km to the top\nUpcoming km about 4.6% slope\nAltitude: 953 meter above sea level"
+        }
+      },
+      {
+        "distance": 2585,
+        "text": {
+          "de": "6 Km bis bis oben\nKommender Km ca. 7,9% Steigung\n999 Meter über dem Meeresspiegel",
+          "en": "6 km to the top\nUpcoming km about 7.9% slope\nAltitude: 999 meter above sea level"
+        }
+      },
+      {
+        "distance": 3585,
+        "text": {
+          "de": "5 Km bis bis oben\nKommender Km ca. 5,3% Steigung\n1078 Meter über dem Meeresspiegel",
+          "en": "5 km to the top\nUpcoming km about 5.3% slope\nAltitude: 1078 meter above sea level"
+        }
+      },
+      {
+        "distance": 4635,
+        "text": {
+          "de": "4 Km bis bis oben\nKommender Km ca. 4,1% Steigung\n1131 Meter über dem Meeresspiegel",
+          "en": "4 km to the top\nUpcoming km about 4.1% slope\nAltitude: 1131 meter above sea level"
+        }
+      },
+      {
+        "distance": 5620,
+        "text": {
+          "de": "3 Km bis bis oben\nKommender Km ca. 6,6% Steigung\n1172 Meter über dem Meeresspiegel",
+          "en": "3 km to the top\nUpcoming km about 6.6% slope\nAltitude: 1172 meter above sea level"
+        }
+      },
+      {
+        "distance": 6620,
+        "text": {
+          "de": "2 Km bis bis oben\nKommender Km ca. 5,5% Steigung\n1236 Meter über dem Meeresspiegel",
+          "en": "2 km to the top\nUpcoming km about 5.5% slope\nAltitude: 1236 meter above sea level"
+        }
+      },
+      {
+        "distance": 7610,
+        "text": {
+          "de": "1 Km bis bis oben\nKommender Km ca. 2,5% Steigung\n1293 Meter über dem Meeresspiegel",
+          "en": "1 km to the top\nUpcoming km about 2.5% slope\nAltitude: 1293 meter above sea level"
+        }
+      },
+      {
+        "distance": 8550,
+        "text": {
+          "de": "Col de Grimone\n1318 Meter über dem Meeresspiegel",
+          "en": "Col de Grimone\nAltitude: 1318 meter above sea level"
+        }
+      }
+    ],
+    "segments": [],
+    "profile": {
+      "spacing": 100,
+      "elevations": [
+        894,
+        898.3,
+        901.8,
+        904.9,
+        907,
+        909.8,
+        912,
+        914.3,
+        917,
+        921.9,
+        928,
+        933.9,
+        939.8,
+        945.1,
+        950.8,
+        957.1,
+        964.5,
+        970,
+        975.6,
+        981,
+        986.4,
+        991.6,
+        997.7,
+        1003.2,
+        1008.3,
+        1014.4,
+        1020.3,
+        1026.2,
+        1031.7,
+        1038.4,
+        1045,
+        1051.5,
+        1056.9,
+        1062.8,
+        1069.1,
+        1074.4,
+        1080.4,
+        1087.2,
+        1094.8,
+        1101.5,
+        1108.2,
+        1115,
+        1120.1,
+        1120.9,
+        1124,
+        1128.6,
+        1134.3,
+        1141.5,
+        1147.8,
+        1153.2,
+        1159.1,
+        1164,
+        1170.4,
+        1175.2,
+        1179.6,
+        1184.2,
+        1189.1,
+        1194.7,
+        1200.9,
+        1206.7,
+        1212.3,
+        1218.3,
+        1223.9,
+        1230.3,
+        1236.1,
+        1242,
+        1248.2,
+        1253.9,
+        1259.9,
+        1265.7,
+        1271.5,
+        1277.7,
+        1284.1,
+        1290.6,
+        1296.7,
+        1298.7,
+        1302.5,
+        1304.5,
+        1306.4,
+        1308.5,
+        1310.2,
+        1311.5,
+        1313.6,
+        1315,
+        1317.4,
+        1319.6,
+        1321.9,
+        1321.3
+      ]
+    },
+    "path": {
+      "spacing": 100,
+      "points": [
+        [
+          44.69237,
+          5.59958
+        ],
+        [
+          44.69242,
+          5.60083
+        ],
+        [
+          44.69289,
+          5.60188
+        ],
+        [
+          44.69317,
+          5.603
+        ],
+        [
+          44.69343,
+          5.60418
+        ],
+        [
+          44.69354,
+          5.60543
+        ],
+        [
+          44.69391,
+          5.60652
+        ],
+        [
+          44.69436,
+          5.60757
+        ],
+        [
+          44.69439,
+          5.60882
+        ],
+        [
+          44.6943,
+          5.61007
+        ],
+        [
+          44.69459,
+          5.61126
+        ],
+        [
+          44.69498,
+          5.61238
+        ],
+        [
+          44.69575,
+          5.61297
+        ],
+        [
+          44.69644,
+          5.61364
+        ],
+        [
+          44.69677,
+          5.61481
+        ],
+        [
+          44.69712,
+          5.61596
+        ],
+        [
+          44.69789,
+          5.61653
+        ],
+        [
+          44.69878,
+          5.61664
+        ],
+        [
+          44.69966,
+          5.61677
+        ],
+        [
+          44.70053,
+          5.61692
+        ],
+        [
+          44.70122,
+          5.61741
+        ],
+        [
+          44.70155,
+          5.61853
+        ],
+        [
+          44.70101,
+          5.61811
+        ],
+        [
+          44.70021,
+          5.61795
+        ],
+        [
+          44.6994,
+          5.61818
+        ],
+        [
+          44.6986,
+          5.61872
+        ],
+        [
+          44.69778,
+          5.61922
+        ],
+        [
+          44.69738,
+          5.62033
+        ],
+        [
+          44.69668,
+          5.62109
+        ],
+        [
+          44.6961,
+          5.62198
+        ],
+        [
+          44.69564,
+          5.62301
+        ],
+        [
+          44.69584,
+          5.62381
+        ],
+        [
+          44.69634,
+          5.62479
+        ],
+        [
+          44.6963,
+          5.62603
+        ],
+        [
+          44.696,
+          5.62714
+        ],
+        [
+          44.69568,
+          5.62825
+        ],
+        [
+          44.69541,
+          5.62943
+        ],
+        [
+          44.69582,
+          5.63048
+        ],
+        [
+          44.69646,
+          5.63094
+        ],
+        [
+          44.69639,
+          5.63219
+        ],
+        [
+          44.69635,
+          5.63342
+        ],
+        [
+          44.6963,
+          5.63454
+        ],
+        [
+          44.69571,
+          5.63536
+        ],
+        [
+          44.69603,
+          5.63653
+        ],
+        [
+          44.69636,
+          5.6377
+        ],
+        [
+          44.69647,
+          5.63893
+        ],
+        [
+          44.69644,
+          5.64019
+        ],
+        [
+          44.69653,
+          5.64145
+        ],
+        [
+          44.69668,
+          5.64267
+        ],
+        [
+          44.6966,
+          5.64393
+        ],
+        [
+          44.69677,
+          5.64505
+        ],
+        [
+          44.69686,
+          5.64385
+        ],
+        [
+          44.69731,
+          5.64282
+        ],
+        [
+          44.69723,
+          5.64166
+        ],
+        [
+          44.69717,
+          5.64042
+        ],
+        [
+          44.69739,
+          5.6392
+        ],
+        [
+          44.69759,
+          5.638
+        ],
+        [
+          44.69825,
+          5.63717
+        ],
+        [
+          44.69831,
+          5.63593
+        ],
+        [
+          44.69888,
+          5.635
+        ],
+        [
+          44.69891,
+          5.63377
+        ],
+        [
+          44.69908,
+          5.63413
+        ],
+        [
+          44.69917,
+          5.6353
+        ],
+        [
+          44.69877,
+          5.63639
+        ],
+        [
+          44.69912,
+          5.63752
+        ],
+        [
+          44.69939,
+          5.63869
+        ],
+        [
+          44.69952,
+          5.63993
+        ],
+        [
+          44.69974,
+          5.64115
+        ],
+        [
+          44.70009,
+          5.6423
+        ],
+        [
+          44.70029,
+          5.64353
+        ],
+        [
+          44.70045,
+          5.64475
+        ],
+        [
+          44.70064,
+          5.6459
+        ],
+        [
+          44.70052,
+          5.64714
+        ],
+        [
+          44.70095,
+          5.64815
+        ],
+        [
+          44.70129,
+          5.64904
+        ],
+        [
+          44.70051,
+          5.64954
+        ],
+        [
+          44.69979,
+          5.65009
+        ],
+        [
+          44.69895,
+          5.6505
+        ],
+        [
+          44.69808,
+          5.65075
+        ],
+        [
+          44.69718,
+          5.65081
+        ],
+        [
+          44.69641,
+          5.65133
+        ],
+        [
+          44.69574,
+          5.65213
+        ],
+        [
+          44.69489,
+          5.65253
+        ],
+        [
+          44.69406,
+          5.653
+        ],
+        [
+          44.6932,
+          5.65338
+        ],
+        [
+          44.69232,
+          5.65362
+        ],
+        [
+          44.69146,
+          5.65394
+        ],
+        [
+          44.69134,
+          5.65406
+        ]
+      ]
+    },
+    "files": {
+      "control": "FR_Col_de_Grimone_Part_2.xml",
+      "gpx": "FR_Col_de_Grimone_Part_2.gpx"
+    }
+  }
+}

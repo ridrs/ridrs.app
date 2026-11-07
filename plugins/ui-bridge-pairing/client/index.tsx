@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {
-  bridgeCompanionsChangedEvent,
-  bridgePairingOfferEvent,
-  bridgePairRequestedEvent,
-} from '@ridrs/contracts';
+import { bridgeCompanionsState, bridgePairingState, bridgePairService } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { type FormEvent, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -127,23 +123,30 @@ function PairingQr({ uri }: { readonly uri: string }) {
 function BridgePairingView({ ctx }: { readonly ctx: UiContext }) {
   const [companions, setCompanions] = useState<readonly Companion[]>([]);
   const [offer, setOffer] = useState<string | null>(null);
+  // App state (ADR 0069): the companions found and the QR code on offer, if any.
   useEffect(
     () =>
-      ctx.events.subscribe(bridgeCompanionsChangedEvent, ({ payload }) =>
-        setCompanions(payload.companions),
+      ctx.state.watch(bridgeCompanionsState, ({ entries }) =>
+        setCompanions([...entries.values()][0]?.companions ?? []),
       ),
     [ctx],
   );
   useEffect(
-    () => ctx.events.subscribe(bridgePairingOfferEvent, ({ payload }) => setOffer(payload.uri)),
+    () =>
+      ctx.state.watch(bridgePairingState, ({ entries }) =>
+        setOffer([...entries.values()][0]?.uri ?? null),
+      ),
     [ctx],
   );
 
   if (!offer) {
     return null;
   }
-  const pair = (address: string, code: string) =>
-    ctx.events.publish(bridgePairRequestedEvent, { address, code });
+  const pair = (address: string, code: string) => {
+    ctx
+      .call(bridgePairService, { address, code })
+      .catch((error: unknown) => ctx.logger.warn('Pairing could not start', error));
+  };
   return (
     <section
       data-testid="bridge-pairing"
@@ -175,7 +178,12 @@ function BridgePairingView({ ctx }: { readonly ctx: UiContext }) {
 }
 
 export const BridgePairing: UiComponent = (container, ctx) => {
-  const root = createRoot(container);
+  // A root of its own inside the slot: the setup may close the slot while React renders, which
+  // defers this root's unmount until after the shell emptied the slot; the root's element then
+  // goes as a whole and React still finds its nodes inside it.
+  const element = document.createElement('div');
+  container.append(element);
+  const root = createRoot(element);
   root.render(<BridgePairingView ctx={ctx} />);
   return () => root.unmount();
 };

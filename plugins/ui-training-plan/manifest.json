@@ -22,19 +22,27 @@
         "id": "next-workout",
         "extensionPoint": "main/tile",
         "export": "NextWorkout"
+      },
+      {
+        "id": "intervals-connection",
+        "extensionPoint": "me/connection",
+        "export": "IntervalsConnection"
       }
     ],
     "events": {
       "subscribe": [
-        "training.account-changed",
-        "training.plan-changed",
         "activity.state-changed"
       ],
-      "publish": [
-        "training.connect-requested",
-        "training.disconnect-requested",
-        "training.refresh-requested"
-      ]
-    }
+      "publish": []
+    },
+    "state": [
+      "training.account",
+      "training.plan"
+    ],
+    "calls": [
+      "training.connect",
+      "training.disconnect",
+      "training.refresh"
+    ]
   }
 }

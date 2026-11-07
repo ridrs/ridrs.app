@@ -7,6 +7,10 @@
 export {
   ActionButton,
   AreaPage,
+  Badge,
+  Card,
+  type CardFact,
+  type CardProps,
   iconStyle,
   MenuEntry,
   PreviewLabel,

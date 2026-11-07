@@ -26,20 +26,24 @@ const CSS = `
 .rt-button { padding: 10px 20px; border: 1.5px solid ${COLORS.line}; border-radius: 999px;
   background: ${COLORS.panel}; color: #fff; font: 600 15px system-ui, sans-serif; cursor: pointer; }
 .rt-quiet { color: ${COLORS.muted}; }
-.rt-card { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 4px 14px;
-  width: 100%; padding: 14px 18px; border: 1.5px solid ${COLORS.line}; border-radius: 16px;
-  background: ${COLORS.panel}; color: #fff; text-align: left; font: 500 14px system-ui, sans-serif;
-  cursor: pointer; }
-.rt-card .rt-day { color: ${COLORS.cyan}; font-weight: 700; text-transform: uppercase; font-size: 12px;
-  letter-spacing: .04em; }
-.rt-card .rt-name { font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; }
-.rt-card .rt-facts, .rt-card .rt-profile { grid-column: 1 / -1; }
+.rt-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%;
+  flex: 1; padding: 0; border: 0; border-radius: 12px; background: none; color: #fff;
+  text-align: left; font: 500 14px system-ui, sans-serif; cursor: pointer; }
+.rt-card .rt-classifier { color: ${COLORS.cyan}; font: 700 12px/1.2 system-ui, sans-serif;
+  letter-spacing: .08em; text-transform: uppercase; }
+.rt-card .rt-name { display: -webkit-box; overflow: hidden; margin-top: auto;
+  font: 800 21px/1.2 system-ui, sans-serif; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  line-clamp: 2; overflow-wrap: anywhere; }
+.rt-facts { display: flex; flex-wrap: wrap; gap: 0 6px; color: ${COLORS.muted}; }
+.rt-facts > span + span::before { content: "·"; margin-right: 6px; }
+.rt-profile { grid-column: 1 / -1; }
 .rt-facts { display: flex; gap: 14px; color: ${COLORS.muted}; }
 .rt-profile { display: flex; align-items: flex-end; gap: 2px; height: 36px; margin-top: 6px; }
 .rt-profile i { display: block; min-width: 2px; border-radius: 2px 2px 0 0; opacity: .85; }
-.rt-button:hover, .rt-card:hover { border-color: ${COLORS.cyan}; }
-.rt-button:focus-visible, .rt-card:focus-visible { outline: 2px solid ${COLORS.lime}; outline-offset: 2px; }
+.rt-button:hover { border-color: ${COLORS.cyan}; }
+.rt-card:hover .rt-name { color: ${COLORS.cyan}; }
+.rt-button:focus-visible { outline: 2px solid ${COLORS.lime}; outline-offset: 2px; }
+.rt-card:focus-visible { outline: 2px solid ${COLORS.lime}; outline-offset: 8px; }
 .rt-spin { display: inline-block; width: 14px; height: 14px; border-radius: 50%;
   border: 2px solid ${COLORS.cyan}40; border-top-color: ${COLORS.cyan}; animation: rt-spin 1s linear infinite; }
 @keyframes rt-spin { to { transform: rotate(360deg); } }

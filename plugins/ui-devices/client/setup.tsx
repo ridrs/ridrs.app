@@ -2,20 +2,18 @@
 
 import {
   type BleRoute,
-  bridgeConnectRequestedEvent,
-  bridgeForgetRequestedEvent,
+  bridgeConnectService,
+  bridgeForgetService,
   type ControllerButton,
   type DeviceCandidate,
   type DeviceStatus,
-  deviceConnectRequestedEvent,
-  deviceDiscoveryRequestedEvent,
-  deviceForgetRequestedEvent,
   type TrainerControlChangedPayload,
   trainerControlChangedEvent,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { takeRequestedDetails } from './details-request.ts';
+import { useDeviceRequests, useDiscovery } from './links.ts';
 import {
   BUTTON_FACES,
   type BridgeStatus,
@@ -834,8 +832,9 @@ function DeviceDetails({
       onClose();
     }
   }, [awaited, row.deviceId, row.state, onClose]);
+  const requests = useDeviceRequests(ctx);
   const connect = (deviceId: string) => {
-    ctx.events.publish(deviceConnectRequestedEvent, { kind, deviceId });
+    requests.connect(kind, deviceId);
     setAwaited(deviceId);
   };
   return (
@@ -866,7 +865,7 @@ function DeviceDetails({
                   type="button"
                   style={REMOVE}
                   onClick={() => {
-                    ctx.events.publish(deviceForgetRequestedEvent, { kind });
+                    requests.forget(kind);
                     onClose();
                   }}
                 >
@@ -938,6 +937,14 @@ function DeviceDetails({
 /** Where the companion is paired (QR code, code fields): another plugin contributes it. */
 const PAIRING_SLOT = 'setup/companion';
 
+/** Asks the companion bridge (a service, ADR 0069). */
+function callBridge(
+  ctx: UiContext,
+  service: typeof bridgeConnectService | typeof bridgeForgetService,
+): void {
+  ctx.call(service, {}).catch((error: unknown) => ctx.logger.warn('The companion bridge refused', error));
+}
+
 function CompanionDetails({
   ctx,
   companion,
@@ -978,7 +985,7 @@ function CompanionDetails({
               type="button"
               style={BUTTON}
               onClick={() => {
-                ctx.events.publish(bridgeConnectRequestedEvent, {});
+                callBridge(ctx, bridgeConnectService);
                 setAwaited(true);
               }}
             >
@@ -990,7 +997,7 @@ function CompanionDetails({
             <button
               type="button"
               style={REMOVE}
-              onClick={() => ctx.events.publish(bridgeForgetRequestedEvent, {})}
+              onClick={() => callBridge(ctx, bridgeForgetService)}
             >
               <TrashIcon />
               Remove
@@ -1046,10 +1053,8 @@ export function DeviceSetupView({
     setOpen(row);
   };
   const close = () => setOpen(undefined);
-  useEffect(() => {
-    ctx.events.publish(deviceDiscoveryRequestedEvent, { active: true });
-    return () => ctx.events.publish(deviceDiscoveryRequestedEvent, { active: false });
-  }, [ctx]);
+  // While the setup is open, every device link looks for devices.
+  useDiscovery(ctx);
 
   const summary = summarize(devices);
   const rows = describeDevices(overLinksInReach(devices, bridge?.state), readings);

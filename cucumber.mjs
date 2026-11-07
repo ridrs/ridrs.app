@@ -8,7 +8,11 @@ const common = {
   publishQuiet: true,
 };
 
-export default { ...common, tags: 'not @ui' };
+/**
+ * `@wip` scenarios show a known, accepted problem and fail until the stage that fixes it removes
+ * the tag (ADR 0068; none is tagged since its stage 3).
+ */
+export default { ...common, tags: 'not @ui and not @wip' };
 
 /** UI scenarios register a headless DOM globally, so they run in a process of their own. */
-export const ui = { ...common, tags: '@ui' };
+export const ui = { ...common, tags: '@ui and not @wip' };

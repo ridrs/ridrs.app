@@ -1,0 +1,9 @@
+{
+  "id": "storage-media-tauri",
+  "name": "Media Storage (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["storage.media"],
+  "requires": [],
+  "entry": "index.ts"
+}

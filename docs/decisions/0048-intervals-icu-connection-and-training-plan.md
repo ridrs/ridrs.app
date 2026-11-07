@@ -6,7 +6,7 @@ Status: accepted by the maintainer on 2026-11-04 and implemented the same day. T
 
 ## Context
 
-The rider plans workouts on [intervals.icu](https://intervals.icu). The first use case: connect the account, load the athlete profile and the planned workouts, show the next workout on the main screen as a small widget, and its details on Enter. Uploading finished rides comes later and is out of scope.
+The rider plans workouts on [intervals.icu](https://intervals.icu). The first use case: connect the account, load the athlete profile and the planned workouts, show the next workout on the main screen as a small widget, and its details on Enter. Uploading finished rides came later ([ADR 0064](0064-ride-debriefing-and-activity-upload.md)).
 
 intervals.icu offers OAuth 2 (authorization code) with PKCE (S256) and "public" clients, which exchange the code without a client secret. There are no refresh tokens; signing in again replaces the token, and `DELETE /api/v1/disconnect-app` revokes it. Redirect URIs must be registered exactly; for `http://127.0.0.1` the port is ignored. The app is registered with `http://127.0.0.1/oauth/callback`, without a port; on 2026-11-05 a sign-in from the macOS app on port 47261 worked against it, so the port is not compared. Without a registered redirect URI, intervals.icu answers "Invalid redirect_uri". Paths with an athlete id accept `0` for the token's athlete. Rate limits are at least 5 000 calls a day per app and 10 per second per IP.
 
@@ -15,7 +15,7 @@ intervals.icu offers OAuth 2 (authorization code) with PKCE (S256) and "public" 
 ### Account and sign-in (maintainer)
 
 - **Public OAuth client "Ridrs.APP", client id `1697`**, with "PKCE required". The client id is configuration, not a secret: a constant in `planner-intervals-icu`. No client secret exists anywhere in ridrs.
-- **Scopes `SETTINGS:READ,CALENDAR:READ`**: the profile (sport settings) and the calendar. Nothing else.
+- **Scopes `SETTINGS:READ,CALENDAR:READ`**: the profile (sport settings) and the calendar. Nothing else. Since [ADR 0064](0064-ride-debriefing-and-activity-upload.md) also `ACTIVITY:WRITE`, to upload finished rides.
 - **Redirect `http://127.0.0.1:<port>/oauth/callback`** (loopback) on every platform: one mechanism for macOS and Android. The app listens on a free port only while a sign-in runs. Android may pause the app while the browser is in front; this is checked on the phone first (vertical use case). If it fails, a deep link replaces the loopback on Android only, in a follow-up ADR.
 - **PKCE with Web Crypto** (`crypto.getRandomValues`, `crypto.subtle.digest('SHA-256')`, built into Node and every webview): a 64-character verifier from the unreserved alphabet, the challenge base64url without padding, a random `state` of 32 characters. No library: three lines over a built-in API.
 - **The token is a secret.** It lives only in the capability `storage.secrets` (OS keychain, [ADR 0050](0050-secrets-in-the-os-keychain.md)), never in an event, a log, a recording or app files.
@@ -57,7 +57,8 @@ Named after the domain (`training.*`), not after intervals.icu: the UI and every
   - Results of asynchronous work (sign-in, HTTP, keychain) enter through `ctx.inputs.accept` as `training.account-changed` and `training.plan-changed` (rule 7). They are therefore recorded during a ride; their payloads hold no secret.
 - **`ui-training-plan`**, type `ui`:
   - Contribution `next-workout` to `main/panel`. Disconnected or failed: a button "Connect intervals.icu" (or "Reconnect intervals.icu" after `token-rejected`) and the reason. Connected: one focusable card with the day ("Today", "Tomorrow", else the weekday and date), the name, the duration, the training load, and a power profile (bars by % FTP) when the workout has steps; "No workout planned" without one; "Offline" for a cached plan.
-  - Screen `training-workout`: name, day, description, profile values (FTP, weight), the steps (repeats as "4×" with their steps), "Refresh" and "Disconnect intervals.icu". Back returns to the main screen.
+  - Screen `training-workout`: name, day, description, profile values (FTP, weight), the steps (repeats as "4×" with their steps) and "Refresh". Back returns to the main screen.
+  - Contribution `intervals-connection` to `me/connection`, the "Connected services" section of the Me area (`ui-area-me`, which knows no service): the account's state ("Connected as …", "Not connected" with the reason, "Connecting to intervals.icu…"), "Connect intervals.icu" (or "Reconnect intervals.icu") and "Disconnect intervals.icu". Disconnecting is only here, with the other account settings, not beside a workout.
   - Keyboard and remote (rule 12): the card is one focusable element; Enter opens the screen; arrows move between its buttons; Back leaves.
 
 ### Not in this ADR

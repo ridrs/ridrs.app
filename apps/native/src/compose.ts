@@ -11,34 +11,33 @@ import {
   authBrowserSignInCapability,
   bleBridgeConnectorCapability,
   bleCentralCapability,
-  bridgeCompanionsChangedEvent,
-  bridgeConnectRequestedEvent,
-  bridgeDisconnectRequestedEvent,
-  bridgeForgetRequestedEvent,
-  bridgePairingOfferEvent,
-  bridgePairRequestedEvent,
-  bridgeStateChangedEvent,
+  bridgeCompanionsState,
+  bridgeConnectService,
+  bridgeDisconnectService,
+  bridgeForgetService,
+  bridgeLinkState,
+  bridgePairingState,
+  bridgePairService,
   configSnapshotCapability,
   controllerButtonsChangedEvent,
-  deviceBatteryChangedEvent,
-  deviceCandidatesChangedEvent,
+  dataArchiveCapability,
+  dataFetchCapability,
   deviceConnectionChangedEvent,
-  deviceConnectRequestedEvent,
-  deviceDiscoveryRequestedEvent,
-  deviceForgetRequestedEvent,
+  deviceConnectService,
+  deviceDiscoverService,
+  deviceForgetService,
   deviceRawNotificationEvent,
   deviceRawReadEvent,
   deviceRawWriteEvent,
   deviceRawWriteFailedEvent,
-  deviceScanChangedEvent,
-  deviceStatusChangedEvent,
+  deviceStatusState,
   drivetrainGearChangedEvent,
   drivetrainShiftRequestedEvent,
   drivetrainVirtualGearCapability,
   type EventDefinition,
   type EventSubscription,
   equipmentBicycleChangedEvent,
-  exportFitWrittenEvent,
+  exportFitState,
   type HostPlatform,
   measurementCadenceEvent,
   measurementHeartRateEvent,
@@ -63,26 +62,37 @@ import {
   physicsStateEvent,
   physicsTotalResistanceCapability,
   physicsTrainerLoadCapability,
-  recordingCompletedEvent,
-  recordingContinueRequestedEvent,
-  recordingFailedEvent,
-  recordingFinishRequestedEvent,
-  recordingRecoverableChangedEvent,
+  type RecoverableRide,
+  recordingContinueService,
+  recordingDeleteService,
+  recordingFinishService,
+  recordingRecoverableState,
+  recordingRideState,
+  routeCancelService,
+  routeFetchService,
+  routeOfferState,
+  routeRemoveService,
+  type ServiceDefinition,
+  type StateDefinition,
   spatialTerrainCapability,
   storageAppFilesCapability,
+  storageMediaCapability,
   storageSecretsCapability,
   type TimeSource,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
-  trainingAccountChangedEvent,
-  trainingConnectRequestedEvent,
-  trainingDisconnectRequestedEvent,
-  trainingPlanChangedEvent,
-  trainingRefreshRequestedEvent,
+  trainingAccountState,
+  trainingConnectService,
+  trainingDisconnectService,
+  trainingPlanState,
+  trainingRefreshService,
+  trainingUploadService,
+  trainingUploadState,
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
+  videoImporterCapability,
   worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
@@ -102,13 +112,6 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   activityInterruptedEvent,
   activityStateChangedEvent,
   deviceConnectionChangedEvent,
-  deviceCandidatesChangedEvent,
-  deviceConnectRequestedEvent,
-  deviceForgetRequestedEvent,
-  deviceDiscoveryRequestedEvent,
-  deviceScanChangedEvent,
-  deviceBatteryChangedEvent,
-  deviceStatusChangedEvent,
   controllerButtonsChangedEvent,
   measurementPowerEvent,
   measurementCadenceEvent,
@@ -123,13 +126,6 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   uiTerrainObservedEvent,
   worldPositionEvent,
   worldTerrainPreviewEvent,
-  bridgeCompanionsChangedEvent,
-  bridgePairingOfferEvent,
-  bridgePairRequestedEvent,
-  bridgeConnectRequestedEvent,
-  bridgeDisconnectRequestedEvent,
-  bridgeForgetRequestedEvent,
-  bridgeStateChangedEvent,
   deviceRawNotificationEvent,
   deviceRawReadEvent,
   deviceRawWriteEvent,
@@ -142,17 +138,6 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
-  recordingCompletedEvent,
-  recordingFailedEvent,
-  recordingRecoverableChangedEvent,
-  recordingContinueRequestedEvent,
-  recordingFinishRequestedEvent,
-  exportFitWrittenEvent,
-  trainingConnectRequestedEvent,
-  trainingDisconnectRequestedEvent,
-  trainingRefreshRequestedEvent,
-  trainingAccountChangedEvent,
-  trainingPlanChangedEvent,
 ];
 
 /** Every capability the host resolves. */
@@ -178,6 +163,46 @@ const CAPABILITIES = [
   netHttpCapability,
   authBrowserSignInCapability,
   storageSecretsCapability,
+  storageMediaCapability,
+  dataFetchCapability,
+  dataArchiveCapability,
+  videoImporterCapability,
+];
+
+/** Every app state topic the host knows (ADR 0068): owned and watched beside the bus. */
+const STATES: readonly StateDefinition[] = [
+  routeOfferState,
+  bridgeLinkState,
+  bridgeCompanionsState,
+  bridgePairingState,
+  deviceStatusState,
+  recordingRideState,
+  recordingRecoverableState,
+  exportFitState,
+  trainingAccountState,
+  trainingPlanState,
+  trainingUploadState,
+];
+
+/** Every service the host knows (ADR 0068): provided and called beside the bus. */
+const SERVICES: readonly ServiceDefinition[] = [
+  routeFetchService,
+  routeCancelService,
+  bridgePairService,
+  bridgeConnectService,
+  bridgeDisconnectService,
+  bridgeForgetService,
+  deviceConnectService,
+  deviceForgetService,
+  deviceDiscoverService,
+  recordingContinueService,
+  recordingFinishService,
+  recordingDeleteService,
+  routeRemoveService,
+  trainingConnectService,
+  trainingDisconnectService,
+  trainingRefreshService,
+  trainingUploadService,
 ];
 
 /** Port to the platform's "keep the display on" facility. */
@@ -233,6 +258,8 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
     logger: options.logger,
     capabilities: CAPABILITIES,
     events: RIDRS_EVENTS,
+    states: STATES,
+    services: SERVICES,
     platform: options.platform,
   };
   const keepAwake = options.keepAwake;
@@ -243,12 +270,20 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
 
   // Before start, so values published while plugins start (the initial activity state) are cached.
   const attach = (host: PluginHost): Composed => {
+    // Only the root can continue a ride: it composes the continuing host (ADR 0057, ADR 0069).
+    host.provideService('ridrs-app', recordingContinueService, ({ sessionId }) => {
+      const ride = host.getState(recordingRecoverableState.id).get(sessionId) as
+        | RecoverableRide
+        | undefined;
+      if (!ride) {
+        throw new Error(`No interrupted ride ${sessionId} is on offer`);
+      }
+      continuing ??= continueRide(ride.file).finally(() => {
+        continuing = undefined;
+      });
+      return {};
+    });
     const subscriptions = [
-      host.subscribeEvent('ridrs-app', recordingContinueRequestedEvent, ({ payload }) => {
-        continuing ??= continueRide(payload.file).finally(() => {
-          continuing = undefined;
-        });
-      }),
       ...(keepAwake
         ? [
             host.subscribeEvent('ridrs-app', activityStateChangedEvent, ({ payload }) =>

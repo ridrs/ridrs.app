@@ -109,17 +109,13 @@ function NextEventView({ ctx }: { readonly ctx: UiContext }) {
   if (!state.showOnToday) return null;
   const next = EVENTS.find((event) => state.joined.includes(event.id));
   return (
-    <TodayCard title="Next event" onHide={() => change((s) => ({ ...s, showOnToday: false }))}>
-      {next ? (
-        <>
-          <strong>{next.name}</strong>
-          <span className="pv-muted">
-            {next.when} · {next.about}
-          </span>
-        </>
-      ) : (
-        <span className="pv-muted">No event joined yet.</span>
-      )}
+    <TodayCard
+      classifier="Next event"
+      icon={TROPHY}
+      title={next ? next.name : 'No event joined yet'}
+      details={next ? [next.when, next.about] : ['Races, group rides and challenges']}
+      onHide={() => change((s) => ({ ...s, showOnToday: false }))}
+    >
       <div className="pv-row">
         <button type="button" className="pv-button" onClick={() => ctx.navigate('events')}>
           {next ? 'All events' : 'Find an event'}

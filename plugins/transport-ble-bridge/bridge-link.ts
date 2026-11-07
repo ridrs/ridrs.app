@@ -8,17 +8,17 @@ import {
   type BleDiscoveredPeripheral,
   type BleScanOptions,
   type BridgeState,
-  bridgeCompanionsChangedEvent,
-  bridgeConnectRequestedEvent,
-  bridgeDisconnectRequestedEvent,
-  bridgeForgetRequestedEvent,
-  bridgePairingOfferEvent,
-  bridgePairRequestedEvent,
-  bridgeStateChangedEvent,
   type CompanionAdvert,
   formatPairingUri,
   type PluginContext,
   type StoredBridgePairing,
+  bridgeCompanionsState,
+  bridgeConnectService,
+  bridgeDisconnectService,
+  bridgeForgetService,
+  bridgeLinkState,
+  bridgePairingState,
+  bridgePairService,
 } from '@ridrs/contracts';
 
 const CLIENT_NAME = 'ridrs';
@@ -114,19 +114,28 @@ export class BridgeLink {
 
   start(connector: BleBridgeConnector): void {
     this.connector = connector;
-    const on = <T>(event: Parameters<PluginContext['events']['subscribe']>[0], fn: (p: T) => void) =>
-      this.ctx.events.subscribe(event, ({ payload }) => fn(payload as T)).unsubscribe;
+    // The rider's requests are services (ADR 0069): never in a journal, never done again.
+    this.ctx.services.provide(bridgePairService, ({ address, code }) => {
+      void this.pair(address, code);
+      return {};
+    });
+    this.ctx.services.provide(bridgeConnectService, () => {
+      this.requestConnect();
+      return {};
+    });
+    this.ctx.services.provide(bridgeDisconnectService, () => {
+      this.requestDisconnect();
+      return {};
+    });
+    this.ctx.services.provide(bridgeForgetService, () => {
+      this.requestForget();
+      return {};
+    });
     this.cleanups.push(
       connector.watchCompanions((adverts) => {
         this.adverts = adverts;
         this.publishCompanions();
       }),
-      on<{ address: string; code: string }>(bridgePairRequestedEvent, (p) => {
-        void this.pair(p.address, p.code);
-      }),
-      on(bridgeConnectRequestedEvent, () => this.requestConnect()),
-      on(bridgeDisconnectRequestedEvent, () => this.requestDisconnect()),
-      on(bridgeForgetRequestedEvent, () => this.requestForget()),
     );
     const pairing = connector.loadPairing();
     if (pairing?.forgotten) {
@@ -499,7 +508,8 @@ export class BridgeLink {
       secret,
       timer: setInterval(() => this.tryOffer(secret), OFFER_RETRY_MS),
     };
-    this.ctx.events.publish(bridgePairingOfferEvent, {
+    // The QR code holds the secret: app state, never on the bus (ADR 0069).
+    this.ctx.state.set(bridgePairingState, this.ctx.manifest.id, {
       uri: formatPairingUri({ secret, name: CLIENT_NAME }),
     });
   }
@@ -511,7 +521,7 @@ export class BridgeLink {
     clearInterval(this.offer.timer);
     this.offer = undefined;
     if (!this.stopped) {
-      this.ctx.events.publish(bridgePairingOfferEvent, { uri: null });
+      this.ctx.state.remove(bridgePairingState, this.ctx.manifest.id);
     }
   }
 
@@ -565,7 +575,7 @@ export class BridgeLink {
     }
     this.publishedKey = key;
     this.published = state;
-    this.ctx.events.publish(bridgeStateChangedEvent, payload);
+    this.ctx.state.set(bridgeLinkState, this.ctx.manifest.id, payload);
   }
 
   private publishedKey?: string;
@@ -575,7 +585,7 @@ export class BridgeLink {
       return;
     }
     const pairedId = this.pairing()?.companionId;
-    this.ctx.events.publish(bridgeCompanionsChangedEvent, {
+    this.ctx.state.set(bridgeCompanionsState, this.ctx.manifest.id, {
       companions: this.adverts.map((a) => ({
         companionId: a.companionId,
         name: a.name,

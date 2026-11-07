@@ -2,7 +2,8 @@
 
 // Asserts that the native app bundle (apps/native/dist, from `vite build`) contains neither the
 // official Garmin FIT SDK (a test-only devDependency that must never be distributed, ADR 0034)
-// nor the Node storage provider (Node-only, excluded at the build layer).
+// nor the Node providers of files, media, downloads and archives (Node-only, excluded at the build
+// layer).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
@@ -11,6 +12,9 @@ const dist = join(root, 'apps/native/dist');
 const FORBIDDEN = [
   ['@garmin/fitsdk', /@garmin\/fitsdk|Garmin International|FIT Protocol License/],
   ['storage-files-node', /storage-files-node|RIDRS_DATA_DIR|env-paths/],
+  ['storage-media-node', /storage-media-node|RIDRS_MEDIA_DIR/],
+  ['data-fetch-node', /data-fetch-node|\.part\.json/],
+  ['data-archive-node', /data-archive-node|FileRangeReader/],
 ];
 
 function files(dir) {
@@ -42,4 +46,4 @@ if (findings.length > 0) {
   console.error(findings.join('\n'));
   process.exit(1);
 }
-console.log(`native bundle ok: ${bundle.length} files without @garmin/fitsdk or storage-files-node`);
+console.log(`native bundle ok: ${bundle.length} files without @garmin/fitsdk or the Node-only providers`);

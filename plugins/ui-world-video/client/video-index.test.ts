@@ -73,4 +73,33 @@ describe('httpRangeReader', () => {
       globalThis.fetch = fetchBefore;
     }
   });
+
+  it('asks again for the rest of a range the server cut short, and never reads past the end', async () => {
+    const { httpRangeReader } = await import('./video-index.ts');
+    const file = new Uint8Array(100).map((_, i) => i);
+    const asked: string[] = [];
+    const fetchBefore = globalThis.fetch;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      const range = new Headers(init?.headers).get('range') ?? '';
+      asked.push(range);
+      const [from, to] = range.slice(6).split('-').map(Number) as [number, number];
+      // At most 30 bytes per answer, as a server with a cap sends them.
+      const end = Math.min(to, from + 29, file.length - 1);
+      return new Response(file.slice(from, end + 1), {
+        status: 206,
+        headers: { 'Content-Range': `bytes ${from}-${end}/${file.length}` },
+      });
+    }) as typeof fetch;
+    try {
+      const read = httpRangeReader('ridrs-media://localhost/videos%2Fa%2Fvideo.mp4');
+      expect([...(await read(10, 70))]).toEqual([...file.slice(10, 80)]);
+      expect(asked).toEqual(['bytes=10-79', 'bytes=40-79', 'bytes=70-79']);
+      expect([...(await read(90, 16))]).toEqual([...file.slice(90, 100)]);
+      asked.length = 0;
+      expect(await read(100, 16)).toHaveLength(0);
+      expect(asked).toEqual([]);
+    } finally {
+      globalThis.fetch = fetchBefore;
+    }
+  });
 });

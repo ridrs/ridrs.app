@@ -7,7 +7,7 @@ Feature: The main menu
   as the current page.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-main-menu, ui-tile-ride-start, ui-devices, ui-area-ride" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-tile-ride-start, ui-devices, ui-area-ride, ui-landscape-demo" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 

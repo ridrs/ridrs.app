@@ -9,25 +9,28 @@ import {
   netHttpCapability,
   type PluginContext,
   RidrsError,
-  recordingCompletedEvent,
+  recordingRideState,
   type Secrets,
   storageAppFilesCapability,
   storageSecretsCapability,
   type TrainingAccount,
   type TrainingPlan,
-  trainingAccountChangedEvent,
-  trainingConnectRequestedEvent,
-  trainingDisconnectRequestedEvent,
-  trainingPlanChangedEvent,
+  trainingAccountState,
+  trainingConnectService,
+  trainingDisconnectService,
   trainingPlanSchema,
-  trainingRefreshRequestedEvent,
+  trainingPlanState,
+  trainingRefreshService,
+  type TrainingUpload,
+  trainingUploadService,
+  trainingUploadState,
 } from '@ridrs/contracts';
 import { localDate, toAthlete, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
 const CLIENT_ID = '1697';
-const SCOPES = 'SETTINGS:READ,CALENDAR:READ';
+const SCOPES = 'SETTINGS:READ,CALENDAR:READ,ACTIVITY:WRITE';
 const SITE = 'https://intervals.icu';
 const CALLBACK_PATH = '/oauth/callback';
 /** The planned workouts of today and the next 13 days. */
@@ -48,9 +51,12 @@ interface Services {
 /**
  * The rider's intervals.icu account and plan (ADR 0048). Signs in with PKCE as a public client,
  * keeps the token in `storage.secrets`, and loads the athlete and the planned cycling workouts
- * at start, after a saved ride and on request. Every result of this asynchronous work enters
- * through `ctx.inputs` as `training.account-changed` and `training.plan-changed`; the token
- * never does. The last plan is cached in app files for a start without network.
+ * at start, after a saved ride and on request. The account, the plan and every upload are app
+ * state beside the bus (ADR 0068): the keys `intervals.icu` of `training.account` and
+ * `training.plan`, and a ride's session id in `training.upload`; the token never is. Connect,
+ * disconnect, refresh and upload are services that answer once the work started: none of them
+ * is recorded, so a continued ride never does them again. The last plan is cached in app files
+ * for a start without network.
  */
 export default definePlugin({
   start(ctx) {
@@ -63,7 +69,7 @@ export default definePlugin({
     let busy = false;
 
     const account = (state: TrainingAccount['state'], extra: Partial<TrainingAccount> = {}) =>
-      ctx.inputs.accept(trainingAccountChangedEvent, { service: SERVICE, state, ...extra });
+      ctx.state.set(trainingAccountState, SERVICE, { service: SERVICE, state, ...extra });
 
     /** Runs one piece of asynchronous work at a time; requests during it are dropped. */
     const run = (work: () => Promise<void>) => {
@@ -78,15 +84,16 @@ export default definePlugin({
         });
     };
 
-    // Read in the turn that asks: the logical time of the request decides what "today" is.
+    // Read when asked: the time of the request decides what "today" is.
     const load = (now: number) => run(() => loadPlan(ctx, services, now, { fromStart: false }));
 
-    ctx.events.subscribe(trainingConnectRequestedEvent, () => {
+    // A connect during other work of the plugin is dropped, like a second press.
+    ctx.services.provide(trainingConnectService, () => {
       if (busy) {
-        return;
+        return {};
       }
       const now = ctx.clock.now();
-      ctx.events.publish(trainingAccountChangedEvent, { service: SERVICE, state: 'connecting' });
+      account('connecting');
       run(async () => {
         const verifier = randomUnreserved(64);
         const state = randomUnreserved(32);
@@ -153,9 +160,10 @@ export default definePlugin({
         await services.secrets.set(TOKEN_KEY, token);
         await loadPlan(ctx, services, now, { fromStart: false });
       });
+      return {};
     });
 
-    ctx.events.subscribe(trainingDisconnectRequestedEvent, () => {
+    ctx.services.provide(trainingDisconnectService, () => {
       const now = ctx.clock.now();
       // Not queued behind a running sign-in or load: the rider wants out now. Whatever that work
       // reports later is overtaken by the "disconnected" of this one, or by the next start.
@@ -174,7 +182,7 @@ export default definePlugin({
         await services.secrets.remove(TOKEN_KEY);
         await services.files.remove(CACHE_FILE).catch(() => undefined);
         account('disconnected');
-        ctx.inputs.accept(trainingPlanChangedEvent, {
+        ctx.state.set(trainingPlanState, SERVICE, {
           service: SERVICE,
           fetchedAt: now,
           offline: false,
@@ -183,15 +191,112 @@ export default definePlugin({
       })().catch((error: unknown) =>
         ctx.logger.error({ error }, 'intervals.icu: disconnecting failed'),
       );
+      return {};
     });
 
-    ctx.events.subscribe(trainingRefreshRequestedEvent, () => load(ctx.clock.now()));
-    ctx.events.subscribe(recordingCompletedEvent, () => load(ctx.clock.now()));
+    ctx.services.provide(trainingUploadService, ({ sessionId, file }) => {
+      ctx.state.set(trainingUploadState, sessionId, { service: SERVICE, sessionId, state: 'uploading' });
+      // Not queued behind a load: the rider waits for this one.
+      void uploadActivity(ctx, services, sessionId, file);
+      return {};
+    });
+
+    ctx.services.provide(trainingRefreshService, () => {
+      load(ctx.clock.now());
+      return {};
+    });
+    // A saved ride may complete a planned workout: load again once one is saved. The first
+    // delivery is every ride of the run so far; the plan loads at start anyway.
+    let first = true;
+    ctx.state.watch(recordingRideState, ({ entries, changed }) => {
+      const saved = changed.some((key) => entries.get(key)?.state === 'saved');
+      if (!first && saved) {
+        load(ctx.clock.now());
+      }
+      first = false;
+    });
 
     const startedAt = ctx.clock.now();
     run(() => loadPlan(ctx, services, startedAt, { fromStart: true }));
   },
 });
+
+/**
+ * Uploads a ride's FIT file as a done activity (`ACTIVITY:WRITE`). The session id goes along as
+ * `external_id`; intervals.icu also knows a file it already has by its hash, so a second upload
+ * creates no second activity. A rejected token is forgotten like on a load: the rider connects
+ * again, which asks for the scope as well.
+ */
+async function uploadActivity(
+  ctx: PluginContext,
+  { http, secrets, files }: Services,
+  sessionId: string,
+  file: string,
+): Promise<void> {
+  const upload = (state: TrainingUpload['state'], reason?: TrainingUpload['reason']) =>
+    ctx.state.set(trainingUploadState, sessionId, {
+      service: SERVICE,
+      sessionId,
+      state,
+      ...(reason ? { reason } : {}),
+    });
+
+  const token = await secrets.get(TOKEN_KEY).catch(() => undefined);
+  if (!token) {
+    upload('failed', 'not-connected');
+    return;
+  }
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    bytes = new Uint8Array(await files.read(file));
+  } catch (error) {
+    ctx.logger.warn({ error, file }, 'intervals.icu: the FIT file could not be read');
+    upload('failed', 'rejected');
+    return;
+  }
+  // The platform encodes the multipart body and its boundary.
+  const form = new FormData();
+  // A File carries its name itself; not every FormData keeps the name given to append.
+  form.append(
+    'file',
+    new File([bytes], file.slice(file.lastIndexOf('/') + 1), { type: 'application/octet-stream' }),
+  );
+  const encoded = new Request(SITE, { method: 'POST', body: form });
+  const body = new Uint8Array(await encoded.arrayBuffer());
+  const query = new URLSearchParams({ external_id: sessionId });
+  let response: HttpResponse;
+  try {
+    response = await http.request({
+      method: 'POST',
+      url: `${SITE}/api/v1/athlete/0/activities?${query}`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: 'application/json',
+        'content-type': encoded.headers.get('content-type') ?? 'multipart/form-data',
+      },
+      body,
+    });
+  } catch {
+    upload('failed', 'unreachable');
+    return;
+  }
+  if (response.status === 200 || response.status === 201) {
+    upload('uploaded');
+    return;
+  }
+  if (response.status === 401 || response.status === 403) {
+    await secrets.remove(TOKEN_KEY);
+    ctx.state.set(trainingAccountState, SERVICE, {
+      service: SERVICE,
+      state: 'failed',
+      reason: 'token-rejected',
+    });
+    upload('failed', 'token-rejected');
+    return;
+  }
+  ctx.logger.warn({ status: response.status, body: response.body }, 'intervals.icu: the upload was rejected');
+  upload('failed', 'rejected');
+}
 
 function accessToken(body: string): string | undefined {
   try {
@@ -214,7 +319,7 @@ async function loadPlan(
   { fromStart }: { readonly fromStart: boolean },
 ): Promise<void> {
   const account = (state: TrainingAccount['state'], extra: Partial<TrainingAccount> = {}) =>
-    ctx.inputs.accept(trainingAccountChangedEvent, { service: SERVICE, state, ...extra });
+    ctx.state.set(trainingAccountState, SERVICE, { service: SERVICE, state, ...extra });
 
   let token: string | undefined;
   try {
@@ -263,7 +368,7 @@ async function loadPlan(
       workouts: toWorkouts(eventsBody, athlete.ftp),
     };
     account('connected', { athleteName: athlete.name });
-    ctx.inputs.accept(trainingPlanChangedEvent, plan);
+    ctx.state.set(trainingPlanState, SERVICE, plan);
     await files
       .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(plan)))
       .catch((error: unknown) => ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
@@ -277,7 +382,7 @@ async function loadPlan(
     const cached = await readCache(files);
     if (cached) {
       account('connected', { athleteName: cached.athlete?.name });
-      ctx.inputs.accept(trainingPlanChangedEvent, { ...cached, offline: true });
+      ctx.state.set(trainingPlanState, SERVICE, { ...cached, offline: true });
     } else {
       account('failed', { reason: 'unreachable' });
     }

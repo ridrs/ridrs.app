@@ -5,7 +5,7 @@ Feature: The trainer's control state in its details
   trainer ridrs cannot control at all says nothing about control.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
     And "test-device" reported its "trainer" "KICKR CORE 1234" as "connected"

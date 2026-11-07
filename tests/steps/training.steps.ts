@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
-import { recordingCompletedEvent } from '@ridrs/contracts';
+import { exportFitState, recordingRideState } from '@ridrs/contracts';
 import FakeTimers from '@sinonjs/fake-timers';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../support/simulated-intervals-icu.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { useRealPlugins } from './devices-and-metrics.steps.ts';
+import { savedRides } from './recording.steps.ts';
 
 /** The secret store entry of ADR 0048. */
 const TOKEN_KEY = 'intervals-icu.token';
@@ -81,6 +82,15 @@ Given(
       types: ['test'],
       provides: ['net.http', 'auth.browser-sign-in', 'storage.secrets'],
     });
+    // Without the recorder, a stand-in owns the rides of the app state (ADR 0069).
+    if (!this.realPluginIds.includes('recording-session')) {
+      await this.writeProbePluginFolder({
+        folder: 'test-recorder',
+        id: 'test-recorder',
+        types: ['recording'],
+        state: { owns: [recordingRideState.id] },
+      });
+    }
     this.useMemoryStorage();
   },
 );
@@ -238,14 +248,17 @@ When('the browser returns a code with a different state', async function (this: 
 });
 
 When('a ride is saved', async function (this: RidrsWorld) {
-  this.ensureHost().publishEvent('recording-session', recordingCompletedEvent, {
+  const recorder = this.ensureHost().getPluginContext('test-recorder');
+  assert.ok(recorder, 'Expected the stand-in recorder');
+  recorder.state.set(recordingRideState, 'session-1', {
     sessionId: 'session-1',
+    state: 'saved',
     file: 'recordings/2026-11-04-ride.ridrs',
     bytes: 1024,
     events: 10,
     durationMs: 60_000,
   });
-  await this.settle();
+  await this.flushState();
 });
 
 When('I open the next workout', async function (this: RidrsWorld) {
@@ -353,6 +366,19 @@ Then('no event on the bus contains the intervals.icu token', async function (thi
     leaking.map((envelope) => envelope.type),
     [],
   );
+  // Nor does any app state value or service call beside the bus (ADR 0068).
+  assert.ok(this.stateWrites.length > 0, 'Expected app state writes');
+  const leakingState = this.stateWrites.filter((write) => JSON.stringify(write).includes(token));
+  assert.deepEqual(
+    leakingState.map((write) => `${write.topic} ${write.key}`),
+    [],
+  );
+  assert.ok(this.serviceTraffic.length > 0, 'Expected service calls');
+  const leakingCalls = this.serviceTraffic.filter((call) => JSON.stringify(call).includes(token));
+  assert.deepEqual(
+    leakingCalls.map((call) => call.service),
+    [],
+  );
 });
 
 Then('no app file contains the intervals.icu token', async function (this: RidrsWorld) {
@@ -380,6 +406,29 @@ Then(
     await within(await trainingTile(this)).findByRole('button', { name: label });
   },
 );
+
+// ---- The account in the Me area ---------------------------------------------------------------
+
+async function meConnection(world: RidrsWorld): Promise<HTMLElement> {
+  return await waitFor(() => {
+    const panel = ui(world).querySelector<HTMLElement>(
+      '[data-testid="slot-me-connection"] [data-testid="intervals-connection"]',
+    );
+    assert.ok(panel, 'No intervals.icu account in the Me area');
+    return panel;
+  });
+}
+
+Then('the Me area shows {string}', async function (this: RidrsWorld, text: string) {
+  await waitFor(async () => {
+    const panel = await meConnection(this);
+    assert.ok(textOf(panel).includes(text), `"${textOf(panel)}"`);
+  });
+});
+
+Then('the Me area offers a {string} button', async function (this: RidrsWorld, label: string) {
+  await within(await meConnection(this)).findByRole('button', { name: label });
+});
 
 Then('the next workout card shows:', async function (this: RidrsWorld, table: DataTable) {
   for (const [field, expected] of table.raw()) {
@@ -440,4 +489,147 @@ Then('the workout details list the steps:', async function (this: RidrsWorld, ta
     target: textOf(row.querySelector('[data-field="target"]') ?? document.createElement('span')),
   }));
   assert.deepEqual(shown, table.hashes());
+});
+
+// ---- The debriefing and the upload of a ride ---------------------------------------------
+
+/**
+ * Settles the host and lets real time pass until `done()` holds: in the app scenarios, the
+ * recording is written by a running app on real I/O, which takes longer than I/O turns.
+ */
+async function until(world: RidrsWorld, done: () => boolean, what: string): Promise<void> {
+  const deadline = performance.now() + 10_000;
+  while (!done()) {
+    if (performance.now() > deadline) {
+      throw new Error(`Timed out waiting for ${what}`);
+    }
+    await world.settle();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+async function debriefing(world: RidrsWorld): Promise<HTMLElement> {
+  return await waitFor(() => {
+    const screen = ui(world).querySelector<HTMLElement>('[data-testid="debriefing"]');
+    assert.ok(screen, 'No debriefing shown');
+    return screen;
+  });
+}
+
+/** The ride's files once written; compression and the FIT export run on real I/O turns. */
+async function rideFiles(
+  world: RidrsWorld,
+): Promise<{ readonly recording: string; readonly fit: string }> {
+  let files: { recording: string; fit: string } | undefined;
+  await world.waitForIo(() => {
+    const completed = savedRides(world).at(-1);
+    const written = world.stateValues<{ file: string }>(exportFitState.id).at(-1);
+    if (completed?.file && written) {
+      files = { recording: completed.file, fit: written.file };
+    }
+    return files !== undefined;
+  }, 'the recording and its FIT file');
+  assert.ok(files);
+  return files;
+}
+
+Then('the debriefing shows {string}', async function (this: RidrsWorld, text: string) {
+  const screen = await debriefing(this);
+  await until(this, () => textOf(screen).includes(text), `"${text}" in "${textOf(screen)}"`);
+});
+
+Then(/^the debriefing offers (.+)$/, async function (this: RidrsWorld, list: string) {
+  const expected = [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? '');
+  const screen = await debriefing(this);
+  await until(
+    this,
+    () => {
+      const buttons = [...screen.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+      return expected.every((label) => buttons.some((button) => textOf(button) === label));
+    },
+    `the buttons ${expected.join(', ')}`,
+  );
+});
+
+Given('intervals.icu cannot be reached for uploads', function (this: RidrsWorld) {
+  intervals(this).uploadsReachable = false;
+});
+
+When('intervals.icu can be reached for uploads again', function (this: RidrsWorld) {
+  intervals(this).uploadsReachable = true;
+});
+
+Given('intervals.icu answers uploads with {int}', function (this: RidrsWorld, status: number) {
+  intervals(this).uploadStatus = status;
+});
+
+Then(
+  "intervals.icu received the ride's FIT file as an activity with the session as its external id",
+  async function (this: RidrsWorld) {
+    const simulation = intervals(this);
+    const { fit } = await rideFiles(this);
+    await this.waitForIo(() => simulation.uploads.length > 0, 'an upload to reach intervals.icu');
+    assert.equal(simulation.uploads.length, 1);
+    const [upload] = simulation.uploads;
+    const session = this.stateValues<{ sessionId: string }>(exportFitState.id).at(-1);
+    assert.equal(upload?.externalId, session?.sessionId);
+    assert.equal(upload?.fileName, fit.slice(fit.lastIndexOf('/') + 1));
+    assert.deepEqual(upload?.bytes, this.memoryFiles?.files.get(fit));
+  },
+);
+
+Then('intervals.icu received no upload', async function (this: RidrsWorld) {
+  await this.settle();
+  assert.deepEqual(intervals(this).uploads, []);
+  assert.equal(
+    intervals(this).requests.some(
+      (request) => request.method === 'POST' && request.url.includes('/activities'),
+    ),
+    false,
+  );
+});
+
+Then('the sign-in asked for the scope {string}', function (this: RidrsWorld, scope: string) {
+  assert.equal(intervals(this).lastAuthorization?.searchParams.get('scope'), scope);
+});
+
+Then(
+  "the memory storage keeps the ride's recording and FIT file",
+  async function (this: RidrsWorld) {
+    const { recording, fit } = await rideFiles(this);
+    await this.settle();
+    assert.ok(this.memoryFiles?.files.has(recording), `No "${recording}"`);
+    assert.ok(this.memoryFiles?.files.has(fit), `No "${fit}"`);
+  },
+);
+
+Given("the ride's FIT file is written", async function (this: RidrsWorld) {
+  await rideFiles(this);
+});
+
+Then('the memory storage holds no recording and no FIT file', async function (this: RidrsWorld) {
+  const ride = (path: string) => /\.(ridrs|ridrs\.jsonl|fit)$/.test(path);
+  await this.waitForIo(
+    () =>
+      this.stateValues<{ state: string }>(recordingRideState.id).some(
+        (ride) => ride.state === 'deleted',
+      ),
+    'the recording to be deleted',
+  );
+  await this.waitForIo(
+    () => ![...(this.memoryFiles?.files.keys() ?? [])].some(ride),
+    'the recording and the FIT file to be deleted',
+  );
+});
+
+// ---- A slow disk -------------------------------------------------------------------------
+
+Given('the app files are written slowly from now on', function (this: RidrsWorld) {
+  // The recording and its FIT file are written in the background; here they wait.
+  this.useMemoryStorage().hold();
+});
+
+When('the app files are written again', async function (this: RidrsWorld) {
+  this.useMemoryStorage().release();
+  await this.settle();
 });

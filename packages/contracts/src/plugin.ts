@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import type { PluginStateContext } from './app-state.ts';
 import type { PluginCapabilitiesContext } from './capabilities.ts';
 import type { Clock } from './clock.ts';
 import type { DiagnosticCode } from './diagnostics.ts';
 import type { PluginEventsContext, PluginIdsContext, PluginInputsContext } from './events.ts';
 import type { PluginHostAccess } from './host.ts';
 import type { PluginManifest } from './manifest.ts';
+import type { PluginServicesContext } from './services.ts';
 import type { PluginSettingsContext } from './settings.ts';
 import type { PluginSpatialContext } from './spatial.ts';
 import type { PluginTemporalContext } from './temporal.ts';
@@ -57,6 +59,10 @@ export interface PluginContext {
   readonly host: PluginHostAccess;
   /** The plugin's settings documents; usable only with the manifest field `persistence`. */
   readonly settings: PluginSettingsContext;
+  /** App state beside the bus (ADR 0068); usable only as the manifest field `state` declares. */
+  readonly state: PluginStateContext;
+  /** Services beside the bus (ADR 0068); usable only as the manifest field `services` declares. */
+  readonly services: PluginServicesContext;
   reportDiagnostic(
     code: DiagnosticCode,
     message: string,

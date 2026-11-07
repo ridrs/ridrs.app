@@ -16,7 +16,7 @@ Feature: Devices over this device's Bluetooth or the companion
 
   Scenario: A device only the companion sees connects through the companion
     Given a simulated BLE environment without devices
-    When the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    When the ridrs plugins "transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
     And 2 seconds pass
     Then the device status is:
       | kind    | state     | device          |
@@ -25,7 +25,7 @@ Feature: Devices over this device's Bluetooth or the companion
 
   Scenario: A device both links see is listed once per link and connects over this device's Bluetooth
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
-    When the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    When the ridrs plugins "transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
     And the device setup looks for devices
     Then the "trainer" is connected through "this device"
     And the companion's trainer "KICKR CORE 1234" is not connected
@@ -38,7 +38,7 @@ Feature: Devices over this device's Bluetooth or the companion
 
   Scenario: A lost direct link reconnects over this device's Bluetooth, not the companion
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
-    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the ridrs plugins "transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
     And the device setup looks for devices
     And the "trainer" is connected through "this device"
     When the trainer "KICKR CORE 1234" drops the connection and refuses new connections
@@ -50,7 +50,7 @@ Feature: Devices over this device's Bluetooth or the companion
 
   Scenario: The rider connects the device found through the companion instead
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
-    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the ridrs plugins "transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
     And the device setup looks for devices
     And the "trainer" is connected through "this device"
     When the rider connects the "trainer" through the "companion"
@@ -61,7 +61,7 @@ Feature: Devices over this device's Bluetooth or the companion
 
   Scenario: The rider connects the device over this device's Bluetooth again
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
-    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the ridrs plugins "transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
     And the device setup looks for devices
     And the "trainer" is connected through "this device"
     And the rider connected the "trainer" through the "companion"
@@ -71,7 +71,7 @@ Feature: Devices over this device's Bluetooth or the companion
 
   Scenario: The rider switches the link back and forth more than once
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234"
-    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the ridrs plugins "transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
     And the device setup looks for devices
     And the "trainer" is connected through "this device"
     When the rider connects the "trainer" through the "companion"
@@ -85,7 +85,7 @@ Feature: Devices over this device's Bluetooth or the companion
 
   Scenario: A device first seen without its name takes its name once it arrives
     Given a simulated BLE environment with an FTMS trainer "KICKR CORE 1234" that advertises its name only later
-    And the ridrs plugins "device-registry, transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
+    And the ridrs plugins "transport-ble-bridge, device-ftms-trainer" run with the simulated BLE central and over the simulated network
     And the device setup looks for devices
     Then the device status lists the "trainer" devices with their links:
       | device          | links       |

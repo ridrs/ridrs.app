@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
-import { defineEvent } from './events.ts';
+import { defineState } from './app-state.ts';
+import { defineService } from './services.ts';
 
 /**
  * The rider's training plan from a planning service (ADR 0048). Named after the domain, not the
@@ -11,23 +12,30 @@ import { defineEvent } from './events.ts';
 export const trainingServiceSchema = z.enum(['intervals.icu']);
 export type TrainingService = z.infer<typeof trainingServiceSchema>;
 
-/** The UI asks to connect the account; the service's sign-in opens in the system browser. */
-export const trainingConnectRequestedEvent = defineEvent(
-  'training.connect-requested',
-  z.object({}).strict(),
-);
+export const TRAINING_UPLOAD_STATES = ['uploading', 'uploaded', 'failed'] as const;
 
-/** The UI asks to disconnect: the token is revoked and forgotten, the plan cleared. */
-export const trainingDisconnectRequestedEvent = defineEvent(
-  'training.disconnect-requested',
-  z.object({}).strict(),
-);
+export const TRAINING_UPLOAD_REASONS = [
+  /** No account is connected. */
+  'not-connected',
+  /** The token was rejected (401 or 403); the account asks to connect again. */
+  'token-rejected',
+  'unreachable',
+  /** The service answered with an error; the file stays on this device. */
+  'rejected',
+] as const;
 
-/** The UI asks to load the plan again. */
-export const trainingRefreshRequestedEvent = defineEvent(
-  'training.refresh-requested',
-  z.object({}).strict(),
-);
+export const trainingUploadSchema = z
+  .object({
+    service: trainingServiceSchema,
+    sessionId: z.string().min(1),
+    state: z.enum(TRAINING_UPLOAD_STATES),
+    reason: z.enum(TRAINING_UPLOAD_REASONS).optional(),
+  })
+  .strict();
+export type TrainingUpload = z.infer<typeof trainingUploadSchema>;
+
+/** How the upload of a ride goes, by its session id (ADR 0068). */
+export const trainingUploadState = defineState('training.upload', trainingUploadSchema);
 
 export const TRAINING_ACCOUNT_STATES = [
   'disconnected',
@@ -53,10 +61,8 @@ export const trainingAccountSchema = z
   .strict();
 export type TrainingAccount = z.infer<typeof trainingAccountSchema>;
 
-export const trainingAccountChangedEvent = defineEvent(
-  'training.account-changed',
-  trainingAccountSchema,
-);
+/** The rider's account of each planning service, by the service (`intervals.icu`; ADR 0068). */
+export const trainingAccountState = defineState('training.account', trainingAccountSchema);
 
 /** A power target in % FTP; a fixed target has `low = high`, a ramp goes from `low` to `high`. */
 export const workoutPowerSchema = z
@@ -156,4 +162,45 @@ export const trainingPlanSchema = z
   .strict();
 export type TrainingPlan = z.infer<typeof trainingPlanSchema>;
 
-export const trainingPlanChangedEvent = defineEvent('training.plan-changed', trainingPlanSchema);
+/** The plan of each planning service, by the service (ADR 0068). */
+export const trainingPlanState = defineState('training.plan', trainingPlanSchema);
+
+/** Calls for an account: `key` is the service, routed to the plugin that owns its account. */
+const accountRequest = z.object({ key: z.string().min(1) }).strict();
+const done = z.object({}).strict();
+
+/**
+ * Connects the account: the service's sign-in opens in the system browser. Answers once the
+ * sign-in started; how it goes is the account's state.
+ */
+export const trainingConnectService = defineService('training.connect', {
+  request: accountRequest,
+  response: done,
+  keyedBy: trainingAccountState,
+});
+
+/** Disconnects: the token is revoked and forgotten, the plan cleared. */
+export const trainingDisconnectService = defineService('training.disconnect', {
+  request: accountRequest,
+  response: done,
+  keyedBy: trainingAccountState,
+});
+
+/** Loads the plan again. */
+export const trainingRefreshService = defineService('training.refresh', {
+  request: accountRequest,
+  response: done,
+  keyedBy: trainingAccountState,
+});
+
+/**
+ * Uploads a ride's FIT file (`file`) to the service as a done activity. Answers once the upload
+ * started; how it goes is the key `sessionId` of `training.upload`.
+ */
+export const trainingUploadService = defineService('training.upload', {
+  request: accountRequest
+    .extend({ sessionId: z.string().min(1), file: z.string().min(1) })
+    .strict(),
+  response: done,
+  keyedBy: trainingAccountState,
+});

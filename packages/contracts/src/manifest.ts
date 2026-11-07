@@ -31,6 +31,43 @@ export const persistenceScopeSchema = z.enum(['machine', 'user']);
  */
 export const PERSISTENCE_TYPES: readonly string[] = ['transport', 'storage', 'ui', 'device'];
 
+/**
+ * Plugin types that may use app state and services (ADR 0068, ADR 0069): the input side and the
+ * recorder and its exports, none of which a replay runs as simulation.
+ */
+export const APP_CHANNEL_TYPES: readonly string[] = [...PERSISTENCE_TYPES, 'recording', 'export'];
+
+/**
+ * App channel types that run in a replay (they decode recorded raw data): they may own state and
+ * provide services, but never read state or call services (ADR 0069).
+ */
+const REPLAYED_APP_CHANNEL_TYPES: readonly string[] = ['device'];
+
+/** App state topics a plugin owns keys of and watches (ADR 0068). */
+export const manifestStateSchema = z
+  .object({
+    owns: z.array(eventIdSchema).default([]),
+    watches: z.array(eventIdSchema).default([]),
+  })
+  .strict();
+
+/** Services a plugin provides and calls (ADR 0068). */
+export const manifestServicesSchema = z
+  .object({
+    provides: z.array(eventIdSchema).default([]),
+    calls: z.array(eventIdSchema).default([]),
+  })
+  .strict();
+
+const onInputSide = (types: readonly string[]): boolean =>
+  types.some((type) => PERSISTENCE_TYPES.includes(type));
+
+const usesAppChannels = (types: readonly string[]): boolean =>
+  types.some((type) => APP_CHANNEL_TYPES.includes(type));
+
+const replayed = (types: readonly string[]): boolean =>
+  types.some((type) => REPLAYED_APP_CHANNEL_TYPES.includes(type));
+
 export const manifestSchema = z
   .object({
     id: pluginIdSchema,
@@ -50,15 +87,40 @@ export const manifestSchema = z
     ui: uiManifestSectionSchema.optional(),
     permissions: z.array(hostPermissionSchema).optional(),
     persistence: z.array(persistenceScopeSchema).optional(),
+    /** App state beside the bus (ADR 0068); input-side types only. */
+    state: manifestStateSchema.optional(),
+    /** Services beside the bus (ADR 0068); input-side types only. */
+    services: manifestServicesSchema.optional(),
   })
   .strict()
+  .refine((manifest) => !manifest.persistence?.length || onInputSide(manifest.types), {
+    path: ['persistence'],
+    message: `Only plugins of the types ${PERSISTENCE_TYPES.join(', ')} may declare persistence: values that affect the simulation enter as inputs`,
+  })
+  .refine((manifest) => manifest.state === undefined || usesAppChannels(manifest.types), {
+    path: ['state'],
+    message: `Only plugins of the types ${APP_CHANNEL_TYPES.join(', ')} may declare state: simulation plugins never read app state`,
+  })
+  .refine((manifest) => manifest.services === undefined || usesAppChannels(manifest.types), {
+    path: ['services'],
+    message: `Only plugins of the types ${APP_CHANNEL_TYPES.join(', ')} may declare services: simulation plugins never call services`,
+  })
   .refine(
     (manifest) =>
-      !manifest.persistence?.length ||
-      manifest.types.some((type) => PERSISTENCE_TYPES.includes(type)),
+      !replayed(manifest.types) ||
+      ((manifest.state?.watches.length ?? 0) === 0 && (manifest.services?.calls.length ?? 0) === 0),
     {
-      path: ['persistence'],
-      message: `Only plugins of the types ${PERSISTENCE_TYPES.join(', ')} may declare persistence: values that affect the simulation enter as inputs`,
+      path: ['state'],
+      message: `Plugins of the types ${REPLAYED_APP_CHANNEL_TYPES.join(', ')} run in a replay: they may own state and provide services, but not watch state or call services`,
+    },
+  )
+  .refine(
+    (manifest) =>
+      manifest.types.includes('ui') ||
+      (manifest.ui?.state.length ?? 0) + (manifest.ui?.calls.length ?? 0) === 0,
+    {
+      path: ['ui'],
+      message: 'Only plugins of the type ui may declare ui.state or ui.calls',
     },
   );
 

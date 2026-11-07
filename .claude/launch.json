@@ -27,6 +27,20 @@
         "docs/ux-draft"
       ],
       "port": 4173
+    },
+    {
+      "name": "native-web-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@ridrs/native",
+        "exec",
+        "vite",
+        "--port",
+        "1431",
+        "--strictPort"
+      ],
+      "port": 1431
     }
   ]
 }

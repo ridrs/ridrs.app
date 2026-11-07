@@ -1,24 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/** A place to ride. Placeholders of the early alpha: every Go rides the demo landscape. */
-export interface Route {
-  readonly id: string;
-  readonly name: string;
-  readonly world: string;
-  readonly kind: 'world' | 'video';
-  readonly km: number;
-  readonly climb: number;
-  readonly minutes: number;
-}
+import type { RouteOffer } from '@ridrs/contracts';
 
-export const ROUTES: readonly Route[] = [
-  { id: 'alpine-loop', name: 'Alpine Loop', world: 'Ridrs Alps', kind: 'world', km: 32, climb: 840, minutes: 75 },
-  { id: 'coastal-flats', name: 'Coastal Flats', world: 'Ridrs Coast', kind: 'world', km: 24, climb: 60, minutes: 40 },
-  { id: 'volcano-climb', name: 'Volcano Climb', world: 'Ridrs Islands', kind: 'world', km: 18, climb: 1120, minutes: 70 },
-  { id: 'city-criterium', name: 'City Criterium', world: 'Ridrs City', kind: 'world', km: 12, climb: 40, minutes: 20 },
-  { id: 'passo-video', name: 'Mountain Pass Video', world: 'Real video', kind: 'video', km: 21, climb: 1300, minutes: 95 },
-  { id: 'harbour-video', name: 'Harbour Morning Video', world: 'Real video', kind: 'video', km: 15, climb: 90, minutes: 30 },
-];
+/** The route ridden last until the rider rides another: the demo course, always on the device. */
+export const FIRST_ROUTE = 'ui-landscape-demo/demo-course';
 
 export type Filter = 'flat' | 'hilly' | 'short' | 'favourites';
 
@@ -29,24 +14,58 @@ export const FILTERS: readonly { readonly id: Filter; readonly label: string }[]
   { id: 'favourites', label: 'Favourites' },
 ];
 
-/** The routes that pass every chosen filter, in their order. */
+const providerOf = (offer: RouteOffer) => offer.id.slice(0, offer.id.indexOf('/'));
+
+/**
+ * The offers of the app state `route.offer` in the ride page's order: by provider (the plugin id
+ * that starts every offer id), then by title. Every plugin start orders them alike.
+ */
+export function orderOffers(offers: Iterable<RouteOffer>): RouteOffer[] {
+  return [...offers].sort(
+    (a, b) => providerOf(a).localeCompare(providerOf(b)) || a.title.localeCompare(b.title),
+  );
+}
+
+/** m climbed per km from which a route counts as hilly. */
+const HILLY = 10;
+
+/** The offers that pass every chosen filter, in their order. A course without an end is not short. */
 export function filterRoutes(
-  routes: readonly Route[],
+  offers: readonly RouteOffer[],
   filters: readonly Filter[],
   favourites: readonly string[],
-): Route[] {
-  return routes.filter((route) =>
-    filters.every((filter) => {
+): RouteOffer[] {
+  return offers.filter((offer) => {
+    const hilly = offer.distance > 0 && offer.ascent / (offer.distance / 1000) >= HILLY;
+    return filters.every((filter) => {
       switch (filter) {
         case 'flat':
-          return route.climb / route.km < 10;
+          return !hilly;
         case 'hilly':
-          return route.climb / route.km >= 10;
+          return hilly;
         case 'short':
-          return route.minutes < 45;
+          return offer.duration !== undefined && offer.duration < 45 * 60;
         case 'favourites':
-          return favourites.includes(route.id);
+          return favourites.includes(offer.id);
       }
-    }),
-  );
+    });
+  });
+}
+
+/** A route's length as the rider reads it: `46.1 km`. */
+export const formatDistance = (offer: RouteOffer): string => `${(offer.distance / 1000).toFixed(1)} km`;
+
+/** A route's climb as the rider reads it: `1216 m`. */
+export const formatAscent = (offer: RouteOffer): string => `${Math.round(offer.ascent)} m`;
+
+/** What the route details say: country, length and climb, e.g. `France · 46.1 km · 1216 m`. */
+export function describeRoute(offer: RouteOffer): string {
+  return [offer.tags.country, formatDistance(offer), formatAscent(offer)]
+    .filter((part) => part !== undefined)
+    .join(' · ');
+}
+
+/** A download's size as the rider reads it: `11.2 GB`, `770 MB`. */
+export function formatSize(bytes: number): string {
+  return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
 }

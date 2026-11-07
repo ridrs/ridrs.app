@@ -15,18 +15,23 @@ import {
   type CapabilityContract,
   configSnapshotCapability,
   controllerButtonsChangedEvent,
+  dataArchiveCapability,
+  dataFetchCapability,
   deviceConnectionChangedEvent,
+  deviceConnectService,
+  deviceDiscoverService,
+  deviceForgetService,
   deviceRawNotificationEvent,
   deviceRawReadEvent,
   deviceRawWriteEvent,
   deviceRawWriteFailedEvent,
-  deviceStatusChangedEvent,
+  deviceStatusState,
   drivetrainGearChangedEvent,
   drivetrainShiftRequestedEvent,
   drivetrainVirtualGearCapability,
   type EventDefinition,
   equipmentBicycleChangedEvent,
-  exportFitWrittenEvent,
+  exportFitState,
   measurementCadenceEvent,
   measurementHeartRateEvent,
   measurementPowerEvent,
@@ -48,19 +53,35 @@ import {
   physicsStateEvent,
   physicsTotalResistanceCapability,
   physicsTrainerLoadCapability,
-  recordingCompletedEvent,
-  recordingContinueRequestedEvent,
-  recordingFailedEvent,
-  recordingFinishRequestedEvent,
-  recordingRecoverableChangedEvent,
+  type RecoverableRide,
+  recordingContinueService,
+  recordingDeleteService,
+  recordingFinishService,
+  recordingRecoverableState,
+  recordingRideState,
+  routeCancelService,
+  routeFetchService,
+  routeOfferState,
+  routeRemoveService,
+  type ServiceDefinition,
+  type StateDefinition,
   spatialTerrainCapability,
   storageAppFilesCapability,
+  storageMediaCapability,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  trainingAccountState,
+  trainingConnectService,
+  trainingDisconnectService,
+  trainingPlanState,
+  trainingRefreshService,
+  trainingUploadService,
+  trainingUploadState,
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
+  videoImporterCapability,
   worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
@@ -83,6 +104,10 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   'storage-files-tauri',
   // intervals.icu needs HTTP, the browser sign-in and the secret store: native-only providers.
   'planner-intervals-icu',
+  // Media, downloads and archives in Rust (crates/ridrs-media); headless has the Node providers.
+  'storage-media-tauri',
+  'data-fetch-tauri',
+  'data-archive-tauri',
   'net-http-tauri',
   'auth-sign-in-tauri',
   'storage-secrets-tauri',
@@ -106,6 +131,39 @@ const CAPABILITIES: readonly CapabilityContract[] = [
   configSnapshotCapability,
   storageAppFilesCapability,
   spatialTerrainCapability,
+  storageMediaCapability,
+  dataFetchCapability,
+  dataArchiveCapability,
+  videoImporterCapability,
+];
+
+/** Every app state topic the host knows (ADR 0068): owned and watched beside the bus. */
+const STATES: readonly StateDefinition[] = [
+  routeOfferState,
+  deviceStatusState,
+  recordingRideState,
+  recordingRecoverableState,
+  exportFitState,
+  trainingAccountState,
+  trainingPlanState,
+  trainingUploadState,
+];
+
+/** Every service the host knows (ADR 0068): provided and called beside the bus. */
+const SERVICES: readonly ServiceDefinition[] = [
+  routeFetchService,
+  routeCancelService,
+  deviceConnectService,
+  deviceForgetService,
+  deviceDiscoverService,
+  recordingContinueService,
+  recordingFinishService,
+  recordingDeleteService,
+  routeRemoveService,
+  trainingConnectService,
+  trainingDisconnectService,
+  trainingRefreshService,
+  trainingUploadService,
 ];
 
 /** Events the host resolves by id: what a replay republishes and validates. */
@@ -117,7 +175,6 @@ const EVENTS: readonly EventDefinition[] = [
   activityInterruptedEvent,
   activityStateChangedEvent,
   deviceConnectionChangedEvent,
-  deviceStatusChangedEvent,
   controllerButtonsChangedEvent,
   deviceRawNotificationEvent,
   deviceRawReadEvent,
@@ -144,12 +201,6 @@ const EVENTS: readonly EventDefinition[] = [
   uiTerrainObservedEvent,
   worldPositionEvent,
   worldTerrainPreviewEvent,
-  recordingCompletedEvent,
-  recordingFailedEvent,
-  recordingRecoverableChangedEvent,
-  recordingContinueRequestedEvent,
-  recordingFinishRequestedEvent,
-  exportFitWrittenEvent,
 ];
 
 function versionOf(packageJson: URL): string {
@@ -168,6 +219,8 @@ async function main(): Promise<void> {
     const code = await runRecordingCommand(rawArgs.slice(1), {
       capabilities: CAPABILITIES,
       events: EVENTS,
+      states: STATES,
+      services: SERVICES,
       resolvePluginDir,
       resolveFile: (file) => resolve(process.env.INIT_CWD ?? process.cwd(), file),
       out: (line) => process.stdout.write(`${line}\n`),
@@ -204,6 +257,8 @@ async function main(): Promise<void> {
     logger,
     capabilities: CAPABILITIES,
     events: EVENTS,
+    states: STATES,
+    services: SERVICES,
     platform: {
       ridrsVersion: versionOf(new URL('../../../package.json', import.meta.url)),
       runtime: 'node',
@@ -217,8 +272,8 @@ async function main(): Promise<void> {
    * Headless continues an interrupted ride on its own (ADR 0057): the ride goes on paused, in a
    * continuing host that replaces the first one, until `activity.resume-requested` arrives.
    */
-  host.subscribeEvent('ridrs-headless', recordingRecoverableChangedEvent, ({ payload }) => {
-    const ride = payload.ride;
+  host.watchState('ridrs-headless', recordingRecoverableState.id, ({ entries }) => {
+    const ride = [...entries.values()][0] as RecoverableRide | undefined;
     const storage = host.getProvider(storageAppFilesCapability);
     if (!ride || !storage) {
       return;

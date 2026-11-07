@@ -13,6 +13,7 @@
     "test:bdd": "NODE_OPTIONS=\"--import tsx\" cucumber-js && NODE_OPTIONS=\"--import tsx\" cucumber-js --profile ui",
     "test": "pnpm test:unit && pnpm test:bdd",
     "check:video-routes": "tsx scripts/check-video-routes.ts",
+    "fetch:video-catalog": "tsx scripts/fetch-video-catalog.ts",
     "check:native-bundle": "pnpm --filter @ridrs/native build && node scripts/check-native-bundle.mjs"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "@garmin/fitsdk": "21.218.0",
     "@happy-dom/global-registrator": "21.0.4",
     "@ridrs/ble-bridge": "workspace:*",
+    "@ridrs/ble-peripheral": "workspace:*",
     "@ridrs/ble-simulator": "workspace:*",
     "@ridrs/fit": "workspace:*",
     "@ridrs/recording": "workspace:*",
@@ -36,6 +38,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/semver": "7.8.0",
+    "@zip.js/zip.js": "2.24.0",
     "dependency-cruiser": "18.7.0",
     "execa": "10.2.1",
     "happy-dom": "21.0.4",

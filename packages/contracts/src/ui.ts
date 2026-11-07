@@ -59,6 +59,10 @@ export const uiManifestSectionSchema = z
     screens: z.array(uiScreenSchema).default([]),
     contributions: z.array(uiContributionSchema).default([]),
     events: uiEventsSchema.default({ subscribe: [], publish: [] }),
+    /** App state topics the client code watches (ADR 0068). */
+    state: z.array(eventIdSchema).default([]),
+    /** Services the client code calls (ADR 0068). */
+    calls: z.array(eventIdSchema).default([]),
   })
   .strict()
   .superRefine((ui, issues) => {
@@ -107,6 +111,13 @@ export interface UiRegistryEvents {
   readonly publish: readonly string[];
 }
 
+export interface UiRegistryPlugin {
+  readonly pluginId: string;
+  readonly events: UiRegistryEvents;
+  readonly state: readonly string[];
+  readonly calls: readonly string[];
+}
+
 /**
  * Screens, extension points and contributions of the plugins that are currently started, as the
  * core indexes them. The core validates and orders; it never interprets what any entry means.
@@ -117,8 +128,12 @@ export interface UiRegistry {
   readonly contributions: readonly UiRegistryContribution[];
   /** Union over all started UI plugins: the bridge allow-list. */
   readonly events: UiRegistryEvents;
-  /** Each started UI plugin's own event lists, which bound what its client code may use. */
-  readonly plugins: readonly { readonly pluginId: string; readonly events: UiRegistryEvents }[];
+  /** Union of `ui.state` over all started UI plugins: the topics the bridge lets clients watch. */
+  readonly state: readonly string[];
+  /** Union of `ui.calls` over all started UI plugins: the services the bridge lets clients call. */
+  readonly calls: readonly string[];
+  /** Each started UI plugin's own lists, which bound what its client code may use. */
+  readonly plugins: readonly UiRegistryPlugin[];
 }
 
 export const uiRegistryChangedEvent = defineEvent(

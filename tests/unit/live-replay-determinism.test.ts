@@ -14,12 +14,19 @@ import {
   bleCentralCapability,
   type CapabilityContract,
   definePlugin,
+  deviceConnectService,
+  deviceDiscoverService,
+  deviceForgetService,
+  deviceStatusState,
   type EventDefinition,
   measurementHeartRateEvent,
   type PhysicsStateBatch,
   type PluginContext,
   physicsStateBatchEvent,
-  recordingCompletedEvent,
+  recordingDeleteService,
+  recordingFinishService,
+  recordingRecoverableState,
+  recordingRideState,
   storageAppFilesCapability,
   uiTerrainObservedEvent,
 } from '@ridrs/contracts';
@@ -38,6 +45,16 @@ import { TerrainPublisher } from '../../plugins/ui-landscape-demo/client/terrain
 
 const PLUGINS_DIR = resolve(import.meta.dirname, '../../plugins');
 const T0 = Date.UTC(2026, 10, 1, 10, 0, 0, 0);
+/** App state and services of the plugins here (ADR 0068, ADR 0069). */
+const states = [recordingRideState, recordingRecoverableState, deviceStatusState];
+const services = [
+  recordingFinishService,
+  recordingDeleteService,
+  deviceConnectService,
+  deviceForgetService,
+  deviceDiscoverService,
+];
+
 const PLUGINS = [
   'activity-session',
   'device-ftms-trainer',
@@ -148,6 +165,8 @@ async function rideLive(seed: number): Promise<Uint8Array> {
     logger: createSilentLogger(),
     capabilities,
     events,
+    states,
+    services,
   });
   // Turns take time: the source advances while the host computes.
   host.observe('computing', {
@@ -158,12 +177,11 @@ async function rideLive(seed: number): Promise<Uint8Array> {
     },
   });
   let file: string | undefined;
-  host.observe('done', {
-    onEvent: (e) => {
-      if (e.type === recordingCompletedEvent.id) {
-        file = (e.payload as { file: string }).file;
-      }
-    },
+  host.observeState('done', (topic, _key, value) => {
+    const ride = value as { state?: string; file?: string } | undefined;
+    if (topic === recordingRideState.id && ride?.state === 'saved') {
+      file = ride.file;
+    }
   });
   // The UI landscape as a sensor: its real publisher, fed with the odometer it would present
   // (the latest batch), publishing through the bridge like the in-process UI bridge does.
@@ -279,6 +297,8 @@ describe('live recording and replay', () => {
         sources: [bundle(new BleSimulator(), new MemoryAppFiles())],
         capabilities,
         events,
+        states,
+        services,
       };
       const first = await replay(recording, options);
       expect(first.firstDifference).toBeUndefined();

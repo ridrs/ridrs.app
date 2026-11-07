@@ -8,7 +8,7 @@ Feature: The devices tile on the main screen
   main screen.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 
@@ -92,4 +92,4 @@ Feature: The devices tile on the main screen
 
   Scenario: The main screen does not know the tile
     Then the tile "ui-devices/devices" is shown on the main screen
-    And the manifest and the client of "ui-main-screen" mention none of "ui-devices, device-registry, setup"
+    And the manifest and the client of "ui-main-screen" mention none of "ui-devices, setup"

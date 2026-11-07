@@ -2,8 +2,20 @@
   "id": "export-fit",
   "name": "FIT Export",
   "version": "0.1.0",
-  "types": ["export"],
+  "types": [
+    "export"
+  ],
   "provides": [],
-  "requires": ["storage.app-files"],
-  "entry": "index.ts"
+  "requires": [
+    "storage.app-files"
+  ],
+  "entry": "index.ts",
+  "state": {
+    "owns": [
+      "export.fit"
+    ],
+    "watches": [
+      "recording.ride"
+    ]
+  }
 }

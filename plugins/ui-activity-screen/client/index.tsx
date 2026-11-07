@@ -15,6 +15,9 @@ const Z_LANDSCAPE = 0;
 const Z_HUD = 1;
 const Z_CONTROLS = 2;
 
+/** Another plugin's screen, there or not: the screen only knows its id. */
+const DEBRIEFING = 'debriefing';
+
 const BUTTON: CSSProperties = { fontSize: 18, padding: '10px 20px', borderRadius: 10 };
 
 function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
@@ -47,10 +50,13 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   useEffect(
     () =>
       ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-        // A paused ride stays here (ADR 0056); a finished one goes back to the main screen.
+        // A paused ride stays here (ADR 0056); a finished one goes to its debriefing, where the
+        // rider saves or deletes it, or back to the main screen without one.
         if (payload.state === 'paused' || payload.state === 'running') {
           setPaused(payload.state === 'paused');
           setWorld(payload.world?.landscape ?? null);
+        } else if (payload.state === 'finished' && ctx.hasScreen(DEBRIEFING)) {
+          ctx.navigate(DEBRIEFING);
         } else {
           ctx.navigate('main');
         }

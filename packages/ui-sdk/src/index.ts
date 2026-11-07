@@ -3,6 +3,7 @@
 export type {
   OutletOptions,
   SlotOptions,
+  StateUpdate,
   UiBridge,
   UiComponent,
   UiContext,

@@ -2,9 +2,9 @@
 
 import {
   type RecoverableRide,
-  recordingContinueRequestedEvent,
-  recordingFinishRequestedEvent,
-  recordingRecoverableChangedEvent,
+  recordingContinueService,
+  recordingFinishService,
+  recordingRecoverableState,
 } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useLayoutEffect, useRef, useState } from 'react';
@@ -40,14 +40,22 @@ function InterruptedRideView({ ctx }: { readonly ctx: UiContext }) {
   const [asked, setAsked] = useState(false);
   const continueButton = useRef<HTMLButtonElement>(null);
 
+  // App state (ADR 0069): the ride on offer, if any.
   useLayoutEffect(
     () =>
-      ctx.events.subscribe(recordingRecoverableChangedEvent, ({ payload }) => {
-        setRide(payload.ride);
+      ctx.state.watch(recordingRecoverableState, ({ entries }) => {
+        setRide([...entries.values()][0]);
         setAsked(false);
       }),
     [ctx],
   );
+  const ask = (call: () => Promise<unknown>) => {
+    setAsked(true);
+    call().catch((error: unknown) => {
+      ctx.logger.warn('The interrupted ride could not be handled', error);
+      setAsked(false);
+    });
+  };
   useLayoutEffect(() => {
     if (ride) {
       continueButton.current?.focus();
@@ -68,10 +76,7 @@ function InterruptedRideView({ ctx }: { readonly ctx: UiContext }) {
           type="button"
           className="rr-button rr-primary"
           disabled={asked}
-          onClick={() => {
-            setAsked(true);
-            ctx.events.publish(recordingContinueRequestedEvent, { file: ride.file });
-          }}
+          onClick={() => ask(() => ctx.call(recordingContinueService, { sessionId: ride.sessionId }))}
         >
           Continue ride
         </button>
@@ -79,10 +84,7 @@ function InterruptedRideView({ ctx }: { readonly ctx: UiContext }) {
           type="button"
           className="rr-button"
           disabled={asked}
-          onClick={() => {
-            setAsked(true);
-            ctx.events.publish(recordingFinishRequestedEvent, { file: ride.file });
-          }}
+          onClick={() => ask(() => ctx.call(recordingFinishService, { key: ride.sessionId }))}
         >
           Finish ride
         </button>

@@ -1,0 +1,37 @@
+{
+  "id": "ui-debriefing",
+  "name": "Ride Debriefing",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "debriefing",
+        "export": "DebriefingScreen"
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "activity.state-changed"
+      ],
+      "publish": []
+    },
+    "state": [
+      "export.fit",
+      "recording.ride",
+      "training.account",
+      "training.upload"
+    ],
+    "calls": [
+      "recording.delete",
+      "training.connect",
+      "training.upload"
+    ]
+  }
+}

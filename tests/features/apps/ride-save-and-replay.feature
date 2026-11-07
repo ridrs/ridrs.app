@@ -14,6 +14,9 @@ Feature: Ride, save, export and replay
     Then the power widget shows "220" "W"
     When 5 seconds pass in real time
     And I press "Finish ride"
+    Then the "debriefing" screen is shown
+    And the debriefing offers "Save" and "Delete"
+    When I press "Save"
     Then the "main" screen is shown
     And eventually the "ride-saved" panel shows a recording file and a FIT file
     And the saved FIT file is valid according to the official FIT SDK

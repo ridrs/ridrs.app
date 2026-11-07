@@ -33,21 +33,24 @@
     ],
     "events": {
       "subscribe": [
-        "device.status-changed",
         "activity.state-changed",
         "metric.power",
         "metric.heart-rate",
         "controller.buttons-changed",
-        "bridge.state-changed",
         "trainer.control-changed"
       ],
-      "publish": [
-        "device.connect-requested",
-        "device.forget-requested",
-        "device.discovery-requested",
-        "bridge.connect-requested",
-        "bridge.forget-requested"
-      ]
-    }
+      "publish": []
+    },
+    "state": [
+      "bridge.state",
+      "device.status"
+    ],
+    "calls": [
+      "bridge.connect",
+      "bridge.forget",
+      "device.connect",
+      "device.discover",
+      "device.forget"
+    ]
   }
 }

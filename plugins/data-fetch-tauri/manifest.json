@@ -1,0 +1,9 @@
+{
+  "id": "data-fetch-tauri",
+  "name": "Downloads (Tauri)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["data.fetch"],
+  "requires": [],
+  "entry": "index.ts"
+}

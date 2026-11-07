@@ -6,6 +6,8 @@
  * index lists the folders and their control files.
  */
 
+import { VIDEO_ROUTE_FILE, videoRouteSchema } from '@ridrs/contracts';
+
 /** Where the app serves the library; `index.json` lists it. */
 export const LIBRARY_URL = '/videos/';
 
@@ -45,7 +47,8 @@ function decodeEntity(entity: string): string {
   return decoded && decoded !== entity ? decoded : entity;
 }
 
-function xml(text: string): Document {
+/** An XML document that may use HTML's entities, as the control files do. */
+export function xml(text: string): Document {
   const plain = text.replace(/&([A-Za-z][A-Za-z0-9]*);/g, (entity, name: string) =>
     XML_ENTITIES.has(name) ? entity : decodeEntity(entity).replace('&', '&amp;'),
   );
@@ -99,6 +102,30 @@ export function parseGpx(text: string): TrackPoint[] {
     points.push({ latitude, longitude, elevation, time: (at - start) / 1000 });
   }
   return points;
+}
+
+/**
+ * A downloaded route in the unified format (`route.json`, docs/ideas/video-sources.md), from the
+ * URLs of its files that its offer names. Never built from each other: the native app's asset
+ * URLs hold the whole path as one encoded segment, so nothing lies "next to" another URL.
+ */
+export async function loadDownloadedRoute(id: string, files: Readonly<Record<string, string>>): Promise<VideoRoute> {
+  const url = (name: string) => {
+    const found = files[name];
+    if (!found) {
+      throw new Error(`The downloaded route "${id}" has no file "${name}"`);
+    }
+    return found;
+  };
+  const route = videoRouteSchema.parse(await (await fetch(url(VIDEO_ROUTE_FILE))).json());
+  return {
+    id,
+    title: route.title,
+    videoUrl: url(route.video.file),
+    gpxUrl: url(route.track.file),
+    framerate: route.video.framerate,
+    startFrame: route.video.startFrame,
+  };
 }
 
 /** Fetches the library's index and every control file in it; a broken route is left out. */

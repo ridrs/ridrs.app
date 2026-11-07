@@ -17,7 +17,7 @@ Feature: Every ride is recorded
     When "test-ui" publishes "activity.finish-requested" through the UI bridge
     Then the memory storage contains "recordings/ride-20261101T100000Z-<session>.ridrs"
     And it contains no ".ridrs.jsonl" file
-    And the latest "recording.completed" event names that file with a distance of 41.94 m and a duration of 10000 ms
+    And the latest "recording.ride" state names that file with a distance of 41.94 m and a duration of 10000 ms
 
   Scenario: The recording is header, snapshot, events and footer
     Given a ride from "+0 ms" to "+10 s" with power 200 W every 0.25 s and heart rate 150 bpm every 1 s was recorded
@@ -57,7 +57,7 @@ Feature: Every ride is recorded
     Then the memory storage contains "recordings/ride-20261101T090000Z-0badc0de.ridrs"
     And its footer has the status "recovered"
     And a "recording-recovered" diagnostic was reported
-    And a "recording.completed" event names that file
+    And a "recording.ride" state names that file
 
   Scenario: Observing the whole host needs a declared permission
     Given a probe plugin "test-spy" without permissions calls "ctx.host.observe"

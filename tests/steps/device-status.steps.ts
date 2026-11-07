@@ -6,10 +6,9 @@ import {
   controllerButtonSchema,
   controllerButtonsChangedEvent,
   type DeviceConnectionChangedPayload,
-  type DeviceStatusChangedPayload,
+  type DeviceStatus,
   deviceConnectionChangedEvent,
   deviceKindSchema,
-  deviceStatusChangedEvent,
   type EventDefinition,
   type MeasurementPayload,
   measurementHeartRateEvent,
@@ -17,13 +16,13 @@ import {
   type PluginContext,
 } from '@ridrs/contracts';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
+import { deviceStatuses, reportConnection } from '../support/device-links.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
 
-function latestStatus(world: RidrsWorld): DeviceStatusChangedPayload {
-  const latest = world.hostObserved.filter((e) => e.type === deviceStatusChangedEvent.id).at(-1);
-  assert.ok(latest, 'Expected a device status');
-  return latest.payload as DeviceStatusChangedPayload;
+/** One status per kind, from every device link (ADR 0069: the app state `device.status`). */
+function latestStatus(world: RidrsWorld): { devices: DeviceStatus[] } {
+  return { devices: deviceStatuses(world) };
 }
 
 function ui(world: RidrsWorld): HTMLElement {
@@ -60,16 +59,13 @@ for (const verb of ['reports', 'reported']) {
   When(
     `{string} ${verb} its {string} {string} as {string}`,
     async function (this: RidrsWorld, pluginId: string, kind: string, name: string, state: string) {
-      const ctx = this.ensureHost().getPluginContext(pluginId);
-      assert.ok(ctx, `Expected context for plugin "${pluginId}"`);
       // A test device reports from outside the host: an external input.
-      ctx.inputs.accept(deviceConnectionChangedEvent, {
+      await reportConnection(this, pluginId, {
         deviceId: `${kind}-1`,
         deviceName: name,
         kind: deviceKindSchema.parse(kind),
         state: state as DeviceConnectionChangedPayload['state'],
       });
-      await this.settle();
     },
   );
 }
@@ -78,13 +74,12 @@ When(
   '{string} searches for a {string}',
   async function (this: RidrsWorld, pluginId: string, kind: string) {
     // No device is known while searching: no id, no name.
-    pluginContext(this, pluginId).inputs.accept(deviceConnectionChangedEvent, {
+    await reportConnection(this, pluginId, {
       deviceId: '',
       deviceName: '',
       kind: deviceKindSchema.parse(kind),
       state: 'searching',
     });
-    await this.settle();
   },
 );
 

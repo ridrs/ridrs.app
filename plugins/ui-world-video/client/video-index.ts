@@ -25,18 +25,56 @@ export interface VideoIndex {
 /** Fetches `length` bytes of the file from `offset`. */
 export type RangeReader = (offset: number, length: number) => Promise<Uint8Array>;
 
-/** Reads byte ranges of a file served over HTTP; nothing past its end. */
+/** The total of a `206` from its `Content-Range: bytes a-b/total`. */
+const totalOf = (range: string | null) => Number(range?.split('/')[1] ?? Number.NaN);
+
+/**
+ * Reads byte ranges of a file served over HTTP; nothing past its end. A server may answer a range
+ * with less than asked (the app's media scheme sends at most 16 MB): the rest is asked for again.
+ * The file's size, learnt from the first answer, keeps every later read within the file, so a
+ * read at its end costs no request.
+ */
 export function httpRangeReader(url: string): RangeReader {
+  let size = Number.POSITIVE_INFINITY;
   return async (offset, length) => {
-    const response = await fetch(url, { headers: { Range: `bytes=${offset}-${offset + length - 1}` } });
-    if (response.status === 416) {
-      // From the end of the file on there is nothing.
-      return new Uint8Array();
+    const parts: Uint8Array[] = [];
+    let at = offset;
+    while (at < Math.min(offset + length, size)) {
+      const end = Math.min(offset + length, size);
+      const response = await fetch(url, { headers: { Range: `bytes=${at}-${end - 1}` } });
+      if (response.status === 416) {
+        // From the end of the file on there is nothing.
+        size = Math.min(size, totalOf(response.headers.get('content-range')) || at);
+        break;
+      }
+      if (response.status !== 206 && response.status !== 200) {
+        throw new Error(`${url}: HTTP ${response.status}`);
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (response.status === 200) {
+        // The whole file: the server ignored the range.
+        size = bytes.length;
+        return bytes.subarray(offset, Math.min(offset + length, size));
+      }
+      const total = totalOf(response.headers.get('content-range'));
+      if (Number.isFinite(total)) {
+        size = total;
+      }
+      if (bytes.length === 0) {
+        break;
+      }
+      parts.push(bytes);
+      at += bytes.length;
     }
-    if (response.status !== 206 && response.status !== 200) {
-      throw new Error(`${url}: HTTP ${response.status}`);
+    if (parts.length === 1) {
+      return parts[0] as Uint8Array;
     }
-    return new Uint8Array(await response.arrayBuffer());
+    const joined = new Uint8Array(at - offset);
+    parts.reduce((position, part) => {
+      joined.set(part, position);
+      return position + part.length;
+    }, 0);
+    return joined;
   };
 }
 

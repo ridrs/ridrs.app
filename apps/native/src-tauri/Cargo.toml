@@ -32,6 +32,8 @@ ridrs-ble = { path = "../../../crates/ridrs-ble" }
 ridrs-bridge = { path = "../../../crates/ridrs-bridge" }
 # storage.secrets without prompts (ADR 0053): an encrypted app file, the Keystore on Android.
 ridrs-secrets = { path = "../../../crates/ridrs-secrets" }
+# storage.media, data.fetch and data.archive for the video rides (docs/ideas/video-sources.md).
+ridrs-media = { path = "../../../crates/ridrs-media" }
 serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]

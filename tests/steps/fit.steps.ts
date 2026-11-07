@@ -10,11 +10,11 @@ import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { type DataTable, Then, When } from '@cucumber/cucumber';
 import { Decoder, Stream } from '@garmin/fitsdk';
-import { exportFitWrittenEvent } from '@ridrs/contracts';
+import { exportFitState } from '@ridrs/contracts';
 import { fitTimestamp } from '@ridrs/fit';
 import type { RidrsWorld } from '../support/world.ts';
 import { parseOffset } from './physics.steps.ts';
-import { memoryFile, tappedOf } from './recording.steps.ts';
+import { memoryFile } from './recording.steps.ts';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const HEADLESS_MAIN = resolve(REPO_ROOT, 'apps/headless/src/main.ts');
@@ -47,16 +47,13 @@ function camel(value: string): string {
 }
 
 function latestFitFile(world: RidrsWorld): string {
-  const written = tappedOf(world, exportFitWrittenEvent.id).at(-1);
-  assert.ok(written, 'Expected an "export.fit-written" event');
-  return (written.payload as { file: string }).file;
+  const written = world.stateValues<{ file: string }>(exportFitState.id).at(-1);
+  assert.ok(written, 'Expected an "export.fit" state');
+  return written.file;
 }
 
 async function fitOf(world: RidrsWorld): Promise<FitMessages> {
-  await world.waitForIo(
-    () => tappedOf(world, exportFitWrittenEvent.id).length > 0,
-    'the FIT export',
-  );
+  await world.waitForIo(() => world.stateValues(exportFitState.id).length > 0, 'the FIT export');
   return decodeFit(memoryFile(world, latestFitFile(world)));
 }
 
@@ -83,11 +80,12 @@ function assertNear(actual: unknown, expected: number, tolerance: number, what: 
 }
 
 Then(
-  'the latest {string} event names that file with {int} records',
-  function (this: RidrsWorld, eventId: string, records: number) {
-    const latest = tappedOf(this, eventId).at(-1);
-    assert.ok(latest, `Expected a "${eventId}" event`);
-    const payload = latest.payload as { file: string; records: number; bytes: number };
+  'the latest {string} state names that file with {int} records',
+  function (this: RidrsWorld, topic: string, records: number) {
+    const payload = this.stateValues<{ file: string; records: number; bytes: number }>(topic).at(
+      -1,
+    );
+    assert.ok(payload, `Expected a "${topic}" state`);
     assert.equal(payload.file, this.lastRecordingFile);
     assert.equal(payload.records, records);
     assert.equal(payload.bytes, memoryFile(this, payload.file).length);
@@ -310,5 +308,15 @@ Then(
       return at >= fitTimestamp(parseOffset(from)) && at <= fitTimestamp(parseOffset(to));
     });
     assert.deepEqual(inPause, []);
+  },
+);
+
+Then(
+  'the latest {string} state names that file with no record count',
+  function (this: RidrsWorld, topic: string) {
+    const payload = this.stateValues<{ file: string; records?: number }>(topic).at(-1);
+    assert.ok(payload, `Expected a "${topic}" state`);
+    assert.equal(payload.file, this.lastRecordingFile);
+    assert.equal(payload.records, undefined);
   },
 );

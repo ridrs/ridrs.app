@@ -14,6 +14,8 @@ import {
   type JsonValue,
   type PluginLogger,
   type RecordedEnvelope,
+  type ServiceDefinition,
+  type StateDefinition,
 } from '@ridrs/contracts';
 import {
   createBundledPluginSource,
@@ -64,6 +66,12 @@ export interface ReplayOptions {
   readonly capabilities: Iterable<CapabilityContract>;
   /** Event types the replay knows: inputs of other types are republished opaquely. */
   readonly events: Iterable<EventDefinition>;
+  /**
+   * App state topics and services (ADR 0068, ADR 0069): plugins that run in a replay (device
+   * plugins) own and provide them as live; nothing of it is compared.
+   */
+  readonly states?: Iterable<StateDefinition>;
+  readonly services?: Iterable<ServiceDefinition>;
   /** Recorded plugin id -> the plugin to replay instead (e.g. a probe). */
   readonly replace?: Readonly<Record<string, string>>;
   readonly logger?: PluginLogger;
@@ -261,6 +269,8 @@ export async function replay(recording: Recording, options: ReplayOptions): Prom
     logger: options.logger ?? createSilentLogger(),
     capabilities: options.capabilities,
     events: definitions.values(),
+    states: options.states,
+    services: options.services,
     platform: recordedHost.platform,
   });
   const replayed: RecordedEnvelope[] = [];

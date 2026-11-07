@@ -176,12 +176,16 @@ export function computeUiRegistry(inputs: readonly UiRegistryInput[]): UiRegistr
         subscribe: sortedUnion(plugins.map((p) => p.ui.events.subscribe)),
         publish: sortedUnion(plugins.map((p) => p.ui.events.publish)),
       },
+      state: sortedUnion(plugins.map((p) => p.ui.state)),
+      calls: sortedUnion(plugins.map((p) => p.ui.calls)),
       plugins: plugins.map((p) => ({
         pluginId: p.pluginId,
         events: {
           subscribe: sortedUnion([p.ui.events.subscribe]),
           publish: sortedUnion([p.ui.events.publish]),
         },
+        state: sortedUnion([p.ui.state]),
+        calls: sortedUnion([p.ui.calls]),
       })),
     },
     problems,

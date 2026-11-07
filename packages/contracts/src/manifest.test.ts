@@ -97,3 +97,106 @@ describe('contract definitions', () => {
     expect(def).toEqual({});
   });
 });
+
+describe('app state and services in the manifest (ADR 0068)', () => {
+  const manifest = (fields: Record<string, unknown>) =>
+    parseManifestJson(
+      JSON.stringify({
+        id: 'probe',
+        name: 'Probe',
+        version: '1.0.0',
+        provides: [],
+        requires: [],
+        entry: 'index.ts',
+        ...fields,
+      }),
+    );
+
+  it('lets an input-side plugin own, watch, provide and call', () => {
+    const result = manifest({
+      types: ['transport'],
+      state: { owns: ['route.offer'], watches: ['training.plan'] },
+      services: { provides: ['route.fetch'], calls: ['training.upload'] },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.state).toEqual({ owns: ['route.offer'], watches: ['training.plan'] });
+      expect(result.data.services?.calls).toEqual(['training.upload']);
+    }
+  });
+
+  it.each([['state'], ['services']])('refuses %s on a simulation plugin', (field) => {
+    const result = manifest({ types: ['physics'], [field]: {} });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.message).toContain(field);
+    }
+  });
+
+  it('refuses unknown fields in the state section', () => {
+    expect(manifest({ types: ['ui'], state: { reads: [] } }).success).toBe(false);
+  });
+
+  it('allows ui.state and ui.calls on ui plugins only', () => {
+    const ui = { state: ['route.offer'], calls: ['route.fetch'] };
+    expect(manifest({ types: ['ui'], ui }).success).toBe(true);
+    const device = manifest({ types: ['device'], ui });
+    expect(device.success).toBe(false);
+    if (!device.success) {
+      expect(device.message).toContain('ui.state');
+    }
+  });
+});
+
+describe('app channel types (ADR 0069)', () => {
+  const manifest = (fields: Record<string, unknown>) =>
+    parseManifestJson(
+      JSON.stringify({
+        id: 'probe',
+        name: 'Probe',
+        version: '1.0.0',
+        provides: [],
+        requires: [],
+        entry: 'index.ts',
+        ...fields,
+      }),
+    );
+
+  it.each([['recording'], ['export']])(
+    'lets a %s plugin own state and provide services',
+    (type) => {
+      expect(
+        manifest({
+          types: [type],
+          state: { owns: ['recording.ride'] },
+          services: { provides: ['recording.delete'] },
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it('keeps settings to the persistence types', () => {
+    expect(manifest({ types: ['recording'], persistence: ['machine'] }).success).toBe(false);
+  });
+
+  it.each([
+    ['state', { watches: ['device.status'] }],
+    ['services', { calls: ['device.connect'] }],
+  ])('refuses a device plugin that reads app state or calls services (%s)', (field, value) => {
+    const result = manifest({ types: ['device'], [field]: value });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.message).toContain('replay');
+    }
+  });
+
+  it('lets a device plugin own state and provide services', () => {
+    expect(
+      manifest({
+        types: ['device'],
+        state: { owns: ['device.status'] },
+        services: { provides: ['device.connect'] },
+      }).success,
+    ).toBe(true);
+  });
+});

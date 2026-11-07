@@ -1,0 +1,9 @@
+{
+  "id": "storage-media-node",
+  "name": "Media Storage (Node)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["storage.media"],
+  "requires": [],
+  "entry": "index.ts"
+}

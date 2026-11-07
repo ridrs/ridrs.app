@@ -16,6 +16,9 @@ Feature: The road moves smoothly while I ride
     And between 50 and 62 frames are rendered per second
     And the virtual-speed widget keeps rising
     When I press "Finish ride"
+    Then the "debriefing" screen is shown
+    And the debriefing offers "Save"
+    When I press "Save"
     Then the "main" screen is shown
     And no frames are rendered
     When I close the ridrs app

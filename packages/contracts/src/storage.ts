@@ -37,6 +37,34 @@ export const storageAppFilesCapability = defineCapability<AppFiles, 'single', 's
 );
 
 /**
+ * Large media on the device, such as downloaded video routes (docs/ideas/video-sources.md), apart
+ * from the app files. Paths are relative and `/`-separated, checked like app file paths.
+ */
+export interface MediaFiles {
+  /** Whether a file is there. */
+  exists(path: string): Promise<boolean>;
+  /** A small file, whole: never a video. */
+  read(path: string): Promise<Uint8Array>;
+  write(path: string, bytes: Uint8Array): Promise<void>;
+  /** Moves a file, creating the target's directories; replaces a file there. */
+  move(from: string, to: string): Promise<void>;
+  /** A file, or a directory with everything in it; a missing one is not an error. */
+  remove(path: string): Promise<void>;
+  /**
+   * Where the file lies for providers on the same platform that write media themselves, such as
+   * `data.fetch` and `data.archive`: an absolute path on the device.
+   */
+  location(path: string): string;
+  /** A URL the UI can read the file from, by range for a video. */
+  url(path: string): string;
+}
+
+export const storageMediaCapability = defineCapability<MediaFiles, 'single', 'storage.media'>(
+  'storage.media',
+  { cardinality: 'single' },
+);
+
+/**
  * Secrets such as access tokens, kept without asking the rider (ADR 0053). Keys are
  * dotted ids (`intervals-icu.token`); values are UTF-8 text. Secrets never go into events, logs,
  * recordings or app files.

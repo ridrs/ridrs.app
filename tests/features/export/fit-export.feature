@@ -10,8 +10,15 @@ Feature: FIT export of a recorded ride
 
   Scenario: The FIT file is written and valid
     Then the memory storage contains "recordings/ride-20261101T100000Z-<session>.fit"
-    And the latest "export.fit-written" event names that file with 11 records
+    And the latest "export.fit" state names that file with 11 records
     And the FIT file is valid according to the official FIT SDK
+
+  Scenario: A restarted FIT export writes no file again
+    Given the memory storage contains "recordings/ride-20261101T100000Z-<session>.fit"
+    When the plugin "export-fit" is stopped
+    And the plugin "export-fit" is started
+    Then the FIT file of the first ride was written only once
+    And the latest "export.fit" state names that file with no record count
 
   Scenario: The file describes a virtual cycling activity
     Then the FIT file has one "file_id" message of the type "activity" from the manufacturer "development"

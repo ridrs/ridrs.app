@@ -1,0 +1,9 @@
+{
+  "id": "video-import-incyclist",
+  "name": "Incyclist Video Import",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["video.importer"],
+  "requires": ["storage.media", "data.archive"],
+  "entry": "index.ts"
+}

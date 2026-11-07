@@ -19,13 +19,15 @@
       }
     ],
     "events": {
-      "subscribe": [
-        "recording.recoverable-changed"
-      ],
-      "publish": [
-        "recording.continue-requested",
-        "recording.finish-requested"
-      ]
-    }
+      "subscribe": [],
+      "publish": []
+    },
+    "state": [
+      "recording.recoverable"
+    ],
+    "calls": [
+      "recording.continue",
+      "recording.finish"
+    ]
   }
 }

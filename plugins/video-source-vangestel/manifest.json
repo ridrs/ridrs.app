@@ -1,0 +1,28 @@
+{
+  "id": "video-source-vangestel",
+  "name": "Van Gestel Video Rides",
+  "version": "0.1.0",
+  "types": [
+    "transport"
+  ],
+  "provides": [],
+  "requires": [],
+  "optionalRequires": [
+    "storage.media",
+    "data.fetch",
+    "video.importer"
+  ],
+  "entry": "index.ts",
+  "state": {
+    "owns": [
+      "route.offer"
+    ]
+  },
+  "services": {
+    "provides": [
+      "route.fetch",
+      "route.cancel",
+      "route.remove"
+    ]
+  }
+}

@@ -2,10 +2,8 @@
 
 import {
   activityStateChangedEvent,
-  bridgeStateChangedEvent,
+  bridgeLinkState,
   controllerButtonsChangedEvent,
-  type DeviceStatus,
-  deviceStatusChangedEvent,
   metricHeartRateEvent,
   metricPowerEvent,
 } from '@ridrs/contracts';
@@ -13,21 +11,10 @@ import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type BridgeStatus, describeDevices, type Readings } from './devices.ts';
+import { useDevices } from './links.ts';
 import { DeviceSetupView } from './setup.tsx';
 import { DevicesTileView, overall } from './tile.tsx';
 
-/**
- * The latest device status; the bridge replays it to every component that mounts later. A layout
- * effect takes the replayed status before the first paint, so "Not set up" never flashes.
- */
-function useDevices(ctx: UiContext): readonly DeviceStatus[] {
-  const [devices, setDevices] = useState<readonly DeviceStatus[]>([]);
-  useLayoutEffect(
-    () => ctx.events.subscribe(deviceStatusChangedEvent, ({ payload }) => setDevices(payload.devices)),
-    [ctx],
-  );
-  return devices;
-}
 
 /**
  * The power, heart rate and controller buttons, for the proofs in the setup rows. Power and heart
@@ -65,8 +52,9 @@ function useReadings(ctx: UiContext): Readings {
 /** The companion bridge's state; none while its transport does not run. */
 function useBridge(ctx: UiContext): BridgeStatus | undefined {
   const [bridge, setBridge] = useState<BridgeStatus>();
+  // App state (ADR 0069): the one companion link, if its transport runs.
   useLayoutEffect(
-    () => ctx.events.subscribe(bridgeStateChangedEvent, ({ payload }) => setBridge(payload)),
+    () => ctx.state.watch(bridgeLinkState, ({ entries }) => setBridge([...entries.values()][0])),
     [ctx],
   );
   return bridge;

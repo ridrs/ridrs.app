@@ -9,7 +9,7 @@ Feature: Dummy devices in the developer companion
     And a developer companion "Pixel 8" without real Bluetooth devices
     And the companion shows the pairing code "482913"
     And ridrs is paired with the companion
-    And the ridrs plugins "transport-ble-bridge, device-registry, device-ftms-trainer, metric-power, metric-cadence" running over the simulated network
+    And the ridrs plugins "transport-ble-bridge, device-ftms-trainer, metric-power, metric-cadence" running over the simulated network
 
   Scenario: A steady dummy trainer
     When the developer adds a dummy FTMS trainer with the profile "steady"

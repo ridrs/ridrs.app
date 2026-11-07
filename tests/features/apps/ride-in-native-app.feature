@@ -14,6 +14,9 @@ Feature: Start a ride and see power and cadence
     Then the power widget shows "220" "W"
     And the cadence widget shows "92" "rpm"
     When I press "Finish ride"
+    Then the "debriefing" screen is shown
+    And the debriefing offers "Save"
+    When I press "Save"
     Then the "main" screen is shown
     When I close the ridrs app
     Then the app reported no lifecycle problems

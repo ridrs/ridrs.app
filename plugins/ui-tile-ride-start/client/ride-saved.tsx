@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {
-  exportFitWrittenEvent,
-  recordingCompletedEvent,
-  recordingFailedEvent,
-} from '@ridrs/contracts';
+import { exportFitState, type RecordingRide, recordingRideState } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useState } from 'react';
 
@@ -34,22 +30,33 @@ export function RideSaved({ ctx }: { readonly ctx: UiContext }) {
   const [fits, setFits] = useState<Readonly<Record<string, string>>>({});
 
   useEffect(() => {
+    // App state (ADR 0069): the rides of this run and their FIT files. The ride shown is the one
+    // that changed last; on the first delivery, the newest ride of the run.
+    const outcomeOf = (ride: RecordingRide | undefined): RideOutcome => {
+      if (ride?.state === 'failed') {
+        return { failed: ride.sessionId };
+      }
+      return ride?.state === 'saved' && ride.file
+        ? {
+            saved: {
+              sessionId: ride.sessionId,
+              recording: fileName(ride.file),
+              distance: ride.distance,
+              durationMs: ride.durationMs ?? 0,
+            },
+          }
+        : undefined;
+    };
     const stops = [
-      ctx.events.subscribe(recordingCompletedEvent, ({ payload }) =>
-        setOutcome({
-          saved: {
-            sessionId: payload.sessionId,
-            recording: fileName(payload.file),
-            distance: payload.distance,
-            durationMs: payload.durationMs,
-          },
-        }),
-      ),
-      ctx.events.subscribe(recordingFailedEvent, ({ payload }) =>
-        setOutcome({ failed: payload.sessionId }),
-      ),
-      ctx.events.subscribe(exportFitWrittenEvent, ({ payload }) =>
-        setFits((known) => ({ ...known, [payload.sessionId]: fileName(payload.file) })),
+      ctx.state.watch(recordingRideState, ({ entries, changed }) => {
+        const key = changed.filter((k) => entries.has(k)).at(-1);
+        if (key !== undefined) {
+          // A deleted ride is no saved ride.
+          setOutcome(outcomeOf(entries.get(key)));
+        }
+      }),
+      ctx.state.watch(exportFitState, ({ entries }) =>
+        setFits(Object.fromEntries([...entries].map(([key, fit]) => [key, fileName(fit.file)]))),
       ),
     ];
     return () => {

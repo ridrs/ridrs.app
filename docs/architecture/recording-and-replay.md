@@ -9,8 +9,8 @@ The event bus is the ride's complete, ordered history, and the raw device bytes 
                device plugins ─► measurement.* ─► metric.* ─► physics.* ┤ event bus ─► ctx.host.observe
  UI input ─► ui-bridge ─► activity.start-/finish-requested ────────────┘          (permission observe-host)
                                                                                    │
-           recording-session ─ storage.app-files ─► recordings/<ride>.ridrs.jsonl ─► .ridrs ─► recording.completed
-           export-fit ─ reads .ridrs ─ @ridrs/fit ─► recordings/<ride>.fit ─► export.fit-written
+           recording-session ─ storage.app-files ─► recordings/<ride>.ridrs.jsonl ─► .ridrs ─► recording.ride (app state)
+           export-fit ─ reads .ridrs ─ @ridrs/fit ─► recordings/<ride>.fit ─► export.fit (app state)
  CLI:      ridrs-headless recording inspect | replay | export-fit <file>
 ```
 
@@ -18,24 +18,32 @@ The event bus is the ride's complete, ordered history, and the raw device bytes 
 
 | Part | License | Role |
 |---|---|---|
-| `@ridrs/contracts` | Apache-2.0 | manifest `permissions`, `ctx.host`, events `device.raw-notification`, `recording.completed`, `recording.failed`, `export.fit-written`, capabilities `storage.app-files`, `config.snapshot`, record schemas, hex codec |
+| `@ridrs/contracts` | Apache-2.0 | manifest `permissions`, `ctx.host`, events `device.raw-notification`, app state `recording.ride`, `recording.recoverable`, `export.fit` and services `recording.continue`, `.finish`, `.delete` (ADR 0069), capabilities `storage.app-files`, `config.snapshot`, record schemas, hex codec |
 | `@ridrs/recording` | AGPL-3.0-or-later (until the legal review) | file names, `RecordingWriter`, reader, recovery, snapshot builder, gzip (Web streams); imports contracts only |
 | `@ridrs/fit` | AGPL-3.0-or-later (until the legal review) | `buildActivity`, `encodeActivity` ([fit-export.md](fit-export.md)) |
 | `@ridrs/replay` | AGPL-3.0-or-later | headless replay and comparison on the host's `ReplayClock`; core, recording, microdiff |
 | `recording-session` | AGPL-3.0-or-later | records every ride; requires `storage.app-files`, `config.snapshot`; permission `observe-host` |
-| `export-fit` | AGPL-3.0-or-later | FIT export on `recording.completed` |
+| `export-fit` | AGPL-3.0-or-later | FIT export of every saved ride (reconciles `recording.ride`) |
 | `storage-files-node` / `storage-files-tauri` | AGPL-3.0-or-later | `storage.app-files` in Node (env-paths, `RIDRS_DATA_DIR`) and in the Tauri app container |
 
 ## Recording lifecycle
 
 1. From `initialize`, `recording-session` observes every event and diagnostic and keeps a rolling 60 s pre-roll (plus the latest connection state per device and the latest bicycle, ADR 0060).
 2. On `activity.state-changed` `running` it creates `<name>.ridrs.jsonl` with header, snapshot and pre-roll, then records live. Lines are queued in order and appended every 1000 ms; the bus is never blocked. The open file is the ride's journal ([ADR 0055](../decisions/0055-the-recording-is-the-session-journal.md)): it is flushed to the disk (`AppFiles.sync`) every 5 s and right after every `activity.state-changed`, in the write chain, so a power loss loses at most the last ~6 s and every line on the disk is complete or torn last. `durable-journal.feature` covers it.
-3. On `finished` it records the rest of that cascade, flushes, writes the footer, gzips to `.ridrs`, reads it back and checks header, footer and line count, removes the `.jsonl` and publishes `recording.completed` (`distance` from the last `physics.state`).
-4. A storage error reports `recording-failed` once and publishes `recording.failed`; recording stops for that ride, the ride goes on.
-5. At host start, the newest orphaned `.ridrs.jsonl` whose ride can go on (a running ride in its committed part, a run id, every recorded simulation plugin present in its recorded version) is offered with `recording.recoverable-changed` ([ADR 0057](../decisions/0057-continuing-an-interrupted-ride.md)); every other one is recovered (`recording-recovered`, `notContinued` names why) and announced with `recording.completed`, which also triggers its FIT export. `recording.finish-requested` recovers the offered one the same way.
-6. **Continuing** (`recording.continue-requested`, done by the composition root; headless on its own): `continueRecording` (`@ridrs/replay`) composes a host with `continueFrom` on a held clock with the recorded run id, starts every plugin, injects the committed inputs (`committedJournal`: complete lines without the last event time), advances to the last committed time, injects `activity.interrupted` there and goes live. The ride is paused with its session; `recording-session` sees `describe().continuing`, ignores the rebuilt past, cuts the file to its committed part at the interruption and appends on with `RecordingWriter.continuing`. `continue-a-ride.feature` and `continue-a-ride-in-native-app.feature` cover it, the replay of a continued ride included.
+3. On `finished` it records the rest of that cascade, flushes, writes the footer, gzips to `.ridrs`, reads it back and checks header, footer and line count, removes the `.jsonl` and sets the ride `saved` in the app state `recording.ride` (`distance` from the last `physics.state`).
+4. A storage error reports `recording-failed` once and sets the ride `failed`; recording stops for that ride, the ride goes on.
+5. At host start, the newest orphaned `.ridrs.jsonl` whose ride can go on (a running ride in its committed part, a run id, every recorded simulation plugin present in its recorded version) is offered in the app state `recording.recoverable` ([ADR 0057](../decisions/0057-continuing-an-interrupted-ride.md)); every other one is recovered (`recording-recovered`, `notContinued` names why) and set `saved` in `recording.ride`, so `export-fit` exports it too. The service `recording.finish` recovers the offered one the same way.
+6. **Continuing** (the service `recording.continue`, which the native composition root provides itself with `PluginHost.provideService`, ADR 0069; headless on its own): `continueRecording` (`@ridrs/replay`) composes a host with `continueFrom` on a held clock with the recorded run id, starts every plugin, injects the committed inputs (`committedJournal`: complete lines without the last event time), advances to the last committed time, injects `activity.interrupted` there and goes live. The ride is paused with its session; `recording-session` sees `describe().continuing`, ignores the rebuilt past, cuts the file to its committed part at the interruption and appends on with `RecordingWriter.continuing`. `continue-a-ride.feature` and `continue-a-ride-in-native-app.feature` cover it, the replay of a continued ride included.
 
 Without a ride nothing is written. Recording is always on (no settings, no retention policy yet). The ride start tile on the main screen shows "Ride saved" with distance (km), duration (`m:ss`) and the file names (`ride-saved*` test ids), or "Ride could not be saved".
+
+**Since ADR 0068 and ADR 0069** the recorder still writes every event, but no app state and no app command is an event any more: continuing a ride re-executes rider input and device data only. `continue-without-app-commands.feature` proves it for downloads, uploads, a forgotten device, a pairing and a FIT export.
+
+## What the journal holds (ADR 0068)
+
+The journal holds the simulation; app state and services never enter it ([ADR 0068](../decisions/0068-app-state-and-services-beside-the-bus.md), [app-state-and-services.md](app-state-and-services.md)). The recorder observes the bus and nothing else, so a value of `ctx.state` or a call of `ctx.services` is neither recorded, replayed nor done again when a ride continues. The route offers and their downloads (`route.offer`, `route.fetch`, `route.remove`) and the training plan and its uploads (`training.*`) left the bus that way; `continue-without-app-commands.feature` proves that a continued ride downloads and uploads nothing again and that the journal holds no app state.
+
+Since [ADR 0069](../decisions/0069-recording-devices-and-bridge-beside-the-bus.md) no app event is left on the bus: recording, devices and the BLE bridge moved too (`recording.ride`, `device.status`, `bridge.*` and their services). Device plugins run in a replay, so `replay(…, { states, services })` gets the same definitions as the live host; they own their keys there as live, and nothing of it is compared. Older recordings still hold the removed events: a replay injects them as opaque inputs nobody handles, and lists derived ones such as `device.status-changed` as not compared. `packages/contracts/src/app-events.test.ts` fails when a new `*-requested` or `*-changed` event appears that is not simulation.
 
 ## Replay
 

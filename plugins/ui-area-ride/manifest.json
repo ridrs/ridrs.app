@@ -37,6 +37,14 @@
       "publish": [
         "activity.start-requested"
       ]
-    }
+    },
+    "state": [
+      "route.offer"
+    ],
+    "calls": [
+      "route.fetch",
+      "route.cancel",
+      "route.remove"
+    ]
   }
 }

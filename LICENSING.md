@@ -20,6 +20,7 @@ Use the following licenses according to the type and purpose of the contribution
 | Public developer APIs and SDK tooling | Apache License 2.0 | `Apache-2.0` |
 | Documentation | Creative Commons Attribution-ShareAlike 4.0 | `CC-BY-SA-4.0` |
 | Configuration and build scripts | Same license as the component they belong to | — |
+| Third-party content (route catalogs, track-derived data, pictures) | Its original license; non-commercial licenses allowed, see section 6a | e.g. `CC-BY-NC-SA-4.0` |
 | Third-party dependencies | Their original license | — |
 
 Do not introduce alternative licenses without explicit approval from the project maintainers.
@@ -48,7 +49,9 @@ The license must remain `AGPL-3.0-or-later` for all modifications and redistribu
 
 The AGPL network-use provision is particularly important: users interacting remotely with a modified version of the platform must be offered access to the corresponding source code under the terms of the license.
 
-Commercial use is explicitly permitted. The license does not prohibit commercial hosting, paid services, or commercial extensions.
+**ridrs is a non-commercial project.** Commercial use of ridrs distributions is excluded: they bundle third-party content under non-commercial licenses (section 6a), and the project offers no commercial hosting, paid services or commercial editions.
+
+The code licenses cannot carry that exclusion themselves. The AGPL permits commercial use of the code, and its section 7 lets any recipient remove an added non-commercial restriction. Excluding commercial use of the code itself would need a different, non-open-source license and the consent of all copyright holders (section 12).
 
 ## 3. Official plugins — AGPL-3.0-or-later
 
@@ -157,6 +160,20 @@ In particular:
 - Do not remove or alter third-party copyright notices.
 
 When in doubt, stop and request maintainer approval.
+
+## 6a. Third-party content — non-commercial
+
+Content that ridrs ships but did not create (route catalogs, notes, descriptions, pictures, profiles and paths derived from someone else's tracks) keeps its author's license. Non-commercial licenses such as `CC-BY-NC-SA-4.0` are allowed for content. They make every distribution that bundles the content non-commercial (section 2).
+
+Rules:
+
+- Content lives in its own folder (for example `plugins/<plugin>/catalog/`), never inside source files. The folder holds a `README.md` naming the author, the origin (URL) and the license, with that license's SPDX identifier.
+- `NOTICE` lists every content folder with its author and license.
+- The UI shows the credits (author, source, license) wherever the content is shown, as the license requires.
+- ShareAlike content is shared under the same license, adaptations included (for example profiles derived from a CC BY-NC-SA track).
+- ridrs never re-hosts or mirrors third-party media. Riders download videos from their origin to their own device.
+- Content under licenses with database or share-alike terms that reach further, such as OpenStreetMap's ODbL, needs maintainer approval first.
+- Content whose license is unclear is not shipped.
 
 ## 7. Copyright headers and SPDX identifiers
 
@@ -280,5 +297,6 @@ The licensing strategy is designed to achieve three objectives:
 1. **Keep the platform open:** The core and official plugins remain under AGPL-3.0-or-later, including applicable network-use obligations.
 2. **Encourage adoption:** Independently reusable SDKs and developer tools use Apache-2.0.
 3. **Protect community knowledge:** Documentation uses CC-BY-SA-4.0.
+4. **Respect content authors:** Third-party content keeps its license, non-commercial ones included (section 6a).
 
-The result should be an open, commercially usable, community-driven cycling platform without unnecessarily restricting independent ecosystem development.
+The result should be an open, non-commercial, community-driven cycling platform without unnecessarily restricting independent ecosystem development.

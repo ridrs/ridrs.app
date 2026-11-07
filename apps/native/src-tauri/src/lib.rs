@@ -5,6 +5,8 @@ mod keep_awake;
 
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
+use ridrs_media::commands as media;
+use ridrs_media::protocol as media_protocol;
 use ridrs_secrets::commands as secrets;
 
 #[cfg(desktop)]
@@ -28,6 +30,22 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_oauth::init())
+        // The media storage's files for the WebView, by range (ADR 0067): the video world reads
+        // downloaded routes through it. Answered off the main thread; a request is at most 16 MB.
+        .register_asynchronous_uri_scheme_protocol(media_protocol::SCHEME, |context, request, responder| {
+            let app = context.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let response = match media::root(&app) {
+                    Ok(root) => media_protocol::respond(&root, &request),
+                    Err(error) => tauri::http::Response::builder()
+                        .status(500)
+                        .header("Access-Control-Allow-Origin", "*")
+                        .body(error.into_bytes())
+                        .expect("a valid response"),
+                };
+                responder.respond(response);
+            });
+        })
         // The arrow keys work from the start (AGENTS.md rule 12): without keyboard focus in the
         // webview, macOS sends no key but Tab to the page until the rider clicks into it.
         // Desktop only: mobile webviews have the focus and no `set_focus`.
@@ -41,6 +59,7 @@ pub fn run() {
         })
         .manage(keep_awake::KeepAwakeState::default())
         .manage(bridge::ClientState::default())
+        .manage(media::MediaState::default())
         .invoke_handler(tauri::generate_handler![
             ble::ble_check_permissions,
             ble::ble_adapter_state,
@@ -63,6 +82,15 @@ pub fn run() {
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,
+            media::media_root,
+            media::media_exists,
+            media::media_read,
+            media::media_write,
+            media::media_move,
+            media::media_remove,
+            media::media_fetch,
+            media::media_fetch_cancel,
+            media::media_extract,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

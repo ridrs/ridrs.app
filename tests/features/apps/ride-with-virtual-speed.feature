@@ -15,6 +15,9 @@ Feature: Pedal and see the virtual speed
     And the virtual-speed widget keeps rising
     And eventually the virtual-distance widget shows at least "0.01" "km"
     When I press "Finish ride"
+    Then the "debriefing" screen is shown
+    And the debriefing offers "Save"
+    When I press "Save"
     Then the "main" screen is shown
     When I close the ridrs app
     Then the app reported no lifecycle problems

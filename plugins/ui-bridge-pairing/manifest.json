@@ -19,13 +19,15 @@
       }
     ],
     "events": {
-      "subscribe": [
-        "bridge.companions-changed",
-        "bridge.pairing-offer"
-      ],
-      "publish": [
-        "bridge.pair-requested"
-      ]
-    }
+      "subscribe": [],
+      "publish": []
+    },
+    "state": [
+      "bridge.companions",
+      "bridge.pairing"
+    ],
+    "calls": [
+      "bridge.pair"
+    ]
   }
 }

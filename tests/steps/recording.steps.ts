@@ -13,8 +13,9 @@ import {
   type PluginManifest,
   physicsStateEvent,
   type RecordingEvent,
+  type RecordingRide,
   RidrsError,
-  recordingCompletedEvent,
+  recordingRideState,
 } from '@ridrs/contracts';
 import { type Recording, readRecording } from '@ridrs/recording';
 import { TEMPORAL_DEFAULTS } from '@ridrs/temporal';
@@ -67,9 +68,9 @@ export async function settleRecording(world: RidrsWorld): Promise<void> {
   const sessionId = currentSessionId(world);
   await world.waitForIo(
     () =>
-      tappedOf(world, recordingCompletedEvent.id).some(
-        (e) => (e.payload as { sessionId: string }).sessionId === sessionId,
-      ) ||
+      world
+        .stateValues<RecordingRide>(recordingRideState.id)
+        .some((ride) => ride.sessionId === sessionId && ride.state === 'saved') ||
       world
         .ensureHost()
         .getDiagnostics()
@@ -78,12 +79,18 @@ export async function settleRecording(world: RidrsWorld): Promise<void> {
   );
 }
 
+/** The rides saved so far, in order (ADR 0069: the app state `recording.ride`). */
+export function savedRides(world: RidrsWorld): RecordingRide[] {
+  return world
+    .stateValues<RecordingRide>(recordingRideState.id)
+    .filter((ride) => ride.state === 'saved');
+}
+
 /** "the recording": the decompressed, parsed `.ridrs` of the last ride. */
 export async function lastRecording(world: RidrsWorld): Promise<Recording> {
   await settleRecording(world);
-  const completed = tappedOf(world, recordingCompletedEvent.id).at(-1);
-  assert.ok(completed, 'Expected a "recording.completed" event');
-  const file = (completed.payload as { file: string }).file;
+  const file = savedRides(world).at(-1)?.file;
+  assert.ok(file, 'Expected a saved ride');
   return readRecording(memoryFile(world, file));
 }
 
@@ -344,10 +351,7 @@ Then('the memory storage contains {string}', async function (this: RidrsWorld, p
   const file = withSession(this, path);
   if (/\.ridrs$/.test(file)) {
     await this.waitForIo(
-      () =>
-        tappedOf(this, recordingCompletedEvent.id).some(
-          (e) => (e.payload as { file: string }).file === file,
-        ),
+      () => savedRides(this).some((ride) => ride.file === file),
       `"${file}" to be completed`,
     );
   } else {
@@ -363,11 +367,12 @@ Then('it contains no {string} file', function (this: RidrsWorld, suffix: string)
 });
 
 Then(
-  'the latest {string} event names that file with a distance of {float} m and a duration of {int} ms',
-  function (this: RidrsWorld, eventId: string, distance: number, duration: number) {
-    const latest = tappedOf(this, eventId).at(-1);
-    assert.ok(latest, `Expected a "${eventId}" event`);
-    const payload = latest.payload as { file: string; distance?: number; durationMs: number };
+  'the latest {string} state names that file with a distance of {float} m and a duration of {int} ms',
+  function (this: RidrsWorld, topic: string, distance: number, duration: number) {
+    const payload = this.stateValues<{ file: string; distance?: number; durationMs: number }>(
+      topic,
+    ).at(-1);
+    assert.ok(payload, `Expected a "${topic}" state`);
     assert.equal(payload.file, this.lastRecordingFile);
     assert.ok(
       payload.distance !== undefined && Math.abs(payload.distance - distance) <= 0.005,
@@ -377,13 +382,13 @@ Then(
   },
 );
 
-Then('a {string} event names that file', async function (this: RidrsWorld, eventId: string) {
+Then('a {string} state names that file', async function (this: RidrsWorld, topic: string) {
   await this.waitForIo(
     () =>
-      tappedOf(this, eventId).some(
-        (e) => (e.payload as { file?: string }).file === this.lastRecordingFile,
+      this.stateValues<{ file?: string }>(topic).some(
+        (value) => value.file === this.lastRecordingFile,
       ),
-    `a "${eventId}" event naming "${this.lastRecordingFile}"`,
+    `a "${topic}" state naming "${this.lastRecordingFile}"`,
   );
 });
 

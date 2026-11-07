@@ -17,7 +17,7 @@ import { gunzip, parseRecording } from '@ridrs/recording';
 import { type ReplayResult, replay } from '@ridrs/replay';
 import type { RidrsWorld } from '../support/world.ts';
 import { addProbe } from './physics.steps.ts';
-import { lastRecording, memoryFile, settleRecording, tappedOf } from './recording.steps.ts';
+import { lastRecording, memoryFile, savedRides, settleRecording } from './recording.steps.ts';
 
 const REAL_PLUGINS_DIR = resolve(import.meta.dirname, '../../plugins');
 
@@ -111,9 +111,8 @@ Then(
 async function recordingLines(world: RidrsWorld): Promise<string[]> {
   if (!world.replayLines) {
     await settleRecording(world);
-    const completed = tappedOf(world, 'recording.completed').at(-1);
-    assert.ok(completed, 'Expected a recorded ride');
-    const file = (completed.payload as { file: string }).file;
+    const file = savedRides(world).at(-1)?.file;
+    assert.ok(file, 'Expected a recorded ride');
     const text = new TextDecoder().decode(await gunzip(memoryFile(world, file)));
     world.replayLines = text.split('\n').filter((line) => line.length > 0);
   }
@@ -133,6 +132,8 @@ async function replayOnce(
     ),
     capabilities: world.capabilityContracts.values(),
     events: world.eventDefinitions.values(),
+    states: world.stateDefinitions.values(),
+    services: world.serviceDefinitions.values(),
     replace,
   });
 }

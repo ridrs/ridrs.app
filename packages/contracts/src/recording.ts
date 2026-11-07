@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
+import { defineState } from './app-state.ts';
 import { jsonValueSchema } from './config.ts';
-import { defineEvent } from './events.ts';
+import { defineService } from './services.ts';
 
 // ridrs recording v1: JSON Lines, one record per line (docs/formats/ridrs-recording-v1.md).
 // Readers ignore unknown record kinds and unknown fields, so records are loose objects.
@@ -95,25 +96,30 @@ export type RecordingDiagnostic = z.infer<typeof recordingDiagnosticSchema>;
 export type RecordingFooter = z.infer<typeof recordingFooterSchema>;
 export type RecordingRecord = z.infer<typeof recordingRecordSchema>;
 
-/** A ride's recording was written and verified (`file` is the compressed `.ridrs`). */
-export const recordingCompletedEvent = defineEvent(
-  'recording.completed',
-  z.object({
+/**
+ * A ride's recording as the app shows it (ADR 0069), by its session: `saved` once written and
+ * verified (`file` is the compressed `.ridrs`; also a ride recovered at start), `failed` when it
+ * could not be written (the ride itself went on), `deleted` once the rider deleted it.
+ */
+export const recordingRideSchema = z
+  .object({
     sessionId: z.string().min(1),
-    file: z.string().min(1),
-    bytes: z.number().int().nonnegative(),
-    events: z.number().int().nonnegative(),
+    state: z.enum(['saved', 'failed', 'deleted']),
+    file: z.string().min(1).optional(),
+    bytes: z.number().int().nonnegative().optional(),
+    events: z.number().int().nonnegative().optional(),
     /** m, from the last `physics.state`; absent without physics. */
     distance: z.number().nonnegative().optional(),
-    durationMs: z.number().nonnegative(),
-  }),
-);
+    durationMs: z.number().nonnegative().optional(),
+    /** Why it failed. */
+    reason: z.string().optional(),
+  })
+  .strict();
 
-/** A ride's recording could not be written; the ride itself went on. */
-export const recordingFailedEvent = defineEvent(
-  'recording.failed',
-  z.object({ sessionId: z.string().min(1), reason: z.string() }),
-);
+export type RecordingRide = z.infer<typeof recordingRideSchema>;
+
+/** Every ride of this run, by session; owner `recording-session`. */
+export const recordingRideState = defineState('recording.ride', recordingRideSchema);
 
 /**
  * An interrupted ride found at start that can go on with the plugins as they are (ADR 0057): the
@@ -134,31 +140,52 @@ export const recoverableRideSchema = z
 
 export type RecoverableRide = z.infer<typeof recoverableRideSchema>;
 
-/** The interrupted ride on offer, or none (`ride` absent) once it was continued or finished. */
-export const recordingRecoverableChangedEvent = defineEvent(
-  'recording.recoverable-changed',
-  z.object({ ride: recoverableRideSchema.optional() }).strict(),
+/** The interrupted ride on offer, by its session; removed once it was continued or finished. */
+export const recordingRecoverableState = defineState(
+  'recording.recoverable',
+  recoverableRideSchema,
 );
 
-/** The rider continues the interrupted ride; the composition root does it (ADR 0057). */
-export const recordingContinueRequestedEvent = defineEvent(
-  'recording.continue-requested',
-  z.object({ file: z.string().min(1) }).strict(),
-);
-
-/** The rider finishes the interrupted ride: it is sealed as `recovered`. */
-export const recordingFinishRequestedEvent = defineEvent(
-  'recording.finish-requested',
-  z.object({ file: z.string().min(1) }).strict(),
-);
-
-/** The FIT export of a recording was written. */
-export const exportFitWrittenEvent = defineEvent(
-  'export.fit-written',
-  z.object({
+/** The FIT export of a ride's recording, by its session; owner `export-fit`. */
+export const exportFitSchema = z
+  .object({
     sessionId: z.string().min(1),
     file: z.string().min(1),
     bytes: z.number().int().nonnegative(),
-    records: z.number().int().nonnegative(),
-  }),
-);
+    /** Absent for a file that was already there (a restarted `export-fit` writes none again). */
+    records: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+export type ExportFit = z.infer<typeof exportFitSchema>;
+
+export const exportFitState = defineState('export.fit', exportFitSchema);
+
+const rideRequest = z.object({ key: z.string().min(1) }).strict();
+const done = z.object({}).strict();
+
+/**
+ * The rider continues the interrupted ride on offer. Only the composition root can do it: it
+ * composes a continuing host (ADR 0057), so it provides the service itself (ADR 0069).
+ */
+export const recordingContinueService = defineService('recording.continue', {
+  request: z.object({ sessionId: z.string().min(1) }).strict(),
+  response: done,
+});
+
+/** The rider finishes the interrupted ride on offer: it is sealed as `recovered`. */
+export const recordingFinishService = defineService('recording.finish', {
+  request: rideRequest,
+  response: done,
+  keyedBy: recordingRecoverableState,
+});
+
+/**
+ * The rider deletes a saved ride: its recording and every export of it are removed from the app
+ * files. Answers once the recording is gone; the ride's state becomes `deleted`.
+ */
+export const recordingDeleteService = defineService('recording.delete', {
+  request: rideRequest,
+  response: done,
+  keyedBy: recordingRideState,
+});

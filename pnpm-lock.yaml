@@ -30,6 +30,9 @@ importers:
       '@ridrs/ble-bridge':
         specifier: workspace:*
         version: link:packages/ble-bridge
+      '@ridrs/ble-peripheral':
+        specifier: workspace:*
+        version: link:packages/ble-peripheral
       '@ridrs/ble-simulator':
         specifier: workspace:*
         version: link:packages/ble-simulator
@@ -63,6 +66,9 @@ importers:
       '@types/semver':
         specifier: 7.8.0
         version: 7.8.0
+      '@zip.js/zip.js':
+        specifier: 2.24.0
+        version: 2.24.0
       dependency-cruiser:
         specifier: 18.7.0
         version: 18.7.0
@@ -447,6 +453,39 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contracts
 
+  plugins/data-archive-node:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@zip.js/zip.js':
+        specifier: 2.24.0
+        version: 2.24.0
+
+  plugins/data-archive-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
+
+  plugins/data-fetch-node:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
+  plugins/data-fetch-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
+
   plugins/device-ftms-trainer:
     dependencies:
       '@ridrs/ble-peripheral':
@@ -461,12 +500,6 @@ importers:
       '@ridrs/ble-peripheral':
         specifier: workspace:*
         version: link:../../packages/ble-peripheral
-      '@ridrs/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-
-  plugins/device-registry:
-    dependencies:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -654,6 +687,24 @@ importers:
         specifier: 2.7.1
         version: 2.7.1
 
+  plugins/storage-media-node:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      env-paths:
+        specifier: 4.0.0
+        version: 4.0.0
+
+  plugins/storage-media-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
+
   plugins/storage-secrets-tauri:
     dependencies:
       '@ridrs/contracts':
@@ -810,6 +861,21 @@ importers:
       uqr:
         specifier: 0.1.3
         version: 0.1.3
+
+  plugins/ui-debriefing:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ui-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ui-sdk
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
 
   plugins/ui-debug-trainer:
     dependencies:
@@ -1188,6 +1254,9 @@ importers:
       '@ridrs/presentation':
         specifier: workspace:*
         version: link:../../packages/presentation
+      '@ridrs/ui-preview':
+        specifier: workspace:*
+        version: link:../../packages/ui-preview
       '@ridrs/ui-sdk':
         specifier: workspace:*
         version: link:../../packages/ui-sdk
@@ -1200,6 +1269,24 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+
+  plugins/video-import-incyclist:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      entities:
+        specifier: 8.1.0
+        version: 8.1.0
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
+
+  plugins/video-source-vangestel:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
 
   plugins/world-driver-ui:
     dependencies:
@@ -1548,6 +1635,9 @@ packages:
     resolution: {integrity: sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ==}
     hasBin: true
 
+  '@nodable/entities@3.1.0':
+    resolution: {integrity: sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ==}
+
   '@npmcli/agent@2.2.2':
     resolution: {integrity: sha512-OrcNPXdpSl9UX7qPVRWbmWMCSXrcDa2M9DvrbOTj7ao1S4PlqVFYv9/yLKMkrJKZ/V5A/kDBC690or307i26Og==}
     engines: {node: ^16.14.0 || >=18.0.0}
@@ -1845,6 +1935,10 @@ packages:
   '@vitest/spy@5.0.5':
     resolution: {integrity: sha512-lwJRExuH417257Q5wv9QYugN9IMJkoxcrKrYxGPQkBzl7wlNpTUxD/5yNX4ESKVUIShKPgkGchYPFMWOOk0wzw==}
 
+  '@zip.js/zip.js@2.24.0':
+    resolution: {integrity: sha512-WlaVKzdqBK+RF3bdiXZWbdCnvGB6PdO4IHC1mn/2Yfl3bASgqUNegnU3+PNg61iecwoPfUi5BgLUPqBukXpyWw==}
+    engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
+
   abbrev@1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
 
@@ -1904,6 +1998,9 @@ packages:
   ansi-styles@6.2.3:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
+
+  anynum@1.0.1:
+    resolution: {integrity: sha512-N6//FLET/tXYNM/F6ABca1oH6fWB+KlTt909Le28WMDBk8oaT4vY17DCrwg2MvmuqUKt3Ni4N5dGJ/EoBgcO6A==}
 
   aproba@2.1.0:
     resolution: {integrity: sha512-tLIEcj5GuR2RSTnxNKdkK0dJ/GrC7P38sUkiDmDuHfsHmbagTFAxDVIBltoklXEVIQ/f14IL8IMJ5pn9Hez1Ew==}
@@ -2061,6 +2158,10 @@ packages:
     resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
     engines: {node: '>=0.12'}
 
+  entities@8.1.0:
+    resolution: {integrity: sha512-kxL7msIffSuh9aaFAMD7rxAIuTRMAHMeBtgHW2yUdWw732ZNh4MehkF2gdjvtdmikkaIP9bFDDJOPlsvm7avrA==}
+    engines: {node: '>=20.19.0'}
+
   env-paths@2.2.1:
     resolution: {integrity: sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==}
     engines: {node: '>=6'}
@@ -2106,6 +2207,13 @@ packages:
 
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
+
+  fast-xml-builder@1.3.1:
+    resolution: {integrity: sha512-pIM/1n3ntFXKYrUZwW7QCK0gAW7XY+wzj1YMIV3tLDvPj/V+zTGJK5e3/4WJfwj0qWw2ElNXiTixda/R+3YSug==}
+
+  fast-xml-parser@5.11.2:
+    resolution: {integrity: sha512-R9iDuNrQYeQut46cn2r2wHKn4HYzVDvDm5J1wW+koZewykv0yuO2HChTYeZtrULyHIDM9cj9TUXloCsueCQUog==}
+    hasBin: true
 
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
@@ -2298,6 +2406,9 @@ packages:
   is-unicode-supported@2.1.0:
     resolution: {integrity: sha512-mE00Gnza5EEB3Ds0HfMyllZzbBrmLOX3vfWoj9A9PEnTfratQ/BcaJOuMhnkhjXvb2+FkY3VuHqtAGpTPmglFQ==}
     engines: {node: '>=18'}
+
+  is-unsafe@2.0.3:
+    resolution: {integrity: sha512-ZBllczCCO267vgdFb6Tq3pv+LhHaCiGMdr+ZsuL+OopruAg7S+3ZDs1vD0RPC0uSrkjzbraxaGjtX1YBxjPeFQ==}
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
@@ -2600,6 +2711,10 @@ packages:
     resolution: {integrity: sha512-TXfryirbmq34y8QBwgqCVLi+8oA3oWx2eAnSn62ITyEhEYaWRlVZ2DvMM9eZbMs/RfxPu/PK/aBLyGj4IrqMHw==}
     engines: {node: '>=18'}
 
+  path-expression-matcher@1.6.2:
+    resolution: {integrity: sha512-enSlaiat05iasnzmgNxRj8reFdj3puY2QpNgP1aPIaVfT6nn9ICuPoFlKHk8EN22HcwewshO+mN2DGbkCEOtqQ==}
+    engines: {node: '>=14.0.0'}
+
   path-is-absolute@1.0.1:
     resolution: {integrity: sha512-AVbw3UJ2e9bq64vSaS9Am0fje1Pa8pbGqTTsmXfaIiMpnr5DlDhfJOuLj9Sf95ZPVDAUerDfEk88MPmPe7UCQg==}
     engines: {node: '>=0.10.0'}
@@ -2885,6 +3000,9 @@ packages:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
 
+  strnum@2.5.1:
+    resolution: {integrity: sha512-UM4nTLWzQiDBseVxUGxN0wJzIk0UU89Qi7pKXz9qISo+lhviJikTuikBsK/oFRlpvYHvSdz0TVoLyQ+sEpYwxA==}
+
   supports-color@11.0.0:
     resolution: {integrity: sha512-/zyImLdxhdygBIaVX0xTlQhKaCDLCrm665aqHk8xqK/Pa6k61fL6gwQGQq1k31yNyz6x55PppQgF2DMyPQa5xw==}
     engines: {node: '>=22'}
@@ -3154,6 +3272,10 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+
+  xml-naming@0.3.0:
+    resolution: {integrity: sha512-ghig2TBE/H11aOVgmahA3MhimvkBr6JIYknH/Dhdk10nXwdbIqBJsbfMxpvFPG8bAw77gN29aQWvKpmVoPlvPQ==}
+    engines: {node: '>=16.0.0'}
 
   xmlbuilder@15.1.1:
     resolution: {integrity: sha512-yMqGBqtXyeN1e3TGYvgNgDVZ3j84W4cwkOXQswghol6APgZWaff9lnbvN7MHYJOiXsvGPXtjTYJEiC9J2wv9Eg==}
@@ -3484,6 +3606,8 @@ snapshots:
       - supports-color
     optional: true
 
+  '@nodable/entities@3.1.0': {}
+
   '@npmcli/agent@2.2.2':
     dependencies:
       agent-base: 7.1.4
@@ -3696,6 +3820,8 @@ snapshots:
 
   '@vitest/spy@5.0.5': {}
 
+  '@zip.js/zip.js@2.24.0': {}
+
   abbrev@1.1.1:
     optional: true
 
@@ -3746,6 +3872,8 @@ snapshots:
 
   ansi-styles@6.2.3:
     optional: true
+
+  anynum@1.0.1: {}
 
   aproba@2.1.0:
     optional: true
@@ -3919,6 +4047,8 @@ snapshots:
 
   entities@7.0.1: {}
 
+  entities@8.1.0: {}
+
   env-paths@2.2.1:
     optional: true
 
@@ -3993,6 +4123,20 @@ snapshots:
   fast-copy@4.3.1: {}
 
   fast-safe-stringify@2.1.1: {}
+
+  fast-xml-builder@1.3.1:
+    dependencies:
+      path-expression-matcher: 1.6.2
+      xml-naming: 0.3.0
+
+  fast-xml-parser@5.11.2:
+    dependencies:
+      '@nodable/entities': 3.1.0
+      fast-xml-builder: 1.3.1
+      is-unsafe: 2.0.3
+      path-expression-matcher: 1.6.2
+      strnum: 2.5.1
+      xml-naming: 0.3.0
 
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
@@ -4191,6 +4335,8 @@ snapshots:
   is-stream@4.0.1: {}
 
   is-unicode-supported@2.1.0: {}
+
+  is-unsafe@2.0.3: {}
 
   isexe@2.0.0:
     optional: true
@@ -4480,6 +4626,8 @@ snapshots:
       type-fest: 4.41.0
 
   parse-ms@4.0.0: {}
+
+  path-expression-matcher@1.6.2: {}
 
   path-is-absolute@1.0.1:
     optional: true
@@ -4800,6 +4948,10 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
+  strnum@2.5.1:
+    dependencies:
+      anynum: 1.0.1
+
   supports-color@11.0.0: {}
 
   supports-color@7.2.0:
@@ -4997,6 +5149,8 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.22.1: {}
+
+  xml-naming@0.3.0: {}
 
   xmlbuilder@15.1.1: {}
 

@@ -1,0 +1,9 @@
+{
+  "id": "data-archive-node",
+  "name": "Archives (Node)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["data.archive"],
+  "requires": ["storage.media"],
+  "entry": "index.ts"
+}

@@ -10,19 +10,14 @@ import {
   type BleRoute,
   type BleWriteOptions,
   bytesToHex,
+  type DeviceConnectionChangedPayload,
   type DeviceConnectionState,
   type DeviceKind,
-  deviceBatteryChangedEvent,
-  deviceCandidatesChangedEvent,
   deviceConnectionChangedEvent,
-  deviceConnectRequestedEvent,
-  deviceDiscoveryRequestedEvent,
-  deviceForgetRequestedEvent,
   deviceRawNotificationEvent,
   deviceRawReadEvent,
   deviceRawWriteEvent,
   deviceRawWriteFailedEvent,
-  deviceScanChangedEvent,
   hexToBytes,
   normalizeBleUuid,
   type PluginContext,
@@ -35,6 +30,7 @@ import {
   advertisesNews,
 } from './advertising.ts';
 import type { DeviceMemory } from './memory.ts';
+import { type DeviceLinkCommands, registerDeviceLink } from './status.ts';
 
 const RECONNECT_BACKOFF = {
   retries: Number.POSITIVE_INFINITY,
@@ -201,6 +197,13 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     centrals.set(routeOf(central), central);
   }
 
+  /** What the rider asks of this link; set once the handlers below exist. */
+  const commands: DeviceLinkCommands = { connect: () => {}, forget: () => {}, discover: () => {} };
+  const board = registerDeviceLink(ctx, kind, {
+    connect: (deviceId) => commands.connect(deviceId),
+    forget: () => commands.forget(),
+    discover: (active) => commands.discover(active),
+  });
   const sightings: Sighting[] = [];
   const scans = new Map<BleRoute, AbortController>();
   const memory = options.memory;
@@ -242,15 +245,18 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     lastRoute = route;
     lastState = state;
     ctx.logger.info({ deviceId, deviceName, state, route }, `${label} connection state: ${state}`);
-    // Connection results come from BLE I/O: they enter the simulation as inputs.
-    ctx.inputs.accept(deviceConnectionChangedEvent, {
+    const connection: DeviceConnectionChangedPayload = {
       deviceId,
       deviceName,
       kind,
       state,
       ...(route ? { route } : {}),
       ...(characteristics ? { characteristics: [...characteristics] } : {}),
-    });
+    };
+    // Connection results come from BLE I/O: they enter the simulation as inputs.
+    ctx.inputs.accept(deviceConnectionChangedEvent, connection);
+    // The app's view of the link is app state (ADR 0069).
+    board.connection(connection);
   };
 
   /** The same device over the other link: same name, nothing in their data tells them apart. */
@@ -269,10 +275,10 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     return sightings.filter((o) => alike(twin, o)).length === 1 ? twin : undefined;
   };
 
+  // Devices found are app state (ADR 0069): the ride does not need them.
   const publishCandidates = (): void => {
-    ctx.inputs.accept(deviceCandidatesChangedEvent, {
-      kind,
-      devices: sightings.map((s) => {
+    board.found(
+      sightings.map((s) => {
         const twin = twinOf(s);
         return {
           deviceId: s.deviceId,
@@ -282,7 +288,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
           ...(twin ? { sameDeviceAs: twin.deviceId } : {}),
         };
       }),
-    });
+    );
   };
 
   /** The links named as scanning last; published again only when they change. */
@@ -295,8 +301,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       return;
     }
     scanning = routes.join();
-    // Whether a scan runs depends on BLE I/O: it enters the simulation as an input.
-    ctx.inputs.accept(deviceScanChangedEvent, { kind, routes });
+    // Which links look for devices is app state (ADR 0069): the ride does not need it.
+    board.scans(routes);
   };
 
   /**
@@ -543,12 +549,8 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       const battery = (data: Uint8Array): void => {
         const level = data[0];
         if (level !== undefined && level <= 100 && !ctx.signal.aborted) {
-          // The level comes from BLE I/O: it enters the simulation as an input.
-          ctx.inputs.accept(deviceBatteryChangedEvent, {
-            deviceId: sighting.deviceId,
-            kind,
-            level,
-          });
+          // The level is app state (ADR 0069): the ride does not need it.
+          board.batteryLevel(sighting.deviceId, level);
         }
       };
       try {
@@ -735,27 +737,20 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     }
   };
 
-  // The rider's requests and the open device setups are UI events.
-  ctx.events.subscribe(deviceConnectRequestedEvent, ({ payload }) => {
-    if (payload.kind === kind) {
-      connectRequested(payload.deviceId);
-    }
-  });
-  ctx.events.subscribe(deviceForgetRequestedEvent, ({ payload }) => {
-    if (payload.kind === kind) {
-      forgetRequested();
-    }
-  });
-  ctx.events.subscribe(deviceDiscoveryRequestedEvent, ({ payload }) => {
+  // The rider's requests and the open device setups are services (ADR 0069): never recorded,
+  // never done again when a ride continues.
+  commands.connect = connectRequested;
+  commands.forget = forgetRequested;
+  commands.discover = (active: boolean): void => {
     const before = discovery;
-    discovery = Math.max(0, discovery + (payload.active ? 1 : -1));
+    discovery = Math.max(0, discovery + (active ? 1 : -1));
     if (before === 0 && discovery > 0) {
       discoveryStarted();
     } else if (before > 0 && discovery === 0) {
       discoveryEnded();
     }
     reconcileScans();
-  });
+  };
 
   // Decoding runs in the turn of the raw input, live and on replay alike: a replay injects the
   // recorded raw inputs with this plugin as their source.

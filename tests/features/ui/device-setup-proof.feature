@@ -8,7 +8,7 @@ Feature: The device setup shows the controller once found, and proof of every de
   band whose heart rate was switched off, the row says "Connected" again.
 
   Background:
-    Given the ridrs plugins "activity-session, device-registry, metric-power, metric-heart-rate, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, metric-power, metric-heart-rate, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-devices" together with a test device plugin "test-device"
     And the host has started
     And the ridrs UI is shown
 

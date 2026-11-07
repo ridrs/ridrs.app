@@ -5,26 +5,27 @@ import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
 import {
   type BleRoute,
   type BridgeState,
-  bridgeConnectRequestedEvent,
-  bridgeStateChangedEvent,
+  bridgeConnectService,
+  bridgeForgetService,
+  bridgeLinkState,
   type DeviceConnectionChangedPayload,
   type DeviceStatus,
-  type DeviceStatusChangedPayload,
-  deviceBatteryChangedEvent,
-  deviceCandidatesChangedEvent,
-  deviceConnectionChangedEvent,
   deviceConnectionStateSchema,
-  deviceConnectRequestedEvent,
-  deviceDiscoveryRequestedEvent,
-  deviceForgetRequestedEvent,
+  deviceConnectService,
+  deviceForgetService,
   deviceKindSchema,
-  deviceScanChangedEvent,
-  deviceStatusChangedEvent,
-  type EventDefinition,
   type PluginContext,
 } from '@ridrs/contracts';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
 import { HEART_RATE_THOUGHTS } from '../../plugins/ui-devices/client/devices.ts';
+import {
+  asked,
+  deviceStatuses,
+  reportConnection,
+  riderCalls,
+  riderDiscovers,
+  testDeviceLink,
+} from '../support/device-links.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { peripheral, splitCsv } from './devices-and-metrics.steps.ts';
 
@@ -40,11 +41,7 @@ function linkWords(routes: readonly BleRoute[]): string {
 }
 
 function statusOf(world: RidrsWorld, kind: string): DeviceStatus {
-  const latest = world.hostObserved.filter((e) => e.type === deviceStatusChangedEvent.id).at(-1);
-  assert.ok(latest, 'Expected a device status');
-  const status = (latest.payload as DeviceStatusChangedPayload).devices.find(
-    (d) => d.kind === kind,
-  );
+  const status = deviceStatuses(world).find((d) => d.kind === kind);
   assert.ok(status, `Expected a status for "${kind}"`);
   return status;
 }
@@ -53,12 +50,6 @@ function pluginContext(world: RidrsWorld, pluginId: string): PluginContext {
   const ctx = world.ensureHost().getPluginContext(pluginId);
   assert.ok(ctx, `Expected context for plugin "${pluginId}"`);
   return ctx;
-}
-
-/** The rider's requests come from outside the host, like the UI's: inputs of the observer. */
-async function riderAsks<T>(world: RidrsWorld, event: EventDefinition<T>, payload: T) {
-  pluginContext(world, 'test-observer').inputs.accept(event, payload);
-  await world.settle();
 }
 
 /** The id the device status gives the device of that name: the one requests name. */
@@ -74,8 +65,7 @@ for (const verb of ['connects', 'connected']) {
   When(
     `the rider ${verb} the {string} {string}`,
     async function (this: RidrsWorld, kind: string, name: string) {
-      await riderAsks(this, deviceConnectRequestedEvent, {
-        kind: deviceKindSchema.parse(kind),
+      await riderCalls(this, deviceConnectService, deviceKindSchema.parse(kind), {
         deviceId: candidateId(this, kind, name),
       });
     },
@@ -90,8 +80,7 @@ for (const verb of ['connects', 'connected']) {
         // Each link's device is a device of its own: the rider connects the one over that link.
         const found = statusOf(this, kind).candidates?.find((c) => c.routes.includes(route(link)));
         assert.ok(found, `Expected a ${kind} found over ${link}`);
-        await riderAsks(this, deviceConnectRequestedEvent, {
-          kind: deviceKindSchema.parse(kind),
+        await riderCalls(this, deviceConnectService, deviceKindSchema.parse(kind), {
           deviceId: found.deviceId,
         });
       },
@@ -101,17 +90,17 @@ for (const verb of ['connects', 'connected']) {
 
 for (const verb of ['forgets', 'forgot']) {
   When(`the rider ${verb} the {string}`, async function (this: RidrsWorld, kind: string) {
-    await riderAsks(this, deviceForgetRequestedEvent, { kind: deviceKindSchema.parse(kind) });
+    await riderCalls(this, deviceForgetService, deviceKindSchema.parse(kind));
   });
 }
 
 Given('the device setup looks for devices', async function (this: RidrsWorld) {
-  await riderAsks(this, deviceDiscoveryRequestedEvent, { active: true });
+  await riderDiscovers(this, true);
 });
 
 for (const verb of ['stops', 'stopped']) {
   When(`the device setup ${verb} looking for devices`, async function (this: RidrsWorld) {
-    await riderAsks(this, deviceDiscoveryRequestedEvent, { active: false });
+    await riderDiscovers(this, false);
   });
 }
 
@@ -236,32 +225,30 @@ Then("the companion's trainer {string} is not connected", function (this: RidrsW
 Given(
   '{string} found the {string} devices {string}',
   async function (this: RidrsWorld, pluginId: string, kind: string, names: string) {
-    pluginContext(this, pluginId).inputs.accept(deviceCandidatesChangedEvent, {
-      kind: deviceKindSchema.parse(kind),
+    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).found(
       // The test device names its devices `<kind>-1`, `<kind>-2`, … in the order found.
-      devices: splitCsv(names).map((deviceName, i) => ({
+      splitCsv(names).map((deviceName, i) => ({
         deviceId: `${kind}-${i + 1}`,
         deviceName,
         routes: ['local'],
       })),
-    });
-    await this.settle();
+    );
+    await this.flushState();
   },
 );
 
 Given(
   '{string} found the {string} devices with signals:',
   async function (this: RidrsWorld, pluginId: string, kind: string, table: DataTable) {
-    pluginContext(this, pluginId).inputs.accept(deviceCandidatesChangedEvent, {
-      kind: deviceKindSchema.parse(kind),
-      devices: table.hashes().map(({ device, signal }, i) => ({
+    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).found(
+      table.hashes().map(({ device, signal }, i) => ({
         deviceId: `${kind}-${i + 1}`,
         deviceName: device ?? '',
         routes: ['local'],
         ...(signal ? { rssi: Number(signal) } : {}),
       })),
-    });
-    await this.settle();
+    );
+    await this.flushState();
   },
 );
 
@@ -280,9 +267,8 @@ Given(
     for (const row of rows) {
       ids.push(row.routes.map(() => `${kind}-${next++}`));
     }
-    pluginContext(this, pluginId).inputs.accept(deviceCandidatesChangedEvent, {
-      kind: deviceKindSchema.parse(kind),
-      devices: rows.flatMap((row, r) =>
+    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).found(
+      rows.flatMap((row, r) =>
         row.routes.map((link, l) => {
           const twin = ids[r]?.find((_, other) => other !== l);
           const rssi = row.signals[l];
@@ -295,8 +281,8 @@ Given(
           };
         }),
       ),
-    });
-    await this.settle();
+    );
+    await this.flushState();
   },
 );
 
@@ -316,24 +302,20 @@ Then(
 Given(
   '{string} reported its {string} {string} as {string} through the {string}',
   async function (this: RidrsWorld, pluginId, kind: string, name: string, state, link: string) {
-    pluginContext(this, pluginId).inputs.accept(deviceConnectionChangedEvent, {
+    await reportConnection(this, pluginId, {
       deviceId: `${kind}-1`,
       deviceName: name,
       kind: deviceKindSchema.parse(kind),
       state: state as DeviceConnectionChangedPayload['state'],
       route: route(link),
     });
-    await this.settle();
   },
 );
 
 /** The links a device plugin looks over for devices of a kind, as it reports them. */
 async function looksOver(world: RidrsWorld, pluginId: string, kind: string, routes: BleRoute[]) {
-  pluginContext(world, pluginId).inputs.accept(deviceScanChangedEvent, {
-    kind: deviceKindSchema.parse(kind),
-    routes,
-  });
-  await world.settle();
+  testDeviceLink(world, pluginId, deviceKindSchema.parse(kind)).scans(routes);
+  await world.flushState();
 }
 
 for (const verb of ['looks', 'looked']) {
@@ -351,13 +333,37 @@ for (const verb of ['looks', 'looked']) {
   );
 }
 
+/** The companion bridge's state, as its stand-in reports it (ADR 0069: the app state `bridge.state`). */
 async function bridgeReports(world: RidrsWorld, state: string, companionName?: string) {
-  pluginContext(world, 'test-device').inputs.accept(bridgeStateChangedEvent, {
+  pluginContext(world, 'test-bridge').state.set(bridgeLinkState, 'test-bridge', {
     state: state as BridgeState,
     ...(companionName ? { companionName } : {}),
   });
-  await world.settle();
+  await world.flushState();
 }
+
+Given(
+  'a stand-in {string} for the companion bridge',
+  async function (this: RidrsWorld, id: string) {
+    await this.writeProbePluginFolder({
+      folder: id,
+      id,
+      types: ['transport'],
+      state: { owns: [bridgeLinkState.id] },
+      services: { provides: [bridgeConnectService.id, bridgeForgetService.id] },
+    });
+    this.getBehavior(id).onStart.push((ctx) => {
+      for (const service of [bridgeConnectService, bridgeForgetService]) {
+        ctx.services.provide(service, () => {
+          const calls = this.serviceCalls.get(id) ?? [];
+          calls.push({ service: service.id, request: {} });
+          this.serviceCalls.set(id, calls);
+          return {};
+        });
+      }
+    });
+  },
+);
 
 Given('the companion bridge reports {string}', async function (this: RidrsWorld, state: string) {
   await bridgeReports(this, state);
@@ -712,19 +718,15 @@ Then('the devices found show no dBm', async function (this: RidrsWorld) {
 
 // ---- What the rider asked for --------------------------------------------------------------
 
-function asked<T>(world: RidrsWorld, event: EventDefinition<T>): T[] {
-  return world.hostObserved.filter((e) => e.type === event.id).map((e) => e.payload as T);
-}
-
 Then('the rider asked to forget the {string}', async function (this: RidrsWorld, kind) {
-  await waitFor(() => assert.deepEqual(asked(this, deviceForgetRequestedEvent).at(-1), { kind }));
+  await waitFor(() => assert.deepEqual(asked(this, deviceForgetService.id).at(-1), { kind }));
 });
 
 Then(
   'the rider asked to connect the {string} {string}',
   async function (this: RidrsWorld, kind: string, deviceId: string) {
     await waitFor(() =>
-      assert.deepEqual(asked(this, deviceConnectRequestedEvent).at(-1), { kind, deviceId }),
+      assert.deepEqual(asked(this, deviceConnectService.id).at(-1), { kind, deviceId }),
     );
   },
 );
@@ -744,13 +746,12 @@ When(
     deviceId: string,
     state: string,
   ) {
-    pluginContext(this, pluginId).inputs.accept(deviceConnectionChangedEvent, {
+    await reportConnection(this, pluginId, {
       deviceId,
       deviceName: name,
       kind: deviceKindSchema.parse(kind),
       state: deviceConnectionStateSchema.parse(state),
     });
-    await this.settle();
   },
 );
 
@@ -763,18 +764,14 @@ Then('the device details are closed', async function (this: RidrsWorld) {
 });
 
 Then('the rider asked to connect the companion', async function (this: RidrsWorld) {
-  await waitFor(() => assert.equal(asked(this, bridgeConnectRequestedEvent).length, 1));
+  await waitFor(() => assert.equal(asked(this, bridgeConnectService.id).length, 1));
 });
 
 Given(
   '{string} reported the battery of its {string} at {int} %',
   async function (this: RidrsWorld, pluginId: string, kind: string, level: number) {
-    pluginContext(this, pluginId).inputs.accept(deviceBatteryChangedEvent, {
-      deviceId: `${kind}-1`,
-      kind: deviceKindSchema.parse(kind),
-      level,
-    });
-    await this.settle();
+    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).batteryLevel(`${kind}-1`, level);
+    await this.flushState();
   },
 );
 

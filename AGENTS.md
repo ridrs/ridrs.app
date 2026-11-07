@@ -21,6 +21,7 @@ Do not introduce or change licenses without maintainer approval.
 10. **Rendering reads, never drives.** Rendering never writes simulation state directly; frame rate never changes physics results except through input timing. A UI plugin may act as a sensor: it delivers world data as an external input through a driver, like a device.
 11. **Layers.** Sensors → drivers → interpolation layer (`@ridrs/temporal`, `@ridrs/spatial`) → physics. Physics plugins read input data only through readers; they subscribe to lifecycle events (`activity.*`) only, never to data events.
 12. **Keyboard and remote first.** Every user interface is fully usable with the arrow keys, Enter and Back (Escape, Backspace or the platform back button) alone: arrows move the focus, Enter activates, Back leaves the current view. The focused element is always clearly visible, and no element looks focused or selected unless it is.
+13. **Simulation on the bus, app state beside it.** The event bus carries what a replay or a continued ride needs: rider input that changes the ride, device data, derived events. App state (accounts, catalogs, progress) is state by key (`ctx.state`), app commands are services (`ctx.services`, `ctx.call`); neither is recorded. A value both the app and a ride use enters the ride as an input. Simulation plugins never read state or call services.
 
 ## Building and Installing the Apps
 

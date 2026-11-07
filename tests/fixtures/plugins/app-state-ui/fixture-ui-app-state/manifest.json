@@ -1,0 +1,15 @@
+{
+  "id": "fixture-ui-app-state",
+  "name": "App State Probe (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "screens": [{ "id": "main", "export": "Offers" }],
+    "state": ["test.offer"],
+    "calls": ["test.fetch"]
+  }
+}

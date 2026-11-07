@@ -11,7 +11,7 @@ Feature: The rider chooses a device, forgets it and connects it again
   Background:
     Given a simulated BLE environment with a heart-rate sensor "HRM-Pro 42"
     And the simulated BLE environment also contains a heart-rate sensor "Polar H10 A1B2"
-    And the ridrs plugins "device-registry, device-heart-rate" running with the simulated BLE central
+    And the ridrs plugins "device-heart-rate" running with the simulated BLE central
 
   Scenario: The first device found connects
     Then the heart-rate sensor "HRM-Pro 42" is connected

@@ -16,7 +16,10 @@
     "screens": [
       {
         "id": "me",
-        "export": "MeArea"
+        "export": "MeArea",
+        "extensionPoints": [
+          "me/connection"
+        ]
       }
     ],
     "contributions": [
