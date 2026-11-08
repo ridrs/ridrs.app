@@ -22,6 +22,21 @@ export const de: Messages = {
   showFrameRate: 'Bildrate anzeigen',
   shown: 'Sichtbar',
   hidden: 'Verborgen',
+  about: 'Über ridrs',
+  appName: 'ridrs',
+  version: (version: string) => `Version ${version}`,
+  licensedUnder: 'Lizenziert unter der GNU AGPL v3 oder neuer',
+  sourceCode: 'Quellcode',
+  licensesAndCredits: 'Lizenzen & Danksagungen',
+  licensesIntro:
+    'ridrs ist freie Software. Hier stehen die Komponenten und Inhalte Dritter, die es enthält, jeweils mit ihrer Lizenz.',
+  loading: 'Lädt…',
+  back: 'Zurück',
+  appEntry: 'ridrs selbst',
+  contentSection: 'Drittinhalte',
+  componentsSection: 'Komponenten',
+  contentBy: (author: string) => `Von ${author}`,
+  licenseName: (license: string) => `Lizenz: ${license}`,
   placeholder:
     'Einheiten, Töne und Glättung werden noch nicht ausgewertet; die Fahrt bleibt bei metrischen Einheiten.',
 };

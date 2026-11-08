@@ -12,6 +12,7 @@
     "test:unit": "vitest run",
     "test:bdd": "NODE_OPTIONS=\"--import tsx\" cucumber-js && NODE_OPTIONS=\"--import tsx\" cucumber-js --profile ui",
     "test": "pnpm test:unit && pnpm test:bdd",
+    "generate:licenses": "tsx scripts/generate-licenses.ts",
     "check:video-routes": "tsx scripts/check-video-routes.ts",
     "fetch:video-catalog": "tsx scripts/fetch-video-catalog.ts",
     "check:native-bundle": "pnpm --filter @ridrs/native build && node scripts/check-native-bundle.mjs"

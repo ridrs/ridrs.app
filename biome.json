@@ -16,7 +16,8 @@
       "!**/src-tauri/gen",
       "!web",
       "!experiments",
-      "!**/assets/icons"
+      "!**/assets/icons",
+      "!**/*.generated.ts"
     ]
   },
   "formatter": {

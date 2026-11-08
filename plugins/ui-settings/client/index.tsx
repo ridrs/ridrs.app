@@ -6,7 +6,12 @@ import type { UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useState } from 'react';
 import { z } from 'zod';
+import { appVersion } from './about.generated.ts';
 import { messages } from './i18n/index.ts';
+import { type Chosen, LicensesPage } from './licenses-page.tsx';
+
+/** Where the source code of ridrs is offered (AGPL-3.0 section 13). */
+const SOURCE_CODE_URL = 'https://github.com/ridrs/ridrs.app';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const SETTINGS = new URL('./assets/icons/settings.svg', import.meta.url).href;
@@ -100,11 +105,33 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const [state, change] = useSettings(ctx);
   const [advanced, setAdvanced] = useState(false);
+  // The licenses are a page inside the settings, not a dialog of their own: Back from them lands
+  // in the settings (ADR 0073).
+  const [licenses, setLicenses] = useState(false);
+  const [chosen, setChosen] = useState<Chosen>();
   useBack(ctx, () => {
+    if (chosen) {
+      setChosen(undefined);
+      return true;
+    }
+    if (licenses) {
+      setLicenses(false);
+      return true;
+    }
     if (!advanced) return false;
     setAdvanced(false);
     return true;
   });
+  if (licenses) {
+    return (
+      <LicensesPage
+        text={text}
+        chosen={chosen}
+        onChoose={setChosen}
+        onBack={() => (chosen ? setChosen(undefined) : setLicenses(false))}
+      />
+    );
+  }
   return (
     <AreaPage title={text.title} intro={text.intro}>
       <section className="pv-section">
@@ -177,6 +204,21 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
         ) : null}
       </section>
       <p className="pv-muted">{text.placeholder}</p>
+      <section className="pv-section">
+        <h2>{text.about}</h2>
+        <p>
+          <strong>{text.appName}</strong> · {text.version(appVersion)}
+        </p>
+        <p>{text.licensedUnder}</p>
+        <div className="pv-row">
+          <a className="pv-button" href={SOURCE_CODE_URL} target="_blank" rel="noopener noreferrer">
+            {text.sourceCode}
+          </a>
+          <button type="button" className="pv-button" onClick={() => setLicenses(true)}>
+            {text.licensesAndCredits}
+          </button>
+        </div>
+      </section>
     </AreaPage>
   );
 }
