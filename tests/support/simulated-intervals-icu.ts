@@ -64,6 +64,8 @@ export class SimulatedIntervalsIcu {
   /** Wellness weights by date (`GET …/wellness/{date}`); a day without one answers 404. */
   readonly wellnessWeights = new Map<string, number>();
   events: PlannedEvent[] = [];
+  /** The writes to events, in order: the method, the name of the event and the body. */
+  readonly eventLog: Array<{ method: string; name: string; body: Record<string, unknown> }> = [];
   /** The workouts of the library as `GET …/workouts` returns them, and its folders. */
   library: Array<Record<string, unknown>> = [];
   folders: Array<{ id: number; name: string; type: string }> = [];
@@ -178,6 +180,10 @@ export class SimulatedIntervalsIcu {
 
   /** The writes of the profile; `undefined` for any other request. */
   private write(request: HttpRequest, url: URL): HttpResponse | undefined {
+    const eventPath = /^\/api\/v1\/athlete\/0\/events(?:\/(\d+))?$/.exec(url.pathname);
+    if (eventPath && request.method !== 'GET') {
+      return this.writeEvent(request, eventPath[1]);
+    }
     const wellness = /^\/api\/v1\/athlete\/0\/wellness\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
     const settings = url.pathname === '/api/v1/athlete/0/sport-settings/Ride';
     if (request.method !== 'PUT' || (!wellness && !settings)) {
@@ -204,6 +210,40 @@ export class SimulatedIntervalsIcu {
       this.indoorFtp = body.indoor_ftp;
     }
     return json(200, { ...body });
+  }
+
+  /** `POST` creates an event, `PUT …/{id}` changes it, `DELETE …/{id}` removes it. */
+  private writeEvent(request: HttpRequest, id: string | undefined): HttpResponse {
+    if (!this.writesReachable) {
+      throw new Error('connect ETIMEDOUT intervals.icu');
+    }
+    if (this.writeStatus !== 200) {
+      return json(this.writeStatus, { error: 'Forbidden' });
+    }
+    const body = JSON.parse(typeof request.body === 'string' ? request.body : '{}') as Record<
+      string,
+      unknown
+    >;
+    const existing = this.events.find((event) => String(event.id) === id);
+    this.eventLog.push({
+      method: request.method,
+      name: existing?.name ?? String(body.name ?? ''),
+      body,
+    });
+    if (request.method === 'POST') {
+      const created = { ...body, id: 80_000 + this.eventLog.length } as unknown as PlannedEvent;
+      this.events.push(created);
+      return json(200, created);
+    }
+    if (!existing) {
+      return json(404, { error: 'No such event' });
+    }
+    if (request.method === 'DELETE') {
+      this.events = this.events.filter((event) => event !== existing);
+      return json(200, {});
+    }
+    Object.assign(existing, body);
+    return json(200, existing);
   }
 
   /** Multipart with the activity in `file`, as the API takes it; a token without the scope gets 403. */

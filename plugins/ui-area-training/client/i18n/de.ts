@@ -35,6 +35,11 @@ export const de: Messages = {
   favourite: (name: string) => `${name} als Favorit`,
   schedule: (name: string, day: string) => `${name} am ${day} einplanen`,
   library: 'Workout-Bibliothek',
+  planFromLibrary: (name: string, day: string) => `${name} am ${day} einplanen`,
+  planRefused: (source: string, reason: 'read-only' | 'unreachable') =>
+    reason === 'read-only'
+      ? `${source} kann nicht aus der Bibliothek geändert werden.`
+      : `${source} war nicht erreichbar: Es wurde nichts eingeplant.`,
   libraryEmpty: 'Deine Quellen haben noch keine Workouts.',
   thisDevice: 'ridrs (dieses Gerät)',
   plans: 'Trainingspläne',

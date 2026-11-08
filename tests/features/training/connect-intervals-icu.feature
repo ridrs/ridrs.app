@@ -26,7 +26,7 @@ Feature: Connecting intervals.icu
     When I press "Connect intervals.icu"
     Then the browser was opened at "https://intervals.icu/oauth/authorize" with:
       | client_id             | 1697                                  |
-      | scope                 | SETTINGS:WRITE,CALENDAR:READ,WELLNESS:WRITE,LIBRARY:READ,ACTIVITY:WRITE |
+      | scope                 | SETTINGS:WRITE,CALENDAR:WRITE,WELLNESS:WRITE,LIBRARY:READ,ACTIVITY:WRITE |
       | code_challenge_method | S256                                  |
       | redirect_uri          | http://127.0.0.1:53682/oauth/callback |
     And the sign-in asked for a code challenge and a state

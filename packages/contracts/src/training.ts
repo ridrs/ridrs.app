@@ -166,10 +166,27 @@ export const trainingCalendarSchema = z
   .strict();
 export type TrainingCalendar = z.infer<typeof trainingCalendarSchema>;
 
-export const trainingCalendarType = defineDataType('training.calendar', trainingCalendarSchema, {});
+const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/**
+ * The calendar as a data type: one chosen source, written by `training.calendar.plan` (a library
+ * workout of the provider `from`, with its steps, on a day), `.move` and `.remove`. The key of a
+ * call is the provider of the calendar.
+ */
+export const trainingCalendarType = defineDataType('training.calendar', trainingCalendarSchema, {
+  plan: z
+    .object({ date: localDateSchema, workoutId: z.string().min(1), from: providerIdSchema })
+    .strict(),
+  move: z.object({ id: z.string().min(1), date: localDateSchema }).strict(),
+  remove: z.object({ id: z.string().min(1) }).strict(),
+});
 
 /** Topic `training.calendar`, keyed by provider. */
 export const trainingCalendarState = trainingCalendarType.topic;
+
+export const trainingCalendarPlanService = trainingCalendarType.writes.plan;
+export const trainingCalendarMoveService = trainingCalendarType.writes.move;
+export const trainingCalendarRemoveService = trainingCalendarType.writes.remove;
 
 /**
  * Hands the calendar of ridrs on this device to its owner: the Training area keeps its entries in

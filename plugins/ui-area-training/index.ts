@@ -4,18 +4,14 @@ import {
   definePlugin,
   type PlannedWorkout,
   trainingCalendarHandOverService,
+  trainingCalendarMoveService,
+  trainingCalendarPlanService,
+  trainingCalendarRemoveService,
   trainingCalendarState,
   trainingLibraryState,
 } from '@ridrs/contracts';
-import { plannedWorkouts } from './client/calendar.ts';
+import { localToday, plannedWorkouts } from './client/calendar.ts';
 import { INITIAL_TRAINING, TRAINING_DOCUMENT } from './document.ts';
-
-/** The rider's local date, `YYYY-MM-DD`. */
-function today(epochMs: number): string {
-  const at = new Date(epochMs);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
-}
 
 // Most of this plugin lives in its client module (see `ui` in the manifest). The host side is
 // the provider `ridrs` of the data type `training.calendar` (ADR 0075): the workouts of the
@@ -44,7 +40,12 @@ export default definePlugin({
     });
 
     const kept = await ctx.settings.user(TRAINING_DOCUMENT).read();
-    publish(plannedWorkouts((kept ?? INITIAL_TRAINING).calendar.entries, today(ctx.clock.now())));
+    publish(plannedWorkouts((kept ?? INITIAL_TRAINING).calendar.entries, localToday(new Date(ctx.clock.now()))));
+    // Only the area edits the calendar on this device: its own buttons, not the library.
+    const refuse = () => ({ ok: false as const, reason: 'read-only' as const });
+    ctx.services.provide(trainingCalendarPlanService, refuse);
+    ctx.services.provide(trainingCalendarMoveService, refuse);
+    ctx.services.provide(trainingCalendarRemoveService, refuse);
     ctx.services.provide(trainingCalendarHandOverService, ({ workouts }) => {
       publish(workouts);
       return {};

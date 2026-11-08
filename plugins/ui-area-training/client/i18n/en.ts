@@ -36,6 +36,11 @@ export const en = {
   favourite: (name: string) => `Favourite ${name}`,
   schedule: (name: string, day: string) => `Schedule ${name} on ${day}`,
   library: 'Workout library',
+  planFromLibrary: (name: string, day: string) => `Plan ${name} on ${day}`,
+  planRefused: (source: string, reason: 'read-only' | 'unreachable') =>
+    reason === 'read-only'
+      ? `${source} cannot be changed from the library.`
+      : `${source} could not be reached: nothing was planned.`,
   libraryEmpty: 'Your sources have no workouts yet.',
   thisDevice: 'ridrs (this device)',
   plans: 'Training plans',

@@ -24,6 +24,9 @@ import {
   storageSecretsCapability,
   type TrainingAccount,
   trainingAccountState,
+  trainingCalendarMoveService,
+  trainingCalendarPlanService,
+  trainingCalendarRemoveService,
   trainingCalendarSchema,
   trainingCalendarState,
   trainingConnectService,
@@ -34,7 +37,7 @@ import {
   trainingUploadService,
   trainingUploadState,
 } from '@ridrs/contracts';
-import { ftpField, localDate, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
+import { fromSteps, ftpField, localDate, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
@@ -42,12 +45,12 @@ const CLIENT_ID = '1697';
 /**
  * The OAuth scopes (names and their `:READ`/`:WRITE` form confirmed on intervals.icu's OAuth
  * support thread, https://forum.intervals.icu/t/intervals-icu-oauth-support/2759; WRITE includes
- * READ). `WELLNESS` reads and writes the weight, `SETTINGS` writes the FTP, `LIBRARY` reads the
- * workout library. A token from before lacks them: the wellness read gets 403, which only leaves
+ * READ). `WELLNESS` reads and writes the weight, `SETTINGS` writes the FTP, `CALENDAR` reads and
+ * writes the planned workouts, `LIBRARY` reads the workout library. A token from before lacks them: the wellness read gets 403, which only leaves
  * the weight of the athlete in its place, the library read gets 403, which leaves the library
  * unavailable, and a write gets 403, which asks the rider to connect again.
  */
-const SCOPES = 'SETTINGS:WRITE,CALENDAR:READ,WELLNESS:WRITE,LIBRARY:READ,ACTIVITY:WRITE';
+const SCOPES = 'SETTINGS:WRITE,CALENDAR:WRITE,WELLNESS:WRITE,LIBRARY:READ,ACTIVITY:WRITE';
 const SITE = 'https://intervals.icu';
 const CALLBACK_PATH = '/oauth/callback';
 /** The planned workouts of today and the next 13 days. */
@@ -238,6 +241,16 @@ export default definePlugin({
       writeProfile(ctx, services, held, change),
     );
 
+    ctx.services.provide(trainingCalendarPlanService, ({ key: _key, ...plan }) =>
+      writeCalendar(ctx, services, held, { plan }),
+    );
+    ctx.services.provide(trainingCalendarMoveService, ({ key: _key, ...move }) =>
+      writeCalendar(ctx, services, held, { move }),
+    );
+    ctx.services.provide(trainingCalendarRemoveService, ({ key: _key, ...remove }) =>
+      writeCalendar(ctx, services, held, { remove }),
+    );
+
     ctx.services.provide(trainingRefreshService, () => {
       load(ctx.clock.now());
       return {};
@@ -345,98 +358,193 @@ function accessToken(body: string): string | undefined {
   }
 }
 
-/** The library as it is shown now, for a state that changes something else. */
-function heldLibrary(ctx: PluginContext): { library?: LibraryWorkout[] } {
+/** What is shown now, for a state that changes only part of it; none before the first load. */
+function shown(ctx: PluginContext, held: Held): Cache | undefined {
+  const profile = ctx.state.entries(athleteProfileState).get(SERVICE);
+  const calendar = ctx.state.entries(trainingCalendarState).get(SERVICE);
   const library = ctx.state.entries(trainingLibraryState).get(SERVICE)?.data?.workouts;
-  return library ? { library } : {};
+  return profile?.data && calendar?.data
+    ? {
+        fetchedAt: profile.fetchedAt ?? ctx.clock.now(),
+        athlete: profile.data,
+        ftpField: held.ftpField,
+        workouts: calendar.data.workouts,
+        ...(library ? { library } : {}),
+      }
+    : undefined;
 }
 
+/** Shows what an accepted change made of the data, and keeps it for a start without network. */
+async function keep(ctx: PluginContext, { files }: Services, loaded: Cache): Promise<void> {
+  setSources(ctx, 'ready', loaded);
+  await files
+    .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(loaded)))
+    .catch((error: unknown) => ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
+}
+
+type Sent = { readonly ok: true; readonly body: unknown } | { readonly ok: false; readonly reason: 'read-only' | 'unreachable' };
+
 /**
- * Writes a change of the profile: the weight to today's wellness record, the FTP to the Ride
- * settings, into the field it was read from. `icu_weight` is never written. A write is refused,
- * not queued: when the service cannot be reached the old value stays. A token without the scope
- * (401 or 403) is forgotten like on an upload (ADR 0064) and the rider connects again; what is
- * shown stays, as the last copy of the service and read only until then.
+ * Sends one change to intervals.icu. A write is refused, not queued: when the service cannot be
+ * reached or does not take it, the old data stays. A token without the scope (401 or 403) is
+ * forgotten like on an upload (ADR 0064) and the rider connects again; what is shown stays, as
+ * the last copy of the service and read only until then.
  */
-async function writeProfile(
+async function send(
   ctx: PluginContext,
-  { http, secrets, files }: Services,
+  { http, secrets }: Services,
   held: Held,
-  change: { readonly ftp?: number; readonly weight?: number },
-): Promise<DataWriteResult> {
+  method: 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<Sent> {
   const token = await secrets.get(TOKEN_KEY).catch(() => undefined);
   if (!token) {
     return { ok: false, reason: 'unreachable' };
   }
-  const put = (path: string, body: Record<string, number>) =>
-    http.request({
-      method: 'PUT',
+  let response: HttpResponse;
+  try {
+    response = await http.request({
+      method,
       url: `${SITE}${path}`,
       headers: {
         authorization: `Bearer ${token}`,
         accept: 'application/json',
-        'content-type': 'application/json',
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       },
-      body: JSON.stringify(body),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-  const writes: Array<[string, Record<string, number>]> = [
-    ...(change.weight === undefined
-      ? []
-      : [[`/api/v1/athlete/0/wellness/${localDate(ctx.clock.now())}`, { weight: change.weight }] as [string, Record<string, number>]]),
-    ...(change.ftp === undefined
-      ? []
-      : [['/api/v1/athlete/0/sport-settings/Ride', { [held.ftpField]: change.ftp }] as [string, Record<string, number>]]),
-  ];
-  for (const [path, body] of writes) {
-    let response: HttpResponse;
-    try {
-      response = await put(path, body);
-    } catch {
-      return { ok: false, reason: 'unreachable' };
+  } catch {
+    return { ok: false, reason: 'unreachable' };
+  }
+  if (response.status === 401 || response.status === 403) {
+    await secrets.remove(TOKEN_KEY);
+    ctx.state.set(trainingAccountState, SERVICE, {
+      service: SERVICE,
+      state: 'failed',
+      reason: 'token-rejected',
+    });
+    const loaded = shown(ctx, held);
+    if (loaded) {
+      setSources(ctx, 'offline', loaded, false);
     }
-    if (response.status === 401 || response.status === 403) {
-      await secrets.remove(TOKEN_KEY);
-      ctx.state.set(trainingAccountState, SERVICE, {
-        service: SERVICE,
-        state: 'failed',
-        reason: 'token-rejected',
-      });
-      const profile = ctx.state.entries(athleteProfileState).get(SERVICE);
-      const calendar = ctx.state.entries(trainingCalendarState).get(SERVICE);
-      if (profile?.data && calendar?.data) {
-        setSources(
-          ctx,
-          'offline',
-          {
-            fetchedAt: profile.fetchedAt ?? ctx.clock.now(),
-            athlete: profile.data,
-            workouts: calendar.data.workouts,
-            ...heldLibrary(ctx),
-          },
-          false,
-        );
-      }
-      return { ok: false, reason: 'read-only' };
-    }
-    if (response.status !== 200) {
-      ctx.logger.warn({ status: response.status, path }, 'intervals.icu: the change was rejected');
-      return { ok: false, reason: 'unreachable' };
+    return { ok: false, reason: 'read-only' };
+  }
+  if (response.status < 200 || response.status >= 300) {
+    ctx.logger.warn({ status: response.status, path }, 'intervals.icu: the change was rejected');
+    return { ok: false, reason: 'unreachable' };
+  }
+  let answer: unknown;
+  try {
+    answer = response.body === '' ? undefined : JSON.parse(response.body);
+  } catch {
+    answer = undefined;
+  }
+  return { ok: true, body: answer };
+}
+
+/**
+ * Writes a change of the profile: the weight to today's wellness record, the FTP to the Ride
+ * settings, into the field it was read from. `icu_weight` is never written.
+ */
+async function writeProfile(
+  ctx: PluginContext,
+  services: Services,
+  held: Held,
+  change: { readonly ftp?: number; readonly weight?: number },
+): Promise<DataWriteResult> {
+  if (change.weight !== undefined) {
+    const sent = await send(ctx, services, held, 'PUT', `/api/v1/athlete/0/wellness/${localDate(ctx.clock.now())}`, {
+      weight: change.weight,
+    });
+    if (!sent.ok) {
+      return sent;
     }
   }
-  const profile = ctx.state.entries(athleteProfileState).get(SERVICE);
-  const calendar = ctx.state.entries(trainingCalendarState).get(SERVICE);
-  if (profile?.data && calendar?.data) {
-    const loaded = {
-      fetchedAt: profile.fetchedAt ?? ctx.clock.now(),
-      athlete: { ...profile.data, ...change },
-      ftpField: held.ftpField,
-      workouts: calendar.data.workouts,
-      ...heldLibrary(ctx),
-    };
-    setSources(ctx, 'ready', loaded);
-    await files
-      .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(loaded)))
-      .catch((error: unknown) => ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
+  if (change.ftp !== undefined) {
+    const sent = await send(ctx, services, held, 'PUT', '/api/v1/athlete/0/sport-settings/Ride', {
+      [held.ftpField]: change.ftp,
+    });
+    if (!sent.ok) {
+      return sent;
+    }
+  }
+  const loaded = shown(ctx, held);
+  if (loaded) {
+    await keep(ctx, services, { ...loaded, athlete: { ...loaded.athlete, ...change } });
+  }
+  return { ok: true };
+}
+
+/** A change of the calendar: a library workout on a day, a workout moved, a workout removed. */
+type CalendarChange =
+  | { readonly plan: { readonly date: string; readonly workoutId: string; readonly from: string } }
+  | { readonly move: { readonly id: string; readonly date: string } }
+  | { readonly remove: { readonly id: string } };
+
+/**
+ * Writes a change of the calendar to the events of intervals.icu (`POST`, `PUT`, `DELETE`). A
+ * planned library workout is created with its steps. The calendar shown follows an accepted change
+ * at once: it holds the planned rides of the next 14 days, as a load does.
+ */
+async function writeCalendar(
+  ctx: PluginContext,
+  services: Services,
+  held: Held,
+  change: CalendarChange,
+): Promise<DataWriteResult> {
+  const now = ctx.clock.now();
+  const loaded = shown(ctx, held);
+  let workouts = loaded?.workouts ?? [];
+  if ('plan' in change) {
+    const { date, workoutId, from } = change.plan;
+    const workout = ctx.state
+      .entries(trainingLibraryState)
+      .get(from)
+      ?.data?.workouts.find((candidate) => candidate.id === workoutId);
+    if (!workout) {
+      throw new Error(`The library of "${from}" has no workout "${workoutId}"`);
+    }
+    const sent = await send(ctx, services, held, 'POST', '/api/v1/athlete/0/events', {
+      category: 'WORKOUT',
+      start_date_local: `${date}T00:00:00`,
+      type: workout.sport === 'virtual-ride' ? 'VirtualRide' : 'Ride',
+      name: workout.name,
+      ...(workout.description !== undefined ? { description: workout.description } : {}),
+      ...(workout.durationSeconds !== undefined ? { moving_time: workout.durationSeconds } : {}),
+      workout_doc: { steps: fromSteps(workout.steps) },
+    });
+    if (!sent.ok) {
+      return sent;
+    }
+    const created = toWorkouts([sent.body], loaded?.athlete.ftp);
+    workouts = [...workouts, ...created];
+  } else if ('move' in change) {
+    const { id, date } = change.move;
+    const sent = await send(ctx, services, held, 'PUT', `/api/v1/athlete/0/events/${encodeURIComponent(id)}`, {
+      start_date_local: `${date}T00:00:00`,
+    });
+    if (!sent.ok) {
+      return sent;
+    }
+    workouts = workouts.map((workout) => (workout.id === id ? { ...workout, date } : workout));
+  } else {
+    const { id } = change.remove;
+    const sent = await send(ctx, services, held, 'DELETE', `/api/v1/athlete/0/events/${encodeURIComponent(id)}`);
+    if (!sent.ok) {
+      return sent;
+    }
+    workouts = workouts.filter((workout) => workout.id !== id);
+  }
+  if (loaded) {
+    const first = localDate(now);
+    const last = localDate(now, PLAN_DAYS - 1);
+    await keep(ctx, services, {
+      ...loaded,
+      workouts: workouts
+        .filter((workout) => workout.date >= first && workout.date <= last)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    });
   }
   return { ok: true };
 }

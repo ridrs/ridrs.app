@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { AreaPage, iconStyle, MenuEntry, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
-import { DEFAULT_PROVIDER, trainingCalendarHandOverService, trainingLibraryState } from '@ridrs/contracts';
+import {
+  DEFAULT_PROVIDER,
+  type DataWriteResult,
+  dataSourceState,
+  trainingCalendarHandOverService,
+  trainingCalendarPlanService,
+  trainingCalendarState,
+  trainingLibraryState,
+} from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
@@ -10,6 +18,7 @@ import {
   type Calendar,
   FIRST_WEEK,
   KIND_TITLES,
+  localToday,
   moveLater,
   plannedWorkouts,
   removeEntry,
@@ -17,6 +26,7 @@ import {
   WEEKDAYS,
   type Weekday,
   WORKOUTS,
+  weekDate,
   weekdayOf,
 } from './calendar.ts';
 import { INITIAL_TRAINING, TRAINING_DOCUMENT } from '../document.ts';
@@ -110,8 +120,27 @@ function Day({
 }
 
 /** The workouts of every provider's library, read only, grouped by provider (ADR 0075). */
-function Library({ ctx }: { readonly ctx: UiContext }) {
+function Library({ ctx, selected }: { readonly ctx: UiContext; readonly selected: Weekday }) {
   const text = useMessages(ctx, messages);
+  const calendars = useStateEntries(ctx, trainingCalendarState);
+  const chosen = useStateEntries(ctx, dataSourceState).get('training.calendar')?.provider ?? DEFAULT_PROVIDER;
+  const [refusal, setRefusal] = useState<string>();
+  // "Plan on a day" writes to the chosen calendar, which answers whether it took it.
+  const plan = (from: string, workoutId: string) => {
+    const source = calendars.get(chosen);
+    const name = chosen === DEFAULT_PROVIDER ? text.thisDevice : (source?.label ?? chosen);
+    ctx
+      .call(trainingCalendarPlanService, {
+        key: chosen,
+        date: weekDate(selected, localToday()),
+        workoutId,
+        from,
+      })
+      .then(
+        (answer: DataWriteResult) => setRefusal(answer.ok ? undefined : text.planRefused(name, answer.reason)),
+        (error: unknown) => ctx.logger.warn(`Could not plan the workout: ${String(error)}`),
+      );
+  };
   const providers = [...useStateEntries(ctx, trainingLibraryState).values()]
     .filter((source) => (source.data?.workouts.length ?? 0) > 0)
     .sort((a, b) => a.provider.localeCompare(b.provider));
@@ -119,6 +148,11 @@ function Library({ ctx }: { readonly ctx: UiContext }) {
     <section className="pv-section" data-testid="library">
       <h2>{text.library}</h2>
       {providers.length === 0 ? <p className="pv-muted">{text.libraryEmpty}</p> : null}
+      {refusal ? (
+        <p className="pv-muted" role="status">
+          {refusal}
+        </p>
+      ) : null}
       {providers.map((source) => (
         <div key={source.provider} data-provider={source.provider}>
           <h3>{source.provider === DEFAULT_PROVIDER ? text.thisDevice : source.label}</h3>
@@ -137,6 +171,11 @@ function Library({ ctx }: { readonly ctx: UiContext }) {
                     .filter(Boolean)
                     .join(' · ')}
                 </span>
+                <div className="pv-row">
+                  <button type="button" className="pv-button" onClick={() => plan(source.provider, workout.id)}>
+                    {text.planFromLibrary(workout.name, text.weekdays[selected])}
+                  </button>
+                </div>
               </article>
             ))}
           </div>
@@ -156,11 +195,10 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   // initial entries, which its owner has read from the same document.
   useEffect(() => {
     if (state.calendar.entries === FIRST_WEEK.entries) return;
-    const date = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const iso = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
     ctx
-      .call(trainingCalendarHandOverService, { workouts: plannedWorkouts(state.calendar.entries, iso) })
+      .call(trainingCalendarHandOverService, {
+        workouts: plannedWorkouts(state.calendar.entries, localToday()),
+      })
       .catch((error: unknown) => ctx.logger.warn(`Could not hand over the calendar: ${String(error)}`));
   }, [ctx, state.calendar.entries]);
   const calendar = (update: (calendar: Calendar) => Calendar) =>
@@ -248,7 +286,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         </div>
       </section>
 
-      <Library ctx={ctx} />
+      <Library ctx={ctx} selected={selected} />
 
       <section className="pv-section">
         <h2>{text.plans}</h2>

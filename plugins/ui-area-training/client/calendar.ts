@@ -107,6 +107,20 @@ export function weekdayOf(date: Date): Weekday {
   return WEEKDAYS[(date.getDay() + 6) % 7] ?? 'Monday';
 }
 
+/** The date of a weekday in the week that holds `today` (`YYYY-MM-DD`), Monday first. */
+export function weekDate(day: Weekday, today: string): string {
+  const [year = 0, month = 1, d = 1] = today.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, d));
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7) + WEEKDAYS.indexOf(day));
+  return date.toISOString().slice(0, 10);
+}
+
+/** The rider's local date, `YYYY-MM-DD`. */
+export function localToday(at: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
 /**
  * The workouts of the calendar as the data type `training.calendar` has them (ADR 0075): the
  * entries of kind workout, each on its day of the week that holds `today` (`YYYY-MM-DD`, Monday
@@ -114,16 +128,9 @@ export function weekdayOf(date: Date): Weekday {
  * entries have no steps.
  */
 export function plannedWorkouts(entries: readonly Entry[], today: string): PlannedWorkout[] {
-  const [year = 0, month = 1, day = 1] = today.split('-').map(Number);
-  const monday = new Date(Date.UTC(year, month - 1, day));
-  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
   return entries
     .filter((entry) => entry.kind === 'workout')
-    .map((entry) => {
-      const date = new Date(monday);
-      date.setUTCDate(monday.getUTCDate() + WEEKDAYS.indexOf(entry.day));
-      return { entry, date: date.toISOString().slice(0, 10) };
-    })
+    .map((entry) => ({ entry, date: weekDate(entry.day, today) }))
     .filter(({ date }) => date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(({ entry, date }) => ({

@@ -181,6 +181,13 @@ Then('the button {string} is disabled', async function (this: RidrsWorld, name: 
   );
 });
 
+Then(
+  'the Training area offers the button {string}',
+  async function (this: RidrsWorld, name: string) {
+    await within(shownScreen(this)).findByRole('button', { name });
+  },
+);
+
 Then('the button {string} is enabled', async function (this: RidrsWorld, name: string) {
   await waitFor(() =>
     assert.equal(

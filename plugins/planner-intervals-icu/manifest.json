@@ -28,6 +28,9 @@
   "services": {
     "provides": [
       "athlete.profile.update",
+      "training.calendar.plan",
+      "training.calendar.move",
+      "training.calendar.remove",
       "training.connect",
       "training.disconnect",
       "training.refresh",

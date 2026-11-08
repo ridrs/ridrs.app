@@ -19,7 +19,10 @@
   },
   "services": {
     "provides": [
-      "training.calendar.hand-over"
+      "training.calendar.hand-over",
+      "training.calendar.plan",
+      "training.calendar.move",
+      "training.calendar.remove"
     ],
     "calls": []
   },
@@ -45,10 +48,13 @@
     },
     "state": [
       "app.language",
+      "data.source",
+      "training.calendar",
       "training.library"
     ],
     "calls": [
-      "training.calendar.hand-over"
+      "training.calendar.hand-over",
+      "training.calendar.plan"
     ]
   }
 }

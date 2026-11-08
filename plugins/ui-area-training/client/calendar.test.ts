@@ -10,6 +10,7 @@ import {
   UNDO_DEPTH,
   undo,
   weekdayOf,
+  weekDate,
 } from './calendar.ts';
 
 const titlesOn = (calendar: typeof FIRST_WEEK, day: string) =>
@@ -66,5 +67,14 @@ describe('the planned workouts of the calendar', () => {
       ['2026-11-08', 'B'],
     ]);
     expect(plannedWorkouts(entries, '2026-11-08').map((w) => w.name)).toEqual(['B']);
+  });
+});
+
+describe('the date of a weekday', () => {
+  it('is the day of the week that holds today, Monday first', () => {
+    expect(weekDate('Monday', '2026-11-04')).toBe('2026-11-02');
+    expect(weekDate('Thursday', '2026-11-04')).toBe('2026-11-05');
+    expect(weekDate('Sunday', '2026-11-08')).toBe('2026-11-08');
+    expect(weekDate('Monday', '2026-11-08')).toBe('2026-11-02');
   });
 });

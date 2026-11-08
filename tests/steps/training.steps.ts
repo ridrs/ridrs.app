@@ -3,7 +3,12 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
-import { exportFitState, recordingRideState } from '@ridrs/contracts';
+import {
+  exportFitState,
+  recordingRideState,
+  trainingCalendarMoveService,
+  trainingCalendarRemoveService,
+} from '@ridrs/contracts';
 import FakeTimers from '@sinonjs/fake-timers';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
 import {
@@ -132,6 +137,15 @@ Given('intervals.icu has the library:', function (this: RidrsWorld, table: DataT
   });
   simulation.folders = [...folders].map(([name, id]) => ({ id, name, type: 'FOLDER' }));
 });
+
+Given(
+  'the library workout {string} of intervals.icu has the steps:',
+  function (this: RidrsWorld, name: string, table: DataTable) {
+    const workout = intervals(this).library.find((entry) => entry.name === name);
+    assert.ok(workout, `The library has no "${name}"`);
+    workout.workout_doc = { steps: workoutDoc(table).steps };
+  },
+);
 
 Given('intervals.icu lacks the scope of the library', function (this: RidrsWorld) {
   intervals(this).libraryScope = false;
@@ -422,6 +436,85 @@ Then(
     );
   },
 );
+
+Then(
+  'the event created in intervals.icu has the steps:',
+  async function (this: RidrsWorld, table: DataTable) {
+    const simulation = intervals(this);
+    await this.waitForIo(
+      () => simulation.eventLog.some((entry) => entry.method === 'POST'),
+      'the event to reach intervals.icu',
+    );
+    const created = simulation.eventLog.filter((entry) => entry.method === 'POST').at(-1);
+    assert.deepEqual(
+      (created?.body.workout_doc as { steps: unknown[] } | undefined)?.steps,
+      workoutDoc(table).steps,
+    );
+  },
+);
+
+function eventNamed(world: RidrsWorld, name: string): string {
+  const event = intervals(world).events.find((candidate) => candidate.name === name);
+  assert.ok(event, `intervals.icu plans no "${name}"`);
+  return String(event.id);
+}
+
+When(
+  'the rider moves the planned workout {string} of {string} to {string}',
+  async function (this: RidrsWorld, name: string, provider: string, date: string) {
+    const answer = await this.ensureHost().callService(trainingCalendarMoveService.id, {
+      key: provider,
+      id: eventNamed(this, name),
+      date,
+    });
+    assert.deepEqual(answer, { ok: true });
+    await this.flushState();
+  },
+);
+
+When(
+  'the rider removes the planned workout {string} of {string}',
+  async function (this: RidrsWorld, name: string, provider: string) {
+    const answer = await this.ensureHost().callService(trainingCalendarRemoveService.id, {
+      key: provider,
+      id: eventNamed(this, name),
+    });
+    assert.deepEqual(answer, { ok: true });
+    await this.flushState();
+  },
+);
+
+Then(
+  'intervals.icu received {string} for the event {string} with the body:',
+  async function (this: RidrsWorld, method: string, name: string, table: DataTable) {
+    const simulation = intervals(this);
+    await this.waitForIo(
+      () => simulation.eventLog.some((entry) => entry.method === method && entry.name === name),
+      `${method} of "${name}" to reach intervals.icu`,
+    );
+    const entry = simulation.eventLog.filter((e) => e.method === method && e.name === name).at(-1);
+    assert.deepEqual(
+      Object.fromEntries(table.raw().map(([field]) => [field, String(entry?.body[field ?? ''])])),
+      Object.fromEntries(table.raw()),
+    );
+  },
+);
+
+Then(
+  'intervals.icu received {string} for the event {string}',
+  async function (this: RidrsWorld, method: string, name: string) {
+    const simulation = intervals(this);
+    await this.waitForIo(
+      () => simulation.eventLog.some((entry) => entry.method === method && entry.name === name),
+      `${method} of "${name}" to reach intervals.icu`,
+    );
+  },
+);
+
+Then('intervals.icu received no write to its events', async function (this: RidrsWorld) {
+  await this.settle();
+  assert.deepEqual(intervals(this).eventLog, []);
+});
 
 Then('no request changed the athlete of intervals.icu', async function (this: RidrsWorld) {
   await this.settle();
