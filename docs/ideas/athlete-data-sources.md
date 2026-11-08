@@ -2,7 +2,7 @@
 
 # Proposal: Data Sources for the Athlete Profile and the Training Plan (P7, P8, P9)
 
-**Status: proposal, 2026-11-08, not yet reviewed.** It continues [persistence-and-recovery.md](persistence-and-recovery.md) and [ADR 0052](../decisions/0052-persistence-domains-and-plan.md) with phases P7 (local athlete profile), P8 (local calendar) and P9 (providers, intervals.icu only). It starts from the maintainer's idea of 2026-11-08, checks it against the code as it is today, challenges parts of it and proposes stages. Each stage starts with failing Cucumber scenarios and gets its own ADR (AGENTS.md rules 1–3).
+**Status: proposal, 2026-11-08; recorded as [ADR 0073](../decisions/0073-data-sources-for-the-athlete-profile-and-the-training-plan.md) (proposed), awaiting the maintainer's answers to section G.** It continues [persistence-and-recovery.md](persistence-and-recovery.md) and [ADR 0052](../decisions/0052-persistence-domains-and-plan.md) with phases P7 (local athlete profile), P8 (local calendar) and P9 (providers, intervals.icu only). It starts from the maintainer's idea of 2026-11-08, checks it against the code as it is today, challenges parts of it and proposes stages. Each stage starts with failing Cucumber scenarios and gets its own ADR (AGENTS.md rules 1–3).
 
 ## Summary
 
