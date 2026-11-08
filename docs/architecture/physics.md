@@ -35,7 +35,7 @@ The boundary between event time and simulation time: the physics **asks** the te
 |---|---|---|---|
 | `physics-engine` | – | `physics.motion` | Simulation clock: fixed 10 ms step while a ride runs, catch-up, publishes `physics.state` and `physics.state-batch`. The only physics plugin with a timer. |
 | `physics-bicycle` | `physics.bicycle` | – | Mass and tyre rolling-resistance coefficient. |
-| `physics-rider` | `physics.rider` | – | Mass and CdA of the rider on the bicycle. |
+| `physics-rider` | `physics.rider` | – | Mass and CdA of the rider on the bicycle; the mass is the weight of the athlete frozen for the ride (`activity.athlete`, origin `profile`), else 75 kg. |
 | `physics-environment` | `physics.environment` | – | Air density. Computes no forces. |
 | `physics-rolling-resistance` | `physics.resistance`, `config.snapshot` | `physics.bicycle` | `Crr · f · m · g · cos θ` while moving, 0 at standstill; `f` the surface factor (asphalt 1.0, gravel 2.0). |
 | `physics-aerodynamics` | `physics.resistance` | `physics.environment`, `physics.rider` | `½ · ρ · CdA · v_rel · |v_rel|`, still air (`v_rel = v`), ρ from the environment. |
@@ -53,7 +53,7 @@ All are `AGPL-3.0-or-later`; the physics plugins import only `@ridrs/contracts` 
 
 SI units everywhere. Resistance forces are signed along the direction of travel: **positive opposes forward motion**. Speed is forward-only.
 
-- `BicycleCapability.parameters()` → `{ mass, rollingResistanceCoefficient }`, `RiderCapability.parameters()` → `{ mass, cdA }`; each a `PhysicsParameter { value, origin: 'default' }`.
+- `BicycleCapability.parameters()` → `{ mass, rollingResistanceCoefficient }`, `RiderCapability.parameters()` → `{ mass, cdA }`; each a `PhysicsParameter { value, origin }` with the origin `default`, `equipment` (the frozen bicycle, ADR 0060) or `profile` (the frozen athlete's weight, ADR 0073).
 - `EnvironmentCapability.parameters()` → `{ airDensity }` (single).
 - `RoadSample { gradient, surface, origin }`: the road the forces of a step use. `gradient` is rise over run, dimensionless: 0.05 is 5 % uphill; `surface` is `asphalt` or `gravel` (`physics.state.road.surface`, zod-validated).
 - Event `world.terrain-preview` (`packages/contracts/src/world.ts`): `{ revision, originDistance, spacing, samples: [{ gradient, surface? }] }`, at least two samples; sample `i` lies at the odometer reading `originDistance + i · spacing`; no surface means asphalt. An input, read by `spatial-terrain` only. Diagnostics `terrain-preview-missing`, `terrain-preview-rejected`.
