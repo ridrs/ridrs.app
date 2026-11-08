@@ -18,7 +18,7 @@ import {
 } from '@ridrs/contracts';
 import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   accountMessage,
@@ -147,8 +147,21 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const { account, plan, source } = useTraining(ctx);
   if (source !== SERVICE) {
-    // The calendar of ridrs on this device has no account to connect.
-    return <NextWorkoutCard ctx={ctx} text={text} plan={plan} caption={text.thisDevice} />;
+    // The calendar of ridrs on this device; the service can still be connected from here.
+    const offer = account && account.state !== 'connected' && account.state !== 'connecting';
+    return (
+      <NextWorkoutCard ctx={ctx} text={text} plan={plan} caption={text.thisDevice}>
+        {offer ? (
+          <button
+            type="button"
+            className="rt-button"
+            onClick={() => callAccount(ctx, trainingConnectService)}
+          >
+            {connectLabel(account, text)}
+          </button>
+        ) : null}
+      </NextWorkoutCard>
+    );
   }
   if (!account) {
     return null;
@@ -193,11 +206,14 @@ function NextWorkoutCard({
   text,
   plan,
   caption,
+  children,
 }: {
   readonly ctx: UiContext;
   readonly text: Messages;
   readonly plan: Plan | undefined;
   readonly caption: string;
+  /** Shown under the caption. */
+  readonly children?: ReactNode;
 }) {
   const workout = nextWorkout(plan);
   return (
@@ -238,6 +254,7 @@ function NextWorkoutCard({
         )}
       </button>
       <span className="rt-caption">{caption}</span>
+      {children}
     </section>
   );
 }

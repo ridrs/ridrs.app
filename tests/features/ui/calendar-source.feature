@@ -1,11 +1,12 @@
 @ui @training
 Feature: The rider chooses where the planned workouts come from
   The planned workouts (the calendar) are a data type with one chosen source (ADR 0075): ridrs on
-  this device, whose workouts are the Training area's calendar entries of this week from today on,
-  or intervals.icu, whose workouts are its planned rides of the next 14 days. The settings page
+  this device, whose workouts are the workouts the rider put in the Training area's calendar this
+  week, from today on (not the sample entries the area starts with), or intervals.icu, whose workouts are its planned rides of the next 14 days. The settings page
   has a row "Planned workouts" beside the athlete profile's, and the next workout card on the main
-  screen follows the chosen source. The first start chooses intervals.icu when its account is
-  connected.
+  screen follows the chosen source. Until the rider chooses, a service whose account they connected
+  is the source, also when they connect it later; without one, ridrs on this device is, and the card
+  still offers to connect the service.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
   2026; the Training area starts with workouts on Tuesday, Thursday and Saturday.
@@ -28,16 +29,39 @@ Feature: The rider chooses where the planned workouts come from
     And the row "Planned workouts" has "ridrs (this device)" chosen
     And the row "Planned workouts" shows the status "Ready"
 
-  Scenario: Without an account the next workout is the Training area's
+  Scenario: Without an account the card shows no sample workout and offers to connect
     Given the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
-    Then the next workout card shows:
-      | day  | Tomorrow    |
-      | name | VO2 Max 5×4  |
+    Then the training tile shows "No workout planned"
     And the training tile shows "ridrs (this device)"
+    And the training tile offers a "Connect intervals.icu" button
 
-  Scenario: The first start chooses intervals.icu when its account is connected
+  Scenario: A workout the rider schedules in the Training area is the next workout
+    Given the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Training"
+    And I press "Thursday"
+    And I press "Schedule Recovery Spin on Thursday"
+    And I press Back
+    Then the next workout card shows:
+      | day  | Tomorrow      |
+      | name | Recovery Spin |
+
+  Scenario: Connecting the service later makes it the source until the rider chooses
+    Given the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the athlete approves the sign-in
+    Then the next workout card shows:
+      | name | Threshold 20 |
+    When I press "Settings"
+    Then the row "Planned workouts" has "intervals.icu" chosen
+    And the row "Athlete profile" has "intervals.icu" chosen
+
+  Scenario: A connected account is the source when the rider has not chosen one
     Given the secret store holds a token for intervals.icu
     And the host has started
     And the main screen is 1400 px wide
@@ -56,8 +80,8 @@ Feature: The rider chooses where the planned workouts come from
     When I press "Settings"
     And I press the chip "ridrs (this device)" of the row "Planned workouts"
     And I press Back
-    Then the next workout card shows:
-      | name | VO2 Max 5×4 |
+    Then the training tile shows "No workout planned"
+    And the training tile offers no "Connect intervals.icu" button
     When I press "Settings"
     And I press the chip "intervals.icu" of the row "Planned workouts"
     And I press Back
@@ -82,11 +106,15 @@ Feature: The rider chooses where the planned workouts come from
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Training"
-    And I press "Remove VO2 Max 5×4 from Thursday"
+    And I press "Thursday"
+    And I press "Schedule Recovery Spin on Thursday"
+    And I press "Saturday"
+    And I press "Schedule Sweet Spot 3×12 on Saturday"
+    And I press "Remove Recovery Spin from Thursday"
     And I press Back
     Then the next workout card shows:
-      | day  | Sat 7 Nov   |
-      | name | Endurance 90 |
+      | day  | Sat 7 Nov       |
+      | name | Sweet Spot 3×12 |
 
   Scenario: Offline, the calendar of intervals.icu is marked
     Given the secret store holds a token for intervals.icu

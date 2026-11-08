@@ -4,8 +4,9 @@ Feature: A library workout is planned on a day in the chosen calendar
   (ADR 0075): in intervals.icu it is an event created with its steps, and a planned workout can be
   moved to another day or removed again. A write is refused, never queued: when intervals.icu
   cannot be reached nothing changes, and a token without the scope asks the rider to connect
-  again. The calendar of ridrs on this device is written in the Training area only, and its own
-  entries (rest days, notes, outdoor rides) are never written to intervals.icu.
+  again. On the calendar of ridrs on this device the workout becomes an entry of the Training area
+  on that weekday; the area's own entries (rest days, notes, outdoor rides) are never written to
+  intervals.icu. A weekday that has passed this week is the one of next week.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
   2026.
@@ -53,6 +54,25 @@ Feature: A library workout is planned on a day in the chosen calendar
       | name | Sweet Spot 3x12 |
     And the next workout card shows a power profile of 8 bars
 
+  Scenario: The workout is planned with the steps exactly as the library has them
+    Given the library workout "Sweet Spot 3x12" of intervals.icu has the workout document:
+      """
+      {
+        "steps": [
+          { "duration": 600, "warmup": true, "ramp": true, "power": { "units": "%ftp", "start": 50, "end": 75 } },
+          { "duration": 1200, "power": { "units": "%ftp", "start": 88, "end": 94 } },
+          { "duration": 900, "power": { "units": "power_zone", "value": 2 } }
+        ]
+      }
+      """
+    And I open the next workout
+    And I press "Refresh"
+    And I press Back
+    When I press "Training"
+    And I press "Thursday"
+    And I press "Plan Sweet Spot 3x12 on Thursday"
+    Then the event created in intervals.icu has the workout document of the library workout "Sweet Spot 3x12"
+
   Scenario: A planned workout is moved to another day
     Given intervals.icu plans:
       | date       | type | name         | duration | load |
@@ -96,14 +116,26 @@ Feature: A library workout is planned on a day in the chosen calendar
     Then the page says "intervals.icu cannot be changed from the library."
     And the secret store holds no intervals.icu token
 
-  Scenario: The calendar of ridrs is written in the Training area only
+  Scenario: On the calendar of ridrs the workout becomes an entry of the Training area
     When I press "Settings"
     And I press the chip "ridrs (this device)" of the row "Planned workouts"
     And I press Back
     And I press "Training"
-    And I press "Plan Sweet Spot 3x12 on Wednesday"
-    Then the page says "ridrs (this device) cannot be changed from the library."
+    And I press "Thursday"
+    And I press "Plan Sweet Spot 3x12 on Thursday"
+    Then the calendar day "Thursday" lists "Sweet Spot 3x12"
     And intervals.icu received no write to its events
+    When I press Back
+    Then the next workout card shows:
+      | day  | Tomorrow        |
+      | name | Sweet Spot 3x12 |
+
+  Scenario: A weekday that has passed this week is the one of next week
+    When I press "Training"
+    And I press "Tuesday"
+    And I press "Plan Sweet Spot 3x12 on Tuesday"
+    Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
+      | start_date_local | 2026-11-10T00:00:00 |
 
   Scenario: The Training area's own entries are not written to intervals.icu
     When I press "Training"

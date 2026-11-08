@@ -115,6 +115,15 @@ export function weekDate(day: Weekday, today: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** The next date of a weekday from `today` on (`YYYY-MM-DD`): this week's, else next week's. */
+export function nextDate(day: Weekday, today: string): string {
+  const date = weekDate(day, today);
+  if (date >= today) return date;
+  const next = new Date(`${date}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 7);
+  return next.toISOString().slice(0, 10);
+}
+
 /** The rider's local date, `YYYY-MM-DD`. */
 export function localToday(at: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -124,12 +133,14 @@ export function localToday(at: Date = new Date()): string {
 /**
  * The workouts of the calendar as the data type `training.calendar` has them (ADR 0075): the
  * entries of kind workout, each on its day of the week that holds `today` (`YYYY-MM-DD`, Monday
- * first), from today on. Rest days, notes and outdoor rides are no planned workouts, and the
- * entries have no steps.
+ * first), from today on. Rest days, notes and outdoor rides are no planned workouts, nor are the
+ * sample entries the area starts with (`FIRST_WEEK`): the rider did not plan them. The entries
+ * have no steps.
  */
 export function plannedWorkouts(entries: readonly Entry[], today: string): PlannedWorkout[] {
+  const samples = new Set(FIRST_WEEK.entries.map((entry) => entry.id));
   return entries
-    .filter((entry) => entry.kind === 'workout')
+    .filter((entry) => entry.kind === 'workout' && !samples.has(entry.id))
     .map((entry) => ({ entry, date: weekDate(entry.day, today) }))
     .filter(({ date }) => date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))

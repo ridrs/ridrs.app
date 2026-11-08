@@ -2,11 +2,12 @@
 Feature: intervals.icu is a source of the athlete profile
   intervals.icu is a provider of the athlete profile (ADR 0075), next to ridrs on this device. Its
   FTP is the indoor FTP of its Ride settings (else the FTP), its weight today's wellness weight
-  (else the weight of the athlete). The first start of this version chooses it when its account
-  is connected, so the rider keeps seeing what they saw before; a choice the rider made is kept.
-  Offline, the cached profile stands in and is marked as such. Disconnected, the source is not
-  available and the next ride uses the default values: the profile on this device does not take
-  its place.
+  (else the weight of the athlete). Until the rider chooses a source, intervals.icu is the source
+  while its account is connected, so a rider keeps seeing what they saw before and one who
+  connects later sees it at once; a choice the rider made is kept. Offline, the cached profile
+  stands in and is marked as such. When the rider chose intervals.icu and disconnects, the source
+  is not available and the next ride uses the default values: the profile on this device does not
+  take its place.
 
   Here intervals.icu, the browser and the secret store are simulated.
 
@@ -16,7 +17,7 @@ Feature: intervals.icu is a source of the athlete profile
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And the local time is "2026-11-04 08:00"
 
-  Scenario: The first start chooses intervals.icu when its account is connected
+  Scenario: A connected account is the source when the rider has not chosen one
     Given the secret store holds a token for intervals.icu
     And the host has started
     And the main screen is 1400 px wide
@@ -31,7 +32,7 @@ Feature: intervals.icu is a source of the athlete profile
     Then the FTP reads "250 W"
     And the weight reads "72.0 kg"
 
-  Scenario: The first start without an account keeps ridrs
+  Scenario: Without an account ridrs is the source
     Given the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
@@ -50,7 +51,7 @@ Feature: intervals.icu is a source of the athlete profile
     When I press "Settings"
     Then the row "Athlete profile" has "ridrs (this device)" chosen
 
-  Scenario: Connecting later does not change the choice
+  Scenario: Connecting later makes intervals.icu the source when the rider has not chosen one
     Given the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
@@ -60,7 +61,28 @@ Feature: intervals.icu is a source of the athlete profile
     And ridrs restarted
     And I reload the UI
     And I press "Settings"
+    Then the row "Athlete profile" has "intervals.icu" chosen
+
+  Scenario: Connecting later does not change a choice the rider made
+    Given the rider chose the athlete profile of "ridrs"
+    And the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Profile"
+    And I press "Connect intervals.icu"
+    And the athlete approves the sign-in
+    And I press Back
+    And I press "Settings"
     Then the row "Athlete profile" has "ridrs (this device)" chosen
+
+  Scenario: Disconnecting without a choice makes ridrs the source again
+    Given the secret store holds a token for intervals.icu
+    And the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Profile"
+    And I press "Disconnect intervals.icu"
+    Then the latest athlete handed to the next ride is from "ridrs" without values
 
   Scenario: Today's wellness weight is the weight, else the weight of the athlete
     Given the secret store holds a token for intervals.icu
@@ -103,8 +125,9 @@ Feature: intervals.icu is a source of the athlete profile
     And I press "Profile"
     Then the FTP reads "250 W"
 
-  Scenario: Disconnected, the source is not available and the ride uses the defaults
+  Scenario: Disconnected, the chosen source is not available and the ride uses the defaults
     Given the secret store holds a token for intervals.icu
+    And the rider chose the athlete profile of "intervals.icu"
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown

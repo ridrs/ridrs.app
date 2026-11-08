@@ -10,7 +10,6 @@ import {
   DEFAULT_LANGUAGE,
   DEFAULT_PROVIDER,
   type DataSource,
-  type DataSourceStatus,
   type AthleteProfile,
   dataSelectService,
   dataSourceState,
@@ -67,11 +66,7 @@ export default definePlugin({
     // The rider's choice per data type. It stays in the document when its provider is gone, so
     // the provider comes back with the choice; the state holds the provider in use.
     const sources = ctx.settings.user(DATA_SOURCES_DOCUMENT);
-    const document = await sources.read();
-    const chosen = new Map(Object.entries(document?.sources ?? {}));
-    // No document: the first start of a version with data sources (ADR 0075), which chooses a
-    // service the rider already connected, so they keep seeing what they saw before.
-    let firstStart = document === undefined;
+    const chosen = new Map(Object.entries((await sources.read())?.sources ?? {}));
     let started = false;
     const inUse = new Map<string, string>();
     let handedOver: string | undefined;
@@ -82,46 +77,34 @@ export default definePlugin({
         .catch((error: unknown) => ctx.logger.warn(`Could not keep the data sources: ${String(error)}`));
 
     /** The providers of each data type with a choice. */
-    const providersOf = (type: string): ReadonlyMap<string, { readonly status: DataSourceStatus }> =>
+    const providersOf = (type: string): ReadonlyMap<string, unknown> =>
       type === ATHLETE_PROFILE
         ? ctx.state.entries(athleteProfileState)
         : ctx.state.entries(trainingCalendarState);
 
     /**
-     * Once every provider has started and none still loads: the connected service of each data
-     * type, else nothing. The document is written either way, so it happens once: connecting a
-     * service later changes no choice.
+     * The source of a data type the rider has not chosen: a service whose account the rider
+     * connected (or is connecting, or whose sign-in failed), so a connected rider keeps seeing
+     * that service and a rider who connects later sees it at once; else ridrs.
      */
-    const chooseFirst = (): void => {
-      if (
-        DATA_TYPES.some((type) =>
-          [...providersOf(type).values()].some((source) => source.status === 'loading'),
-        )
-      ) {
-        return;
-      }
-      firstStart = false;
+    const implicitChoice = (type: string): string => {
       const accounts = ctx.state.entries(trainingAccountState);
-      for (const type of DATA_TYPES) {
-        const connected = [...providersOf(type).keys()]
+      return (
+        [...providersOf(type).keys()]
           .filter((provider) => provider !== DEFAULT_PROVIDER)
           .sort()
-          .find((provider) => accounts.get(provider)?.state === 'connected');
-        if (connected !== undefined) {
-          chosen.set(type, connected);
-        }
-      }
-      void keepChoices();
+          .find((provider) => {
+            const state = accounts.get(provider)?.state;
+            return state !== undefined && state !== 'disconnected';
+          }) ?? DEFAULT_PROVIDER
+      );
     };
 
     /** The provider in use: the chosen one, or ridrs once the host has started and it is gone. */
     const evaluate = (force = false): void => {
-      if (started && firstStart) {
-        chooseFirst();
-      }
       for (const type of DATA_TYPES) {
         const entries = providersOf(type);
-        const choice = chosen.get(type) ?? DEFAULT_PROVIDER;
+        const choice = chosen.get(type) ?? implicitChoice(type);
         const provider = !started || entries.has(choice) ? choice : DEFAULT_PROVIDER;
         if (provider !== inUse.get(type)) {
           inUse.set(type, provider);
@@ -145,6 +128,7 @@ export default definePlugin({
     evaluate();
     ctx.state.watch(athleteProfileState, () => evaluate());
     ctx.state.watch(trainingCalendarState, () => evaluate());
+    ctx.state.watch(trainingAccountState, () => evaluate());
     // Providers start in turn: the choice counts as gone only when all of them have started.
     ctx.events.subscribe(hostStartedEvent, () => {
       started = true;

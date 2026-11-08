@@ -147,6 +147,15 @@ Given(
   },
 );
 
+Given(
+  'the library workout {string} of intervals.icu has the workout document:',
+  function (this: RidrsWorld, name: string, json: string) {
+    const workout = intervals(this).library.find((entry) => entry.name === name);
+    assert.ok(workout, `The library has no "${name}"`);
+    workout.workout_doc = JSON.parse(json) as { steps: unknown[] };
+  },
+);
+
 Given('intervals.icu lacks the scope of the library', function (this: RidrsWorld) {
   intervals(this).libraryScope = false;
 });
@@ -453,6 +462,20 @@ Then(
   },
 );
 
+Then(
+  'the event created in intervals.icu has the workout document of the library workout {string}',
+  async function (this: RidrsWorld, name: string) {
+    const simulation = intervals(this);
+    await this.waitForIo(
+      () => simulation.eventLog.some((entry) => entry.method === 'POST'),
+      'the event to reach intervals.icu',
+    );
+    const created = simulation.eventLog.filter((entry) => entry.method === 'POST').at(-1);
+    const workout = simulation.library.find((entry) => entry.name === name);
+    assert.deepEqual(created?.body.workout_doc, workout?.workout_doc);
+  },
+);
+
 function eventNamed(world: RidrsWorld, name: string): string {
   const event = intervals(world).events.find((candidate) => candidate.name === name);
   assert.ok(event, `intervals.icu plans no "${name}"`);
@@ -585,6 +608,16 @@ Then(
   'the training tile offers a {string} button',
   async function (this: RidrsWorld, label: string) {
     await within(await trainingTile(this)).findByRole('button', { name: label });
+  },
+);
+
+/** Checked once the tile shows its card: what it offers then is what it offers. */
+Then(
+  'the training tile offers no {string} button',
+  async function (this: RidrsWorld, label: string) {
+    const panel = await trainingTile(this);
+    await within(panel).findByTestId('next-workout');
+    assert.equal(within(panel).queryByRole('button', { name: label }), null);
   },
 );
 

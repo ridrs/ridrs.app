@@ -144,6 +144,17 @@ export function toLibrary(body: unknown, folders: unknown, ftp: number | undefin
     .sort((a, b) => (a.folder ?? '').localeCompare(b.folder ?? '') || a.name.localeCompare(b.name));
 }
 
+/** The `workout_doc` of each workout of `GET /api/v1/athlete/0/workouts`, by the workout's id. */
+export function libraryDocs(body: unknown): Record<string, unknown> {
+  return Object.fromEntries(
+    (Array.isArray(body) ? body.filter(isObject) : []).flatMap((entry) =>
+      entry.id !== undefined && entry.workout_doc !== undefined
+        ? [[String(entry.id), entry.workout_doc] as const]
+        : [],
+    ),
+  );
+}
+
 /** The steps of a `workout_doc`, repeats nested. */
 export function toSteps(steps: unknown, ftp: number | undefined): WorkoutStep[] {
   if (!Array.isArray(steps)) {
@@ -172,27 +183,6 @@ export function toSteps(steps: unknown, ftp: number | undefined): WorkoutStep[] 
       ...(cadence ? { cadence } : {}),
     };
     return [interval];
-  });
-}
-
-/** The steps as a `workout_doc` of an event: targets in % FTP, ramps and repeats (the reverse of `toSteps`). */
-export function fromSteps(steps: readonly WorkoutStep[]): Json[] {
-  const target = (units: string, range: { low: number; high: number }): Json =>
-    range.low === range.high
-      ? { units, value: range.low }
-      : { units, start: range.low, end: range.high };
-  return steps.map((step): Json => {
-    if (step.kind === 'repeat') {
-      return { reps: step.reps, steps: fromSteps(step.steps) };
-    }
-    return {
-      duration: step.durationSeconds,
-      ...(step.phase === 'warm-up' ? { warmup: true } : {}),
-      ...(step.phase === 'cool-down' ? { cooldown: true } : {}),
-      ...(step.text !== undefined ? { text: step.text } : {}),
-      ...(step.power ? { ...(step.power.low !== step.power.high ? { ramp: true } : {}), power: target('%ftp', step.power) } : {}),
-      ...(step.cadence ? { cadence: target('rpm', step.cadence) } : {}),
-    };
   });
 }
 

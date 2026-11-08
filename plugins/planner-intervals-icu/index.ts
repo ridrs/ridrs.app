@@ -37,7 +37,7 @@ import {
   trainingUploadService,
   trainingUploadState,
 } from '@ridrs/contracts';
-import { fromSteps, ftpField, localDate, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
+import { ftpField, libraryDocs, localDate, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
@@ -72,11 +72,14 @@ interface Cache {
   readonly workouts: PlannedWorkout[];
   /** None when the token lacks the scope of the library. */
   readonly library?: LibraryWorkout[];
+  /** The `workout_doc` of each library workout by its id, as intervals.icu has it. */
+  readonly libraryDocs?: Record<string, unknown>;
 }
 
-/** The field of the Ride settings the FTP was read from (see `Cache`). */
+/** What the last load read for the writes (see `Cache`). */
 interface Held {
   ftpField: Cache['ftpField'];
+  libraryDocs: Record<string, unknown>;
 }
 
 interface Services {
@@ -106,7 +109,7 @@ export default definePlugin({
     const signIn = ctx.capabilities.get(authBrowserSignInCapability);
     let busy = false;
     /** What the last load read, for the writes. */
-    const held: Held = { ftpField: 'ftp' };
+    const held: Held = { ftpField: 'ftp', libraryDocs: {} };
 
     // The sources are there from the start, so the rider can choose them while they load.
     setSources(ctx, 'loading');
@@ -369,7 +372,7 @@ function shown(ctx: PluginContext, held: Held): Cache | undefined {
         athlete: profile.data,
         ftpField: held.ftpField,
         workouts: calendar.data.workouts,
-        ...(library ? { library } : {}),
+        ...(library ? { library, libraryDocs: held.libraryDocs } : {}),
       }
     : undefined;
 }
@@ -498,12 +501,15 @@ async function writeCalendar(
   let workouts = loaded?.workouts ?? [];
   if ('plan' in change) {
     const { date, workoutId, from } = change.plan;
+    // The steps go as intervals.icu has them: ridrs reads only part of a workout document (no
+    // zones, no difference between a range and a ramp), so its steps would change the workout.
     const workout = ctx.state
       .entries(trainingLibraryState)
       .get(from)
       ?.data?.workouts.find((candidate) => candidate.id === workoutId);
-    if (!workout) {
-      throw new Error(`The library of "${from}" has no workout "${workoutId}"`);
+    const doc = from === SERVICE ? held.libraryDocs[workoutId] : undefined;
+    if (!workout || doc === undefined) {
+      throw new Error(`The library of "${SERVICE}" has no workout "${workoutId}" of "${from}"`);
     }
     const sent = await send(ctx, services, held, 'POST', '/api/v1/athlete/0/events', {
       category: 'WORKOUT',
@@ -512,7 +518,7 @@ async function writeCalendar(
       name: workout.name,
       ...(workout.description !== undefined ? { description: workout.description } : {}),
       ...(workout.durationSeconds !== undefined ? { moving_time: workout.durationSeconds } : {}),
-      workout_doc: { steps: fromSteps(workout.steps) },
+      workout_doc: doc,
     });
     if (!sent.ok) {
       return sent;
@@ -682,13 +688,17 @@ async function loadPlan(
     ]);
     const athlete = toAthlete(athleteBody, weight);
     held.ftpField = ftpField(athleteBody);
+    held.libraryDocs = libraryBodies ? libraryDocs(libraryBodies[0]) : {};
     const loaded: Cache = {
       fetchedAt: now,
       athlete,
       ftpField: held.ftpField,
       workouts: toWorkouts(eventsBody, athlete.ftp),
       ...(libraryBodies
-        ? { library: toLibrary(libraryBodies[0], libraryBodies[1], athlete.ftp) }
+        ? {
+            library: toLibrary(libraryBodies[0], libraryBodies[1], athlete.ftp),
+            libraryDocs: held.libraryDocs,
+          }
         : {}),
     };
     account('connected', { athleteName: athlete.name });
@@ -707,6 +717,7 @@ async function loadPlan(
     const cached = await readCache(files);
     if (cached) {
       held.ftpField = cached.ftpField;
+      held.libraryDocs = cached.libraryDocs ?? {};
       account('connected', { athleteName: cached.athlete.name });
       setSources(ctx, 'offline', cached);
     } else {
@@ -729,6 +740,7 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
       athlete?: { name?: unknown };
       workouts?: unknown;
       library?: unknown;
+      libraryDocs?: unknown;
     };
     const { name, ...rest } = parsed.athlete ?? {};
     const athlete = athleteProfileSchema.safeParse({ ...rest, ...(name ? { name } : {}) });
@@ -743,9 +755,13 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
           ftpField: parsed.ftpField === 'indoor_ftp' ? 'indoor_ftp' : 'ftp',
           workouts: calendar.data.workouts,
           ...(library.success ? { library: library.data.workouts } : {}),
+          ...(isRecord(parsed.libraryDocs) ? { libraryDocs: parsed.libraryDocs } : {}),
         }
       : undefined;
   } catch {
     return undefined;
   }
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);

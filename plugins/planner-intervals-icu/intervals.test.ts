@@ -2,7 +2,7 @@
 
 import { athleteProfileSchema, libraryWorkoutSchema, plannedWorkoutSchema } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { fromSteps, ftpField, localDate, toAthlete, toLibrary, toSteps, toWorkouts } from './intervals.ts';
+import { ftpField, libraryDocs, localDate, toAthlete, toLibrary, toSteps, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 describe('toAthlete', () => {
@@ -213,34 +213,11 @@ describe('toLibrary', () => {
   });
 });
 
-describe('fromSteps', () => {
-  it('writes the steps as the workout document, so that reading them gives the steps back', () => {
-    const steps = [
-      { kind: 'interval', durationSeconds: 600, phase: 'warm-up', power: { low: 50, high: 75 } },
-      {
-        kind: 'repeat',
-        reps: 3,
-        steps: [
-          {
-            kind: 'interval',
-            durationSeconds: 720,
-            power: { low: 90, high: 90 },
-            cadence: { low: 95, high: 95 },
-          },
-          { kind: 'interval', durationSeconds: 240, text: 'Easy', power: { low: 55, high: 55 } },
-        ],
-      },
-      { kind: 'interval', durationSeconds: 300, phase: 'cool-down', power: { low: 60, high: 40 } },
-    ] as const;
-    const doc = fromSteps(steps);
-    expect(doc[0]).toEqual({
-      duration: 600,
-      warmup: true,
-      ramp: true,
-      power: { units: '%ftp', start: 50, end: 75 },
-    });
-    expect(doc[1]).toMatchObject({ reps: 3 });
-    expect(toSteps(doc, undefined)).toEqual(steps);
+describe('libraryDocs', () => {
+  it('keeps the workout document of each library workout as it is, by its id', () => {
+    const doc = { steps: [{ duration: 900, power: { units: 'power_zone', value: 2 } }] };
+    expect(libraryDocs([{ id: 7, workout_doc: doc }, { id: 8 }, 'x'])).toEqual({ '7': doc });
+    expect(libraryDocs(null)).toEqual({});
   });
 });
 

@@ -11,6 +11,7 @@ import {
   undo,
   weekdayOf,
   weekDate,
+  nextDate,
 } from './calendar.ts';
 
 const titlesOn = (calendar: typeof FIRST_WEEK, day: string) =>
@@ -51,10 +52,18 @@ describe('the calendar', () => {
 describe('the planned workouts of the calendar', () => {
   it('puts the workouts of the week on their dates from today on, and leaves other entries out', () => {
     // Wednesday 4 November 2026: Tuesday's workout is past, Sunday's outdoor ride is no workout.
-    expect(plannedWorkouts(FIRST_WEEK.entries, '2026-11-04')).toEqual([
-      { id: 'seed-2', date: '2026-11-05', name: 'VO2 Max 5×4', sport: 'ride', steps: [] },
-      { id: 'seed-3', date: '2026-11-07', name: 'Endurance 90', sport: 'ride', steps: [] },
+    const entries = [
+      { id: 'entry-1', day: 'Tuesday', kind: 'workout', title: 'Past' },
+      { id: 'entry-2', day: 'Thursday', kind: 'workout', title: 'Threshold' },
+      { id: 'entry-3', day: 'Sunday', kind: 'outdoor', title: 'Outdoor ride' },
+    ] as const;
+    expect(plannedWorkouts(entries, '2026-11-04')).toEqual([
+      { id: 'entry-2', date: '2026-11-05', name: 'Threshold', sport: 'ride', steps: [] },
     ]);
+  });
+
+  it('leaves out the sample entries the area starts with', () => {
+    expect(plannedWorkouts(FIRST_WEEK.entries, '2026-11-02')).toEqual([]);
   });
 
   it('keeps the workouts of today, and orders them by date', () => {
@@ -76,5 +85,13 @@ describe('the date of a weekday', () => {
     expect(weekDate('Thursday', '2026-11-04')).toBe('2026-11-05');
     expect(weekDate('Sunday', '2026-11-08')).toBe('2026-11-08');
     expect(weekDate('Monday', '2026-11-08')).toBe('2026-11-02');
+  });
+});
+
+describe('the next date of a weekday', () => {
+  it('is today or a later day of this week, else the day of next week', () => {
+    expect(nextDate('Wednesday', '2026-11-04')).toBe('2026-11-04');
+    expect(nextDate('Thursday', '2026-11-04')).toBe('2026-11-05');
+    expect(nextDate('Tuesday', '2026-11-04')).toBe('2026-11-10');
   });
 });

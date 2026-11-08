@@ -26,7 +26,7 @@ import {
   WEEKDAYS,
   type Weekday,
   WORKOUTS,
-  weekDate,
+  nextDate,
   weekdayOf,
 } from './calendar.ts';
 import { INITIAL_TRAINING, TRAINING_DOCUMENT } from '../document.ts';
@@ -120,24 +120,39 @@ function Day({
 }
 
 /** The workouts of every provider's library, read only, grouped by provider (ADR 0075). */
-function Library({ ctx, selected }: { readonly ctx: UiContext; readonly selected: Weekday }) {
+function Library({
+  ctx,
+  selected,
+  planHere,
+}: {
+  readonly ctx: UiContext;
+  readonly selected: Weekday;
+  /** Puts a workout on the selected day of this area's calendar, the calendar of ridrs. */
+  readonly planHere: (name: string) => void;
+}) {
   const text = useMessages(ctx, messages);
   const calendars = useStateEntries(ctx, trainingCalendarState);
   const chosen = useStateEntries(ctx, dataSourceState).get('training.calendar')?.provider ?? DEFAULT_PROVIDER;
   const [refusal, setRefusal] = useState<string>();
-  // "Plan on a day" writes to the chosen calendar, which answers whether it took it.
-  const plan = (from: string, workoutId: string) => {
+  // "Plan on a day" writes to the chosen calendar, which answers whether it took it. The calendar
+  // of ridrs is this area's own: the workout becomes one of its entries, without steps.
+  const plan = (from: string, workoutId: string, name: string) => {
+    if (chosen === DEFAULT_PROVIDER) {
+      setRefusal(undefined);
+      planHere(name);
+      return;
+    }
     const source = calendars.get(chosen);
-    const name = chosen === DEFAULT_PROVIDER ? text.thisDevice : (source?.label ?? chosen);
+    const label = source?.label ?? chosen;
     ctx
       .call(trainingCalendarPlanService, {
         key: chosen,
-        date: weekDate(selected, localToday()),
+        date: nextDate(selected, localToday()),
         workoutId,
         from,
       })
       .then(
-        (answer: DataWriteResult) => setRefusal(answer.ok ? undefined : text.planRefused(name, answer.reason)),
+        (answer: DataWriteResult) => setRefusal(answer.ok ? undefined : text.planRefused(label, answer.reason)),
         (error: unknown) => ctx.logger.warn(`Could not plan the workout: ${String(error)}`),
       );
   };
@@ -172,7 +187,7 @@ function Library({ ctx, selected }: { readonly ctx: UiContext; readonly selected
                     .join(' · ')}
                 </span>
                 <div className="pv-row">
-                  <button type="button" className="pv-button" onClick={() => plan(source.provider, workout.id)}>
+                  <button type="button" className="pv-button" onClick={() => plan(source.provider, workout.id, workout.name)}>
                     {text.planFromLibrary(workout.name, text.weekdays[selected])}
                   </button>
                 </div>
@@ -286,7 +301,13 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         </div>
       </section>
 
-      <Library ctx={ctx} selected={selected} />
+      <Library
+        ctx={ctx}
+        selected={selected}
+        planHere={(name) =>
+          calendar((c) => addEntry(c, { day: selected, kind: 'workout', title: name }))
+        }
+      />
 
       <section className="pv-section">
         <h2>{text.plans}</h2>
