@@ -17,6 +17,7 @@ import {
   hostStartedEvent,
   languageSchema,
   type RideAthlete,
+  trainingAccountState,
 } from '@ridrs/contracts';
 import { z } from 'zod';
 import { DATA_SOURCES_DOCUMENT } from './data-sources.ts';
@@ -63,13 +64,47 @@ export default definePlugin({
     // The rider's choice per data type. It stays in the document when its provider is gone, so
     // the provider comes back with the choice; the state holds the provider in use.
     const sources = ctx.settings.user(DATA_SOURCES_DOCUMENT);
-    const chosen = new Map(Object.entries((await sources.read())?.sources ?? {}));
+    const document = await sources.read();
+    const chosen = new Map(Object.entries(document?.sources ?? {}));
+    // No document: the first start of a version with data sources (ADR 0075), which chooses a
+    // service the rider already connected, so they keep seeing what they saw before.
+    let firstStart = document === undefined;
     let started = false;
     let inUse: string | undefined;
     let handedOver: string | undefined;
 
+    const keepChoices = () =>
+      sources
+        .write({ sources: Object.fromEntries(chosen) })
+        .catch((error: unknown) => ctx.logger.warn(`Could not keep the data sources: ${String(error)}`));
+
+    /**
+     * Once every provider has started and none still loads: the connected service of the
+     * profile, else nothing. The document is written either way, so it happens once: connecting
+     * a service later changes no choice.
+     */
+    const chooseFirst = (): void => {
+      const providers = ctx.state.entries(athleteProfileState);
+      if ([...providers.values()].some((source) => source.status === 'loading')) {
+        return;
+      }
+      firstStart = false;
+      const accounts = ctx.state.entries(trainingAccountState);
+      const connected = [...providers.keys()]
+        .filter((provider) => provider !== DEFAULT_PROVIDER)
+        .sort()
+        .find((provider) => accounts.get(provider)?.state === 'connected');
+      if (connected !== undefined) {
+        chosen.set(ATHLETE_PROFILE, connected);
+      }
+      void keepChoices();
+    };
+
     /** The provider in use: the chosen one, or ridrs once the host has started and it is gone. */
     const evaluate = (force = false): void => {
+      if (started && firstStart) {
+        chooseFirst();
+      }
       const entries = ctx.state.entries(athleteProfileState);
       const choice = chosen.get(ATHLETE_PROFILE) ?? DEFAULT_PROVIDER;
       const provider = !started || entries.has(choice) ? choice : DEFAULT_PROVIDER;
@@ -113,9 +148,7 @@ export default definePlugin({
       }
       chosen.set(key, provider);
       evaluate();
-      await sources
-        .write({ sources: Object.fromEntries(chosen) })
-        .catch((error: unknown) => ctx.logger.warn(`Could not keep the data sources: ${String(error)}`));
+      await keepChoices();
       return {};
     });
   },

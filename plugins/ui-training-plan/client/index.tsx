@@ -2,14 +2,17 @@
 
 import {
   activityStateChangedEvent,
+  type AthleteProfile,
+  athleteProfileState,
+  type DataSource,
   type PlannedWorkout,
   type ServiceDefinition,
   type TrainingAccount,
-  type TrainingPlan,
+  type TrainingCalendar,
   trainingAccountState,
+  trainingCalendarState,
   trainingConnectService,
   trainingDisconnectService,
-  trainingPlanState,
   trainingRefreshService,
 } from '@ridrs/contracts';
 import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
@@ -34,25 +37,44 @@ const DETAILS = 'training-workout';
 /** The service whose account and plan this plugin shows: its key in the app state. */
 const SERVICE = 'intervals.icu';
 
+/** The plan as the card and the details show it: the calendar of the service and its athlete. */
+interface Plan {
+  /** True when the service could not be reached and its last load stands in. */
+  readonly offline: boolean;
+  readonly workouts: PlannedWorkout[];
+  readonly athlete?: AthleteProfile;
+}
+
 /**
- * The account and the plan, from the app state `training.account` and `training.plan` (ADR
- * 0068): every component that mounts gets both as they are now, then their changes.
+ * The account, the athlete profile and the calendar of the service, from the app state
+ * `training.account`, `athlete.profile` and `training.calendar` (ADR 0068, 0075): every component
+ * that mounts gets them as they are now, then their changes. The plan is there once the calendar
+ * has data.
  */
 function useTraining(ctx: UiContext): {
   readonly account?: TrainingAccount;
-  readonly plan?: TrainingPlan;
+  readonly plan?: Plan;
 } {
   const [account, setAccount] = useState<TrainingAccount>();
-  const [plan, setPlan] = useState<TrainingPlan>();
+  const [calendar, setCalendar] = useState<DataSource<TrainingCalendar>>();
+  const [profile, setProfile] = useState<DataSource<AthleteProfile>>();
   useLayoutEffect(() => {
     const subscriptions = [
       ctx.state.watch(trainingAccountState, ({ entries }) => setAccount(entries.get(SERVICE))),
-      ctx.state.watch(trainingPlanState, ({ entries }) => setPlan(entries.get(SERVICE))),
+      ctx.state.watch(trainingCalendarState, ({ entries }) => setCalendar(entries.get(SERVICE))),
+      ctx.state.watch(athleteProfileState, ({ entries }) => setProfile(entries.get(SERVICE))),
     ];
     return () => {
       for (const unsubscribe of subscriptions) unsubscribe();
     };
   }, [ctx]);
+  const plan = calendar?.data
+    ? {
+        offline: calendar.status === 'offline',
+        workouts: calendar.data.workouts,
+        ...(profile?.data ? { athlete: profile.data } : {}),
+      }
+    : undefined;
   return { account, plan };
 }
 
@@ -64,7 +86,7 @@ function callAccount(ctx: UiContext, service: ServiceDefinition<{ readonly key: 
 }
 
 /** "Today" is the rider's calendar day; the UI reads the wall clock, never drives anything with it. */
-const nextWorkout = (plan: TrainingPlan | undefined): PlannedWorkout | undefined =>
+const nextWorkout = (plan: Plan | undefined): PlannedWorkout | undefined =>
   plan?.workouts[0];
 
 function PowerProfile({ workout }: { readonly workout: PlannedWorkout }) {

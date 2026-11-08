@@ -16,7 +16,8 @@
   "state": {
     "owns": [
       "training.account",
-      "training.plan",
+      "athlete.profile",
+      "training.calendar",
       "training.upload"
     ],
     "watches": [

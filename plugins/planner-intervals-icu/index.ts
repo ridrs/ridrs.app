@@ -2,11 +2,16 @@
 
 import {
   type AppFiles,
+  type AthleteProfile,
+  athleteProfileSchema,
+  athleteProfileState,
   authBrowserSignInCapability,
   definePlugin,
   type HttpClient,
   type HttpResponse,
+  type DataSourceStatus,
   netHttpCapability,
+  type PlannedWorkout,
   type PluginContext,
   RidrsError,
   recordingRideState,
@@ -14,12 +19,11 @@ import {
   storageAppFilesCapability,
   storageSecretsCapability,
   type TrainingAccount,
-  type TrainingPlan,
   trainingAccountState,
+  trainingCalendarSchema,
+  trainingCalendarState,
   trainingConnectService,
   trainingDisconnectService,
-  trainingPlanSchema,
-  trainingPlanState,
   trainingRefreshService,
   type TrainingUpload,
   trainingUploadService,
@@ -30,7 +34,13 @@ import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
 const CLIENT_ID = '1697';
-const SCOPES = 'SETTINGS:READ,CALENDAR:READ,ACTIVITY:WRITE';
+/**
+ * The OAuth scopes (names and their `:READ`/`:WRITE` form confirmed on intervals.icu's OAuth
+ * support thread, https://forum.intervals.icu/t/intervals-icu-oauth-support/2759; WRITE includes
+ * READ). The wellness weight is read with `WELLNESS:READ`; a token from before lacks it and
+ * gets 403 there, which only leaves the weight of the athlete in its place.
+ */
+const SCOPES = 'SETTINGS:READ,CALENDAR:READ,WELLNESS:READ,ACTIVITY:WRITE';
 const SITE = 'https://intervals.icu';
 const CALLBACK_PATH = '/oauth/callback';
 /** The planned workouts of today and the next 13 days. */
@@ -38,9 +48,17 @@ const PLAN_DAYS = 14;
 const TOKEN_KEY = 'intervals-icu.token';
 const CACHE_FILE = 'training/intervals-icu-plan.json';
 const SERVICE = 'intervals.icu';
+const LABEL = 'intervals.icu';
 
 /** The service answered 401 or 403: the token is no longer valid. */
 class TokenRejected extends Error {}
+
+/** What is kept for a start without network. */
+interface Cache {
+  readonly fetchedAt: number;
+  readonly athlete: AthleteProfile;
+  readonly workouts: PlannedWorkout[];
+}
 
 interface Services {
   readonly http: HttpClient;
@@ -49,11 +67,12 @@ interface Services {
 }
 
 /**
- * The rider's intervals.icu account and plan (ADR 0048). Signs in with PKCE as a public client,
+ * The rider's intervals.icu account, athlete profile and plan (ADR 0048, 0075). Signs in with PKCE as a public client,
  * keeps the token in `storage.secrets`, and loads the athlete and the planned cycling workouts
  * at start, after a saved ride and on request. The account, the plan and every upload are app
- * state beside the bus (ADR 0068): the keys `intervals.icu` of `training.account` and
- * `training.plan`, and a ride's session id in `training.upload`; the token never is. Connect,
+ * state beside the bus (ADR 0068): the keys `intervals.icu` of `training.account`, of the
+ * athlete profile and of the calendar (the data types of ADR 0075, which the rider chooses a
+ * source of), and a ride's session id in `training.upload`; the token never is. Connect,
  * disconnect, refresh and upload are services that answer once the work started: none of them
  * is recorded, so a continued ride never does them again. The last plan is cached in app files
  * for a start without network.
@@ -68,6 +87,8 @@ export default definePlugin({
     const signIn = ctx.capabilities.get(authBrowserSignInCapability);
     let busy = false;
 
+    // The sources are there from the start, so the rider can choose them while they load.
+    setSources(ctx, 'loading');
     const account = (state: TrainingAccount['state'], extra: Partial<TrainingAccount> = {}) =>
       ctx.state.set(trainingAccountState, SERVICE, { service: SERVICE, state, ...extra });
 
@@ -164,7 +185,6 @@ export default definePlugin({
     });
 
     ctx.services.provide(trainingDisconnectService, () => {
-      const now = ctx.clock.now();
       // Not queued behind a running sign-in or load: the rider wants out now. Whatever that work
       // reports later is overtaken by the "disconnected" of this one, or by the next start.
       void (async () => {
@@ -182,12 +202,7 @@ export default definePlugin({
         await services.secrets.remove(TOKEN_KEY);
         await services.files.remove(CACHE_FILE).catch(() => undefined);
         account('disconnected');
-        ctx.state.set(trainingPlanState, SERVICE, {
-          service: SERVICE,
-          fetchedAt: now,
-          offline: false,
-          workouts: [],
-        });
+        setSources(ctx, 'unavailable');
       })().catch((error: unknown) =>
         ctx.logger.error({ error }, 'intervals.icu: disconnecting failed'),
       );
@@ -309,6 +324,32 @@ function accessToken(body: string): string | undefined {
 }
 
 /**
+ * Both data types of this provider, with the data when there is any. `unavailable` has none: a
+ * disconnected or rejected account is not served from the cache.
+ */
+function setSources(
+  ctx: PluginContext,
+  status: DataSourceStatus,
+  loaded?: { readonly fetchedAt: number; readonly athlete: AthleteProfile; readonly workouts: PlannedWorkout[] },
+): void {
+  const common = {
+    provider: SERVICE,
+    label: LABEL,
+    status,
+    writable: false,
+    ...(loaded ? { fetchedAt: loaded.fetchedAt } : {}),
+  };
+  ctx.state.set(athleteProfileState, SERVICE, {
+    ...common,
+    ...(loaded ? { data: loaded.athlete } : {}),
+  });
+  ctx.state.set(trainingCalendarState, SERVICE, {
+    ...common,
+    ...(loaded ? { data: { workouts: loaded.workouts } } : {}),
+  });
+}
+
+/**
  * Loads the athlete and the plan with the stored token. Without a token the rider is
  * disconnected. Offline, the cached plan stands in, marked `offline`.
  */
@@ -330,16 +371,19 @@ async function loadPlan(
   if (!token) {
     if (fromStart) {
       account('disconnected');
+      setSources(ctx, 'unavailable');
     }
     return;
   }
 
-  const get = async (path: string): Promise<unknown> => {
-    const response = await http.request({
+  const request = (path: string) =>
+    http.request({
       method: 'GET',
       url: `${SITE}${path}`,
       headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
     });
+  const get = async (path: string): Promise<unknown> => {
+    const response = await request(path);
     if (response.status === 401 || response.status === 403) {
       throw new TokenRejected();
     }
@@ -348,6 +392,21 @@ async function loadPlan(
     }
     return JSON.parse(response.body);
   };
+  /** Today's wellness weight; none on a day without a record or with a token without the scope. */
+  const wellnessWeight = async (): Promise<number | undefined> => {
+    const response = await request(`/api/v1/athlete/0/wellness/${localDate(now)}`);
+    if (response.status === 401) {
+      throw new TokenRejected();
+    }
+    if (response.status === 404 || response.status === 403) {
+      return undefined;
+    }
+    if (response.status !== 200) {
+      throw new Error(`intervals.icu answered ${response.status} for the wellness record`);
+    }
+    const weight = (JSON.parse(response.body) as { weight?: unknown }).weight;
+    return typeof weight === 'number' ? weight : undefined;
+  };
 
   try {
     const query = new URLSearchParams({
@@ -355,45 +414,59 @@ async function loadPlan(
       newest: localDate(now, PLAN_DAYS - 1),
       category: 'WORKOUT',
     });
-    const [athleteBody, eventsBody] = await Promise.all([
+    const [athleteBody, eventsBody, weight] = await Promise.all([
       get('/api/v1/athlete/0'),
       get(`/api/v1/athlete/0/events?${query}`),
+      wellnessWeight(),
     ]);
-    const athlete = toAthlete(athleteBody);
-    const plan: TrainingPlan = {
-      service: SERVICE,
+    const athlete = toAthlete(athleteBody, weight);
+    const loaded: Cache = {
       fetchedAt: now,
-      offline: false,
       athlete,
       workouts: toWorkouts(eventsBody, athlete.ftp),
     };
     account('connected', { athleteName: athlete.name });
-    ctx.state.set(trainingPlanState, SERVICE, plan);
+    setSources(ctx, 'ready', loaded);
     await files
-      .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(plan)))
+      .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(loaded)))
       .catch((error: unknown) => ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
   } catch (error) {
     if (error instanceof TokenRejected) {
       await secrets.remove(TOKEN_KEY);
       account('failed', { reason: 'token-rejected' });
+      setSources(ctx, 'unavailable');
       return;
     }
     ctx.logger.warn({ error }, 'intervals.icu: the plan could not be loaded');
     const cached = await readCache(files);
     if (cached) {
-      account('connected', { athleteName: cached.athlete?.name });
-      ctx.state.set(trainingPlanState, SERVICE, { ...cached, offline: true });
+      account('connected', { athleteName: cached.athlete.name });
+      setSources(ctx, 'offline', cached);
     } else {
       account('failed', { reason: 'unreachable' });
+      setSources(ctx, 'unavailable');
     }
   }
 }
 
-async function readCache(files: AppFiles): Promise<TrainingPlan | undefined> {
+/**
+ * The last load, if it can be read. A cache from before the data sources (ADR 0075) has the same
+ * fields, plus a plan state and an athlete name that may be empty.
+ */
+async function readCache(files: AppFiles): Promise<Cache | undefined> {
   try {
     const bytes = await files.read(CACHE_FILE);
-    const parsed = trainingPlanSchema.safeParse(JSON.parse(new TextDecoder().decode(bytes)));
-    return parsed.success ? parsed.data : undefined;
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as {
+      fetchedAt?: unknown;
+      athlete?: { name?: unknown };
+      workouts?: unknown;
+    };
+    const { name, ...rest } = parsed.athlete ?? {};
+    const athlete = athleteProfileSchema.safeParse({ ...rest, ...(name ? { name } : {}) });
+    const calendar = trainingCalendarSchema.safeParse({ workouts: parsed.workouts });
+    return athlete.success && calendar.success && typeof parsed.fetchedAt === 'number'
+      ? { fetchedAt: parsed.fetchedAt, athlete: athlete.data, workouts: calendar.data.workouts }
+      : undefined;
   } catch {
     return undefined;
   }

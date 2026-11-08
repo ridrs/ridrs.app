@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type {
+  AthleteProfile,
   PlannedWorkout,
-  TrainingAthlete,
   WorkoutInterval,
   WorkoutPower,
   WorkoutStep,
@@ -35,8 +35,11 @@ const SPORTS: Readonly<Record<string, PlannedWorkout['sport']>> = {
   VirtualRide: 'virtual-ride',
 };
 
-/** `GET /api/v1/athlete/0`: the name, the weight and the cycling sport settings. */
-export function toAthlete(body: unknown): TrainingAthlete {
+/**
+ * `GET /api/v1/athlete/0`: the name, the weight and the cycling sport settings. The weight is
+ * today's wellness weight (`GET …/wellness/{today}`), else the weight of the athlete.
+ */
+export function toAthlete(body: unknown, wellnessWeight?: number): AthleteProfile {
   const athlete = isObject(body) ? body : {};
   const settings = Array.isArray(athlete.sportSettings) ? athlete.sportSettings : [];
   const ride = settings.find(
@@ -45,12 +48,14 @@ export function toAthlete(body: unknown): TrainingAthlete {
   );
   // ridrs rides indoors: an indoor FTP, where the athlete set one, is the one that applies.
   const ftp = positive(ride?.indoor_ftp) ?? positive(ride?.ftp);
-  const weight = positive(athlete.icu_weight) ?? positive(athlete.weight);
+  const weight =
+    positive(wellnessWeight) ?? positive(athlete.icu_weight) ?? positive(athlete.weight);
   const lthr = positive(ride?.lthr);
   const maxHeartRate = positive(ride?.max_hr);
+  const name = text(athlete.name);
   return {
-    name: text(athlete.name) ?? '',
-    ...(ftp !== undefined ? { ftp } : {}),
+    ...(name !== undefined ? { name } : {}),
+    ...(ftp !== undefined ? { ftp: Math.round(ftp) } : {}),
     ...(weight !== undefined ? { weight } : {}),
     ...(lthr !== undefined ? { lthr } : {}),
     ...(maxHeartRate !== undefined ? { maxHeartRate } : {}),

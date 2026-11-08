@@ -115,12 +115,12 @@ describe('app state and services in the manifest (ADR 0068)', () => {
   it('lets an input-side plugin own, watch, provide and call', () => {
     const result = manifest({
       types: ['transport'],
-      state: { owns: ['route.offer'], watches: ['training.plan'] },
+      state: { owns: ['route.offer'], watches: ['training.calendar'] },
       services: { provides: ['route.fetch'], calls: ['training.upload'] },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.state).toEqual({ owns: ['route.offer'], watches: ['training.plan'] });
+      expect(result.data.state).toEqual({ owns: ['route.offer'], watches: ['training.calendar'] });
       expect(result.data.services?.calls).toEqual(['training.upload']);
     }
   });

@@ -81,9 +81,9 @@ import {
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
   trainingAccountState,
+  trainingCalendarState,
   trainingConnectService,
   trainingDisconnectService,
-  trainingPlanState,
   trainingRefreshService,
   trainingUploadService,
   trainingUploadState,
@@ -156,7 +156,7 @@ const STATES: readonly StateDefinition[] = [
   recordingRecoverableState,
   exportFitState,
   trainingAccountState,
-  trainingPlanState,
+  trainingCalendarState,
   trainingUploadState,
 ];
 

@@ -38,7 +38,8 @@
     "state": [
       "app.language",
       "training.account",
-      "training.plan"
+      "athlete.profile",
+      "training.calendar"
     ],
     "calls": [
       "training.connect",

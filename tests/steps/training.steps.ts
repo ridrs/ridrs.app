@@ -102,6 +102,21 @@ Given(
   },
 );
 
+Given('a test device plugin {string}', async function (this: RidrsWorld, deviceId: string) {
+  await this.writeProbePluginFolder({ folder: deviceId, id: deviceId, types: ['device'] });
+});
+
+Given(
+  'intervals.icu holds a wellness weight of {float} kg for {string}',
+  function (this: RidrsWorld, weight: number, date: string) {
+    intervals(this).wellnessWeights.set(date, weight);
+  },
+);
+
+Given('intervals.icu keeps an indoor FTP of {int} W', function (this: RidrsWorld, ftp: number) {
+  intervals(this).indoorFtp = ftp;
+});
+
 Given('the local time is {string}', function (this: RidrsWorld, text: string) {
   const [date = '', time] = text.split(' ');
   // Only the date is fake: the UI's waitFor needs real timers. The clock still runs from here.

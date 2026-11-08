@@ -59,6 +59,10 @@ const ISSUED_CODE = 'simulated-code-41d2';
 
 export class SimulatedIntervalsIcu {
   athlete = { id: 'i4711', name: 'Athlete', ftp: 200, weight: 70 };
+  /** The indoor FTP of the Ride settings, when the athlete set one. */
+  indoorFtp: number | undefined;
+  /** Wellness weights by date (`GET …/wellness/{date}`); a day without one answers 404. */
+  readonly wellnessWeights = new Map<string, number>();
   events: PlannedEvent[] = [];
   reachable = true;
   /** Uploads fail as if the network were gone, while everything else answers. */
@@ -106,12 +110,21 @@ export class SimulatedIntervalsIcu {
             {
               types: ['Ride', 'VirtualRide', 'GravelRide'],
               ftp: this.athlete.ftp,
+              ...(this.indoorFtp === undefined ? {} : { indoor_ftp: this.indoorFtp }),
               lthr: 165,
               max_hr: 185,
             },
             { types: ['Run', 'VirtualRun'], ftp: null, lthr: 170, max_hr: 190 },
           ],
         });
+      }
+      const wellness = /^\/api\/v1\/athlete\/0\/wellness\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
+      if (request.method === 'GET' && wellness) {
+        const date = wellness[1] ?? '';
+        const weight = this.wellnessWeights.get(date);
+        return weight === undefined
+          ? json(404, { error: 'No wellness record' })
+          : json(200, { id: date, weight });
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/athlete/0/events') {
         const oldest = url.searchParams.get('oldest') ?? '';

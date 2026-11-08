@@ -17,7 +17,8 @@
       "data.source"
     ],
     "watches": [
-      "athlete.profile"
+      "athlete.profile",
+      "training.account"
     ]
   },
   "services": {

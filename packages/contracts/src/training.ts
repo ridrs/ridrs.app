@@ -2,14 +2,17 @@
 
 import { z } from 'zod';
 import { defineState } from './app-state.ts';
+import { defineDataType, providerIdSchema } from './data-sources.ts';
 import { defineService } from './services.ts';
 
 /**
- * The rider's training plan from a planning service (ADR 0048). Named after the domain, not the
- * service: `service` says where the data came from. No payload ever carries a token.
+ * The rider's planning services (ADR 0048): their account, their uploads and the planned workouts
+ * of the calendar. Named after the domain, not the service: `service` says where the data came
+ * from. No payload ever carries a token.
  */
 
-export const trainingServiceSchema = z.enum(['intervals.icu']);
+/** A planning service is a provider (ADR 0075): its id is a provider id. */
+export const trainingServiceSchema = providerIdSchema;
 export type TrainingService = z.infer<typeof trainingServiceSchema>;
 
 export const TRAINING_UPLOAD_STATES = ['uploading', 'uploaded', 'failed'] as const;
@@ -134,36 +137,22 @@ export const plannedWorkoutSchema = z
   .strict();
 export type PlannedWorkout = z.infer<typeof plannedWorkoutSchema>;
 
-export const trainingAthleteSchema = z
+/**
+ * The planned workouts of a provider (ADR 0075): the data type `training.calendar`, keyed by the
+ * provider. The athlete of a service is its `athlete.profile`, not part of the calendar.
+ */
+export const trainingCalendarSchema = z
   .object({
-    name: z.string(),
-    /** W, for indoor riding. */
-    ftp: z.number().positive().optional(),
-    /** kg */
-    weight: z.number().positive().optional(),
-    /** bpm */
-    lthr: z.number().positive().optional(),
-    maxHeartRate: z.number().positive().optional(),
-  })
-  .strict();
-export type TrainingAthlete = z.infer<typeof trainingAthleteSchema>;
-
-export const trainingPlanSchema = z
-  .object({
-    service: trainingServiceSchema,
-    /** When the service answered, epoch ms. */
-    fetchedAt: z.number().nonnegative(),
-    /** True when the plan comes from the cache because the service could not be reached. */
-    offline: z.boolean(),
-    athlete: trainingAthleteSchema.optional(),
     /** Planned cycling workouts in date order. */
     workouts: z.array(plannedWorkoutSchema),
   })
   .strict();
-export type TrainingPlan = z.infer<typeof trainingPlanSchema>;
+export type TrainingCalendar = z.infer<typeof trainingCalendarSchema>;
 
-/** The plan of each planning service, by the service (ADR 0068). */
-export const trainingPlanState = defineState('training.plan', trainingPlanSchema);
+export const trainingCalendarType = defineDataType('training.calendar', trainingCalendarSchema, {});
+
+/** Topic `training.calendar`, keyed by provider. */
+export const trainingCalendarState = trainingCalendarType.topic;
 
 /** Calls for an account: `key` is the service, routed to the plugin that owns its account. */
 const accountRequest = z.object({ key: z.string().min(1) }).strict();

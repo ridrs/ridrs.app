@@ -84,7 +84,7 @@ Feature: A finished ride is saved or deleted in its debriefing
     When intervals.icu answers uploads with 201
     And I press "Reconnect intervals.icu"
     And the athlete approves the sign-in
-    Then the sign-in asked for the scope "SETTINGS:READ,CALENDAR:READ,ACTIVITY:WRITE"
+    Then the sign-in asked for the scope "SETTINGS:READ,CALENDAR:READ,WELLNESS:READ,ACTIVITY:WRITE"
     When I press "Try again"
     Then intervals.icu received the ride's FIT file as an activity with the session as its external id
     And the "main" screen is shown

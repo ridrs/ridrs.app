@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { plannedWorkoutSchema, trainingAthleteSchema } from '@ridrs/contracts';
+import { athleteProfileSchema, plannedWorkoutSchema } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
 import { localDate, toAthlete, toSteps, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
@@ -16,14 +16,20 @@ describe('toAthlete', () => {
       ],
     });
     expect(athlete).toEqual({ name: 'Alex Rider', ftp: 250, weight: 72, lthr: 165, maxHeartRate: 185 });
-    expect(trainingAthleteSchema.parse(athlete)).toEqual(athlete);
+    expect(athleteProfileSchema.parse(athlete)).toEqual(athlete);
   });
 
   it('leaves out what is missing or invalid', () => {
     expect(toAthlete({ name: 'A', icu_weight: -1, sportSettings: [{ types: ['Ride'], ftp: 0 }] })).toEqual({
       name: 'A',
     });
-    expect(toAthlete(null)).toEqual({ name: '' });
+    expect(toAthlete(null)).toEqual({});
+  });
+
+  it("prefers today's wellness weight to the weight of the athlete", () => {
+    expect(toAthlete({ icu_weight: 72 }, 71.2)).toEqual({ weight: 71.2 });
+    expect(toAthlete({ icu_weight: 72 }, undefined)).toEqual({ weight: 72 });
+    expect(toAthlete({ icu_weight: 72 }, 0)).toEqual({ weight: 72 });
   });
 });
 
