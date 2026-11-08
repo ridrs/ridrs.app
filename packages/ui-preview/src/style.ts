@@ -131,4 +131,20 @@ export const PREVIEW_CSS = `
   text-shadow: 0 1px 8px rgb(0 0 0 / .55); }
 .pv-hero-text h2 { margin: 0; font: 800 34px/1.15 system-ui, sans-serif; overflow-wrap: anywhere; }
 [data-breakpoint="compact"] .pv-hero-text h2 { font-size: 24px; }
+
+/* An area's picture: taller than a detail's, right under the top bar, the title over its foot. */
+.pv-area-hero { height: clamp(340px, 58vh, 620px); margin-top: -24px; padding-bottom: 40px;
+  color: #f2f5fa; }
+[data-breakpoint="compact"] .pv-area-hero { height: clamp(280px, 48vh, 420px); margin-top: -16px;
+  padding-bottom: 28px; }
+.pv-area-hero .pv-hero-image { object-position: 55% 10%; }
+.pv-area-hero::after { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to right, rgb(11 18 32 / .7), rgb(11 18 32 / 0) 60%); }
+.pv-area-hero .pv-title h1 { font-size: 52px; line-height: 1.05; letter-spacing: -.01em; }
+[data-breakpoint="compact"] .pv-area-hero .pv-title h1 { font-size: 34px; }
+.pv-area-intro { margin: 0; max-width: 620px; color: rgb(242 245 250 / .88); font-size: 16px; }
+[data-breakpoint="compact"] .pv-area-intro { font-size: 14px; }
+.pv-credits { position: absolute; right: 40px; bottom: 10px; color: rgb(242 245 250 / .6);
+  font: 11px system-ui, sans-serif; text-shadow: 0 1px 4px rgb(0 0 0 / .6); }
+[data-breakpoint="compact"] .pv-credits { right: 16px; bottom: 4px; }
 `;

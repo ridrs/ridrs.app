@@ -7,6 +7,7 @@ export const de: Messages = {
   title: 'Training',
   intro:
     'Der Kalender ist die Zentrale: Einträge hinzufügen, verschieben und entfernen, Workouts aus der Bibliothek einplanen. Jede Änderung gilt sofort; Rückgängig nimmt sie zurück.',
+  pictureCredits: 'Foto: Munbaik Cycling Clothing, Unsplash',
   weekdays: {
     Monday: 'Montag',
     Tuesday: 'Dienstag',

@@ -27,6 +27,42 @@ Then('the screen is marked as a preview', async function (this: RidrsWorld) {
   });
 });
 
+/** The picture across the top of the shown screen: the first thing in its page. */
+function heroOf(world: RidrsWorld): HTMLElement {
+  const page = shownScreen(world).querySelector('.pv-page');
+  const hero = [...(page?.children ?? [])].find((child) => child.tagName !== 'STYLE');
+  assert.ok(hero?.matches('[data-hero]'), hero?.outerHTML.slice(0, 200) ?? 'empty page');
+  return hero as HTMLElement;
+}
+
+Then(
+  'the screen shows the picture {string} across the top',
+  async function (this: RidrsWorld, path: string) {
+    await waitFor(() => {
+      const picture = heroOf(this).querySelector('img');
+      assert.ok(
+        picture?.getAttribute('src')?.endsWith(path),
+        picture?.getAttribute('src') ?? 'no picture',
+      );
+    });
+  },
+);
+
+Then(
+  'the screen shows the heading {string} over the picture',
+  async function (this: RidrsWorld, text: string) {
+    await waitFor(() =>
+      assert.equal(within(heroOf(this)).getByRole('heading', { level: 1 }).textContent, text),
+    );
+  },
+);
+
+Then("the picture's credits read {string}", async function (this: RidrsWorld, text: string) {
+  await waitFor(() =>
+    assert.equal(heroOf(this).querySelector('[data-credits]')?.textContent, text),
+  );
+});
+
 Then(
   'the top bar offers {string} in this order',
   async function (this: RidrsWorld, actionsCsv: string) {

@@ -25,6 +25,8 @@ import { messages } from './i18n/index.ts';
 const DUMBBELL = new URL('./assets/icons/dumbbell.svg', import.meta.url).href;
 const STAR = new URL('./assets/icons/star.svg', import.meta.url).href;
 const UNDO = new URL('./assets/icons/undo-2.svg', import.meta.url).href;
+/** By Munbaik Cycling Clothing on Unsplash (Unsplash License, see the folder's README). */
+const PICTURE = new URL('./assets/pictures/hero.jpg', import.meta.url).href;
 
 const CSS = `
 .tr-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
@@ -139,7 +141,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
     calendar((c) => addEntry(c, { day: selected, kind, title: KIND_TITLES[kind] }));
 
   return (
-    <AreaPage title={text.title} intro={text.intro}>
+    <AreaPage title={text.title} intro={text.intro} picture={{ image: PICTURE, credits: text.pictureCredits }}>
       <style>{CSS}</style>
       <section className="pv-section">
         <h2>{text.thisWeek}</h2>

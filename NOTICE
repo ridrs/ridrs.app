@@ -67,3 +67,4 @@ Third-party content (LICENSING.md, section 6a). Distributions that bundle it are
 | Folder | Author | Origin | SPDX License |
 |---|---|---|---|
 | `plugins/video-source-vangestel/catalog/` | Fred Van Gestel | https://cycling.vangestel.online/indoor/videos/ | CC-BY-NC-SA-4.0 (profiles and paths derived from his GPX tracks, under the same license) |
+| `plugins/ui-area-training/client/assets/pictures/` | Munbaik Cycling Clothing | https://unsplash.com/photos/gPXh9Nl7KHk | LicenseRef-Unsplash (Unsplash License, https://unsplash.com/license) |

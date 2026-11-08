@@ -5,6 +5,7 @@ export const en = {
   title: 'Training',
   intro:
     'The calendar is the hub: add, move and remove entries here, schedule workouts from the library. Every change is kept at once; Undo takes it back.',
+  pictureCredits: 'Photo: Munbaik Cycling Clothing, Unsplash',
   weekdays: {
     Monday: 'Monday',
     Tuesday: 'Tuesday',

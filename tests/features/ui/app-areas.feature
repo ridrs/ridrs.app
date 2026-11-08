@@ -33,6 +33,13 @@ Feature: The app's areas as a clickable preview
       | Training | training |
       | Events   | events   |
 
+  Scenario: Training opens under a big picture that credits its photographer
+    When I press "Training"
+    Then the "training" screen is shown
+    And the screen shows the picture "pictures/hero.jpg" across the top
+    And the screen shows the heading "Training" over the picture
+    And the picture's credits read "Photo: Munbaik Cycling Clothing, Unsplash"
+
   Scenario: The top bar offers the global actions
     Then the top bar offers "Search, Devices, Settings, Garage, Profile" in this order
 

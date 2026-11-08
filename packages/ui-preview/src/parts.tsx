@@ -87,24 +87,53 @@ export function PreviewLabel() {
   );
 }
 
-/** An area's page: its title with the preview label, an introduction, then its sections. */
+/** A big picture across the top of an area's page, with the credits its license asks for. */
+export interface AreaPicture {
+  readonly image: string;
+  readonly credits: string;
+}
+
+/**
+ * An area's page: its title with the preview label, an introduction, then its sections. With a
+ * `picture`, the title and the introduction sit over it, across the top under the top bar.
+ */
 export function AreaPage({
   title,
   intro,
+  picture,
   children,
 }: {
   readonly title: string;
   readonly intro?: string;
+  readonly picture?: AreaPicture;
   readonly children: ReactNode;
 }) {
+  const heading = (
+    <header className="pv-title">
+      <h1>{title}</h1>
+      <PreviewLabel />
+    </header>
+  );
   return (
     <div className="pv-page">
       <style>{PREVIEW_CSS}</style>
-      <header className="pv-title">
-        <h1>{title}</h1>
-        <PreviewLabel />
-      </header>
-      {intro ? <p className="pv-muted">{intro}</p> : null}
+      {picture ? (
+        <div className="pv-hero pv-area-hero" data-hero>
+          <img className="pv-hero-image" src={picture.image} alt="" />
+          <div className="pv-hero-text">
+            {heading}
+            {intro ? <p className="pv-area-intro">{intro}</p> : null}
+          </div>
+          <small className="pv-credits" data-credits>
+            {picture.credits}
+          </small>
+        </div>
+      ) : (
+        <>
+          {heading}
+          {intro ? <p className="pv-muted">{intro}</p> : null}
+        </>
+      )}
       {children}
     </div>
   );
