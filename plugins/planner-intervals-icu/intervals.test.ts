@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { athleteProfileSchema, plannedWorkoutSchema } from '@ridrs/contracts';
+import { athleteProfileSchema, libraryWorkoutSchema, plannedWorkoutSchema } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { ftpField, localDate, toAthlete, toSteps, toWorkouts } from './intervals.ts';
+import { fromSteps, ftpField, localDate, toAthlete, toLibrary, toSteps, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 describe('toAthlete', () => {
@@ -151,6 +151,96 @@ describe('toSteps', () => {
       { kind: 'interval', durationSeconds: 60 },
       { kind: 'interval', durationSeconds: 60 },
     ]);
+  });
+});
+
+describe('toLibrary', () => {
+  const workout = (fields: Record<string, unknown>) => ({
+    id: 7,
+    type: 'Ride',
+    name: 'Sweet Spot',
+    folder_id: 3,
+    ...fields,
+  });
+
+  it('keeps the cycling workouts with their folder, ordered by folder and name', () => {
+    const library = toLibrary(
+      [
+        workout({ id: 9, name: 'Z2', folder_id: 4 }),
+        workout({ id: 8, type: 'Run', name: 'Easy Run' }),
+        workout({
+          moving_time: 3600,
+          icu_training_load: 70,
+          description: 'Seated',
+          workout_doc: { steps: [{ duration: 600, power: { units: '%ftp', value: 90 } }] },
+        }),
+        workout({ id: 10, name: 'Loose', folder_id: null }),
+      ],
+      [
+        { id: 3, name: 'Base', type: 'FOLDER' },
+        { id: 4, name: 'Base', type: 'PLAN' },
+      ],
+      250,
+    );
+    expect(library.map((w) => [w.folder, w.name])).toEqual([
+      [undefined, 'Loose'],
+      ['Base', 'Sweet Spot'],
+      ['Base', 'Z2'],
+    ]);
+    expect(library[1]).toEqual({
+      id: '7',
+      name: 'Sweet Spot',
+      folder: 'Base',
+      sport: 'ride',
+      description: 'Seated',
+      durationSeconds: 3600,
+      trainingLoad: 70,
+      steps: [
+        {
+          kind: 'interval',
+          durationSeconds: 600,
+          power: { low: 90, high: 90, lowWatts: 225, highWatts: 225 },
+        },
+      ],
+    });
+    for (const entry of library) {
+      expect(libraryWorkoutSchema.parse(entry)).toEqual(entry);
+    }
+  });
+
+  it('is empty for an answer that is no list', () => {
+    expect(toLibrary(null, null, undefined)).toEqual([]);
+  });
+});
+
+describe('fromSteps', () => {
+  it('writes the steps as the workout document, so that reading them gives the steps back', () => {
+    const steps = [
+      { kind: 'interval', durationSeconds: 600, phase: 'warm-up', power: { low: 50, high: 75 } },
+      {
+        kind: 'repeat',
+        reps: 3,
+        steps: [
+          {
+            kind: 'interval',
+            durationSeconds: 720,
+            power: { low: 90, high: 90 },
+            cadence: { low: 95, high: 95 },
+          },
+          { kind: 'interval', durationSeconds: 240, text: 'Easy', power: { low: 55, high: 55 } },
+        ],
+      },
+      { kind: 'interval', durationSeconds: 300, phase: 'cool-down', power: { low: 60, high: 40 } },
+    ] as const;
+    const doc = fromSteps(steps);
+    expect(doc[0]).toEqual({
+      duration: 600,
+      warmup: true,
+      ramp: true,
+      power: { units: '%ftp', start: 50, end: 75 },
+    });
+    expect(doc[1]).toMatchObject({ reps: 3 });
+    expect(toSteps(doc, undefined)).toEqual(steps);
   });
 });
 

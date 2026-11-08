@@ -64,6 +64,11 @@ export class SimulatedIntervalsIcu {
   /** Wellness weights by date (`GET …/wellness/{date}`); a day without one answers 404. */
   readonly wellnessWeights = new Map<string, number>();
   events: PlannedEvent[] = [];
+  /** The workouts of the library as `GET …/workouts` returns them, and its folders. */
+  library: Array<Record<string, unknown>> = [];
+  folders: Array<{ id: number; name: string; type: string }> = [];
+  /** The token has the scope of the library; without it the library answers 403. */
+  libraryScope = true;
   reachable = true;
   /** Uploads fail as if the network were gone, while everything else answers. */
   uploadsReachable = true;
@@ -133,6 +138,16 @@ export class SimulatedIntervalsIcu {
         return weight === undefined
           ? json(404, { error: 'No wellness record' })
           : json(200, { id: date, weight });
+      }
+      if (
+        request.method === 'GET' &&
+        (url.pathname === '/api/v1/athlete/0/workouts' ||
+          url.pathname === '/api/v1/athlete/0/folders')
+      ) {
+        if (!this.libraryScope) {
+          return json(403, { error: 'Forbidden' });
+        }
+        return json(200, url.pathname.endsWith('/workouts') ? this.library : this.folders);
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/athlete/0/events') {
         const oldest = url.searchParams.get('oldest') ?? '';

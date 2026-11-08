@@ -13,7 +13,8 @@
   ],
   "state": {
     "owns": [
-      "training.calendar"
+      "training.calendar",
+      "training.library"
     ]
   },
   "services": {
@@ -43,7 +44,8 @@
       "publish": []
     },
     "state": [
-      "app.language"
+      "app.language",
+      "training.library"
     ],
     "calls": [
       "training.calendar.hand-over"

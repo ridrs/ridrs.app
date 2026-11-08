@@ -18,6 +18,7 @@
       "training.account",
       "athlete.profile",
       "training.calendar",
+      "training.library",
       "training.upload"
     ],
     "watches": [

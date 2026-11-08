@@ -24,7 +24,7 @@ Feature: The Me area writes the athlete profile to intervals.icu
     And I press "Disconnect intervals.icu"
     And I press "Connect intervals.icu"
     Then the browser was opened at "https://intervals.icu/oauth/authorize" with:
-      | scope | SETTINGS:WRITE,CALENDAR:READ,WELLNESS:WRITE,ACTIVITY:WRITE |
+      | scope | SETTINGS:WRITE,CALENDAR:READ,WELLNESS:WRITE,LIBRARY:READ,ACTIVITY:WRITE |
 
   Scenario: A new weight is written to today's wellness record
     When I press "Profile"

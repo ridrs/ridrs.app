@@ -6,10 +6,12 @@ import {
   athleteProfileSchema,
   athleteProfileState,
   athleteProfileUpdateService,
+  libraryWorkoutSchema,
   authBrowserSignInCapability,
   definePlugin,
   type HttpClient,
   type HttpResponse,
+  type LibraryWorkout,
   type DataSourceStatus,
   type DataWriteResult,
   netHttpCapability,
@@ -26,12 +28,13 @@ import {
   trainingCalendarState,
   trainingConnectService,
   trainingDisconnectService,
+  trainingLibraryState,
   trainingRefreshService,
   type TrainingUpload,
   trainingUploadService,
   trainingUploadState,
 } from '@ridrs/contracts';
-import { ftpField, localDate, toAthlete, toWorkouts } from './intervals.ts';
+import { ftpField, localDate, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
@@ -39,11 +42,12 @@ const CLIENT_ID = '1697';
 /**
  * The OAuth scopes (names and their `:READ`/`:WRITE` form confirmed on intervals.icu's OAuth
  * support thread, https://forum.intervals.icu/t/intervals-icu-oauth-support/2759; WRITE includes
- * READ). `WELLNESS` reads and writes the weight, `SETTINGS` writes the FTP. A token from before
- * lacks them: the wellness read gets 403, which only leaves the weight of the athlete in its
- * place, and a write gets 403, which asks the rider to connect again.
+ * READ). `WELLNESS` reads and writes the weight, `SETTINGS` writes the FTP, `LIBRARY` reads the
+ * workout library. A token from before lacks them: the wellness read gets 403, which only leaves
+ * the weight of the athlete in its place, the library read gets 403, which leaves the library
+ * unavailable, and a write gets 403, which asks the rider to connect again.
  */
-const SCOPES = 'SETTINGS:WRITE,CALENDAR:READ,WELLNESS:WRITE,ACTIVITY:WRITE';
+const SCOPES = 'SETTINGS:WRITE,CALENDAR:READ,WELLNESS:WRITE,LIBRARY:READ,ACTIVITY:WRITE';
 const SITE = 'https://intervals.icu';
 const CALLBACK_PATH = '/oauth/callback';
 /** The planned workouts of today and the next 13 days. */
@@ -63,6 +67,8 @@ interface Cache {
   /** The field of the Ride settings the FTP was read from, which a change is written to. */
   readonly ftpField: 'indoor_ftp' | 'ftp';
   readonly workouts: PlannedWorkout[];
+  /** None when the token lacks the scope of the library. */
+  readonly library?: LibraryWorkout[];
 }
 
 /** The field of the Ride settings the FTP was read from (see `Cache`). */
@@ -339,6 +345,12 @@ function accessToken(body: string): string | undefined {
   }
 }
 
+/** The library as it is shown now, for a state that changes something else. */
+function heldLibrary(ctx: PluginContext): { library?: LibraryWorkout[] } {
+  const library = ctx.state.entries(trainingLibraryState).get(SERVICE)?.data?.workouts;
+  return library ? { library } : {};
+}
+
 /**
  * Writes a change of the profile: the weight to today's wellness record, the FTP to the Ride
  * settings, into the field it was read from. `icu_weight` is never written. A write is refused,
@@ -395,7 +407,12 @@ async function writeProfile(
         setSources(
           ctx,
           'offline',
-          { fetchedAt: profile.fetchedAt ?? ctx.clock.now(), athlete: profile.data, workouts: calendar.data.workouts },
+          {
+            fetchedAt: profile.fetchedAt ?? ctx.clock.now(),
+            athlete: profile.data,
+            workouts: calendar.data.workouts,
+            ...heldLibrary(ctx),
+          },
           false,
         );
       }
@@ -414,6 +431,7 @@ async function writeProfile(
       athlete: { ...profile.data, ...change },
       ftpField: held.ftpField,
       workouts: calendar.data.workouts,
+      ...heldLibrary(ctx),
     };
     setSources(ctx, 'ready', loaded);
     await files
@@ -434,6 +452,7 @@ function setSources(
     readonly fetchedAt: number;
     readonly athlete: AthleteProfile;
     readonly workouts: PlannedWorkout[];
+    readonly library?: LibraryWorkout[];
   },
   writable = status === 'ready' || status === 'offline',
 ): void {
@@ -452,6 +471,15 @@ function setSources(
     ...common,
     ...(loaded ? { data: { workouts: loaded.workouts } } : {}),
   });
+  // The library is read only, and unavailable where the token lacks its scope.
+  const library = loaded?.library;
+  ctx.state.set(
+    trainingLibraryState,
+    SERVICE,
+    loaded && !library
+      ? { provider: SERVICE, label: LABEL, status: 'unavailable', writable: false }
+      : { ...common, writable: false, ...(library ? { data: { workouts: library } } : {}) },
+  );
 }
 
 /**
@@ -514,16 +542,35 @@ async function loadPlan(
     return typeof weight === 'number' ? weight : undefined;
   };
 
+  /** The library and its folders; none where the token lacks the scope. */
+  const libraryBodiesOf = async (): Promise<[unknown, unknown] | undefined> => {
+    const [workouts, folders] = await Promise.all([
+      request('/api/v1/athlete/0/workouts'),
+      request('/api/v1/athlete/0/folders'),
+    ]);
+    if (workouts.status === 401 || folders.status === 401) {
+      throw new TokenRejected();
+    }
+    if (workouts.status === 403 || folders.status === 403) {
+      return undefined;
+    }
+    if (workouts.status !== 200 || folders.status !== 200) {
+      throw new Error('intervals.icu did not answer with the library');
+    }
+    return [JSON.parse(workouts.body), JSON.parse(folders.body)];
+  };
+
   try {
     const query = new URLSearchParams({
       oldest: localDate(now),
       newest: localDate(now, PLAN_DAYS - 1),
       category: 'WORKOUT',
     });
-    const [athleteBody, eventsBody, weight] = await Promise.all([
+    const [athleteBody, eventsBody, weight, libraryBodies] = await Promise.all([
       get('/api/v1/athlete/0'),
       get(`/api/v1/athlete/0/events?${query}`),
       wellnessWeight(),
+      libraryBodiesOf(),
     ]);
     const athlete = toAthlete(athleteBody, weight);
     held.ftpField = ftpField(athleteBody);
@@ -532,6 +579,9 @@ async function loadPlan(
       athlete,
       ftpField: held.ftpField,
       workouts: toWorkouts(eventsBody, athlete.ftp),
+      ...(libraryBodies
+        ? { library: toLibrary(libraryBodies[0], libraryBodies[1], athlete.ftp) }
+        : {}),
     };
     account('connected', { athleteName: athlete.name });
     setSources(ctx, 'ready', loaded);
@@ -570,16 +620,21 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
       ftpField?: unknown;
       athlete?: { name?: unknown };
       workouts?: unknown;
+      library?: unknown;
     };
     const { name, ...rest } = parsed.athlete ?? {};
     const athlete = athleteProfileSchema.safeParse({ ...rest, ...(name ? { name } : {}) });
     const calendar = trainingCalendarSchema.safeParse({ workouts: parsed.workouts });
+    const library = trainingCalendarSchema
+      .extend({ workouts: libraryWorkoutSchema.array() })
+      .safeParse({ workouts: parsed.library });
     return athlete.success && calendar.success && typeof parsed.fetchedAt === 'number'
       ? {
           fetchedAt: parsed.fetchedAt,
           athlete: athlete.data,
           ftpField: parsed.ftpField === 'indoor_ftp' ? 'indoor_ftp' : 'ftp',
           workouts: calendar.data.workouts,
+          ...(library.success ? { library: library.data.workouts } : {}),
         }
       : undefined;
   } catch {

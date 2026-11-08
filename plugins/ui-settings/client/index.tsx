@@ -11,6 +11,7 @@ import {
   type Language,
   type StateDefinition,
   trainingCalendarState,
+  trainingLibraryState,
 } from '@ridrs/contracts';
 import { ActionButton, AreaPage, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
@@ -192,6 +193,23 @@ function SourceRow<D>({
   );
 }
 
+/** The workout library has no choice: it lists every provider, read only. */
+function LibraryRow({ ctx, name }: { readonly ctx: UiContext; readonly name: string }) {
+  const text = useMessages(ctx, messages);
+  const providers = useStateEntries(ctx, trainingLibraryState);
+  return (
+    <div className="pv-row" role="group" aria-label={name}>
+      <span style={{ minWidth: 140 }}>{name}</span>
+      <span data-testid="library-providers">
+        {inOrder(providers)
+          .map((provider) => (provider.provider === DEFAULT_PROVIDER ? text.thisDevice : provider.label))
+          .join(', ')}
+      </span>
+      <span className="pv-muted">{text.allReadOnly}</span>
+    </div>
+  );
+}
+
 function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const [state, change] = useSettings(ctx);
@@ -249,6 +267,7 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
         <h2>{text.dataSources}</h2>
         <SourceRow ctx={ctx} type="athlete.profile" topic={athleteProfileState} name={text.athleteProfile} />
         <SourceRow ctx={ctx} type="training.calendar" topic={trainingCalendarState} name={text.plannedWorkouts} />
+        <LibraryRow ctx={ctx} name={text.workoutLibrary} />
         {riding ? <p className="pv-muted">{text.riding}</p> : null}
       </section>
       <section className="pv-section">

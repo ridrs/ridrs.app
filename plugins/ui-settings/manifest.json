@@ -53,7 +53,8 @@
       "app.language",
       "athlete.profile",
       "data.source",
-      "training.calendar"
+      "training.calendar",
+      "training.library"
     ],
     "calls": [
       "app.set-language",

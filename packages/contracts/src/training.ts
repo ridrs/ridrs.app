@@ -137,6 +137,23 @@ export const plannedWorkoutSchema = z
   .strict();
 export type PlannedWorkout = z.infer<typeof plannedWorkoutSchema>;
 
+/** A workout of a library (ADR 0075): what a planned workout has, without a date. */
+export const libraryWorkoutSchema = plannedWorkoutSchema
+  .omit({ date: true })
+  .extend({ folder: z.string().optional() })
+  .strict();
+export type LibraryWorkout = z.infer<typeof libraryWorkoutSchema>;
+
+/** The workouts of a provider's library, read only; ridrs on this device has none. */
+export const trainingLibraryType = defineDataType(
+  'training.library',
+  z.object({ workouts: z.array(libraryWorkoutSchema) }).strict(),
+  {},
+);
+
+/** Topic `training.library`, keyed by provider. */
+export const trainingLibraryState = trainingLibraryType.topic;
+
 /**
  * The planned workouts of a provider (ADR 0075): the data type `training.calendar`, keyed by the
  * provider. The athlete of a service is its `athlete.profile`, not part of the calendar.

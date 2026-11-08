@@ -2,6 +2,7 @@
 
 import type {
   AthleteProfile,
+  LibraryWorkout,
   PlannedWorkout,
   WorkoutInterval,
   WorkoutPower,
@@ -105,6 +106,44 @@ export function toWorkouts(body: unknown, ftp: number | undefined): PlannedWorko
     .map(({ start: _start, ...workout }) => workout);
 }
 
+/**
+ * `GET /api/v1/athlete/0/workouts` with `GET …/folders`: the cycling workouts of the library,
+ * each with the name of its folder or plan, ordered by folder and name.
+ */
+export function toLibrary(body: unknown, folders: unknown, ftp: number | undefined): LibraryWorkout[] {
+  const names = new Map(
+    (Array.isArray(folders) ? folders.filter(isObject) : []).flatMap((folder) => {
+      const name = text(folder.name);
+      return folder.id !== undefined && name !== undefined ? [[String(folder.id), name] as const] : [];
+    }),
+  );
+  return (Array.isArray(body) ? body.filter(isObject) : [])
+    .flatMap((entry): LibraryWorkout[] => {
+      const sport = typeof entry.type === 'string' ? SPORTS[entry.type] : undefined;
+      if (!sport || entry.id === undefined) {
+        return [];
+      }
+      const folder = entry.folder_id == null ? undefined : names.get(String(entry.folder_id));
+      const description = text(entry.description);
+      const durationSeconds = nonNegative(entry.moving_time);
+      const trainingLoad = nonNegative(entry.icu_training_load);
+      const doc = isObject(entry.workout_doc) ? entry.workout_doc : undefined;
+      return [
+        {
+          id: String(entry.id),
+          name: text(entry.name) ?? 'Workout',
+          ...(folder !== undefined ? { folder } : {}),
+          sport,
+          ...(description !== undefined ? { description } : {}),
+          ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+          ...(trainingLoad !== undefined ? { trainingLoad } : {}),
+          steps: toSteps(doc?.steps, ftp),
+        },
+      ];
+    })
+    .sort((a, b) => (a.folder ?? '').localeCompare(b.folder ?? '') || a.name.localeCompare(b.name));
+}
+
 /** The steps of a `workout_doc`, repeats nested. */
 export function toSteps(steps: unknown, ftp: number | undefined): WorkoutStep[] {
   if (!Array.isArray(steps)) {
@@ -133,6 +172,27 @@ export function toSteps(steps: unknown, ftp: number | undefined): WorkoutStep[] 
       ...(cadence ? { cadence } : {}),
     };
     return [interval];
+  });
+}
+
+/** The steps as a `workout_doc` of an event: targets in % FTP, ramps and repeats (the reverse of `toSteps`). */
+export function fromSteps(steps: readonly WorkoutStep[]): Json[] {
+  const target = (units: string, range: { low: number; high: number }): Json =>
+    range.low === range.high
+      ? { units, value: range.low }
+      : { units, start: range.low, end: range.high };
+  return steps.map((step): Json => {
+    if (step.kind === 'repeat') {
+      return { reps: step.reps, steps: fromSteps(step.steps) };
+    }
+    return {
+      duration: step.durationSeconds,
+      ...(step.phase === 'warm-up' ? { warmup: true } : {}),
+      ...(step.phase === 'cool-down' ? { cooldown: true } : {}),
+      ...(step.text !== undefined ? { text: step.text } : {}),
+      ...(step.power ? { ...(step.power.low !== step.power.high ? { ramp: true } : {}), power: target('%ftp', step.power) } : {}),
+      ...(step.cadence ? { cadence: target('rpm', step.cadence) } : {}),
+    };
   });
 }
 

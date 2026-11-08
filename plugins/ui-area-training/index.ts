@@ -5,6 +5,7 @@ import {
   type PlannedWorkout,
   trainingCalendarHandOverService,
   trainingCalendarState,
+  trainingLibraryState,
 } from '@ridrs/contracts';
 import { plannedWorkouts } from './client/calendar.ts';
 import { INITIAL_TRAINING, TRAINING_DOCUMENT } from './document.ts';
@@ -18,7 +19,7 @@ function today(epochMs: number): string {
 
 // Most of this plugin lives in its client module (see `ui` in the manifest). The host side is
 // the provider `ridrs` of the data type `training.calendar` (ADR 0075): the workouts of the
-// area's calendar, read from its document at start and handed over by the client after every
+// area's calendar (and an empty library), read from its document at start and handed over by the client after every
 // change. Only the area edits the calendar, so the provider is read only for everyone else.
 export default definePlugin({
   async start(ctx) {
@@ -31,6 +32,16 @@ export default definePlugin({
         fetchedAt: ctx.clock.now(),
         data: { workouts },
       });
+
+    // ridrs on this device has no workouts of its own to offer (no built-in workouts yet).
+    ctx.state.set(trainingLibraryState, 'ridrs', {
+      provider: 'ridrs',
+      label: 'ridrs (this device)',
+      status: 'ready',
+      writable: false,
+      fetchedAt: ctx.clock.now(),
+      data: { workouts: [] },
+    });
 
     const kept = await ctx.settings.user(TRAINING_DOCUMENT).read();
     publish(plannedWorkouts((kept ?? INITIAL_TRAINING).calendar.entries, today(ctx.clock.now())));

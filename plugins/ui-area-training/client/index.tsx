@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { AreaPage, iconStyle, MenuEntry, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
-import { trainingCalendarHandOverService } from '@ridrs/contracts';
+import { DEFAULT_PROVIDER, trainingCalendarHandOverService, trainingLibraryState } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
-import { useMessages } from '@ridrs/ui-sdk/react';
+import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import {
   addEntry,
@@ -109,6 +109,43 @@ function Day({
   );
 }
 
+/** The workouts of every provider's library, read only, grouped by provider (ADR 0075). */
+function Library({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const providers = [...useStateEntries(ctx, trainingLibraryState).values()]
+    .filter((source) => (source.data?.workouts.length ?? 0) > 0)
+    .sort((a, b) => a.provider.localeCompare(b.provider));
+  return (
+    <section className="pv-section" data-testid="library">
+      <h2>{text.library}</h2>
+      {providers.length === 0 ? <p className="pv-muted">{text.libraryEmpty}</p> : null}
+      {providers.map((source) => (
+        <div key={source.provider} data-provider={source.provider}>
+          <h3>{source.provider === DEFAULT_PROVIDER ? text.thisDevice : source.label}</h3>
+          <div className="pv-cards">
+            {source.data?.workouts.map((workout) => (
+              <article key={workout.id} className="pv-card" data-library-workout={workout.id}>
+                <h4>{workout.name}</h4>
+                <span className="pv-muted">
+                  {[
+                    workout.folder,
+                    workout.durationSeconds === undefined
+                      ? undefined
+                      : `${Math.round(workout.durationSeconds / 60)} min`,
+                    workout.trainingLoad === undefined ? undefined : `${Math.round(workout.trainingLoad)} TSS`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </article>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const [state, change] = useTraining(ctx);
@@ -210,6 +247,8 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
           ))}
         </div>
       </section>
+
+      <Library ctx={ctx} />
 
       <section className="pv-section">
         <h2>{text.plans}</h2>

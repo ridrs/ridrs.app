@@ -41,6 +41,8 @@ export const en = {
   dataSources: 'Data sources',
   athleteProfile: 'Athlete profile',
   plannedWorkouts: 'Planned workouts',
+  workoutLibrary: 'Workout library',
+  allReadOnly: 'all providers, read only',
   thisDevice: 'ridrs (this device)',
   status: (status: DataSourceStatus, loadedAt?: string) =>
     ({

@@ -113,6 +113,30 @@ Given(
   },
 );
 
+Given('intervals.icu has the library:', function (this: RidrsWorld, table: DataTable) {
+  const simulation = intervals(this);
+  const folders = new Map<string, number>();
+  simulation.library = table.hashes().map((row, index) => {
+    const folder = row.folder ?? '-';
+    if (folder !== '-' && !folders.has(folder)) {
+      folders.set(folder, 40 + folders.size);
+    }
+    return {
+      id: 5000 + index,
+      type: row.type ?? 'Ride',
+      name: row.name ?? '',
+      folder_id: folder === '-' ? null : folders.get(folder),
+      moving_time: parseDuration(row.duration ?? '0s'),
+      icu_training_load: Number(row.load),
+    };
+  });
+  simulation.folders = [...folders].map(([name, id]) => ({ id, name, type: 'FOLDER' }));
+});
+
+Given('intervals.icu lacks the scope of the library', function (this: RidrsWorld) {
+  intervals(this).libraryScope = false;
+});
+
 Given('intervals.icu rejects writes with 403', function (this: RidrsWorld) {
   intervals(this).writeStatus = 403;
 });

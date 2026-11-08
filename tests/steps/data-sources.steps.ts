@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { Given, Then, When } from '@cucumber/cucumber';
+import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
@@ -70,6 +70,52 @@ Then(
         splitCsv(providersCsv),
       ),
     );
+  },
+);
+
+Then(
+  'the row {string} lists {string}',
+  async function (this: RidrsWorld, name: string, providersCsv: string) {
+    await waitFor(() =>
+      assert.deepEqual(
+        splitCsv(within(row(this, name)).getByTestId('library-providers').textContent ?? ''),
+        splitCsv(providersCsv),
+      ),
+    );
+  },
+);
+
+/** The library section of the Training area: a block per provider. */
+function libraryOf(world: RidrsWorld, provider: string): HTMLElement | null {
+  return shownScreen(world).querySelector<HTMLElement>(
+    `[data-testid="library"] [data-provider="${provider}"]`,
+  );
+}
+
+Then(
+  'the library lists these workouts of {string}:',
+  async function (this: RidrsWorld, provider: string, table: DataTable) {
+    await waitFor(() => {
+      const block = libraryOf(this, provider);
+      assert.ok(block, `The library shows nothing of ${provider}`);
+      const listed = [...block.querySelectorAll('article')].map((card) => ({
+        name: card.querySelector('h4')?.textContent ?? '',
+        details: card.querySelector('span')?.textContent ?? '',
+      }));
+      assert.deepEqual(listed, table.hashes());
+    });
+  },
+);
+
+Then(
+  'the library lists no workouts of {string}',
+  async function (this: RidrsWorld, provider: string) {
+    // The library is there: its heading names the section.
+    await within(shownScreen(this)).findByRole('heading', {
+      level: 2,
+      name: /library|Bibliothek/i,
+    });
+    await waitFor(() => assert.equal(libraryOf(this, provider), null));
   },
 );
 

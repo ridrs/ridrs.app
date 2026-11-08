@@ -98,6 +98,7 @@ import {
   trainingCalendarState,
   trainingConnectService,
   trainingDisconnectService,
+  trainingLibraryState,
   trainingRefreshService,
   trainingUploadService,
   trainingUploadState,
@@ -197,6 +198,7 @@ const STATES: readonly StateDefinition[] = [
   exportFitState,
   trainingAccountState,
   trainingCalendarState,
+  trainingLibraryState,
   trainingUploadState,
 ];
 

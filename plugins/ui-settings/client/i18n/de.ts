@@ -41,6 +41,8 @@ export const de: Messages = {
   dataSources: 'Datenquellen',
   athleteProfile: 'Athletenprofil',
   plannedWorkouts: 'Geplante Trainings',
+  workoutLibrary: 'Trainingsbibliothek',
+  allReadOnly: 'alle Anbieter, nur lesbar',
   thisDevice: 'ridrs (dieses Gerät)',
   status: (status: DataSourceStatus, loadedAt?: string) =>
     ({
