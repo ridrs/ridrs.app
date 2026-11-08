@@ -19,6 +19,19 @@ export {
   type StateView,
 } from './app-state.ts';
 export {
+  type ActivityAthletePayload,
+  type AthleteProfile,
+  type AthleteProfileChangedPayload,
+  activityAthleteEvent,
+  athleteProfileChangedEvent,
+  athleteProfileSchema,
+  athleteProfileState,
+  athleteProfileType,
+  athleteProfileUpdateService,
+  type RideAthlete,
+  rideAthleteSchema,
+} from './athlete.ts';
+export {
   authBrowserSignInCapability,
   type BrowserSignIn,
   type BrowserSignInRequest,
@@ -110,6 +123,24 @@ export {
   dataArchiveCapability,
   dataFetchCapability,
 } from './data.ts';
+export {
+  DATA_SOURCE_STATUSES,
+  DATA_WRITE_REFUSALS,
+  type DataSource,
+  type DataSourceChoice,
+  type DataSourceStatus,
+  type DataType,
+  type DataWriteResult,
+  DEFAULT_PROVIDER,
+  dataSelectService,
+  dataSourceChoiceSchema,
+  dataSourceState,
+  dataSourceStatusSchema,
+  dataWriteResultSchema,
+  defineDataType,
+  type ProviderId,
+  providerIdSchema,
+} from './data-sources.ts';
 export {
   deviceConnectService,
   deviceDiscoverService,

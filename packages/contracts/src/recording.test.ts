@@ -149,6 +149,8 @@ const SAMPLES: Record<string, unknown> = {
       },
     },
   },
+  'athlete.profile-changed': { provider: 'ridrs', ftp: 230, weight: 80.5 },
+  'activity.athlete': { sessionId: 's-1', athlete: { provider: 'ridrs', ftp: 230, weight: 80.5 } },
   'measurement.power': {
     deviceId: 'd',
     value: 200,

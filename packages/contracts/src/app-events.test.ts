@@ -15,6 +15,7 @@ const SIMULATION = [
   'activity.resume-requested',
   'activity.start-requested',
   'activity.state-changed',
+  'athlete.profile-changed',
   'controller.buttons-changed',
   'device.connection-changed',
   'drivetrain.gear-changed',

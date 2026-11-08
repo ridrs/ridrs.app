@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { setWorldConstructor, World } from '@cucumber/cucumber';
 import type { BridgeSession } from '@ridrs/ble-bridge';
 import {
+  activityAthleteEvent,
   activityEquipmentEvent,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
@@ -16,6 +17,9 @@ import {
   activityStateChangedEvent,
   appLanguageSetService,
   appLanguageState,
+  athleteProfileChangedEvent,
+  athleteProfileState,
+  athleteProfileUpdateService,
   authBrowserSignInCapability,
   type BleCentral,
   bleBridgeConnectorCapability,
@@ -33,6 +37,8 @@ import {
   controllerButtonsChangedEvent,
   dataArchiveCapability,
   dataFetchCapability,
+  dataSelectService,
+  dataSourceState,
   defineCapability,
   defineEvent,
   defineService,
@@ -214,6 +220,8 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   drivetrainShiftRequestedEvent,
   equipmentBicycleChangedEvent,
   activityEquipmentEvent,
+  athleteProfileChangedEvent,
+  activityAthleteEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
@@ -227,6 +235,8 @@ const testOfferSchema = z
 const testOfferState = defineState('test.offer', testOfferSchema);
 const TEST_STATES: readonly StateDefinition[] = [
   appLanguageState,
+  dataSourceState,
+  athleteProfileState,
   routeOfferState,
   bridgeLinkState,
   bridgeCompanionsState,
@@ -245,6 +255,8 @@ const TEST_STATES: readonly StateDefinition[] = [
 /** Services of ridrs and of the scenarios of ADR 0068. */
 const TEST_SERVICES: readonly ServiceDefinition[] = [
   appLanguageSetService,
+  dataSelectService,
+  athleteProfileUpdateService,
   routeFetchService,
   routeCancelService,
   bridgePairService,
@@ -291,6 +303,8 @@ const HOST_OBSERVED_EVENTS: readonly EventDefinition[] = [
   drivetrainShiftRequestedEvent,
   equipmentBicycleChangedEvent,
   activityEquipmentEvent,
+  athleteProfileChangedEvent,
+  activityAthleteEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
@@ -571,6 +585,7 @@ export class RidrsWorld extends World {
     }
     this.envOverrides.clear();
     delete (globalThis as Record<symbol, unknown>)[MEMORY_STORAGE_SYMBOL];
+    delete (globalThis as Record<symbol, unknown>)[Symbol.for('ridrs.fixture.data-source')];
   }
 
   /** Phase 9: the plugins use `fixture-storage-memory`, whose files the World owns. */

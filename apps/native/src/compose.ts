@@ -2,6 +2,7 @@
 
 import {
   APP_LANGUAGE_KEY,
+  activityAthleteEvent,
   activityEquipmentEvent,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
@@ -11,6 +12,9 @@ import {
   activityStateChangedEvent,
   appLanguageSetService,
   appLanguageState,
+  athleteProfileChangedEvent,
+  athleteProfileState,
+  athleteProfileUpdateService,
   authBrowserSignInCapability,
   bleBridgeConnectorCapability,
   bleCentralCapability,
@@ -26,6 +30,8 @@ import {
   DEFAULT_LANGUAGE,
   dataArchiveCapability,
   dataFetchCapability,
+  dataSelectService,
+  dataSourceState,
   deviceConnectionChangedEvent,
   deviceConnectService,
   deviceDiscoverService,
@@ -138,6 +144,8 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   drivetrainShiftRequestedEvent,
   equipmentBicycleChangedEvent,
   activityEquipmentEvent,
+  athleteProfileChangedEvent,
+  activityAthleteEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
@@ -176,6 +184,8 @@ const CAPABILITIES = [
 /** Every app state topic the host knows (ADR 0068): owned and watched beside the bus. */
 const STATES: readonly StateDefinition[] = [
   appLanguageState,
+  dataSourceState,
+  athleteProfileState,
   routeOfferState,
   bridgeLinkState,
   bridgeCompanionsState,
@@ -192,6 +202,8 @@ const STATES: readonly StateDefinition[] = [
 /** Every service the host knows (ADR 0068): provided and called beside the bus. */
 const SERVICES: readonly ServiceDefinition[] = [
   appLanguageSetService,
+  dataSelectService,
+  athleteProfileUpdateService,
   routeFetchService,
   routeCancelService,
   bridgePairService,

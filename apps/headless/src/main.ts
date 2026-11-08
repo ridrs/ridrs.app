@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  activityAthleteEvent,
   activityEquipmentEvent,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
@@ -13,12 +14,17 @@ import {
   activityStateChangedEvent,
   appLanguageSetService,
   appLanguageState,
+  athleteProfileChangedEvent,
+  athleteProfileState,
+  athleteProfileUpdateService,
   bleCentralCapability,
   type CapabilityContract,
   configSnapshotCapability,
   controllerButtonsChangedEvent,
   dataArchiveCapability,
   dataFetchCapability,
+  dataSelectService,
+  dataSourceState,
   deviceConnectionChangedEvent,
   deviceConnectService,
   deviceDiscoverService,
@@ -142,6 +148,8 @@ const CAPABILITIES: readonly CapabilityContract[] = [
 /** Every app state topic the host knows (ADR 0068): owned and watched beside the bus. */
 const STATES: readonly StateDefinition[] = [
   appLanguageState,
+  dataSourceState,
+  athleteProfileState,
   routeOfferState,
   deviceStatusState,
   recordingRideState,
@@ -155,6 +163,8 @@ const STATES: readonly StateDefinition[] = [
 /** Every service the host knows (ADR 0068): provided and called beside the bus. */
 const SERVICES: readonly ServiceDefinition[] = [
   appLanguageSetService,
+  dataSelectService,
+  athleteProfileUpdateService,
   routeFetchService,
   routeCancelService,
   deviceConnectService,
@@ -188,6 +198,8 @@ const EVENTS: readonly EventDefinition[] = [
   drivetrainShiftRequestedEvent,
   equipmentBicycleChangedEvent,
   activityEquipmentEvent,
+  athleteProfileChangedEvent,
+  activityAthleteEvent,
   trainerCommandEvent,
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
