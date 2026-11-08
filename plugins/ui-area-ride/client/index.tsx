@@ -153,6 +153,13 @@ const FULL_RISE_SHARE = 0.3;
 const BACKDROP_SHARE = 0.42;
 const riseShare = (rise: number) => Math.min(FULL_RISE_SHARE * Math.sqrt(Math.max(rise, 0) / FULL_RISE), BACKDROP_SHARE);
 
+/**
+ * How far above the card's lower edge the profile's lowest point sits, in the 32 units of its
+ * area (about 7 px on a card): clear of the card's rounded corners, so a route that starts at its
+ * lowest point still shows its first metres. The fill below still reaches the edge.
+ */
+const PROFILE_LIFT = 2.5;
+
 /** How long the glowing dot takes to ride a card's profile from start to end. */
 const TRACE_MS = 1600;
 
@@ -231,9 +238,10 @@ function Profile({
   const low = Math.min(...elevations);
   const rise = Math.max(...elevations) - low;
   // The hill's height in the 32 units of the profile's area, which is the card's lowest 42 %.
-  const hill = (riseShare(rise) / BACKDROP_SHARE) * 32;
+  const hill = (riseShare(rise) / BACKDROP_SHARE) * (32 - PROFILE_LIFT);
   const points = elevations.map(
-    (elevation, i) => [(i / (elevations.length - 1)) * 100, 32 - (rise > 0 ? ((elevation - low) / rise) * hill : 0)] as const,
+    (elevation, i) =>
+      [(i / (elevations.length - 1)) * 100, 32 - PROFILE_LIFT - (rise > 0 ? ((elevation - low) / rise) * hill : 0)] as const,
   );
   const { box, dot } = useTrace(points);
   if (points.length < 2) {

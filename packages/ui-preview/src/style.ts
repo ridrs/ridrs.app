@@ -54,10 +54,13 @@ export const PREVIEW_CSS = `
   border: 1px solid var(--ridrs-line, #24324d); border-radius: var(--ridrs-radius, 16px);
   background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa);
   font: 15px/1.4 system-ui, sans-serif; }
-.pv-teaser[data-media] { min-height: 0; aspect-ratio: 16 / 10; padding: 18px 20px 12px 14px;
-  border-color: transparent;
+.pv-teaser[data-media] { min-height: 0; aspect-ratio: 16 / 10; padding: 19px 21px 13px 15px;
+  border: 0;
   background: radial-gradient(120% 90% at 85% 0%, #2a4a78 0%, transparent 60%),
     linear-gradient(160deg, #1b2d4d, #0d1626); }
+/* The edge of a picture card is drawn over the picture, so no background shows through around it. */
+.pv-teaser[data-media]::after { content: ""; position: absolute; inset: 0; z-index: 1;
+  border-radius: inherit; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); pointer-events: none; }
 .pv-teaser[data-media]::before { content: ""; position: absolute; inset: 0; z-index: -1;
   background: radial-gradient(85% 55% at 0% 100%, rgb(6 10 20 / .7), rgb(6 10 20 / 0) 100%),
     linear-gradient(to top, rgb(6 10 20 / .95) 0%, rgb(6 10 20 / .72) 38%, rgb(6 10 20 / 0) 75%),
