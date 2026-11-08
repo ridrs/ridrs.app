@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import { PREVIEW_CSS } from './style.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const HIDE = new URL('./assets/icons/eye-off.svg', import.meta.url).href;
+const BACK = new URL('./assets/icons/arrow-left.svg', import.meta.url).href;
 
 /** A component rendered with React into the shell's container, unmounted with it. */
 export function reactComponent(render: (ctx: UiContext) => ReactNode): UiComponent {
@@ -81,6 +89,43 @@ export function AreaPage({
       {intro ? <p className="pv-muted">{intro}</p> : null}
       {children}
     </div>
+  );
+}
+
+/**
+ * A page about one thing of an area, e.g. a route: its picture across the top under the top bar,
+ * Back at the picture's top left and a few words over its foot (`hero`), then its sections. Back
+ * does what the platform's back does there; the area handles both alike (`useBack`).
+ */
+export function DetailPage({
+  label,
+  image,
+  hero,
+  onBack,
+  children,
+}: {
+  readonly label: string;
+  readonly image?: string;
+  readonly hero: ReactNode;
+  readonly onBack: () => void;
+  readonly children: ReactNode;
+}) {
+  // The page opens at its top, whatever the list before it was scrolled to.
+  const page = useRef<HTMLElement>(null);
+  useLayoutEffect(() => page.current?.scrollIntoView?.({ block: 'start' }), []);
+  return (
+    <section ref={page} className="pv-page pv-detail" aria-label={label}>
+      <div className="pv-hero" data-hero>
+        {image ? <img className="pv-hero-image" src={image} alt="" /> : null}
+        <button type="button" className="pv-button pv-back" onClick={onBack}>
+          <span className="pv-glyph" aria-hidden="true" style={iconStyle(BACK)} />
+          Back
+        </button>
+        <div className="pv-hero-text">{hero}</div>
+      </div>
+      {children}
+      <style>{PREVIEW_CSS}</style>
+    </section>
   );
 }
 

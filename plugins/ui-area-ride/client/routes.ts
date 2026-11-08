@@ -58,11 +58,97 @@ export const formatDistance = (offer: RouteOffer): string => `${(offer.distance 
 /** A route's climb as the rider reads it: `1216 m`. */
 export const formatAscent = (offer: RouteOffer): string => `${Math.round(offer.ascent)} m`;
 
-/** What the route details say: country, length and climb, e.g. `France · 46.1 km · 1216 m`. */
+/** A categorised climb's name: `HC` or `Cat 1` to `Cat 4` (ADR 0070). */
+export type Climb = NonNullable<RouteOffer['climbs']>[number];
+export const climbCategory = (climb: Climb): string => (climb.category === 'HC' ? 'HC' : `Cat ${climb.category}`);
+
+/** m along the route as the rider reads it: `14.3`. */
+export const km = (distance: number): string => (distance / 1000).toFixed(1);
+
+/** A categorised climb in the route details, e.g. `Cat 1: summit 1244 m at km 14.3 · 14.3 km at 4.9 %`. */
+export function describeClimb(climb: Climb): string {
+  return `${climbCategory(climb)}: summit ${Math.round(climb.summit)} m at km ${km(climb.end)} · ${km(climb.end - climb.start)} km at ${climb.grade.toFixed(1)} %`;
+}
+
+/** What the route details say over its picture: what it is and where, e.g. `Video · France · Grimone, part 1`. */
 export function describeRoute(offer: RouteOffer): string {
-  return [offer.tags.country, formatDistance(offer), formatAscent(offer)]
+  const { country, tour } = offer.tags;
+  return [offer.kind === 'video' ? 'Video' : 'Route', country, tour && `${tour.name}, part ${tour.part}`]
     .filter((part) => part !== undefined)
     .join(' · ');
+}
+
+/**
+ * The gradient bands of a route's profile, from the flattest up, as in the catalog's profile
+ * picture (ADR 0070); a descent counts as flat. The steepest band is a dark purple instead of the
+ * picture's black, which would vanish on the app's dark background.
+ */
+export const GRADES = [
+  { label: 'below 2 %', below: 2, colour: '#8fbf5a' },
+  { label: '2–4 %', below: 4, colour: '#f2cd2f' },
+  { label: '4–6 %', below: 6, colour: '#f0962a' },
+  { label: '6–8 %', below: 8, colour: '#df4b2b' },
+  { label: '8–10 %', below: 10, colour: '#a11d2b' },
+  { label: '10 % and more', below: Number.POSITIVE_INFINITY, colour: '#6a1b6e' },
+] as const;
+
+export type Grade = (typeof GRADES)[number];
+
+/** The band of a gradient in %. */
+export const gradeOf = (grade: number): Grade => GRADES.find(({ below }) => grade < below) ?? GRADES[5];
+
+/**
+ * A stretch of the profile between two of its points: from and to in m along the route, the
+ * elevations there, its own gradient and the gradient over `TREND` m around it, in %.
+ */
+export interface Stretch {
+  readonly from: number;
+  readonly to: number;
+  readonly low: number;
+  readonly high: number;
+  readonly grade: number;
+  readonly trend: number;
+}
+
+/** m around a stretch whose gradient colours it: GPS elevations jitter from one sample to the next. */
+const TREND = 500;
+
+/**
+ * The route's profile as stretches from start to end; none without elevations. Its points are the
+ * evenly spaced elevations and each categorised summit at its altitude: the summits lie between
+ * the samples, which would cut their tops off and leave their markers beside the peak.
+ */
+export function stretchesOf(offer: RouteOffer): Stretch[] {
+  const elevations = offer.sparkline ?? [];
+  const step = offer.distance / Math.max(elevations.length - 1, 1);
+  const points = [
+    ...elevations.map((elevation, i) => ({ at: i * step, elevation })),
+    ...(elevations.length > 1 ? (offer.climbs ?? []) : []).map((climb) => ({ at: climb.end, elevation: climb.summit })),
+  ].sort((a, b) => a.at - b.at);
+  const end = points.at(-1)?.at ?? 0;
+  const elevationAt = (at: number) => {
+    const next = points.findIndex((point) => point.at >= at);
+    const b = points[Math.max(next, 0)] ?? { at, elevation: 0 };
+    const a = points[next - 1];
+    return a && b.at > a.at ? a.elevation + ((b.elevation - a.elevation) * (at - a.at)) / (b.at - a.at) : b.elevation;
+  };
+  return points.slice(1).flatMap((to, i) => {
+    const from = points[i] ?? to;
+    const length = to.at - from.at;
+    if (length <= 0) return [];
+    const middle = (from.at + to.at) / 2;
+    const start = Math.max(0, Math.min(middle - TREND / 2, end - TREND));
+    const stop = Math.min(end, start + TREND);
+    const trend = stop > start ? ((elevationAt(stop) - elevationAt(start)) / (stop - start)) * 100 : 0;
+    const grade = ((to.elevation - from.elevation) / length) * 100;
+    return [{ from: from.at, to: to.at, low: from.elevation, high: to.elevation, grade, trend }];
+  });
+}
+
+/** How long a ride takes about, as the rider reads it: `about 2 h 53 min`, `about 44 min`. */
+export function formatDuration(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `about ${minutes} min` : `about ${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
 /** A download's size as the rider reads it: `11.2 GB`, `770 MB`. */

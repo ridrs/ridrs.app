@@ -103,4 +103,29 @@ export const PREVIEW_CSS = `
 .pv-badge[data-tone="warn"] { background: var(--ridrs-warn, #ffb62e); color: #0b1220; }
 .pv-badge[data-tone="done"] { display: inline-flex; padding: 9px; background: rgb(11 18 32 / .55); }
 .pv-badge .pv-glyph { width: 16px; height: 16px; }
+
+.pv-detail, [data-breakpoint="compact"] .pv-detail { padding-top: 0; }
+.pv-hero { position: relative; isolation: isolate; display: flex; flex-direction: column;
+  justify-content: flex-end; height: clamp(260px, 46vh, 500px); margin: 0 -40px;
+  padding: 96px 40px 24px; overflow: hidden;
+  background: radial-gradient(120% 90% at 85% 0%, #2a4a78 0%, transparent 60%),
+    linear-gradient(160deg, #1b2d4d, #0d1626); }
+[data-breakpoint="compact"] .pv-hero { height: clamp(220px, 36vh, 340px); margin: 0 -16px;
+  padding: 72px 16px 16px; }
+.pv-hero-image { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%;
+  object-fit: cover; }
+.pv-hero::before { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to top, var(--ridrs-bg, #0b1220) 0, var(--ridrs-bg, #0b1220) 3px,
+    rgb(11 18 32 / .6) 28%,
+    rgb(11 18 32 / 0) 58%), linear-gradient(to bottom, rgb(6 10 20 / .45), rgb(6 10 20 / 0) 26%); }
+/* Level with the main screen's actions over the picture, and as tall: 44 px, 28 px from the top
+   (12 px when compact). */
+.pv-back { position: absolute; top: 28px; left: 40px; height: 44px; min-height: 44px;
+  padding: 0 18px 0 14px; border: 1px solid rgb(255 255 255 / .14); border-radius: 999px;
+  background: rgb(11 18 32 / .55); backdrop-filter: blur(8px); }
+[data-breakpoint="compact"] .pv-back { top: 12px; left: 16px; }
+.pv-hero-text { display: flex; flex-direction: column; gap: 6px; max-width: 960px;
+  text-shadow: 0 1px 8px rgb(0 0 0 / .55); }
+.pv-hero-text h2 { margin: 0; font: 800 34px/1.15 system-ui, sans-serif; overflow-wrap: anywhere; }
+[data-breakpoint="compact"] .pv-hero-text h2 { font-size: 24px; }
 `;

@@ -47,9 +47,17 @@ const CSS = `
 .ms-actions [data-action-tone="ok"] { background: var(--ridrs-ok); }
 .ms-actions [data-action-tone="busy"] { background: var(--ridrs-info); }
 .ms-actions [data-action-tone="warn"] { background: var(--ridrs-warn); }
+/* A screen that starts with a picture across its top (\`[data-hero]\`) runs under the head: the
+   actions stand over the picture, on a glass of their own. */
+.ms-column { position: relative; }
+.ms-column:has(> .ms-outlet:not([hidden]) [data-hero]) > .ms-head { position: absolute; inset: 0 0 auto;
+  z-index: 2; pointer-events: none; }
+.ms-column:has(> .ms-outlet:not([hidden]) [data-hero]) > .ms-head > * { pointer-events: auto; }
+.ms-column:has(> .ms-outlet:not([hidden]) [data-hero]) .ms-actions [data-action] {
+  border-color: rgb(255 255 255 / .14); background: rgb(11 18 32 / .55); backdrop-filter: blur(8px); }
 .ms-main { display: flex; flex-direction: column; gap: 24px; padding: 24px 40px 32px; }
 .ms-root[data-breakpoint="compact"] .ms-main { padding: 16px; }
-.ms-outlet { flex: 1 0 auto; display: grid; min-width: 0; }
+.ms-outlet { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .ms-outlet[hidden] { display: none; }
 .ms-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--ridrs-gap); }
 .ms-grid > [data-tile] > [data-contribution] { height: 100%; }

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" width="1600" height="640" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+<rect width="1600" height="640" fill="#f7f4ee"/>
+<line x1="84" x2="1552" y1="457.1" y2="457.1" stroke="#d9d4ca" stroke-dasharray="4 6"/>
+<text x="74" y="462.1" text-anchor="end" font-size="15" fill="#7a746a">800 m</text>
+<line x1="84" x2="1552" y1="371.4" y2="371.4" stroke="#d9d4ca" stroke-dasharray="4 6"/>
+<text x="74" y="376.4" text-anchor="end" font-size="15" fill="#7a746a">1000 m</text>
+<line x1="84" x2="1552" y1="285.7" y2="285.7" stroke="#d9d4ca" stroke-dasharray="4 6"/>
+<text x="74" y="290.7" text-anchor="end" font-size="15" fill="#7a746a">1200 m</text>
+<line x1="84" x2="1552" y1="200" y2="200" stroke="#d9d4ca" stroke-dasharray="4 6"/>
+<text x="74" y="205" text-anchor="end" font-size="15" fill="#7a746a">1400 m</text>
+<polygon points="84,416.9 100.8,415 117.5,413.5 134.3,412.2 151,411.3 167.8,410.1 184.6,409.1 201.3,408.2 218.1,407 234.8,404.9 251.6,402.3 261.6,390.3 244.8,392.9 228.1,395 211.3,396.2 194.6,397.1 177.8,398.1 161,399.3 144.3,400.2 127.5,401.5 110.8,403 94,404.9" fill="#f8e48a" stroke="#f8e48a" stroke-width="0.5"/>
+<polygon class="km" data-km="1" data-grade="2–4 %" points="84,500 84,416.9 100.8,415 117.5,413.5 134.3,412.2 151,411.3 167.8,410.1 184.6,409.1 201.3,408.2 218.1,407 234.8,404.9 251.6,402.3 251.6,500" fill="#f2cd2f" stroke="#ffffff" stroke-width="1"/>
+<text x="167.8" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">3.4</text>
+<polygon points="251.6,402.3 268.3,399.8 285.1,397.2 301.9,395 318.6,392.5 335.4,389.8 352.1,386.6 368.9,384.3 385.7,381.9 402.4,379.6 419.2,377.3 429.2,365.3 412.4,367.6 395.7,369.9 378.9,372.3 362.1,374.6 345.4,377.8 328.6,380.5 311.9,383 295.1,385.2 278.3,387.8 261.6,390.3" fill="#f7c27f" stroke="#f7c27f" stroke-width="0.5"/>
+<polygon class="km" data-km="2" data-grade="4–6 %" points="251.6,500 251.6,402.3 268.3,399.8 285.1,397.2 301.9,395 318.6,392.5 335.4,389.8 352.1,386.6 368.9,384.3 385.7,381.9 402.4,379.6 419.2,377.3 419.2,500" fill="#f0962a" stroke="#ffffff" stroke-width="1"/>
+<text x="335.4" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">5.8</text>
+<polygon points="419.2,377.3 435.9,375 452.7,372.4 469.4,370.1 486.2,367.9 503,365.3 519.7,362.7 536.5,360.2 553.2,357.8 570,355 586.8,352.1 596.8,340.1 580,343 563.2,345.8 546.5,348.2 529.7,350.7 513,353.3 496.2,355.9 479.4,358.1 462.7,360.4 445.9,363 429.2,365.3" fill="#f7c27f" stroke="#f7c27f" stroke-width="0.5"/>
+<polygon class="km" data-km="3" data-grade="4–6 %" points="419.2,500 419.2,377.3 435.9,375 452.7,372.4 469.4,370.1 486.2,367.9 503,365.3 519.7,362.7 536.5,360.2 553.2,357.8 570,355 586.8,352.1 586.8,500" fill="#f0962a" stroke="#ffffff" stroke-width="1"/>
+<text x="503" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">5.9</text>
+<polygon points="586.8,352.1 603.5,349.4 620.3,347 637,344.5 653.8,341.8 670.6,339.5 687.3,337 704.1,334.1 720.8,330.8 737.6,327.9 754.3,325.1 764.3,313.1 747.6,315.9 730.8,318.8 714.1,322.1 697.3,325 680.6,327.5 663.8,329.8 647,332.5 630.3,335 613.5,337.4 596.8,340.1" fill="#ec8b72" stroke="#ec8b72" stroke-width="0.5"/>
+<polygon class="km" data-km="4" data-grade="6–8 %" points="586.8,500 586.8,352.1 603.5,349.4 620.3,347 637,344.5 653.8,341.8 670.6,339.5 687.3,337 704.1,334.1 720.8,330.8 737.6,327.9 754.3,325.1 754.3,500" fill="#df4b2b" stroke="#ffffff" stroke-width="1"/>
+<text x="670.6" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">6.3</text>
+<polygon points="754.3,325.1 771.1,322.1 787.9,320 804.6,319.6 821.4,318.3 838.1,316.3 854.9,313.9 871.7,310.8 888.4,308.1 905.2,305.8 921.9,303.2 931.9,291.2 915.2,293.8 898.4,296.1 881.7,298.8 864.9,301.9 848.1,304.3 831.4,306.3 814.6,307.6 797.9,308 781.1,310.1 764.3,313.1" fill="#f7c27f" stroke="#f7c27f" stroke-width="0.5"/>
+<polygon class="km" data-km="5" data-grade="4–6 %" points="754.3,500 754.3,325.1 771.1,322.1 787.9,320 804.6,319.6 821.4,318.3 838.1,316.3 854.9,313.9 871.7,310.8 888.4,308.1 905.2,305.8 921.9,303.2 921.9,500" fill="#f0962a" stroke="#ffffff" stroke-width="1"/>
+<text x="838.1" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">5.1</text>
+<polygon points="921.9,303.2 938.7,301.1 955.4,298.4 972.2,296.3 989,294.5 1005.7,292.5 1022.5,290.4 1039.2,288 1056,285.3 1072.8,282.8 1089.5,280.4 1099.5,268.4 1082.8,270.8 1066,273.3 1049.2,276 1032.5,278.4 1015.7,280.5 999,282.5 982.2,284.3 965.4,286.4 948.7,289.1 931.9,291.2" fill="#f7c27f" stroke="#f7c27f" stroke-width="0.5"/>
+<polygon class="km" data-km="6" data-grade="4–6 %" points="921.9,500 921.9,303.2 938.7,301.1 955.4,298.4 972.2,296.3 989,294.5 1005.7,292.5 1022.5,290.4 1039.2,288 1056,285.3 1072.8,282.8 1089.5,280.4 1089.5,500" fill="#f0962a" stroke="#ffffff" stroke-width="1"/>
+<text x="1005.7" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">5.3</text>
+<polygon points="1089.5,280.4 1106.3,277.9 1123,275.5 1139.8,272.7 1156.6,270.2 1173.3,267.7 1190.1,265.1 1206.8,262.6 1223.6,260 1240.3,257.6 1257.1,255.1 1267.1,243.1 1250.3,245.6 1233.6,248 1216.8,250.6 1200.1,253.1 1183.3,255.7 1166.6,258.2 1149.8,260.7 1133,263.5 1116.3,265.9 1099.5,268.4" fill="#f7c27f" stroke="#f7c27f" stroke-width="0.5"/>
+<polygon class="km" data-km="7" data-grade="4–6 %" points="1089.5,500 1089.5,280.4 1106.3,277.9 1123,275.5 1139.8,272.7 1156.6,270.2 1173.3,267.7 1190.1,265.1 1206.8,262.6 1223.6,260 1240.3,257.6 1257.1,255.1 1257.1,500" fill="#f0962a" stroke="#ffffff" stroke-width="1"/>
+<text x="1173.3" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">5.9</text>
+<polygon points="1257.1,255.1 1273.9,252.4 1290.6,249.7 1307.4,246.9 1324.1,244.3 1340.9,243.4 1357.7,241.8 1374.4,240.9 1391.2,240.1 1407.9,239.2 1424.7,238.5 1434.7,226.5 1417.9,227.2 1401.2,228.1 1384.4,228.9 1367.7,229.8 1350.9,231.4 1334.1,232.3 1317.4,234.9 1300.6,237.7 1283.9,240.4 1267.1,243.1" fill="#f8e48a" stroke="#f8e48a" stroke-width="0.5"/>
+<polygon class="km" data-km="8" data-grade="2–4 %" points="1257.1,500 1257.1,255.1 1273.9,252.4 1290.6,249.7 1307.4,246.9 1324.1,244.3 1340.9,243.4 1357.7,241.8 1374.4,240.9 1391.2,240.1 1407.9,239.2 1424.7,238.5 1424.7,500" fill="#f2cd2f" stroke="#ffffff" stroke-width="1"/>
+<text x="1340.9" y="491" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">3.9</text>
+<polygon points="1424.7,238.5 1441.4,237.9 1458.2,237 1475,236.4 1491.7,235.4 1508.5,234.5 1525.2,233.5 1542,233.7 1552,221.7 1535.2,221.5 1518.5,222.5 1501.7,223.4 1485,224.4 1468.2,225 1451.4,225.9 1434.7,226.5" fill="#c2df9f" stroke="#c2df9f" stroke-width="0.5"/>
+<polygon class="km" data-km="9" data-grade="below 2 %" points="1424.7,500 1424.7,238.5 1441.4,237.9 1458.2,237 1475,236.4 1491.7,235.4 1508.5,234.5 1525.2,233.5 1542,233.7 1542,500" fill="#8fbf5a" stroke="#ffffff" stroke-width="1"/>
+<polygon points="84,500 1542,500 1552,488 1552,508 84,508" fill="#57524a"/>
+<line x1="84" x2="84" y1="508" y2="518" stroke="#57524a"/>
+<text x="84" y="536" text-anchor="middle" font-size="15" fill="#57524a">0</text>
+<line x1="251.6" x2="251.6" y1="508" y2="518" stroke="#57524a"/>
+<text x="251.6" y="536" text-anchor="middle" font-size="15" fill="#57524a">1</text>
+<line x1="419.2" x2="419.2" y1="508" y2="518" stroke="#57524a"/>
+<text x="419.2" y="536" text-anchor="middle" font-size="15" fill="#57524a">2</text>
+<line x1="586.8" x2="586.8" y1="508" y2="518" stroke="#57524a"/>
+<text x="586.8" y="536" text-anchor="middle" font-size="15" fill="#57524a">3</text>
+<line x1="754.3" x2="754.3" y1="508" y2="518" stroke="#57524a"/>
+<text x="754.3" y="536" text-anchor="middle" font-size="15" fill="#57524a">4</text>
+<line x1="921.9" x2="921.9" y1="508" y2="518" stroke="#57524a"/>
+<text x="921.9" y="536" text-anchor="middle" font-size="15" fill="#57524a">5</text>
+<line x1="1089.5" x2="1089.5" y1="508" y2="518" stroke="#57524a"/>
+<text x="1089.5" y="536" text-anchor="middle" font-size="15" fill="#57524a">6</text>
+<line x1="1257.1" x2="1257.1" y1="508" y2="518" stroke="#57524a"/>
+<text x="1257.1" y="536" text-anchor="middle" font-size="15" fill="#57524a">7</text>
+<line x1="1424.7" x2="1424.7" y1="508" y2="518" stroke="#57524a"/>
+<text x="1424.7" y="536" text-anchor="middle" font-size="15" fill="#57524a">8</text>
+<text x="1542" y="536" text-anchor="middle" font-size="15" font-weight="700" fill="#2b2b2b">8.7 km</text>
+<g class="summit"><line x1="1530.2" x2="1530.2" y1="227.5" y2="168" stroke="#2b2b2b" stroke-width="1.2"/><circle cx="1530.2" cy="227.5" r="3.5" fill="#2b2b2b"/><circle cx="1530.2" cy="148" r="17" fill="#d4202c" stroke="#ffffff" stroke-width="2"/><text class="badge" x="1530.2" y="154" text-anchor="middle" font-size="17" font-weight="800" fill="#ffffff">2</text><text x="1554.2" y="146" font-size="16" font-weight="700" fill="#2b2b2b">Col de Grimone</text><text x="1554.2" y="164" font-size="14" fill="#7a746a">1322 m · km 8.6</text></g>
+<g class="start"><line x1="89" x2="89" y1="410.9" y2="208" stroke="#2b2b2b" stroke-width="1.2"/><circle cx="89" cy="410.9" r="3.5" fill="#2b2b2b"/><text x="89" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#2b2b2b">894 m</text></g>
+<g class="finish"><line x1="1547" x2="1547" y1="227.7" y2="208" stroke="#2b2b2b" stroke-width="1.2"/><circle cx="1547" cy="227.7" r="3.5" fill="#2b2b2b"/><text x="1547" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#2b2b2b">1321 m</text></g>
+<g class="legend"><rect data-grade="below 2 %" x="84" y="596" width="22" height="16" fill="#8fbf5a"/><text x="114" y="609" font-size="14" fill="#57524a">below 2 %</text><rect data-grade="2–4 %" x="264" y="596" width="22" height="16" fill="#f2cd2f"/><text x="294" y="609" font-size="14" fill="#57524a">2–4 %</text><rect data-grade="4–6 %" x="444" y="596" width="22" height="16" fill="#f0962a"/><text x="474" y="609" font-size="14" fill="#57524a">4–6 %</text><rect data-grade="6–8 %" x="624" y="596" width="22" height="16" fill="#df4b2b"/><text x="654" y="609" font-size="14" fill="#57524a">6–8 %</text><rect data-grade="8–10 %" x="804" y="596" width="22" height="16" fill="#a11d2b"/><text x="834" y="609" font-size="14" fill="#57524a">8–10 %</text><rect data-grade="10 % and more" x="984" y="596" width="22" height="16" fill="#2a2a2a"/><text x="1014" y="609" font-size="14" fill="#57524a">10 % and more</text></g>
+</svg>

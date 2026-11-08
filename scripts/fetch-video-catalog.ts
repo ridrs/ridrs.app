@@ -2,19 +2,24 @@
 
 // Builds the catalog of the video rides of cycling.vangestel.online, shipped with the video
 // source plugin: what the site lists for each video, the route from its Incyclist control file
-// and GPX track, and a thumbnail. No video is downloaded: each ZIP's central directory and its
-// small entries are read with HTTP range requests, about 40 kB per route.
+// and GPX track with its categorised climbs, a thumbnail and a picture of the elevation profile.
+// No video is downloaded: each ZIP's central directory and its small entries are read with HTTP
+// range requests, about 40 kB per route.
 //
 //   pnpm fetch:video-catalog [--out <folder>] [--only <route id> …]
 //
 // The folder defaults to `plugins/video-source-vangestel/catalog`. It gets `index.json` (every
 // route, light enough for a list) and per route `<id>/route.json` (profile, path, notes,
-// segments) and `<id>/thumbnail.jpg`. Running it again rewrites the files; unchanged sources
-// give the same files.
-import { mkdirSync, writeFileSync } from 'node:fs';
+// segments, climbs with their summit names), `<id>/peaks.txt` (the names of the summits along the
+// route), `<id>/thumbnail.jpg` and `<id>/profile.svg` (ADR 0070). Running it again rewrites the
+// files; unchanged sources give the same files. A thumbnail or peaks file that is already there
+// stays: the routes get thumbnails and summit names of their own, the site's picture is only a start.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { configure, type Entry, HttpRangeReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 import { Window } from 'happy-dom';
+import { categoriseClimbs, nameClimbs } from '../plugins/video-source-vangestel/climbs.ts';
+import { drawProfile } from '../plugins/video-source-vangestel/profile-picture.ts';
 import { parseControlFile, parseGpx, xml } from '../plugins/ui-world-video/client/library.ts';
 import { plausibleTrack } from '../plugins/ui-world-video/client/plausible-track.ts';
 import { placeAt, type Track } from '../plugins/ui-world-video/client/track.ts';
@@ -33,8 +38,12 @@ const SOURCE = {
 
 /** m between two samples of a route's profile and path in `route.json`. */
 const SPACING = 100;
-/** Samples of the small profile in `index.json`, enough for a sparkline in a list. */
-const SPARKLINE = 64;
+/**
+ * Samples of the profile in `index.json`, evenly spaced from start to end: enough for the route
+ * details' large profile with its gradients (about 70 m apart on a 46 km route), and for the
+ * sparkline of a card.
+ */
+const SPARKLINE = 640;
 /** ms between two requests to the site, to stay a polite visitor. */
 const PAUSE = 250;
 const HEADERS = { 'User-Agent': 'ridrs-video-catalog (+https://ridrs.app)' };
@@ -229,7 +238,9 @@ function describeTrack(gpx: string) {
   const elevations = samples.map((place) => place.elevation);
   // The ascent of the profile every SPACING m: GPS elevation jitter between fixes does not count.
   const ascent = elevations.slice(1).reduce((sum, elevation, i) => sum + Math.max(0, elevation - (elevations[i] ?? 0)), 0);
-  const sparkline = along(track, track.length / (SPARKLINE - 1)).map((place) => round(place.elevation, 0));
+  // To 0.1 m: whole metres would put up to 1.4 % of rounding into the gradient of each stretch.
+  const sparkline = along(track, track.length / (SPARKLINE - 1)).map((place) => round(place.elevation, 1));
+  const profile = { spacing: SPACING, elevations: elevations.map((elevation) => round(elevation, 1)) };
   const latitudes = samples.map((place) => place.latitude);
   const longitudes = samples.map((place) => place.longitude);
   return {
@@ -245,7 +256,8 @@ function describeTrack(gpx: string) {
       east: round(Math.max(...longitudes), 5),
     },
     sparkline,
-    profile: { spacing: SPACING, elevations: elevations.map((elevation) => round(elevation, 1)) },
+    profile,
+    climbs: categoriseClimbs(profile),
     path: { spacing: SPACING, points: samples.map((place) => [round(place.latitude, 5), round(place.longitude, 5)]) },
   };
 }
@@ -265,11 +277,26 @@ async function build(listed: Listed, tours: readonly string[], out: string) {
   const track = describeTrack(archive.gpx.text);
   const folder = join(out, listed.id);
   mkdirSync(folder, { recursive: true });
-  let thumbnail: string | undefined;
-  if (details.thumbnail) {
-    writeFileSync(join(folder, 'thumbnail.jpg'), new Uint8Array(await (await get(details.thumbnail)).arrayBuffer()));
-    thumbnail = `${listed.id}/thumbnail.jpg`;
+  // A thumbnail or peaks file already in the folder is ours (made for the route) and stays; only a
+  // route without one gets the site's picture or the names from the control file's notes.
+  const peaksFile = join(folder, 'peaks.txt');
+  const peaks = existsSync(peaksFile)
+    ? readFileSync(peaksFile, 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : [];
+  const climbs = nameClimbs(track.climbs, extras.notes, peaks);
+  if (!existsSync(peaksFile)) {
+    const names = climbs.map((climb) => climb.name ?? '').filter(Boolean);
+    writeFileSync(peaksFile, names.length > 0 ? `${names.join('\n')}\n` : '');
   }
+  const picture = join(folder, 'thumbnail.jpg');
+  if (!existsSync(picture) && details.thumbnail) {
+    writeFileSync(picture, new Uint8Array(await (await get(details.thumbnail)).arrayBuffer()));
+  }
+  const thumbnail = existsSync(picture) ? `${listed.id}/thumbnail.jpg` : undefined;
+  writeFileSync(join(folder, 'profile.svg'), drawProfile(track.profile, climbs));
   const video = archive.files.find((file) => file.name.split('/').at(-1) === extras.videoFile);
   const summary = {
     id: listed.id,
@@ -287,6 +314,7 @@ async function build(listed: Listed, tours: readonly string[], out: string) {
     elevation: track.elevation,
     start: track.start,
     sparkline: track.sparkline,
+    climbs,
     stated: listed.stated,
     thumbnail,
     trailer: details.trailer,

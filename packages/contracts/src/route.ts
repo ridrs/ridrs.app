@@ -20,10 +20,30 @@ export const routeOfferSchema = z
     ascent: z.number().nonnegative(),
     /** s a ride takes about; none for a course without an end. */
     duration: z.number().positive().optional(),
-    /** Elevations (m) evenly spaced from the start to the end, for a small profile. */
+    /** Elevations (m) evenly spaced from the start to the end, for its profile on a card and in the details. */
     sparkline: z.array(z.number()).min(2).optional(),
     /** A picture of the route, as a URL the UI may load. */
     thumbnail: z.string().min(1).optional(),
+    /**
+     * The route's categorised climbs, in their order along it (ADR 0070): from the foot to the
+     * summit in m along the route, m climbed, the average gradient in % and the summit's altitude;
+     * the name of the summit or the climb where the provider knows it.
+     */
+    climbs: z
+      .array(
+        z
+          .object({
+            category: z.enum(['HC', '1', '2', '3', '4']),
+            start: z.number().nonnegative(),
+            end: z.number().nonnegative(),
+            gain: z.number().nonnegative(),
+            grade: z.number(),
+            summit: z.number(),
+            name: z.string().min(1).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
     tags: z
       .object({
         country: z.string().min(1).optional(),

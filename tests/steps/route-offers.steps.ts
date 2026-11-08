@@ -150,3 +150,93 @@ Then(
     );
   },
 );
+
+Then(
+  'the route details draw the elevation profile of {string}',
+  async function (this: RidrsWorld, title: string) {
+    await waitFor(() => {
+      // Drawn by the app from the offer's elevations, not a picture file.
+      const profile = within(details(this)).getByRole('img', {
+        name: `Elevation profile of ${title}`,
+      });
+      assert.equal(profile.tagName.toLowerCase(), 'svg');
+    });
+  },
+);
+
+Then('the route details list the climb {string}', async function (this: RidrsWorld, text: string) {
+  await waitFor(() => {
+    const climbs = within(details(this))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '');
+    assert.ok(
+      climbs.some((climb) => climb.includes(text)),
+      JSON.stringify(climbs),
+    );
+  });
+});
+
+Then(
+  'the route details show the picture {string} across the top',
+  async function (this: RidrsWorld, path: string) {
+    await waitFor(() => {
+      // The hero comes first in the details, before their title and everything else.
+      const hero = details(this).firstElementChild;
+      assert.ok(hero?.matches('[data-hero]'), hero?.outerHTML.slice(0, 200) ?? 'empty details');
+      assert.ok(hero);
+      const picture = hero.querySelector('img');
+      assert.ok(
+        picture?.getAttribute('src')?.endsWith(path),
+        picture?.getAttribute('src') ?? 'no picture',
+      );
+    });
+  },
+);
+
+/** The profile the route details draw, by its label. */
+const detailsProfile = (world: RidrsWorld) =>
+  within(details(world)).getByRole('img', {
+    name: (name) => name.startsWith('Elevation profile of '),
+  });
+
+Then(
+  "the route's profile marks a {string} summit {string} at km {float}",
+  async function (this: RidrsWorld, category: string, label: string, at: number) {
+    await waitFor(() => {
+      const summits = [...detailsProfile(this).querySelectorAll('.summit')];
+      const texts = summits.map((summit) => summit.textContent?.replace(/\s+/g, ' ').trim());
+      assert.ok(
+        summits.some(
+          (summit) =>
+            summit.querySelector('.badge')?.textContent?.trim() === category &&
+            summit.textContent?.includes(label) &&
+            summit.textContent?.includes(`km ${at.toFixed(1)}`),
+        ),
+        `Summits: ${JSON.stringify(texts)}`,
+      );
+    });
+  },
+);
+
+Then("the route's profile colours each stretch by its gradient", async function (this: RidrsWorld) {
+  await waitFor(() => {
+    const profile = detailsProfile(this);
+    const legend = new Map(
+      [...details(this).querySelectorAll('.legend [data-grade]')].map((entry) => [
+        entry.getAttribute('data-grade'),
+        entry.getAttribute('data-colour'),
+      ]),
+    );
+    const stretches = [...profile.querySelectorAll('.stretch')];
+    assert.ok(stretches.length > 10, `${stretches.length} stretches`);
+    for (const stretch of stretches) {
+      assert.equal(
+        stretch.getAttribute('fill'),
+        legend.get(stretch.getAttribute('data-grade')),
+        stretch.outerHTML,
+      );
+    }
+    const grades = new Set(stretches.map((stretch) => stretch.getAttribute('data-grade')));
+    assert.ok(grades.size >= 3, `Grades: ${[...grades]}`);
+  });
+});

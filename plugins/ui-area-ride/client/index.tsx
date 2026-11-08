@@ -13,6 +13,7 @@ import {
   Badge,
   Card,
   type CardFact,
+  DetailPage,
   iconStyle,
   MenuEntry,
   reactComponent,
@@ -24,7 +25,10 @@ import {
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import { RouteProfile } from './profile.tsx';
 import {
+  climbCategory,
+  describeClimb,
   describeRoute,
   FILTERS,
   type Filter,
@@ -32,6 +36,7 @@ import {
   filterRoutes,
   formatAscent,
   formatDistance,
+  formatDuration,
   formatSize,
   orderOffers,
 } from './routes.ts';
@@ -47,6 +52,7 @@ const VIDEO = new URL('./assets/icons/video.svg', import.meta.url).href;
 const DOWNLOAD = new URL('./assets/icons/download.svg', import.meta.url).href;
 const CANCEL = new URL('./assets/icons/x.svg', import.meta.url).href;
 const ON_DEVICE = new URL('./assets/icons/check.svg', import.meta.url).href;
+const DURATION = new URL('./assets/icons/clock.svg', import.meta.url).href;
 
 /** What the rider changed in this area, kept at once (ADR 0059). */
 const useRide = userDocument(
@@ -87,7 +93,52 @@ function useGo(ctx: UiContext) {
   };
 }
 
-const PICTURE = { width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 8 } as const;
+/** Over the route's picture: what it is, in small capitals. */
+const KICKER = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  color: 'rgb(255 255 255 / .85)',
+  font: '700 12px/1.2 system-ui, sans-serif',
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+} as const;
+/** The route's numbers in a row of large figures, its actions beside them. */
+const SUMMARY = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '16px 32px',
+} as const;
+const STATS = { display: 'flex', flexWrap: 'wrap', gap: '12px 32px', margin: 0 } as const;
+const STAT = { display: 'grid', gap: 2 } as const;
+const STAT_LABEL = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  color: 'var(--ridrs-text-muted, #93a1b8)',
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: '.06em',
+  textTransform: 'uppercase',
+} as const;
+const STAT_VALUE = { margin: 0, font: '800 24px/1.2 system-ui, sans-serif' } as const;
+const CLIMBS = { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 } as const;
+const CLIMB = { display: 'flex', alignItems: 'center', gap: 12 } as const;
+/** A climb's category in a red disc. */
+const CATEGORY_BADGE = {
+  display: 'inline-grid',
+  placeItems: 'center',
+  width: 30,
+  height: 30,
+  borderRadius: '50%',
+  background: '#d4202c',
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 800,
+  flex: 'none',
+} as const;
 
 /**
  * The climb that fills the profile's height: 3 % over the route's whole length, so a gentle route
@@ -253,7 +304,7 @@ function downloadState(offer: RouteOffer): string | undefined {
 }
 
 const minutes = (offer: RouteOffer) =>
-  offer.duration === undefined ? undefined : `about ${Math.round(offer.duration / 60)} min`;
+  offer.duration === undefined ? undefined : formatDuration(offer.duration);
 
 /** What a card says under the title: the route's length and climb, each by its icon. */
 const facts = (offer: RouteOffer): CardFact[] => [
@@ -346,10 +397,24 @@ function RouteCard({
   );
 }
 
+/** One of the route's numbers in the details: a small label with its icon over a large figure. */
+function Stat({ icon, label, value }: { readonly icon: string; readonly label: string; readonly value: string }) {
+  return (
+    <div style={STAT}>
+      <dt style={STAT_LABEL}>
+        <span className="pv-glyph" aria-hidden="true" style={{ ...iconStyle(icon), width: 14, height: 14 }} />
+        {label}
+      </dt>
+      <dd style={STAT_VALUE}>{value}</dd>
+    </div>
+  );
+}
+
 /**
- * One route up close: two clicks from the list to the ride (tap the route, then Go). A route that
- * is not on this device yet says what it takes and downloads on Download, a download on its way
- * stops on Cancel download; a downloaded one can be removed again.
+ * One route up close, two clicks from the list to the ride (tap the route, then Go): its picture
+ * across the top with Back and its title, then its numbers and actions, its profile and its
+ * climbs. A route that is not on this device yet says what it takes and downloads on Download, a
+ * download on its way stops on Cancel download; a downloaded one can be removed again.
  */
 function RouteDetails({
   ctx,
@@ -376,61 +441,105 @@ function RouteDetails({
     run().catch((error: unknown) => setRefusal(reasonOf(error)));
   };
   const state = refusal ?? downloadState(offer);
+  const duration = minutes(offer);
   return (
-    <section className="pv-section" aria-label={`${offer.title} details`}>
-      <h2>{offer.title}</h2>
-      {offer.thumbnail ? <img src={offer.thumbnail} alt="" style={{ ...PICTURE, maxWidth: 640 }} /> : null}
-      <Profile offer={offer} height={64} />
-      <p className="pv-muted">{[describeRoute(offer), minutes(offer)].filter(Boolean).join(' · ')}</p>
+    <DetailPage
+      label={`${offer.title} details`}
+      image={offer.thumbnail}
+      onBack={onClose}
+      hero={
+        <>
+          <span style={KICKER}>
+            <span className="pv-glyph" aria-hidden="true" style={{ ...iconStyle(offer.kind === 'video' ? VIDEO : MOUNTAIN), width: 15, height: 15 }} />
+            {describeRoute(offer)}
+          </span>
+          <h2>{offer.title}</h2>
+        </>
+      }
+    >
+      <div style={SUMMARY}>
+        <dl style={STATS}>
+          <Stat icon={DISTANCE} label="Distance" value={formatDistance(offer)} />
+          <Stat icon={ASCENT} label="Climb" value={formatAscent(offer)} />
+          {duration ? <Stat icon={DURATION} label="Duration" value={duration} /> : null}
+          {offer.tags.level ? <Stat icon={MOUNTAIN} label="Level" value={offer.tags.level} /> : null}
+        </dl>
+        <div className="pv-row">
+          {availability.state === 'ready' ? (
+            <button ref={first} type="button" className="pv-button pv-primary" onClick={() => go(offer)}>
+              <span className="pv-glyph" aria-hidden="true" style={iconStyle(BIKE)} />
+              Go
+            </button>
+          ) : null}
+          {fetchable ? (
+            <button
+              ref={first}
+              type="button"
+              className="pv-button pv-primary"
+              onClick={() => call(() => ctx.call(routeFetchService, { key: offer.id }))}
+            >
+              <span className="pv-glyph" aria-hidden="true" style={iconStyle(DOWNLOAD)} />
+              Download
+            </button>
+          ) : null}
+          {availability.state === 'fetching' ? (
+            <button
+              ref={first}
+              type="button"
+              className="pv-button"
+              onClick={() => call(() => ctx.call(routeCancelService, { key: offer.id }))}
+            >
+              <span className="pv-glyph" aria-hidden="true" style={iconStyle(CANCEL)} />
+              Cancel download
+            </button>
+          ) : null}
+          <FavouriteToggle ctx={ctx} offer={offer} label="Favourite" />
+          {availability.state === 'ready' && availability.removable ? (
+            <button
+              type="button"
+              className="pv-button"
+              onClick={() => call(() => ctx.call(routeRemoveService, { key: offer.id }))}
+            >
+              Remove from this device
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {state ? (
+        <p role="status" className="pv-muted">
+          {state}
+        </p>
+      ) : null}
+      {offer.sparkline ? (
+        <section className="pv-section" aria-label="Profile">
+          <h2>Profile</h2>
+          <RouteProfile offer={offer} />
+        </section>
+      ) : null}
+      {offer.climbs?.length ? (
+        <section className="pv-section" aria-label="Climbs">
+          <h2>Climbs</h2>
+          <ul aria-label="Climbs" style={CLIMBS}>
+            {offer.climbs.map((climb) => (
+              <li key={climb.end} style={CLIMB}>
+                <span role="img" aria-label={climbCategory(climb)} style={CATEGORY_BADGE}>
+                  {climb.category}
+                </span>
+                <span style={{ display: 'grid' }}>
+                  {climb.name ? <strong>{climb.name}</strong> : null}
+                  <span className={climb.name ? 'pv-muted' : undefined}>{describeClimb(climb)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {credits ? (
-        <p className="pv-muted">
+        <p className="pv-muted" style={{ fontSize: 13, overflowWrap: 'anywhere' }}>
           By {credits.author}, {credits.source}, {credits.license}. {credits.url}
         </p>
       ) : null}
-      {state ? <p role="status">{state}</p> : null}
-      <div className="pv-row">
-        {availability.state === 'ready' ? (
-          <button ref={first} type="button" className="pv-button pv-primary" onClick={() => go(offer)}>
-            <span className="pv-glyph" aria-hidden="true" style={iconStyle(BIKE)} />
-            Go
-          </button>
-        ) : null}
-        {fetchable ? (
-          <button
-            ref={first}
-            type="button"
-            className="pv-button pv-primary"
-            onClick={() => call(() => ctx.call(routeFetchService, { key: offer.id }))}
-          >
-            Download
-          </button>
-        ) : null}
-        {availability.state === 'fetching' ? (
-          <button
-            ref={first}
-            type="button"
-            className="pv-button"
-            onClick={() => call(() => ctx.call(routeCancelService, { key: offer.id }))}
-          >
-            <span className="pv-glyph" aria-hidden="true" style={iconStyle(CANCEL)} />
-            Cancel download
-          </button>
-        ) : null}
-        <FavouriteToggle ctx={ctx} offer={offer} label="Favourite" />
-        {availability.state === 'ready' && availability.removable ? (
-          <button
-            type="button"
-            className="pv-button"
-            onClick={() => call(() => ctx.call(routeRemoveService, { key: offer.id }))}
-          >
-            Remove from this device
-          </button>
-        ) : null}
-        <button type="button" className="pv-button" onClick={onClose}>
-          All routes
-        </button>
-      </div>
-    </section>
+    </DetailPage>
   );
 }
 
@@ -467,12 +576,11 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
     );
   };
 
+  if (open) {
+    return <RouteDetails ctx={ctx} offer={open} onClose={() => setOpenId(undefined)} />;
+  }
   return (
     <AreaPage title="Ride" intro="Ride freely: worlds, routes and real video. Pick a route, then Go.">
-      {open ? (
-        <RouteDetails ctx={ctx} offer={open} onClose={() => setOpenId(undefined)} />
-      ) : (
-        <>
           <section className="pv-section" aria-label="Filters">
             <div className="pv-row">
               {FILTERS.map((filter) => (
@@ -506,8 +614,6 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
               />
             </div>
           </section>
-        </>
-      )}
     </AreaPage>
   );
 }

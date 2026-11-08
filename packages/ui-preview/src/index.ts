@@ -11,6 +11,7 @@ export {
   Card,
   type CardFact,
   type CardProps,
+  DetailPage,
   iconStyle,
   MenuEntry,
   PreviewLabel,
