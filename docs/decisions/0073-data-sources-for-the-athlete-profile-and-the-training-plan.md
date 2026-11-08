@@ -2,7 +2,7 @@
 
 # ADR 0073: Data Sources for the Athlete Profile and the Training Plan
 
-Status: **proposed** on 2026-11-08, from the proposal [athlete-data-sources.md](../ideas/athlete-data-sources.md), on the maintainer's request ("pick p7, p8. p9 should be only intervals.icu. add an interface for different data types, that can be implemented by sync providers. add data source settings to the existing settings page"). Stage D0 of that proposal; nothing is built yet. The points marked **[Open]** wait for the maintainer; the text states the proposed answer. Once accepted, it amends [ADR 0052](0052-persistence-domains-and-plan.md) (no SQLite and no profile history in P7) and [ADR 0060](0060-equipment-garage-and-the-frozen-bicycle.md) (the bicycle stays out of the athlete profile).
+Status: **accepted** on 2026-11-08 by the maintainer ("Accept all as proposed": every point the proposal left open is decided as proposed), from the proposal [athlete-data-sources.md](../ideas/athlete-data-sources.md), on the maintainer's request ("pick p7, p8. p9 should be only intervals.icu. add an interface for different data types, that can be implemented by sync providers. add data source settings to the existing settings page"). Stage D0 of that proposal; D1 to D5 are not built yet. Amends [ADR 0052](0052-persistence-domains-and-plan.md) (no SQLite and no profile history in P7) and [ADR 0060](0060-equipment-garage-and-the-frozen-bicycle.md) (the bicycle stays out of the athlete profile).
 
 ## Context
 
@@ -19,7 +19,7 @@ The maintainer wants a source per data type chosen on the settings page from eve
 
 ### Names and data types
 
-- **Data sources, not sync providers.** A data type has one source of truth; nothing is copied or merged between stores, and switching the source copies nothing. Sync stays P10. **[Open]** the name.
+- **Data sources, not sync providers.** A data type has one source of truth; nothing is copied or merged between stores, and switching the source copies nothing. Sync stays P10. (Name: maintainer.)
 - **Three data types:**
 
   | Data type | Topic | Access | Source |
@@ -41,7 +41,7 @@ The maintainer wants a source per data type chosen on the settings page from eve
 - **ridrs (this device)**, a new plugin `profile-local` (type `storage`, `"persistence": ["user"]`): always `ready` and writable. The profile is the user document `athlete` (version 1: `ftp`, `weight`, `lthr`, `maxHeartRate`, `changedAt`), migrated once from the Me area's `preview` FTP and weight. The calendar comes from the Training area's entries (P8). It is the default source of every type, so a choice is never empty.
 - **intervals.icu**, the existing `planner-intervals-icu` (id, secret key and cache path unchanged), owns the key `intervals.icu` in all three topics:
   - Profile read as today; weight from today's wellness record, else `icu_weight`.
-  - Profile write: weight to `PUT /api/v1/athlete/0/wellness/{today}`, FTP to `PUT /api/v1/athlete/0/sport-settings/Ride`, into the field it was read from (`indoor_ftp` if set, else `ftp`). **[Open]** also `icu_weight`; always `indoor_ftp`.
+  - Profile write: weight to `PUT /api/v1/athlete/0/wellness/{today}`, FTP to `PUT /api/v1/athlete/0/sport-settings/Ride`, into the field it was read from (`indoor_ftp` if set, else `ftp`). `icu_weight` is not written (maintainer).
   - Calendar read as today (`GET …/events`); writes as `POST`, `PUT` and `DELETE …/events`.
   - Library read from `GET /api/v1/athlete/0/workouts` (and `…/folders` for the grouping).
   - New scopes for the writes and the library, expected `WELLNESS:WRITE`, `SETTINGS:WRITE`, `CALENDAR:WRITE`, `LIBRARY:READ`; **to be confirmed** against intervals.icu's OAuth documentation before stage D4 (the OpenAPI spec names none per operation). Older tokens get 403 and the rider reconnects, as in [ADR 0064](0064-ride-debriefing-and-activity-upload.md).
@@ -52,19 +52,19 @@ The maintainer wants a source per data type chosen on the settings page from eve
 
 - **The profile enters a ride as an input** (AGENTS.md rules 7 and 13), as the bicycle does: the owner of `data.source` watches the chosen profile and accepts `athlete.profile-changed { provider, ftp?, weight? }` (no name) at host start and after every change. `activity-session` freezes it with the lifecycle event `activity.athlete { sessionId, athlete }` right before `running`, beside `activity.equipment`. A change during a ride applies to the next one.
 - **`physics-rider`** subscribes to `activity.athlete` (rule 11) and takes the frozen weight with the new origin `'profile'`; without it, 75 kg as before. The recording's pre-roll keeps the latest `athlete.profile-changed`; a continued ride re-enters it from the journal (ADR 0057).
-- The chosen source unavailable without a cache: the ride uses the defaults, and Today's start card says so. **[Open]** use the ridrs profile instead.
+- The chosen source unavailable without a cache: the ride uses the defaults, and Today's start card says so; the ridrs profile is not used in its place, since that would mix two sources (maintainer).
 
 ### The settings page
 
 - A section **"Data sources"** in `ui-settings` with one row per data type. The profile and the calendar offer **one chip per provider** (the topic's keys), the chosen one pressed, and beside it the source's status ("Connected as …", "Offline · last loaded …", "Not connected" with Connect, which calls `training.connect`). The library row lists its providers and is not a choice. During a ride, a change says that it applies from the next ride.
-- **Chips, not a dropdown** (rule 12): a focused native `<select>` takes the arrow keys, and its open list differs per platform. A picker screen replaces the chips only if a type has more than about four providers. **[Open]** chips.
+- **Chips, not a dropdown** (rule 12): a focused native `<select>` takes the arrow keys, and its open list differs per platform. A picker screen replaces the chips only if a type has more than about four providers. (Chips: maintainer.)
 - The Me area's FTP and weight show the chosen source's values and write through `athlete.profile.update`.
 
-### Not decided here
+### Later
 
 - **No SQLite and no effective-dated history** in P7: a ride freezes its own values, and intervals.icu keeps its own history. Both wait for a use case (charts of FTP or weight) behind the same access.
-- **The calendar write** is "plan a library workout on a day" (with its steps), then move and remove. **[Open]** whether the Training area's own entries (rest, note) are written too.
-- **Built-in ridrs workouts** for the library, shipped as files like the drivetrain specifications. **[Open]**
+- **The calendar write** is "plan a library workout on a day" (with its steps), then move and remove. The Training area's own entries (rest, note, outdoor) stay in the ridrs calendar and are not written to intervals.icu (maintainer).
+- **Built-in ridrs workouts**: not in these stages (maintainer); the ridrs library stays empty until riding a workout gives them a use, then they ship as files like the drivetrain specifications.
 - **Riding a workout** (steps to `trainer.target-power` inputs with the frozen FTP), the use case that makes the library and the calendar worth more than a list: proposed as the next stage, with its own ADR.
 - **Ride uploads as a data type** with chosen targets, once a second target exists.
 - The bicycle stays a ridrs-only user document, not part of the profile.

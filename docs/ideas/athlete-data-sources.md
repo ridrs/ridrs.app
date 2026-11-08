@@ -2,7 +2,7 @@
 
 # Proposal: Data Sources for the Athlete Profile and the Training Plan (P7, P8, P9)
 
-**Status: proposal, 2026-11-08; recorded as [ADR 0073](../decisions/0073-data-sources-for-the-athlete-profile-and-the-training-plan.md) (proposed), awaiting the maintainer's answers to section G.** It continues [persistence-and-recovery.md](persistence-and-recovery.md) and [ADR 0052](../decisions/0052-persistence-domains-and-plan.md) with phases P7 (local athlete profile), P8 (local calendar) and P9 (providers, intervals.icu only). It starts from the maintainer's idea of 2026-11-08, checks it against the code as it is today, challenges parts of it and proposes stages. Each stage starts with failing Cucumber scenarios and gets its own ADR (AGENTS.md rules 1–3).
+**Status: proposal, 2026-11-08; accepted as [ADR 0073](../decisions/0073-data-sources-for-the-athlete-profile-and-the-training-plan.md) on 2026-11-08, every open question answered as proposed (section G).** Where the ADR differs, the ADR holds. It continues [persistence-and-recovery.md](persistence-and-recovery.md) and [ADR 0052](../decisions/0052-persistence-domains-and-plan.md) with phases P7 (local athlete profile), P8 (local calendar) and P9 (providers, intervals.icu only). It starts from the maintainer's idea of 2026-11-08, checks it against the code as it is today, challenges parts of it and proposes stages. Each stage starts with failing Cucumber scenarios and gets its own ADR (AGENTS.md rules 1–3).
 
 ## Summary
 
@@ -167,6 +167,8 @@ One chip per provider in the topic's keys (C.5); the chosen one pressed. Next to
 D1 and D2 need no network and give the first real setting; D3–D4 rework existing intervals.icu code; D5 is the largest stage and can split into calendar read, library read and calendar write.
 
 ## G. Open questions for the maintainer
+
+Answered on 2026-11-08: "Accept all as proposed". 1 data sources; 2 chips; 3 defaults; 4 today's wellness weight only and the FTP field that was read; 5 only library workouts are written; 6 no built-in workouts yet; 7 uploads later; 8 history and SQLite wait.
 
 1. Name: "data sources" (proposed) instead of "sync providers" (C.1)?
 2. Chips instead of a dropdown on the settings page (C.5)?

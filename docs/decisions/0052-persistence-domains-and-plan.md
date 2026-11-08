@@ -2,7 +2,7 @@
 
 # ADR 0052: Persistence Domains and the Persistence Plan
 
-Status: accepted on 2026-11-05 by the maintainer, from the proposal [persistence-and-recovery.md](../ideas/persistence-and-recovery.md). Phases P0–P5 are implemented ([ADR 0053](0053-secrets-in-an-encrypted-app-file.md) to [ADR 0057](0057-continuing-an-interrupted-ride.md)); P6 and later wait for their use cases.
+Status: accepted on 2026-11-05 by the maintainer, from the proposal [persistence-and-recovery.md](../ideas/persistence-and-recovery.md). Phases P0–P5 are implemented ([ADR 0053](0053-secrets-in-an-encrypted-app-file.md) to [ADR 0057](0057-continuing-an-interrupted-ride.md)); P6 and later wait for their use cases. Amended by [ADR 0073](0073-data-sources-for-the-athlete-profile-and-the-training-plan.md) (2026-11-08): P7–P9 as data sources; the athlete profile keeps current values in a JSON document, without SQLite or effective-dated history until a use case needs them.
 
 ## Context
 
