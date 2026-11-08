@@ -7,7 +7,7 @@ import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 're
 import { createRoot } from 'react-dom/client';
 import configured from '../layout.json' with { type: 'json' };
 import { messages } from './i18n/index.ts';
-import { ThemePicker } from './themes.tsx';
+import { KineticStyle } from './kinetic.tsx';
 import { BREAKPOINTS, type Breakpoint, breakpointAt, columnsAt, type Layout, layoutSchema, type Tile } from './layout.ts';
 
 /**
@@ -274,6 +274,7 @@ function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readon
   return (
     <div className="ms-root" data-testid="main-layout" data-breakpoint={breakpoint}>
       <style>{CSS}</style>
+      <KineticStyle doc={view.document} />
       {layout.menu ? <div className="ms-menu" data-testid="slot-main-menu" ref={menu} inert={open} aria-hidden={open || undefined} /> : null}
       <div className="ms-column" inert={open} aria-hidden={open || undefined}>
         {layout.topBar || layout.actions.length > 0 ? (
@@ -292,7 +293,6 @@ function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readon
         <div className="ms-outlet" data-testid="main-outlet" ref={outlet} hidden={!framing} />
       </div>
       <Dialog ctx={ctx} open={open} container={dialog} />
-      <ThemePicker doc={view.document} />
     </div>
   );
 }
