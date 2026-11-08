@@ -23,6 +23,25 @@ Do not introduce or change licenses without maintainer approval.
 12. **Keyboard and remote first.** Every user interface is fully usable with the arrow keys, Enter and Back (Escape, Backspace or the platform back button) alone: arrows move the focus, Enter activates, Back leaves the current view. The focused element is always clearly visible, and no element looks focused or selected unless it is.
 13. **Simulation on the bus, app state beside it.** The event bus carries what a replay or a continued ride needs: rider input that changes the ride, device data, derived events. App state (accounts, catalogs, progress) is state by key (`ctx.state`), app commands are services (`ctx.services`, `ctx.call`); neither is recorded. A value both the app and a ride use enters the ride as an input. Simulation plugins never read state or call services.
 
+## Feature Workflow: One Worktree per Feature
+
+Features are developed in parallel, each in its own Git worktree. The main checkout stays on `main` and is never used for feature work.
+
+1. **Start in a new worktree.** Before the first change to a new feature, create a branch and a worktree next to the repository, not inside it (tools such as `biome check .` and Vitest would otherwise scan it):
+   ```bash
+   git worktree add -b feat/<name> ../ridrs_app-worktrees/<name> main
+   cd ../ridrs_app-worktrees/<name> && pnpm install
+   ```
+   Use `feat/`, `fix/` or `docs/` as the branch prefix. If you are already in a feature worktree, keep working there.
+2. **Stay in it.** Read, edit, build, test and run apps (including `tauri dev`) only inside that worktree. Never change files of the main checkout or of another feature's worktree.
+3. **Done means all checks pass.** A feature is complete only when it meets the Standing Engineering Rules and, in its worktree, `pnpm typecheck`, `pnpm lint` and `pnpm test` all pass, with no skipped or weakened scenarios.
+4. **Then suggest, don't act.** When the feature is complete, report the check results and suggest committing and merging into `main`. Commit, merge or push only after the maintainer agrees. Before merging, rebase the branch onto the current `main` and run the checks again; merge with a fast-forward:
+   ```bash
+   git rebase main
+   cd <main checkout> && git merge --ff-only feat/<name>
+   ```
+5. **Clean up after the merge.** Remove the worktree and the branch: `git worktree remove ../ridrs_app-worktrees/<name>` and `git branch -d feat/<name>`.
+
 ## Building and Installing the Apps
 
 How to build the release companion and install and launch it on an Android phone over `adb`, including the local environment pitfalls (no `cargo` on the `PATH`, OpenJ9 JDK, signing): [README, "Release companion on an Android phone"](README.md#release-companion-on-an-android-phone).
