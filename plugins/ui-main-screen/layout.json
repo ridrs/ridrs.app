@@ -2,7 +2,7 @@
   "version": 1,
   "menu": "ui-main-menu/menu",
   "topBar": "ui-main-top-bar/top-bar",
-  "actions": ["ui-search/search", "ui-devices/status", "ui-settings/settings", "ui-area-me/profile"],
+  "actions": ["ui-search/search", "ui-devices/status", "ui-settings/settings", "ui-garage/garage", "ui-area-me/profile"],
   "tiles": [
     { "contribution": "ui-ride-recovery/interrupted-ride", "columns": { "wide": 12 } },
     { "contribution": "ui-tile-ride-start/ride-start", "columns": { "wide": 8, "medium": 12 } },
@@ -12,5 +12,6 @@
     { "contribution": "ui-area-me/weekly-goal", "columns": { "wide": 4, "medium": 6 } },
     { "contribution": "ui-training-plan/next-workout", "columns": { "wide": 6, "medium": 6 } }
   ],
-  "screens": ["ride", "training", "events", "me", "garage", "search", "settings", "setup"]
+  "screens": ["ride", "training", "events"],
+  "dialogs": ["search", "setup", "settings", "garage", "me"]
 }

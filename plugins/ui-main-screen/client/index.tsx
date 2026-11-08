@@ -2,7 +2,7 @@
 
 import { activityStateChangedEvent } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import configured from '../layout.json' with { type: 'json' };
 import { BREAKPOINTS, type Breakpoint, breakpointAt, columnsAt, type Layout, layoutSchema, type Tile } from './layout.ts';
@@ -53,6 +53,27 @@ const CSS = `
 .ms-outlet[hidden] { display: none; }
 .ms-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--ridrs-gap); }
 .ms-grid > [data-tile] > [data-contribution] { height: 100%; }
+/* A screen in a dialog (ADR 0071) floats over the page, which stays as it is beneath it. */
+.ms-dialog { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 40px;
+  background: rgb(4 8 16 / .66); backdrop-filter: blur(6px); }
+.ms-dialog[hidden] { display: none; }
+.ms-dialog-panel { position: relative; display: flex; flex-direction: column; width: min(960px, 100%);
+  max-height: 100%; overflow: hidden; border: 1px solid var(--ridrs-line); border-radius: 20px;
+  background: var(--ridrs-bg); box-shadow: 0 24px 64px rgb(0 0 0 / .5); }
+.ms-dialog-panel:focus { outline: none; }
+.ms-dialog-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; overflow: auto; }
+.ms-dialog-close { position: absolute; top: 16px; right: 16px; z-index: 1; width: 40px; height: 40px;
+  padding: 0; border: 1px solid var(--ridrs-line); border-radius: 50%; background: var(--ridrs-surface);
+  color: var(--ridrs-text); cursor: pointer; }
+.ms-dialog-close:hover { background: var(--ridrs-surface-raised); }
+.ms-dialog-close:focus-visible { outline: 3px solid var(--ridrs-focus); outline-offset: 2px; }
+.ms-dialog-close::before, .ms-dialog-close::after { content: ""; position: absolute; top: 50%; left: 50%;
+  width: 16px; height: 2px; border-radius: 1px; background: currentColor; }
+.ms-dialog-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.ms-dialog-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.ms-root[data-breakpoint="compact"] .ms-dialog { padding: 0; }
+.ms-root[data-breakpoint="compact"] .ms-dialog-panel { width: 100%; height: 100%; border: 0;
+  border-radius: 0; }
 `;
 
 /** The breakpoint of the window's width, following it through media queries. */
@@ -149,18 +170,78 @@ function Home({
   );
 }
 
+/**
+ * The dialog over the page: a screen of `dialogs` in the layout. While it is open, the page beneath
+ * it is inert, so the arrows stay in the dialog; it starts with the focus on its panel and gives
+ * the focus back to where it was once it closes. Back, Close and the backdrop leave the screen.
+ */
+function Dialog({
+  ctx,
+  open,
+  container,
+}: {
+  readonly ctx: UiContext;
+  readonly open: boolean;
+  readonly container: RefObject<HTMLDivElement | null>;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  const opener = useRef<Element | null>(null);
+  // In the effect, not its cleanup: the page beneath is no longer inert only once it committed.
+  useLayoutEffect(() => {
+    if (open) {
+      opener.current = panel.current?.ownerDocument.activeElement ?? null;
+      panel.current?.focus();
+    } else if (opener.current) {
+      const back = opener.current;
+      opener.current = null;
+      if (back instanceof HTMLElement && back.isConnected) {
+        back.focus();
+      }
+    }
+  }, [open]);
+  return (
+    // The backdrop is a pointer's way out; keys leave with Back.
+    <div
+      className="ms-dialog"
+      role="dialog"
+      aria-modal="true"
+      hidden={!open}
+      data-testid="main-dialog"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) ctx.leave();
+      }}
+    >
+      <div ref={panel} className="ms-dialog-panel" tabIndex={-1}>
+        {open ? (
+          <button type="button" className="ms-dialog-close" aria-label="Close" onClick={() => ctx.leave()} />
+        ) : null}
+        <div ref={container} className="ms-dialog-body" />
+      </div>
+    </div>
+  );
+}
+
 function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readonly layout: Layout; readonly view: Window }) {
   const breakpoint = useBreakpoint(view);
   const menu = useSlot(ctx, 'main/menu', layout.menu);
   // The screens the layout names take the place of the top bar and the tiles; the menu stays.
+  // Its dialog screens open over the page, which stays as it is (ADR 0071).
   const outlet = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState<string>();
-  useEffect(() => ctx.onNavigated(setShown), [ctx]);
+  const dialog = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState<{ readonly screen: string; readonly page: string }>();
+  useEffect(() => ctx.onNavigated((screen, page) => setShown({ screen, page })), [ctx]);
   useEffect(
-    () => (outlet.current ? ctx.outlet(outlet.current, { screens: layout.screens }) : undefined),
+    () =>
+      outlet.current && dialog.current
+        ? ctx.outlet(outlet.current, {
+            screens: layout.screens,
+            dialog: { container: dialog.current, screens: layout.dialogs },
+          })
+        : undefined,
     [ctx, layout],
   );
-  const framing = shown !== undefined && layout.screens.includes(shown);
+  const framing = shown !== undefined && layout.screens.includes(shown.page);
+  const open = shown !== undefined && shown.screen !== shown.page && layout.dialogs.includes(shown.screen);
 
   // Navigation follows the activity state, not the click: a replayed "running" state after a
   // reload leads back into the ride as well.
@@ -175,13 +256,14 @@ function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readon
   );
 
   // Reading order is the keyboard's order (ADR 0045): the menu, the top bar, the global actions,
-  // then the tiles or the screen in the content area. The top bar and the tiles are unmounted
-  // while another screen is there; the menu and the actions stay.
+  // then the tiles or the screen in the content area, then the dialog. The top bar and the tiles
+  // are unmounted while another screen is there; the menu and the actions stay.
+  // Beneath a dialog the page is inert and hidden from assistive technology.
   return (
     <div className="ms-root" data-testid="main-layout" data-breakpoint={breakpoint}>
       <style>{CSS}</style>
-      {layout.menu ? <div className="ms-menu" data-testid="slot-main-menu" ref={menu} /> : null}
-      <div className="ms-column">
+      {layout.menu ? <div className="ms-menu" data-testid="slot-main-menu" ref={menu} inert={open} aria-hidden={open || undefined} /> : null}
+      <div className="ms-column" inert={open} aria-hidden={open || undefined}>
         {layout.topBar || layout.actions.length > 0 ? (
           <div className="ms-head">
             {layout.topBar && !framing ? (
@@ -197,6 +279,7 @@ function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readon
         {framing ? null : <Home ctx={ctx} layout={layout} breakpoint={breakpoint} />}
         <div className="ms-outlet" data-testid="main-outlet" ref={outlet} hidden={!framing} />
       </div>
+      <Dialog ctx={ctx} open={open} container={dialog} />
     </div>
   );
 }

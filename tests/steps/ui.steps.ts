@@ -45,19 +45,51 @@ function contributionsIn(slot: HTMLElement): string[] {
     .map((child) => child.dataset.contribution ?? '');
 }
 
+/** The modal dialog a screen is shown in over the page, if one is open. */
+const openDialog = (root: HTMLElement) =>
+  root.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]:not([hidden])');
+
+/**
+ * The innermost screen of the page: a framed screen is shown inside its frame, so the screens
+ * beneath a dialog form one chain.
+ */
+function pageScreen(root: HTMLElement): HTMLElement | undefined {
+  const dialog = openDialog(root);
+  const screens = [...root.querySelectorAll<HTMLElement>('[data-screen]')].filter(
+    (screen) => !dialog?.contains(screen),
+  );
+  for (const [index, inner] of screens.slice(1).entries()) {
+    assert.ok(screens[index]?.contains(inner));
+  }
+  return screens.at(-1);
+}
+
 async function screenShown(root: HTMLElement, screenId: string): Promise<void> {
   await waitFor(() => {
-    // A framed screen is shown inside its frame: the screens form one chain, the innermost shown.
-    const screens = [...root.querySelectorAll<HTMLElement>('[data-screen]')];
-    for (const [index, inner] of screens.slice(1).entries()) {
-      assert.ok(screens[index]?.contains(inner));
-    }
-    const shown = screens.at(-1);
+    const shown = openDialog(root)?.querySelector<HTMLElement>('[data-screen]') ?? pageScreen(root);
     assert.equal(shown?.dataset.screen, screenId);
     // A screen counts as shown once its component rendered something.
     assert.ok(shown?.childElementCount, `Screen "${screenId}" rendered nothing`);
   });
 }
+
+Then(
+  'the {string} screen is shown in a dialog over the {string} screen',
+  async function (this: RidrsWorld, screenId: string, pageId: string) {
+    await screenShown(ui(this), screenId);
+    await waitFor(() => {
+      assert.ok(openDialog(ui(this)), `Screen "${screenId}" is not in a dialog`);
+      const page = pageScreen(ui(this));
+      assert.equal(page?.dataset.screen, pageId);
+      assert.ok(page?.childElementCount, `Screen "${pageId}" rendered nothing`);
+    });
+  },
+);
+
+Then('no dialog is shown', async function (this: RidrsWorld) {
+  // `ok`, not `equal`: a diff against the element found would print the whole page.
+  await waitFor(() => assert.ok(openDialog(ui(this)) === null, 'A dialog is shown'));
+});
 
 async function widget(world: RidrsWorld, kind: string): Promise<HTMLElement> {
   return within(ui(world)).findByTestId(`widget-${kind}`);

@@ -2,7 +2,7 @@
 
 # ADR 0059: The App's Areas as a Clickable Preview; User Settings for UI Clients
 
-Status: accepted on 2026-11-06 by the maintainer and implemented the same day. Takes up the menu structure of [main-menu-structure.md](../ideas/main-menu-structure.md) as a clickable preview of the early alpha. Extends [ADR 0054](0054-plugin-settings-and-remembered-devices.md) (the `user` scope, settings for UI clients) and [ADR 0058](0058-main-screen-layout-by-configuration.md) (global actions, the areas in the content area). Amended by [ADR 0060](0060-equipment-garage-and-the-frozen-bicycle.md): the garage (`ui-garage`, no preview: it changes the ride) is a sixth menu entry after Me; Me keeps the achievements.
+Status: accepted on 2026-11-06 by the maintainer and implemented the same day. Takes up the menu structure of [main-menu-structure.md](../ideas/main-menu-structure.md) as a clickable preview of the early alpha. Extends [ADR 0054](0054-plugin-settings-and-remembered-devices.md) (the `user` scope, settings for UI clients) and [ADR 0058](0058-main-screen-layout-by-configuration.md) (global actions, the areas in the content area). Amended by [ADR 0060](0060-equipment-garage-and-the-frozen-bicycle.md): the garage (`ui-garage`, no preview: it changes the ride) is a sixth menu entry after Me; Me keeps the achievements. Amended by [ADR 0071](0071-global-screens-in-a-dialog-over-the-page.md): Me and the garage leave the menu for the top bar, and the global screens open in a dialog over the page.
 
 ## Context
 

@@ -63,7 +63,7 @@ Feature: Changes in the app's areas take effect at once and are kept
     Then the calendar day "Friday" lists "Recovery Spin"
 
   Scenario: The FTP is changed in steps and kept
-    When I press "Me"
+    When I press "Profile"
     And I press "Raise FTP"
     And I press "Raise FTP"
     Then the FTP reads "210 W"

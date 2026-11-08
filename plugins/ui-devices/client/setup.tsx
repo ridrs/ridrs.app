@@ -47,9 +47,6 @@ import {
   TrashIcon,
 } from './theme.tsx';
 
-/** Where Continue leads. */
-const MAIN = 'main';
-
 const TONE_COLOR: Record<Tone, string> = {
   ok: COLORS.lime,
   busy: COLORS.cyan,
@@ -1090,7 +1087,7 @@ export function DeviceSetupView({
   }, [details]);
   // Back closes the details, or leaves the setup.
   const leave = useRef(close);
-  leave.current = details ? close : () => ctx.navigate(MAIN);
+  leave.current = details ? close : () => ctx.leave();
   useEffect(() => ctx.onBack(() => leave.current()), [ctx]);
   return (
     <main
@@ -1238,7 +1235,7 @@ export function DeviceSetupView({
           <button
             type="button"
             className="rd-continue"
-            onClick={() => ctx.navigate(MAIN)}
+            onClick={() => ctx.leave()}
             style={{
               marginTop: 22,
               padding: 18,

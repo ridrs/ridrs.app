@@ -3,7 +3,6 @@
 import {
   ActionButton,
   AreaPage,
-  MenuEntry,
   reactComponent,
   TodayCard,
   Toggle,
@@ -189,7 +188,6 @@ function WeeklyGoalView({ ctx }: { readonly ctx: UiContext }) {
 
 export const MeArea = reactComponent((ctx) => <MeAreaView ctx={ctx} />);
 export const WeeklyGoalTile = reactComponent((ctx) => <WeeklyGoalView ctx={ctx} />);
-export const MeMenuEntry = reactComponent((ctx) => <MenuEntry ctx={ctx} screen="me" label="Me" icon={USER} />);
 export const ProfileAction = reactComponent((ctx) => (
   <ActionButton ctx={ctx} screen="me" label="Profile" icon={USER} />
 ));

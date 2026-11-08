@@ -1,6 +1,7 @@
 @ui
 Feature: The garage
-  The garage is an entry of the main menu of its own, after Me; Me keeps only the achievements.
+  The garage is a global action of the top bar, next to the profile (Me), and opens in a dialog over
+  the page that is shown (ADR 0071); Me keeps only the achievements.
   In the garage the rider sets the name, the weight, the shifting mode of the Di2 and the start gear; every
   change is kept at once, without a Save, and handed to the next ride (ADR 0060). Today's start
   card names the bicycle. The garage works, so it carries no "Preview" label. In a ride the gear
@@ -13,22 +14,23 @@ Feature: The garage
     And the main screen is 1400 px wide
     And the ridrs UI is shown
 
-  Scenario: The menu offers the garage after Me
-    Then the menu offers "Today, Me, Garage" in this order
+  Scenario: The top bar offers the garage next to the profile, and the menu offers neither
+    Then the top bar offers "Garage, Profile" in this order
+    And the menu offers "Today" in this order
 
   Scenario: Me keeps the achievements, apart from the garage
-    When I press "Me"
+    When I press "Profile"
     Then the page shows the section "Achievements" and no section "Garage"
 
-  Scenario: The garage opens beside the menu and Back returns to Today
+  Scenario: The garage opens in a dialog over Today and Back closes it
     When I press "Garage"
-    Then the "garage" screen is shown
-    And the slot "main/menu" contains the contribution "ui-main-menu/menu"
-    And the menu entry "Garage" is the current page
+    Then the "garage" screen is shown in a dialog over the "main" screen
+    And the menu entry "Today" is the current page
     And the page offers no "Save" button
     And the screen is not marked as a preview
     When I press Back
     Then the "main" screen is shown
+    And no dialog is shown
 
   Scenario: A change is kept at once and handed to the next ride
     When I press "Garage"
@@ -50,10 +52,9 @@ Feature: The garage
   Scenario: The garage is used with the keyboard alone
     When I move the focus to "Garage"
     And I press Enter
-    Then the "garage" screen is shown
-    And the focus is on "Garage"
+    Then the "garage" screen is shown in a dialog over the "main" screen
     When I press the arrow key "Down"
-    Then the focus is on "Profile"
+    Then the focus is on "Close"
     When I press the arrow key "Down"
     Then the focus is on "Name"
     When I press the arrow key "Down"
@@ -66,6 +67,7 @@ Feature: The garage
     Then the button "Full synchro" is on
     When I press Back
     Then the "main" screen is shown
+    And the focus is on "Garage"
 
   Scenario: The gear widget shows and shifts the chainring and the sprocket
     When I press "Start ride"

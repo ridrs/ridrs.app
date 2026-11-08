@@ -24,12 +24,6 @@
     ],
     "contributions": [
       {
-        "id": "menu-item",
-        "extensionPoint": "menu/item",
-        "export": "MeMenuEntry",
-        "order": 40
-      },
-      {
         "id": "weekly-goal",
         "extensionPoint": "main/tile",
         "export": "WeeklyGoalTile"

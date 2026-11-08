@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { activityStateChangedEvent, equipmentBicycleChangedEvent, type ShiftMode } from '@ridrs/contracts';
-import { iconStyle, MenuEntry, PREVIEW_CSS, reactComponent, useBack, userDocument } from '@ridrs/ui-preview';
+import { ActionButton, iconStyle, PREVIEW_CSS, reactComponent, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useState } from 'react';
 import {
@@ -14,6 +14,7 @@ import {
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const WRENCH = new URL('./assets/icons/wrench.svg', import.meta.url).href;
+const WAREHOUSE = new URL('./assets/icons/warehouse.svg', import.meta.url).href;
 
 const CSS = `
 .ga-row { display: grid; grid-template-columns: 170px auto; align-items: center; gap: 12px; }
@@ -208,6 +209,6 @@ function GarageView({ ctx }: { readonly ctx: UiContext }) {
 }
 
 export const GarageScreen = reactComponent((ctx) => <GarageView ctx={ctx} />);
-export const GarageMenuEntry = reactComponent((ctx) => (
-  <MenuEntry ctx={ctx} screen="garage" label="Garage" icon={WRENCH} />
+export const GarageAction = reactComponent((ctx) => (
+  <ActionButton ctx={ctx} screen="garage" label="Garage" icon={WAREHOUSE} />
 ));

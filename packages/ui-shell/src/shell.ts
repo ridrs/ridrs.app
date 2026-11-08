@@ -13,7 +13,14 @@ import {
   type UiRegistryScreen,
 } from '@ridrs/contracts';
 import { FrameClock, type FrameSource } from '@ridrs/presentation';
-import type { UiBridge, UiComponent, UiContext, UiLogger, Unsubscribe } from '@ridrs/ui-sdk';
+import type {
+  OutletOptions,
+  UiBridge,
+  UiComponent,
+  UiContext,
+  UiLogger,
+  Unsubscribe,
+} from '@ridrs/ui-sdk';
 import { keyboardNavigation } from './keyboard.ts';
 
 export interface ShellOptions {
@@ -51,6 +58,20 @@ interface Slot {
   readonly mounted: Map<string, { readonly wrapper: HTMLElement; readonly handle: Mounted }>;
 }
 
+/** Where an outlet shows screens: its container and the ids of the screens it takes over. */
+interface Place {
+  readonly container: HTMLElement;
+  readonly screens: ReadonlySet<string>;
+}
+
+/** A screen mounted into a place. */
+interface Placed {
+  readonly screen: UiRegistryScreen;
+  readonly container: HTMLElement;
+  readonly wrapper: HTMLElement;
+  readonly handle: Mounted;
+}
+
 const keyOf = (entry: Entry) => `${entry.pluginId}/${entry.id}`;
 
 /** The same screen of the same plugin, whichever registry revision it comes from. */
@@ -64,7 +85,8 @@ const sameScreen = (a: UiRegistryScreen | undefined, b: UiRegistryScreen | undef
 
 /**
  * Renders one screen of the UI registry at a time into `root` (or into the outlet of the screen in
- * `root`, which stays mounted around it, when that screen takes it over), mounts contributions into
+ * `root`, which stays mounted around it, when that screen takes it over; or into its dialog over
+ * the page, which stays mounted beneath it, ADR 0071), mounts contributions into
  * the slots screens and contributions open, and keeps everything in sync with registry changes.
  * Owns the one frame clock that components reach through `ctx.frames`. Knows no screen,
  * extension point or plugin by name.
@@ -104,21 +126,17 @@ export function mountShell(
   let active: { readonly screen: UiRegistryScreen; readonly handle: Mounted } | undefined;
   /** The shown screen while it is in the outlet of `active`. */
   let wanted: UiRegistryScreen | undefined;
-  let outlet:
-    | { readonly container: HTMLElement; readonly screens: ReadonlySet<string> }
-    | undefined;
-  let framed:
-    | {
-        readonly screen: UiRegistryScreen;
-        readonly container: HTMLElement;
-        readonly wrapper: HTMLElement;
-        readonly handle: Mounted;
-      }
-    | undefined;
-  const navigated = new Set<(screen: string) => void>();
-  let announced: string | undefined;
+  /** The shown screen while it is in the dialog of `active`, over the page. */
+  let over: UiRegistryScreen | undefined;
+  let outlet: (Place & { readonly dialog?: Place }) | undefined;
+  let framed: Placed | undefined;
+  let overlaid: Placed | undefined;
+  const navigated = new Set<(screen: string, page: string) => void>();
+  let announced: { readonly screen: string; readonly page: string } | undefined;
   let disposed = false;
-  const shownScreen = () => wanted ?? active?.screen;
+  /** The page: the screen beneath a dialog, or the shown screen. */
+  const pageScreen = () => wanted ?? active?.screen;
+  const shownScreen = () => over ?? pageScreen();
 
   const loadModule = (pluginId: string) => {
     let module = modules.get(pluginId);
@@ -247,13 +265,17 @@ export function mountShell(
         // Deferred so a component may navigate from inside its own render or event handler.
         queueMicrotask(() => navigate(path));
       },
+      leave: () => {
+        queueMicrotask(leave);
+      },
       hasScreen: (path) => registry.screens.some((s) => s.id === path),
       onNavigated: (handler) => {
-        const entryHandler = (screen: string) => handler(screen);
+        const entryHandler = (screen: string, page: string) => handler(screen, page);
         navigated.add(entryHandler);
         const shown = shownScreen();
-        if (shown) {
-          handler(shown.id);
+        const page = pageScreen();
+        if (shown && page) {
+          handler(shown.id, page.id);
         }
         return own(() => navigated.delete(entryHandler));
       },
@@ -262,7 +284,7 @@ export function mountShell(
         return bridge.settings(entry.pluginId);
       },
       outlet: (outletContainer, outletOptions) =>
-        own(openOutlet(entry, outletContainer, outletOptions.screens)),
+        own(openOutlet(entry, outletContainer, outletOptions)),
     };
 
     const fail = (reason: unknown) => {
@@ -360,40 +382,51 @@ export function mountShell(
     };
   };
 
-  /** Mounts the wanted screen into the outlet, or unmounts it when either is gone or changed. */
-  const syncFramed = () => {
-    const fits = wanted !== undefined && outlet?.screens.has(wanted.id) === true;
+  /** Keeps `screen` mounted in `place`; unmounts what is there when either is gone or changed. */
+  const placeScreen = (
+    placed: Placed | undefined,
+    screen: UiRegistryScreen | undefined,
+    place: Place | undefined,
+  ): Placed | undefined => {
+    const fits = screen !== undefined && place?.screens.has(screen.id) === true;
     if (
-      framed &&
-      (!fits || !sameScreen(framed.screen, wanted) || framed.container !== outlet?.container)
+      placed &&
+      (!fits || !sameScreen(placed.screen, screen) || placed.container !== place?.container)
     ) {
-      framed.handle.unmount();
-      framed.wrapper.remove();
-      framed = undefined;
+      placed.handle.unmount();
+      placed.wrapper.remove();
+    } else if (placed) {
+      return placed;
     }
-    if (wanted && outlet && fits && !framed) {
-      const wrapper = document.createElement('div');
-      wrapper.dataset.screen = wanted.id;
-      outlet.container.appendChild(wrapper);
-      framed = {
-        screen: wanted,
-        container: outlet.container,
-        wrapper,
-        handle: mountComponent(wanted, wrapper),
-      };
+    if (!screen || !place || !fits) {
+      return undefined;
     }
+    const wrapper = document.createElement('div');
+    wrapper.dataset.screen = screen.id;
+    place.container.appendChild(wrapper);
+    return { screen, container: place.container, wrapper, handle: mountComponent(screen, wrapper) };
+  };
+
+  /** Mounts the wanted screen into the outlet and the one over the page into its dialog. */
+  const syncFramed = () => {
+    framed = placeScreen(framed, wanted, outlet);
+    overlaid = placeScreen(overlaid, over, outlet?.dialog);
   };
 
   const openOutlet = (
     entry: Entry,
     container: HTMLElement,
-    screens: readonly string[],
+    { screens, dialog }: OutletOptions,
   ): Unsubscribe => {
     if (entry !== active?.screen) {
       logger.warn(`"${keyOf(entry)}" is not the screen in the root; its outlet stays empty`);
       return () => {};
     }
-    const opened = { container, screens: new Set(screens) };
+    const opened = {
+      container,
+      screens: new Set(screens),
+      dialog: dialog && { container: dialog.container, screens: new Set(dialog.screens) },
+    };
     outlet = opened;
     syncFramed();
     return () => {
@@ -405,11 +438,16 @@ export function mountShell(
   };
 
   const announce = () => {
-    const shown = shownScreen()?.id;
-    if (shown !== undefined && shown !== announced) {
-      announced = shown;
+    const screen = shownScreen()?.id;
+    const page = pageScreen()?.id;
+    if (
+      screen !== undefined &&
+      page !== undefined &&
+      (screen !== announced?.screen || page !== announced.page)
+    ) {
+      announced = { screen, page };
       for (const handler of [...navigated]) {
-        handler(shown);
+        handler(screen, page);
       }
     }
   };
@@ -427,15 +465,20 @@ export function mountShell(
   };
 
   /**
-   * Shows a screen: in the outlet of the screen in the root when that one took it over, otherwise
-   * in the root. The screen in the root stays mounted when it is shown again.
+   * Shows a screen: in the dialog of the screen in the root over the page, or in its outlet, when
+   * that one took it over, otherwise in the root. The screen in the root stays mounted when it is
+   * shown again.
    */
   const show = (screen: UiRegistryScreen | undefined) => {
-    if (screen && !sameScreen(active?.screen, screen) && outlet?.screens.has(screen.id)) {
+    const inRoot = sameScreen(active?.screen, screen);
+    over = screen && !inRoot && outlet?.dialog?.screens.has(screen.id) ? screen : undefined;
+    if (over) {
+      // The page stays as it is beneath the dialog.
+    } else if (screen && !inRoot && outlet?.screens.has(screen.id)) {
       wanted = screen;
     } else {
       wanted = undefined;
-      if (!sameScreen(active?.screen, screen)) {
+      if (!inRoot) {
         mountRoot(screen);
       }
     }
@@ -459,6 +502,20 @@ export function mountShell(
     show(screen);
   }
 
+  /** Closes the dialog over the page, or goes to the first screen from any other screen. */
+  function leave(): void {
+    if (disposed) {
+      return;
+    }
+    if (over) {
+      over = undefined;
+      syncFramed();
+      announce();
+      return;
+    }
+    navigate(initialScreen);
+  }
+
   const onRegistry = (next: UiRegistry) => {
     registry = next;
     const present = new Set([...next.screens, ...next.contributions].map((e) => e.pluginId));
@@ -472,11 +529,13 @@ export function mountShell(
     // back once it opens its outlet again; without it, that screen is shown on its own.
     const around = active && next.screens.find((s) => s.id === active?.screen.id);
     const inside = wanted && next.screens.find((s) => s.id === wanted?.id);
-    if (around && wanted) {
+    const overInside = over && next.screens.find((s) => s.id === over?.id);
+    if (around && (wanted || over)) {
       if (!sameScreen(around, active?.screen)) {
         mountRoot(around);
       }
       wanted = inside;
+      over = overInside;
       syncFramed();
       announce();
     } else {
@@ -484,6 +543,7 @@ export function mountShell(
       const current = next.screens.find((s) => s.id === shown?.id);
       if (!around) {
         wanted = undefined;
+        over = undefined;
         mountRoot(undefined);
       }
       show(current ?? defaultScreen());

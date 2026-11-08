@@ -2,7 +2,7 @@
 
 # ADR 0058: The Main Screen's Layout by Configuration
 
-Status: accepted on 2026-11-05 (decisions L1–L9 of the main screen layout brief, chosen by the maintainer) and implemented the same day. Amended on 2026-11-06 at the maintainer's request: the menu stays while the device setup is shown (screens in the content area). Extended by [ADR 0059](0059-app-areas-as-a-clickable-preview.md): global actions (`main/action`), the areas, Home renamed Today, Devices moved from the menu to the actions.
+Status: accepted on 2026-11-05 (decisions L1–L9 of the main screen layout brief, chosen by the maintainer) and implemented the same day. Amended on 2026-11-06 at the maintainer's request: the menu stays while the device setup is shown (screens in the content area). Extended by [ADR 0059](0059-app-areas-as-a-clickable-preview.md): global actions (`main/action`), the areas, Home renamed Today, Devices moved from the menu to the actions. Amended by [ADR 0071](0071-global-screens-in-a-dialog-over-the-page.md): the layout names the screens shown in a dialog over the page (`dialogs`).
 
 ## Context
 

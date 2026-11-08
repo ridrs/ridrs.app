@@ -6,7 +6,8 @@ Feature: The main screen's layout
   in the layout of ui-main-screen (ADR 0058). A tile the layout does not name is not shown; a
   named tile of a plugin that is not running, or one with nothing to show, takes no space. The
   layout also names the screens that the content area shows instead of the top bar and the
-  tiles, beside the menu; the screens themselves do not know the main screen.
+  tiles, beside the menu, and the screens shown in a dialog over the page (ADR 0071); the screens
+  themselves do not know the main screen.
 
   The width decides the breakpoint: wide from 1200 px, medium from 768 px, compact below. Medium
   keeps the top bar and uses each tile's medium span; compact drops the top bar and gives every
@@ -80,11 +81,11 @@ Feature: The main screen's layout
     When I press the arrow key "Down"
     Then the focus is on "Set up your devices"
 
-  Scenario: A screen the layout names replaces the tiles, and the menu stays
+  Scenario: A dialog screen the layout names opens over the tiles, and the menu stays
     When I press "Devices"
-    Then the "setup" screen is shown
+    Then the "setup" screen is shown in a dialog over the "main" screen
     And the slot "main/menu" contains the contribution "ui-main-menu/menu"
-    And the main screen shows no tiles
+    And the tile "ui-tile-ride-start/ride-start" is shown on the main screen
     And the manifest and the client of "ui-devices" mention none of "frame, ui-main-screen, main/menu"
 
   Scenario: The top bar greets the rider for the time of day

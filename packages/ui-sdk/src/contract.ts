@@ -25,6 +25,11 @@ export interface UiFrame {
 export interface OutletOptions {
   /** The ids of the screens shown in the outlet instead of on their own. */
   readonly screens: readonly string[];
+  /**
+   * The screens shown in `container` over the page instead (ADR 0071): navigating to one keeps
+   * the shown screen, in the outlet or not, mounted beneath it as the page.
+   */
+  readonly dialog?: { readonly container: HTMLElement; readonly screens: readonly string[] };
 }
 
 export interface SlotOptions {
@@ -75,6 +80,11 @@ export interface UiContext {
   onBack(handler: () => void): Unsubscribe;
   /** Switches the active screen; unknown paths are logged and ignored. */
   navigate(path: string): void;
+  /**
+   * Leaves the shown screen, as Back does by default: a screen in a dialog closes and gives the
+   * page beneath it back; any other screen gives way to the first screen (Today).
+   */
+  leave(): void;
   /** Whether a screen with this id is there to navigate to: a screen of a plugin that may be absent. */
   hasScreen(path: string): boolean;
   /**
@@ -85,9 +95,10 @@ export interface UiContext {
   readonly settings: PluginSettingsContext;
   /**
    * Called with the shown screen's id at once and after every navigation. With a screen shown in
-   * an outlet, that is the screen in the outlet, not the screen around it.
+   * an outlet, that is the screen in the outlet, not the screen around it. `page` is the screen
+   * beneath a dialog while one is shown in a dialog (ADR 0071), else the shown screen itself.
    */
-  onNavigated(handler: (screen: string) => void): Unsubscribe;
+  onNavigated(handler: (screen: string, page: string) => void): Unsubscribe;
   /**
    * Takes over the screens named in `options`: navigating to one of them while this screen is
    * shown mounts it into `container` and keeps this screen mounted around it. Elsewhere they are

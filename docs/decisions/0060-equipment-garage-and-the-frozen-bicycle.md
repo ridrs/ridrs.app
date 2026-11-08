@@ -2,7 +2,7 @@
 
 # ADR 0060: The Equipment Garage and the Bicycle Frozen for a Ride
 
-Status: accepted on 2026-11-06 by the maintainer (brief 12, revision 2; "build all three" shifting modes) and implemented the same day. Amends [ADR 0036](0036-config-snapshot-capability.md) (frozen values in the sections), [ADR 0055](0055-virtual-gears-and-never-stale-series.md) (the gears per ride) and [ADR 0059](0059-app-areas-as-a-clickable-preview.md) (the garage is a top-level area of its own, apart from Me's achievements, and is no preview).
+Status: accepted on 2026-11-06 by the maintainer (brief 12, revision 2; "build all three" shifting modes) and implemented the same day. Amends [ADR 0036](0036-config-snapshot-capability.md) (frozen values in the sections), [ADR 0055](0055-virtual-gears-and-never-stale-series.md) (the gears per ride) and [ADR 0059](0059-app-areas-as-a-clickable-preview.md) (the garage is a top-level area of its own, apart from Me's achievements, and is no preview). Amended by [ADR 0071](0071-global-screens-in-a-dialog-over-the-page.md): the garage is a global action of the top bar and opens in a dialog over the page.
 
 ## Context
 

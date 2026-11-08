@@ -10,9 +10,10 @@ const span = z.number().int().min(1).max(12);
 
 /**
  * Which contribution fills the menu, the top bar, which global actions sit beside the top bar and
- * which tiles, in which order and how wide, and which screens the content area shows instead of
- * the tiles, beside the menu and the actions (ADR 0058). The layout is configuration: the screen's
- * code never names a contribution or another screen.
+ * which tiles, in which order and how wide, which screens the content area shows instead of the
+ * tiles, beside the menu and the actions (ADR 0058), and which screens a dialog shows over the
+ * page, leaving it as it is (ADR 0071). The layout is configuration: the screen's code never names
+ * a contribution or another screen.
  */
 export const layoutSchema = z
   .strictObject({
@@ -27,8 +28,9 @@ export const layoutSchema = z
       }),
     ),
     screens: z.array(uiPathSchema).default([]),
+    dialogs: z.array(uiPathSchema).default([]),
   })
-  .superRefine(({ tiles, actions, screens }, issues) => {
+  .superRefine(({ tiles, actions, screens, dialogs }, issues) => {
     actions.forEach((action, index) => {
       if (actions.indexOf(action) !== index) {
         issues.addIssue({
@@ -54,6 +56,15 @@ export const layoutSchema = z
         issues.addIssue({
           code: 'custom',
           path: ['screens', index],
+          message: `"${screen}" is named twice`,
+        });
+      }
+    });
+    dialogs.forEach((screen, index) => {
+      if (dialogs.indexOf(screen) !== index || screens.includes(screen)) {
+        issues.addIssue({
+          code: 'custom',
+          path: ['dialogs', index],
           message: `"${screen}" is named twice`,
         });
       }

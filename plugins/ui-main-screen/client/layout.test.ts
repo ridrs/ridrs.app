@@ -52,6 +52,14 @@ describe('layoutSchema', () => {
     );
   });
 
+  it('shows no screen in a dialog unless it names it, once and not as a framed screen', () => {
+    expect(layoutSchema.parse({ version: 1, tiles: [] }).dialogs).toEqual([]);
+    const both = layoutSchema.safeParse({ version: 1, tiles: [], screens: ['me'], dialogs: ['me'] });
+    expect(both.error?.issues[0]?.message).toBe('"me" is named twice');
+    const twice = layoutSchema.safeParse({ version: 1, tiles: [], dialogs: ['me', 'me'] });
+    expect(twice.error?.issues[0]?.message).toBe('"me" is named twice');
+  });
+
   it('rejects unknown fields and versions', () => {
     expect(layoutSchema.safeParse({ version: 1, tiles: [], rows: 2 }).success).toBe(false);
     expect(layoutSchema.safeParse({ version: 2, tiles: [] }).success).toBe(false);

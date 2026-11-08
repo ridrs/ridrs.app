@@ -8,9 +8,6 @@ import { PREVIEW_CSS } from './style.ts';
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const HIDE = new URL('./assets/icons/eye-off.svg', import.meta.url).href;
 
-/** The screen Back leads to from an area: Today, the main screen. */
-const TODAY = 'main';
-
 /** A component rendered with React into the shell's container, unmounted with it. */
 export function reactComponent(render: (ctx: UiContext) => ReactNode): UiComponent {
   return (container, ctx) => {
@@ -32,9 +29,16 @@ export function useShownScreen(ctx: UiContext): string | undefined {
   return shown;
 }
 
+/** The id of the page: the screen beneath a dialog while one is open (ADR 0071), else the shown one. */
+function usePage(ctx: UiContext): string | undefined {
+  const [page, setPage] = useState<string>();
+  useEffect(() => ctx.onNavigated((_, shownPage) => setPage(shownPage)), [ctx]);
+  return page;
+}
+
 /**
- * Back leaves the area for Today, unless `inner` handles it first (closing a detail view) and
- * returns `true`.
+ * Back leaves the screen (`ctx.leave`: an area for Today, a dialog for the page beneath it),
+ * unless `inner` handles it first (closing a detail view) and returns `true`.
  */
 export function useBack(ctx: UiContext, inner?: () => boolean): void {
   const latest = useRef(inner);
@@ -42,7 +46,7 @@ export function useBack(ctx: UiContext, inner?: () => boolean): void {
   useEffect(
     () =>
       ctx.onBack(() => {
-        if (!latest.current?.()) ctx.navigate(TODAY);
+        if (!latest.current?.()) ctx.leave();
       }),
     [ctx],
   );
@@ -92,12 +96,13 @@ export function MenuEntry({
   readonly label: string;
   readonly icon: string;
 }) {
-  const shown = useShownScreen(ctx);
+  // An area stays marked while a dialog is open over it.
+  const page = usePage(ctx);
   return (
     <button
       type="button"
       data-menu-item
-      aria-current={shown === screen ? 'page' : undefined}
+      aria-current={page === screen ? 'page' : undefined}
       onClick={() => ctx.navigate(screen)}
     >
       <span data-menu-icon aria-hidden="true" style={iconStyle(icon)} />
@@ -106,7 +111,10 @@ export function MenuEntry({
   );
 }
 
-/** A global action (`main/action`, ADR 0059): a round icon button that opens its screen. */
+/**
+ * A global action (`main/action`, ADR 0059): a round icon button that opens its screen, in a
+ * dialog over the page where the layout says so (ADR 0071).
+ */
 export function ActionButton({
   ctx,
   screen,

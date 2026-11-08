@@ -115,7 +115,8 @@ Then(
 Then(
   'the menu entry {string} is the current page',
   async function (this: RidrsWorld, name: string) {
-    const menu = await within(ui(this)).findByRole('navigation', { name: 'Main' });
+    // Beneath a dialog the menu is hidden from assistive technology, yet still marks the page.
+    const menu = await within(ui(this)).findByRole('navigation', { name: 'Main', hidden: true });
     await waitFor(() => {
       const current = menu.querySelectorAll('[aria-current="page"]');
       assert.deepEqual(

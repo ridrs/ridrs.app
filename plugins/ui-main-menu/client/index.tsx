@@ -42,8 +42,9 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
   const items = useRef<HTMLDivElement>(null);
   // The other screens' entries; the menu does not know them.
   useEffect(() => (items.current ? ctx.slot('menu/item', items.current) : undefined), [ctx]);
-  const [shown, setShown] = useState<string>();
-  useEffect(() => ctx.onNavigated(setShown), [ctx]);
+  // Today stays marked while a dialog is open over it (ADR 0071).
+  const [page, setPage] = useState<string>();
+  useEffect(() => ctx.onNavigated((_, shownPage) => setPage(shownPage)), [ctx]);
 
   return (
     <nav className="mm-nav" aria-label="Main">
@@ -56,7 +57,7 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
         <button
           type="button"
           data-menu-item
-          aria-current={shown === 'main' ? 'page' : undefined}
+          aria-current={page === 'main' ? 'page' : undefined}
           onClick={() => ctx.navigate('main')}
         >
           <span data-menu-icon aria-hidden="true" style={{ '--icon': `url("${TODAY}")` } as object} />

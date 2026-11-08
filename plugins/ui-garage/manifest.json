@@ -21,10 +21,9 @@
     ],
     "contributions": [
       {
-        "id": "menu-item",
-        "extensionPoint": "menu/item",
-        "export": "GarageMenuEntry",
-        "order": 50
+        "id": "garage",
+        "extensionPoint": "main/action",
+        "export": "GarageAction"
       }
     ],
     "events": {

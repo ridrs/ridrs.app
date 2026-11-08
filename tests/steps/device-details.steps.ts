@@ -26,6 +26,7 @@ import {
   riderDiscovers,
   testDeviceLink,
 } from '../support/device-links.ts';
+import { untilQuiet } from '../support/dom-quiet.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { peripheral, splitCsv } from './devices-and-metrics.steps.ts';
 
@@ -396,6 +397,8 @@ async function setupRow(world: RidrsWorld, title: string): Promise<HTMLElement> 
 }
 
 When('I open the {string} in the device setup', async function (this: RidrsWorld, title: string) {
+  // The rider opens a row of the setup they see, not of one still being assembled.
+  await untilQuiet(ui(this));
   const row = await setupRow(this, title);
   fireEvent.click(within(row).getByRole('button'));
   await this.settle();
@@ -635,14 +638,23 @@ Then('the page shows {string}', async function (this: RidrsWorld, text: string) 
   );
 });
 
+/** The text the rider can reach: without a page that lies inert beneath a dialog. */
+function reachableText(root: HTMLElement): string {
+  const copy = root.cloneNode(true) as HTMLElement;
+  for (const inert of copy.querySelectorAll('[inert]')) {
+    inert.remove();
+  }
+  return copy.textContent ?? '';
+}
+
 Then('the page shows no {string}', async function (this: RidrsWorld, text: string) {
   await this.settle();
-  assert.ok(!(ui(this).textContent ?? '').includes(text), `The page shows "${text}"`);
+  assert.ok(!reachableText(ui(this)).includes(text), `The page shows "${text}"`);
 });
 
 Then('the page names {string} once', async function (this: RidrsWorld, text: string) {
   await this.settle();
-  const shown = (ui(this).textContent ?? '').split(text).length - 1;
+  const shown = reachableText(ui(this)).split(text).length - 1;
   assert.equal(shown, 1, `The page names "${text}" ${shown} times`);
 });
 
