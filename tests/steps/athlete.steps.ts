@@ -144,6 +144,20 @@ function latestHandedOver(world: RidrsWorld): AthleteProfileChangedPayload {
   return latest;
 }
 
+/** The first start chooses a connected service once it has loaded: scenarios wait for it. */
+Given(
+  'the athlete profile of {string} is in use',
+  async function (this: RidrsWorld, provider: string) {
+    await this.waitForIo(
+      () =>
+        payloads<AthleteProfileChangedPayload>(this, athleteProfileChangedEvent.id).some(
+          (athlete) => athlete.provider === provider && athlete.ftp !== undefined,
+        ),
+      `the athlete profile of ${provider}`,
+    );
+  },
+);
+
 Then(
   'the latest athlete handed to the next ride is from {string} with an FTP of {int} W and a weight of {float} kg',
   function (this: RidrsWorld, provider: string, ftp: number, weight: number) {

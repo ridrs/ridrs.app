@@ -5,11 +5,13 @@ import {
   type AthleteProfile,
   athleteProfileSchema,
   athleteProfileState,
+  athleteProfileUpdateService,
   authBrowserSignInCapability,
   definePlugin,
   type HttpClient,
   type HttpResponse,
   type DataSourceStatus,
+  type DataWriteResult,
   netHttpCapability,
   type PlannedWorkout,
   type PluginContext,
@@ -29,7 +31,7 @@ import {
   trainingUploadService,
   trainingUploadState,
 } from '@ridrs/contracts';
-import { localDate, toAthlete, toWorkouts } from './intervals.ts';
+import { ftpField, localDate, toAthlete, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
@@ -37,10 +39,11 @@ const CLIENT_ID = '1697';
 /**
  * The OAuth scopes (names and their `:READ`/`:WRITE` form confirmed on intervals.icu's OAuth
  * support thread, https://forum.intervals.icu/t/intervals-icu-oauth-support/2759; WRITE includes
- * READ). The wellness weight is read with `WELLNESS:READ`; a token from before lacks it and
- * gets 403 there, which only leaves the weight of the athlete in its place.
+ * READ). `WELLNESS` reads and writes the weight, `SETTINGS` writes the FTP. A token from before
+ * lacks them: the wellness read gets 403, which only leaves the weight of the athlete in its
+ * place, and a write gets 403, which asks the rider to connect again.
  */
-const SCOPES = 'SETTINGS:READ,CALENDAR:READ,WELLNESS:READ,ACTIVITY:WRITE';
+const SCOPES = 'SETTINGS:WRITE,CALENDAR:READ,WELLNESS:WRITE,ACTIVITY:WRITE';
 const SITE = 'https://intervals.icu';
 const CALLBACK_PATH = '/oauth/callback';
 /** The planned workouts of today and the next 13 days. */
@@ -57,7 +60,14 @@ class TokenRejected extends Error {}
 interface Cache {
   readonly fetchedAt: number;
   readonly athlete: AthleteProfile;
+  /** The field of the Ride settings the FTP was read from, which a change is written to. */
+  readonly ftpField: 'indoor_ftp' | 'ftp';
   readonly workouts: PlannedWorkout[];
+}
+
+/** The field of the Ride settings the FTP was read from (see `Cache`). */
+interface Held {
+  ftpField: Cache['ftpField'];
 }
 
 interface Services {
@@ -86,6 +96,8 @@ export default definePlugin({
     };
     const signIn = ctx.capabilities.get(authBrowserSignInCapability);
     let busy = false;
+    /** What the last load read, for the writes. */
+    const held: Held = { ftpField: 'ftp' };
 
     // The sources are there from the start, so the rider can choose them while they load.
     setSources(ctx, 'loading');
@@ -106,7 +118,7 @@ export default definePlugin({
     };
 
     // Read when asked: the time of the request decides what "today" is.
-    const load = (now: number) => run(() => loadPlan(ctx, services, now, { fromStart: false }));
+    const load = (now: number) => run(() => loadPlan(ctx, services, held, now, { fromStart: false }));
 
     // A connect during other work of the plugin is dropped, like a second press.
     ctx.services.provide(trainingConnectService, () => {
@@ -179,7 +191,7 @@ export default definePlugin({
           return;
         }
         await services.secrets.set(TOKEN_KEY, token);
-        await loadPlan(ctx, services, now, { fromStart: false });
+        await loadPlan(ctx, services, held, now, { fromStart: false });
       });
       return {};
     });
@@ -216,6 +228,10 @@ export default definePlugin({
       return {};
     });
 
+    ctx.services.provide(athleteProfileUpdateService, ({ key: _key, ...change }) =>
+      writeProfile(ctx, services, held, change),
+    );
+
     ctx.services.provide(trainingRefreshService, () => {
       load(ctx.clock.now());
       return {};
@@ -232,7 +248,7 @@ export default definePlugin({
     });
 
     const startedAt = ctx.clock.now();
-    run(() => loadPlan(ctx, services, startedAt, { fromStart: true }));
+    run(() => loadPlan(ctx, services, held, startedAt, { fromStart: true }));
   },
 });
 
@@ -324,19 +340,108 @@ function accessToken(body: string): string | undefined {
 }
 
 /**
+ * Writes a change of the profile: the weight to today's wellness record, the FTP to the Ride
+ * settings, into the field it was read from. `icu_weight` is never written. A write is refused,
+ * not queued: when the service cannot be reached the old value stays. A token without the scope
+ * (401 or 403) is forgotten like on an upload (ADR 0064) and the rider connects again; what is
+ * shown stays, as the last copy of the service and read only until then.
+ */
+async function writeProfile(
+  ctx: PluginContext,
+  { http, secrets, files }: Services,
+  held: Held,
+  change: { readonly ftp?: number; readonly weight?: number },
+): Promise<DataWriteResult> {
+  const token = await secrets.get(TOKEN_KEY).catch(() => undefined);
+  if (!token) {
+    return { ok: false, reason: 'unreachable' };
+  }
+  const put = (path: string, body: Record<string, number>) =>
+    http.request({
+      method: 'PUT',
+      url: `${SITE}${path}`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  const writes: Array<[string, Record<string, number>]> = [
+    ...(change.weight === undefined
+      ? []
+      : [[`/api/v1/athlete/0/wellness/${localDate(ctx.clock.now())}`, { weight: change.weight }] as [string, Record<string, number>]]),
+    ...(change.ftp === undefined
+      ? []
+      : [['/api/v1/athlete/0/sport-settings/Ride', { [held.ftpField]: change.ftp }] as [string, Record<string, number>]]),
+  ];
+  for (const [path, body] of writes) {
+    let response: HttpResponse;
+    try {
+      response = await put(path, body);
+    } catch {
+      return { ok: false, reason: 'unreachable' };
+    }
+    if (response.status === 401 || response.status === 403) {
+      await secrets.remove(TOKEN_KEY);
+      ctx.state.set(trainingAccountState, SERVICE, {
+        service: SERVICE,
+        state: 'failed',
+        reason: 'token-rejected',
+      });
+      const profile = ctx.state.entries(athleteProfileState).get(SERVICE);
+      const calendar = ctx.state.entries(trainingCalendarState).get(SERVICE);
+      if (profile?.data && calendar?.data) {
+        setSources(
+          ctx,
+          'offline',
+          { fetchedAt: profile.fetchedAt ?? ctx.clock.now(), athlete: profile.data, workouts: calendar.data.workouts },
+          false,
+        );
+      }
+      return { ok: false, reason: 'read-only' };
+    }
+    if (response.status !== 200) {
+      ctx.logger.warn({ status: response.status, path }, 'intervals.icu: the change was rejected');
+      return { ok: false, reason: 'unreachable' };
+    }
+  }
+  const profile = ctx.state.entries(athleteProfileState).get(SERVICE);
+  const calendar = ctx.state.entries(trainingCalendarState).get(SERVICE);
+  if (profile?.data && calendar?.data) {
+    const loaded = {
+      fetchedAt: profile.fetchedAt ?? ctx.clock.now(),
+      athlete: { ...profile.data, ...change },
+      ftpField: held.ftpField,
+      workouts: calendar.data.workouts,
+    };
+    setSources(ctx, 'ready', loaded);
+    await files
+      .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(loaded)))
+      .catch((error: unknown) => ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
+  }
+  return { ok: true };
+}
+
+/**
  * Both data types of this provider, with the data when there is any. `unavailable` has none: a
  * disconnected or rejected account is not served from the cache.
  */
 function setSources(
   ctx: PluginContext,
   status: DataSourceStatus,
-  loaded?: { readonly fetchedAt: number; readonly athlete: AthleteProfile; readonly workouts: PlannedWorkout[] },
+  loaded?: {
+    readonly fetchedAt: number;
+    readonly athlete: AthleteProfile;
+    readonly workouts: PlannedWorkout[];
+  },
+  writable = status === 'ready' || status === 'offline',
 ): void {
   const common = {
     provider: SERVICE,
     label: LABEL,
     status,
-    writable: false,
+    writable,
     ...(loaded ? { fetchedAt: loaded.fetchedAt } : {}),
   };
   ctx.state.set(athleteProfileState, SERVICE, {
@@ -356,6 +461,7 @@ function setSources(
 async function loadPlan(
   ctx: PluginContext,
   { http, secrets, files }: Services,
+  held: Held,
   now: number,
   { fromStart }: { readonly fromStart: boolean },
 ): Promise<void> {
@@ -420,9 +526,11 @@ async function loadPlan(
       wellnessWeight(),
     ]);
     const athlete = toAthlete(athleteBody, weight);
+    held.ftpField = ftpField(athleteBody);
     const loaded: Cache = {
       fetchedAt: now,
       athlete,
+      ftpField: held.ftpField,
       workouts: toWorkouts(eventsBody, athlete.ftp),
     };
     account('connected', { athleteName: athlete.name });
@@ -440,6 +548,7 @@ async function loadPlan(
     ctx.logger.warn({ error }, 'intervals.icu: the plan could not be loaded');
     const cached = await readCache(files);
     if (cached) {
+      held.ftpField = cached.ftpField;
       account('connected', { athleteName: cached.athlete.name });
       setSources(ctx, 'offline', cached);
     } else {
@@ -458,6 +567,7 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
     const bytes = await files.read(CACHE_FILE);
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as {
       fetchedAt?: unknown;
+      ftpField?: unknown;
       athlete?: { name?: unknown };
       workouts?: unknown;
     };
@@ -465,7 +575,12 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
     const athlete = athleteProfileSchema.safeParse({ ...rest, ...(name ? { name } : {}) });
     const calendar = trainingCalendarSchema.safeParse({ workouts: parsed.workouts });
     return athlete.success && calendar.success && typeof parsed.fetchedAt === 'number'
-      ? { fetchedAt: parsed.fetchedAt, athlete: athlete.data, workouts: calendar.data.workouts }
+      ? {
+          fetchedAt: parsed.fetchedAt,
+          athlete: athlete.data,
+          ftpField: parsed.ftpField === 'indoor_ftp' ? 'indoor_ftp' : 'ftp',
+          workouts: calendar.data.workouts,
+        }
       : undefined;
   } catch {
     return undefined;

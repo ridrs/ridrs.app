@@ -26,6 +26,7 @@
   },
   "services": {
     "provides": [
+      "athlete.profile.update",
       "training.connect",
       "training.disconnect",
       "training.refresh",

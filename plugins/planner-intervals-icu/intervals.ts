@@ -35,17 +35,26 @@ const SPORTS: Readonly<Record<string, PlannedWorkout['sport']>> = {
   VirtualRide: 'virtual-ride',
 };
 
+/** The cycling settings of the athlete. */
+const rideSettings = (athlete: Json): Json | undefined =>
+  (Array.isArray(athlete.sportSettings) ? athlete.sportSettings : []).find(
+    (entry): entry is Json =>
+      isObject(entry) && Array.isArray(entry.types) && entry.types.includes('Ride'),
+  );
+
+/** The field of the Ride settings the FTP is read from, and written to: the indoor FTP, else the FTP. */
+export function ftpField(body: unknown): 'indoor_ftp' | 'ftp' {
+  const ride = rideSettings(isObject(body) ? body : {});
+  return positive(ride?.indoor_ftp) !== undefined ? 'indoor_ftp' : 'ftp';
+}
+
 /**
  * `GET /api/v1/athlete/0`: the name, the weight and the cycling sport settings. The weight is
  * today's wellness weight (`GET …/wellness/{today}`), else the weight of the athlete.
  */
 export function toAthlete(body: unknown, wellnessWeight?: number): AthleteProfile {
   const athlete = isObject(body) ? body : {};
-  const settings = Array.isArray(athlete.sportSettings) ? athlete.sportSettings : [];
-  const ride = settings.find(
-    (entry): entry is Json =>
-      isObject(entry) && Array.isArray(entry.types) && entry.types.includes('Ride'),
-  );
+  const ride = rideSettings(athlete);
   // ridrs rides indoors: an indoor FTP, where the athlete set one, is the one that applies.
   const ftp = positive(ride?.indoor_ftp) ?? positive(ride?.ftp);
   const weight =

@@ -67,6 +67,10 @@ export class SimulatedIntervalsIcu {
   reachable = true;
   /** Uploads fail as if the network were gone, while everything else answers. */
   uploadsReachable = true;
+  /** Writes answer this status (403: the token lacks the scope); 200 accepts them. */
+  writeStatus = 200;
+  /** Writes fail as if the network were gone, while reads answer. */
+  writesReachable = true;
   /** The status of the next uploads; 201 creates the activity. */
   uploadStatus = 201;
   readonly uploads: UploadedActivity[] = [];
@@ -118,6 +122,10 @@ export class SimulatedIntervalsIcu {
           ],
         });
       }
+      const write = this.write(request, url);
+      if (write) {
+        return write;
+      }
       const wellness = /^\/api\/v1\/athlete\/0\/wellness\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
       if (request.method === 'GET' && wellness) {
         const date = wellness[1] ?? '';
@@ -152,6 +160,36 @@ export class SimulatedIntervalsIcu {
       return json(404, { error: `No route ${request.method} ${url.pathname}` });
     },
   };
+
+  /** The writes of the profile; `undefined` for any other request. */
+  private write(request: HttpRequest, url: URL): HttpResponse | undefined {
+    const wellness = /^\/api\/v1\/athlete\/0\/wellness\/(\d{4}-\d{2}-\d{2})$/.exec(url.pathname);
+    const settings = url.pathname === '/api/v1/athlete/0/sport-settings/Ride';
+    if (request.method !== 'PUT' || (!wellness && !settings)) {
+      return undefined;
+    }
+    if (!this.writesReachable) {
+      throw new Error('connect ETIMEDOUT intervals.icu');
+    }
+    if (this.writeStatus !== 200) {
+      return json(this.writeStatus, { error: 'Forbidden' });
+    }
+    const body = JSON.parse(typeof request.body === 'string' ? request.body : '{}') as {
+      weight?: number;
+      ftp?: number;
+      indoor_ftp?: number;
+    };
+    if (wellness && typeof body.weight === 'number') {
+      this.wellnessWeights.set(wellness[1] ?? '', body.weight);
+    }
+    if (settings && typeof body.ftp === 'number') {
+      this.athlete.ftp = body.ftp;
+    }
+    if (settings && typeof body.indoor_ftp === 'number') {
+      this.indoorFtp = body.indoor_ftp;
+    }
+    return json(200, { ...body });
+  }
 
   /** Multipart with the activity in `file`, as the API takes it; a token without the scope gets 403. */
   private async upload(request: HttpRequest, url: URL): Promise<HttpResponse> {

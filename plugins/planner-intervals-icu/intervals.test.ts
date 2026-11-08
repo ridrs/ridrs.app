@@ -2,7 +2,7 @@
 
 import { athleteProfileSchema, plannedWorkoutSchema } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { localDate, toAthlete, toSteps, toWorkouts } from './intervals.ts';
+import { ftpField, localDate, toAthlete, toSteps, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 describe('toAthlete', () => {
@@ -30,6 +30,19 @@ describe('toAthlete', () => {
     expect(toAthlete({ icu_weight: 72 }, 71.2)).toEqual({ weight: 71.2 });
     expect(toAthlete({ icu_weight: 72 }, undefined)).toEqual({ weight: 72 });
     expect(toAthlete({ icu_weight: 72 }, 0)).toEqual({ weight: 72 });
+  });
+});
+
+describe('ftpField', () => {
+  const settings = (ride: Record<string, unknown>) => ({
+    sportSettings: [{ types: ['Run'], ftp: 1 }, { types: ['Ride'], ...ride }],
+  });
+
+  it('is the field the FTP is read from: the indoor FTP where one is set, else the FTP', () => {
+    expect(ftpField(settings({ ftp: 260, indoor_ftp: 250 }))).toBe('indoor_ftp');
+    expect(ftpField(settings({ ftp: 260 }))).toBe('ftp');
+    expect(ftpField(settings({ ftp: 0, indoor_ftp: 0 }))).toBe('ftp');
+    expect(ftpField(null)).toBe('ftp');
   });
 });
 

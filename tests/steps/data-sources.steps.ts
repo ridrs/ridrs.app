@@ -126,6 +126,15 @@ Then('the button {string} is disabled', async function (this: RidrsWorld, name: 
   );
 });
 
+Then('the button {string} is enabled', async function (this: RidrsWorld, name: string) {
+  await waitFor(() =>
+    assert.equal(
+      (within(shownScreen(this)).getByRole('button', { name }) as HTMLButtonElement).disabled,
+      false,
+    ),
+  );
+});
+
 Given(
   'the Me area kept an FTP of {int} W and a weight of {float} kg before the athlete profile existed',
   async function (this: RidrsWorld, ftp: number, weight: number) {

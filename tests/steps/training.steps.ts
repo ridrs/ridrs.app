@@ -113,6 +113,22 @@ Given(
   },
 );
 
+Given('intervals.icu rejects writes with 403', function (this: RidrsWorld) {
+  intervals(this).writeStatus = 403;
+});
+
+Given('intervals.icu accepts writes', function (this: RidrsWorld) {
+  intervals(this).writeStatus = 200;
+});
+
+Given('intervals.icu cannot be reached for writes', function (this: RidrsWorld) {
+  intervals(this).writesReachable = false;
+});
+
+When('intervals.icu can be reached for writes', function (this: RidrsWorld) {
+  intervals(this).writesReachable = true;
+});
+
 Given('intervals.icu keeps an indoor FTP of {int} W', function (this: RidrsWorld, ftp: number) {
   intervals(this).indoorFtp = ftp;
 });
@@ -360,6 +376,39 @@ Then(
     assert.equal(authorization, `Bearer ${simulation.token}`);
   },
 );
+
+Then(
+  'intervals.icu received {string} with the body:',
+  async function (this: RidrsWorld, call: string, table: DataTable) {
+    const [method, path] = call.split(' ');
+    const simulation = intervals(this);
+    const matching = () =>
+      simulation.requests.filter(
+        (request) => request.method === method && new URL(request.url).pathname === path,
+      );
+    await this.waitForIo(() => matching().length > 0, `${call} to reach intervals.icu`);
+    const request = matching().at(-1);
+    const body = JSON.parse(typeof request?.body === 'string' ? request.body : '{}') as Record<
+      string,
+      unknown
+    >;
+    assert.deepEqual(
+      Object.fromEntries(table.raw().map(([name]) => [name, String(body[name ?? ''])])),
+      Object.fromEntries(table.raw()),
+    );
+  },
+);
+
+Then('no request changed the athlete of intervals.icu', async function (this: RidrsWorld) {
+  await this.settle();
+  const changes = intervals(this)
+    .requests.filter(
+      (request) =>
+        request.method !== 'GET' && new URL(request.url).pathname === '/api/v1/athlete/0',
+    )
+    .map((request) => `${request.method} ${request.url}`);
+  assert.deepEqual(changes, []);
+});
 
 // ---- Keychain and leaks ------------------------------------------------------------------
 
