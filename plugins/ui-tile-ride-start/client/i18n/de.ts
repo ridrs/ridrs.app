@@ -9,6 +9,7 @@ export const de: Messages = {
   ready: 'Bereit zum Fahren?',
   about: 'Fahre in deinem Tempo. Deine Geräte kommen dazu, sobald sie verbunden sind.',
   riding: (bicycle: string, kg: string) => `Mit ${bicycle} · ${kg} kg`,
+  profileUnavailable: 'Dein Athletenprofil ist nicht verfügbar: Die nächste Fahrt nutzt Standardwerte.',
   start: 'Fahrt starten',
   notSaved: 'Die Fahrt konnte nicht gespeichert werden',
   saved: 'Fahrt gespeichert',

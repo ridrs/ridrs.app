@@ -7,6 +7,7 @@ export const en = {
   ready: 'Ready to ride?',
   about: 'Ride at your own pace. Your devices join as they connect.',
   riding: (bicycle: string, kg: string) => `Riding ${bicycle} · ${kg} kg`,
+  profileUnavailable: 'Your athlete profile is not available: the next ride uses default values.',
   start: 'Start ride',
   notSaved: 'Ride could not be saved',
   saved: 'Ride saved',

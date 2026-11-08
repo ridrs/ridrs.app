@@ -2,11 +2,14 @@
 
 import {
   activityStartRequestedEvent,
+  athleteProfileState,
   type Bicycle,
+  DEFAULT_PROVIDER,
+  dataSourceState,
   equipmentBicycleChangedEvent,
 } from '@ridrs/contracts';
 import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
-import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
+import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { messages } from './i18n/index.ts';
@@ -40,6 +43,17 @@ const CSS = `
 .rs-riding { margin: 6px 0 0; color: var(--ridrs-text, #f2f5fa); font-size: 15px; font-weight: 600; }
 `;
 
+/**
+ * Whether the athlete profile in use cannot be read and has no values to fall back on: the next
+ * ride then uses the defaults (ADR 0073). Not so while there is no provider at all.
+ */
+function useProfileUnavailable(ctx: UiContext): boolean {
+  const providers = useStateEntries(ctx, athleteProfileState);
+  const chosen = useStateEntries(ctx, dataSourceState).get('athlete.profile')?.provider;
+  const source = providers.get(chosen ?? DEFAULT_PROVIDER);
+  return source?.status === 'unavailable' && source.data === undefined;
+}
+
 /** Start ride, the main action of the main screen, and what became of the last ride. */
 function RideStartView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
@@ -50,6 +64,7 @@ function RideStartView({ ctx }: { readonly ctx: UiContext }) {
     () => ctx.events.subscribe(equipmentBicycleChangedEvent, ({ payload }) => setBicycle(payload)),
     [ctx],
   );
+  const profileUnavailable = useProfileUnavailable(ctx);
   return (
     <section className="rs-tile" aria-label={text.ride}>
       <style>{CSS}</style>
@@ -60,6 +75,11 @@ function RideStartView({ ctx }: { readonly ctx: UiContext }) {
         {bicycle ? (
           <p className="rs-riding" data-testid="riding">
             {text.riding(bicycle.name, localizeNumber(bicycle.mass.toFixed(1), language))}
+          </p>
+        ) : null}
+        {profileUnavailable ? (
+          <p className="rs-riding" data-testid="athlete-note">
+            {text.profileUnavailable}
           </p>
         ) : null}
       </div>

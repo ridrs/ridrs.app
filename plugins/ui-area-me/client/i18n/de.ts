@@ -13,7 +13,15 @@ export const de: Messages = {
   ftp: 'FTP',
   weight: 'Gewicht',
   weeklyGoal: 'Wochenziel',
-  notUsed: (wattsPerKg: string) => `${wattsPerKg} W/kg. Die Fahrt nutzt diese Werte noch nicht.`,
+  thisDevice: 'ridrs (dieses Gerät)',
+  wattsPerKg: (ratio: string) => `${ratio} W/kg.`,
+  fromSource: (source: string) => `Von ${source}.`,
+  readOnly: (source: string) => `${source} kann hier nicht geändert werden.`,
+  refused: (source: string, reason: 'read-only' | 'unreachable') =>
+    reason === 'read-only'
+      ? `${source} kann hier nicht geändert werden.`
+      : `${source} war nicht erreichbar: Der Wert bleibt, wie er war.`,
+  rideUses: 'Die nächste Fahrt nutzt dein Gewicht; die FTP wird noch nicht genutzt.',
   activities: 'Aktivitäten',
   activitiesSoon: 'Hier stehen bald deine aufgezeichneten Fahrten mit ihren FIT-Dateien.',
   achievements: 'Erfolge',

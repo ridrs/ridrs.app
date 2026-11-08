@@ -71,6 +71,18 @@ Feature: The rider chooses where the athlete profile comes from
     Then the row "Athlete profile" shows the status "Not available"
     And the latest athlete handed to the next ride is from "fixture-cloud" without values
 
+  Scenario: An unavailable source gives the ride the defaults, and the start card says so
+    Given the test data source is unavailable
+    And ridrs restarted
+    And I reload the UI
+    Then the start card notes nothing
+    When I press "Settings"
+    And I press "Fixture cloud"
+    Then the start card notes "Your athlete profile is not available: the next ride uses default values."
+    And the latest athlete handed to the next ride is from "fixture-cloud" without values
+    When I press "ridrs (this device)"
+    Then the start card notes nothing
+
   Scenario: The choice is made with the keyboard alone
     When I move the focus to "Settings"
     And I press Enter

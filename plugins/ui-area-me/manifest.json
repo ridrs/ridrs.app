@@ -11,6 +11,11 @@
   "persistence": [
     "user"
   ],
+  "services": {
+    "calls": [
+      "athlete.profile.update"
+    ]
+  },
   "ui": {
     "client": "client/index.tsx",
     "screens": [
@@ -39,7 +44,12 @@
       "publish": []
     },
     "state": [
-      "app.language"
+      "app.language",
+      "athlete.profile",
+      "data.source"
+    ],
+    "calls": [
+      "athlete.profile.update"
     ]
   }
 }

@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  athleteProfileState,
+  athleteProfileUpdateService,
+  DEFAULT_PROVIDER,
+  type DataWriteResult,
+  dataSourceState,
+} from '@ridrs/contracts';
+import {
   ActionButton,
   AreaPage,
   reactComponent,
@@ -10,8 +17,8 @@ import {
   userDocument,
 } from '@ridrs/ui-preview';
 import { localizeNumber, type UiContext } from '@ridrs/ui-sdk';
-import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
-import { useEffect, useRef } from 'react';
+import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
+import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { messages } from './i18n/index.ts';
 
@@ -37,24 +44,68 @@ const FILL = { display: 'block', height: '100%', background: 'var(--ridrs-accent
 const RIDDEN_HOURS = 2.5;
 
 /**
- * What the rider changed in this area, kept at once (ADR 0059). FTP and weight are placeholders:
- * nothing in the ride reads them yet.
+ * What the rider changed in this area, kept at once (ADR 0059). Not strict: documents kept before
+ * the athlete profile (ADR 0073) still hold the FTP and weight, which the host side hands to the
+ * profile on this device.
  */
 const useMe = userDocument(
   {
     name: 'preview',
     version: 1,
-    schema: z
-      .object({
-        ftp: z.number().int().min(50).max(600),
-        weight: z.number().min(30).max(200),
-        weeklyHours: z.number().min(0.5).max(30),
-        showOnToday: z.boolean(),
-      })
-      .strict(),
+    schema: z.object({
+      weeklyHours: z.number().min(0.5).max(30),
+      showOnToday: z.boolean(),
+    }),
   },
-  { ftp: 200, weight: 72, weeklyHours: 5, showOnToday: true },
+  { weeklyHours: 5, showOnToday: true },
 );
+
+/** Where the first step of an unset FTP or weight starts. */
+const FIRST_FTP = 200;
+const FIRST_WEIGHT = 75;
+
+/**
+ * The athlete profile of the chosen data source (ADR 0073): its FTP and weight, whether it can be
+ * changed, and a call that changes them through `athlete.profile.update`, which the host routes to
+ * the provider. A step starts from the value last asked for while the source has not shown it yet
+ * (two quick steps are two steps); a refused change says why and leaves the old value.
+ */
+function useAthleteProfile(ctx: UiContext) {
+  const providers = useStateEntries(ctx, athleteProfileState);
+  const chosen = useStateEntries(ctx, dataSourceState).get('athlete.profile')?.provider;
+  const provider = chosen ?? DEFAULT_PROVIDER;
+  const source = providers.get(provider);
+  const [refusal, setRefusal] = useState<DataWriteResult & { ok: false }>();
+  const asked = useRef<{ ftp?: number; weight?: number }>({});
+  // The source shows what was asked for: the value is its own again.
+  useEffect(() => {
+    for (const name of ['ftp', 'weight'] as const) {
+      if (source?.data?.[name] === asked.current[name]) {
+        delete asked.current[name];
+      }
+    }
+  }, [source]);
+  const update = (change: { ftp?: number; weight?: number }) => {
+    asked.current = { ...asked.current, ...change };
+    ctx.call(athleteProfileUpdateService, { key: provider, ...change }).then(
+      (answer) => {
+        setRefusal(answer.ok ? undefined : answer);
+        if (!answer.ok) asked.current = {};
+      },
+      (error: unknown) => {
+        asked.current = {};
+        ctx.logger.warn(`Could not change the athlete profile: ${String(error)}`);
+      },
+    );
+  };
+  return {
+    source,
+    update,
+    refusal,
+    /** The value to show and to step from. */
+    current: (name: 'ftp' | 'weight') => asked.current[name] ?? source?.data?.[name],
+  };
+}
 
 /** A value changed in steps with two buttons: usable with arrows and Enter alone. */
 function Stepper({
@@ -62,30 +113,48 @@ function Stepper({
   name,
   value,
   testId,
+  disabled = false,
   onStep,
 }: {
   readonly ctx: UiContext;
   readonly name: string;
   readonly value: string;
   readonly testId: string;
+  /** A value that cannot be changed here. */
+  readonly disabled?: boolean;
   readonly onStep: (direction: 1 | -1) => void;
 }) {
   const text = useMessages(ctx, messages);
   return (
     <div className="me-stepper">
       <span>{name}</span>
-      <button type="button" className="pv-icon" aria-label={text.lower(name)} onClick={() => onStep(-1)}>
+      <button
+        type="button"
+        className="pv-icon"
+        aria-label={text.lower(name)}
+        disabled={disabled}
+        onClick={() => onStep(-1)}
+      >
         −
       </button>
       <output data-testid={testId} aria-label={name}>
         {value}
       </output>
-      <button type="button" className="pv-icon" aria-label={text.raise(name)} onClick={() => onStep(1)}>
+      <button
+        type="button"
+        className="pv-icon"
+        aria-label={text.raise(name)}
+        disabled={disabled}
+        onClick={() => onStep(1)}
+      >
         +
       </button>
     </div>
   );
 }
+
+/** What an unset FTP or weight shows. */
+const NOT_SET = '–';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -99,7 +168,16 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
   const connections = useRef<HTMLDivElement>(null);
   useBack(ctx);
   useEffect(() => (connections.current ? ctx.slot(CONNECTION_SLOT, connections.current) : undefined), [ctx]);
-  const wattsPerKg = localizeNumber((state.ftp / state.weight).toFixed(2), language);
+  const { source, update, refusal, current } = useAthleteProfile(ctx);
+  const ftp = current('ftp');
+  const weight = current('weight');
+  // Only a source known to be read only holds the buttons back: before it is known, they work.
+  const readOnly = source !== undefined && !source.writable;
+  const sourceName = source?.provider === DEFAULT_PROVIDER ? text.thisDevice : source?.label;
+  const wattsPerKg =
+    ftp !== undefined && weight !== undefined
+      ? localizeNumber((ftp / weight).toFixed(2), language)
+      : undefined;
   return (
     <AreaPage title={text.title} intro={text.intro}>
       <style>{CSS}</style>
@@ -109,15 +187,17 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
           ctx={ctx}
           name={text.ftp}
           testId="ftp"
-          value={`${state.ftp} W`}
-          onStep={(d) => change((s) => ({ ...s, ftp: clamp(s.ftp + 5 * d, 50, 600) }))}
+          value={ftp === undefined ? NOT_SET : `${ftp} W`}
+          disabled={readOnly}
+          onStep={(d) => update({ ftp: clamp((current('ftp') ?? FIRST_FTP) + 5 * d, 50, 600) })}
         />
         <Stepper
           ctx={ctx}
           name={text.weight}
           testId="weight"
-          value={`${localizeNumber(state.weight.toFixed(1), language)} kg`}
-          onStep={(d) => change((s) => ({ ...s, weight: clamp(s.weight + 0.5 * d, 30, 200) }))}
+          value={weight === undefined ? NOT_SET : `${localizeNumber(weight.toFixed(1), language)} kg`}
+          disabled={readOnly}
+          onStep={(d) => update({ weight: clamp((current('weight') ?? FIRST_WEIGHT) + 0.5 * d, 30, 200) })}
         />
         <Stepper
           ctx={ctx}
@@ -126,7 +206,19 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
           value={`${localizeNumber(String(state.weeklyHours), language)} h`}
           onStep={(d) => change((s) => ({ ...s, weeklyHours: clamp(s.weeklyHours + 0.5 * d, 0.5, 30) }))}
         />
-        <p className="pv-muted">{text.notUsed(wattsPerKg)}</p>
+        {source ? (
+          <p className="pv-muted">
+            {wattsPerKg ? `${text.wattsPerKg(wattsPerKg)} ` : ''}
+            {text.fromSource(sourceName ?? '')}
+            {source.writable ? '' : ` ${text.readOnly(sourceName ?? '')}`}
+          </p>
+        ) : null}
+        {refusal ? (
+          <p className="pv-muted" role="status">
+            {text.refused(sourceName ?? '', refusal.reason)}
+          </p>
+        ) : null}
+        <p className="pv-muted">{text.rideUses}</p>
       </section>
       <section className="pv-section">
         <h2>{text.activities}</h2>

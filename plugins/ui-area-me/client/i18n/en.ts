@@ -11,7 +11,15 @@ export const en = {
   ftp: 'FTP',
   weight: 'Weight',
   weeklyGoal: 'Weekly goal',
-  notUsed: (wattsPerKg: string) => `${wattsPerKg} W/kg. The ride does not use these values yet.`,
+  thisDevice: 'ridrs (this device)',
+  wattsPerKg: (ratio: string) => `${ratio} W/kg.`,
+  fromSource: (source: string) => `From ${source}.`,
+  readOnly: (source: string) => `${source} cannot be changed here.`,
+  refused: (source: string, reason: 'read-only' | 'unreachable') =>
+    reason === 'read-only'
+      ? `${source} cannot be changed here.`
+      : `${source} could not be reached: the value stays as it was.`,
+  rideUses: 'The next ride uses your weight; FTP is not used yet.',
   activities: 'Activities',
   activitiesSoon: 'Your recorded rides with their FIT files will be listed here.',
   achievements: 'Achievements',

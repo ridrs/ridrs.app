@@ -27,6 +27,8 @@
     },
     "state": [
       "app.language",
+      "athlete.profile",
+      "data.source",
       "export.fit",
       "recording.ride"
     ]
