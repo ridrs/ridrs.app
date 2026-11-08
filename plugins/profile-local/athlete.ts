@@ -4,7 +4,7 @@ import type { SettingsDocument } from '@ridrs/contracts';
 import { z } from 'zod';
 
 /**
- * The athlete profile kept on this device (ADR 0073): current values only, no history. `changedAt`
+ * The athlete profile kept on this device (ADR 0075): current values only, no history. `changedAt`
  * is the time of the last change, epoch ms.
  */
 export const athleteDocumentSchema = z

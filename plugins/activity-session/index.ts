@@ -42,7 +42,7 @@ const worldOf = (state: ActivityState) => ('world' in state && state.world ? { w
  * Knows nothing about any UI. Freezes the latest bicycle (`equipment.bicycle-changed`) for every
  * new session and announces it as `activity.equipment` right before the session runs; pause,
  * resume and a continued ride keep it (ADR 0060). The athlete is frozen the same way, from
- * `athlete.profile-changed` into `activity.athlete` (ADR 0073). Without a bicycle or an athlete
+ * `athlete.profile-changed` into `activity.athlete` (ADR 0075). Without a bicycle or an athlete
  * it announces none. The world a
  start asks for (a landscape and its route) stays with the ride in every state until it ends.
  */

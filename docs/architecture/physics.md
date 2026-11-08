@@ -53,7 +53,7 @@ All are `AGPL-3.0-or-later`; the physics plugins import only `@ridrs/contracts` 
 
 SI units everywhere. Resistance forces are signed along the direction of travel: **positive opposes forward motion**. Speed is forward-only.
 
-- `BicycleCapability.parameters()` → `{ mass, rollingResistanceCoefficient }`, `RiderCapability.parameters()` → `{ mass, cdA }`; each a `PhysicsParameter { value, origin }` with the origin `default`, `equipment` (the frozen bicycle, ADR 0060) or `profile` (the frozen athlete's weight, ADR 0073).
+- `BicycleCapability.parameters()` → `{ mass, rollingResistanceCoefficient }`, `RiderCapability.parameters()` → `{ mass, cdA }`; each a `PhysicsParameter { value, origin }` with the origin `default`, `equipment` (the frozen bicycle, ADR 0060) or `profile` (the frozen athlete's weight, ADR 0075).
 - `EnvironmentCapability.parameters()` → `{ airDensity }` (single).
 - `RoadSample { gradient, surface, origin }`: the road the forces of a step use. `gradient` is rise over run, dimensionless: 0.05 is 5 % uphill; `surface` is `asphalt` or `gravel` (`physics.state.road.surface`, zod-validated).
 - Event `world.terrain-preview` (`packages/contracts/src/world.ts`): `{ revision, originDistance, spacing, samples: [{ gradient, surface? }] }`, at least two samples; sample `i` lies at the odometer reading `originDistance + i · spacing`; no surface means asphalt. An input, read by `spatial-terrain` only. Diagnostics `terrain-preview-missing`, `terrain-preview-rejected`.

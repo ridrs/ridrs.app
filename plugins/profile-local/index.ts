@@ -15,7 +15,7 @@ function profileOf({ changedAt: _changedAt, ...values }: AthleteDocument): Athle
 }
 
 /**
- * The athlete profile on this device (ADR 0073): the provider `ridrs` of `athlete.profile`,
+ * The athlete profile on this device (ADR 0075): the provider `ridrs` of `athlete.profile`,
  * always ready and writable, the default of the choice. The profile is the user document
  * `athlete`; a change takes effect at once and is kept after it, as the language is. The values
  * of an older preview in the Me area are handed over through the update service (ui-area-me).

@@ -28,7 +28,7 @@ const languageDocument = {
   schema: z.object({ language: languageSchema }).strict(),
 };
 
-/** The data type with a choice (ADR 0073); the calendar joins with its stage. */
+/** The data type with a choice (ADR 0075); the calendar joins with its stage. */
 const ATHLETE_PROFILE = 'athlete.profile';
 
 /** What a ride uses of a source's profile: the values that change the ride, never the name. */
@@ -43,7 +43,7 @@ function rideAthleteOf(source: DataSource<AthleteProfile>): RideAthlete {
 
 // The rest of this plugin lives in its client module (see `ui` in the manifest). The host side
 // owns the app's language: every UI plugin watches it, so it must be there before they render.
-// It owns the choice of the data sources as well (ADR 0073) and hands the chosen athlete profile
+// It owns the choice of the data sources as well (ADR 0075) and hands the chosen athlete profile
 // to the next ride as the input `athlete.profile-changed`, as the garage hands over the bicycle.
 export default definePlugin({
   async start(ctx) {

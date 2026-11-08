@@ -20,7 +20,7 @@ const parametersOf = new WeakMap<PluginContext, { current: RiderParameters }>();
 
 /**
  * Rider parameters only; computes no forces. The mass is the weight of the athlete that the
- * activity session froze for the ride (`activity.athlete`, a lifecycle event, ADR 0073), the
+ * activity session froze for the ride (`activity.athlete`, a lifecycle event, ADR 0075), the
  * default of 75 kg without a weight; the drag area stays the default.
  */
 export default definePlugin({

@@ -45,7 +45,7 @@ const CSS = `
 
 /**
  * Whether the athlete profile in use cannot be read and has no values to fall back on: the next
- * ride then uses the defaults (ADR 0073). Not so while there is no provider at all.
+ * ride then uses the defaults (ADR 0075). Not so while there is no provider at all.
  */
 function useProfileUnavailable(ctx: UiContext): boolean {
   const providers = useStateEntries(ctx, athleteProfileState);

@@ -5,7 +5,7 @@ import { defineState, type StateDefinition } from './app-state.ts';
 import { defineService, type ServiceDefinition } from './services.ts';
 
 /**
- * Data sources (ADR 0073): a data type has one source of truth, chosen from every provider that
+ * Data sources (ADR 0075): a data type has one source of truth, chosen from every provider that
  * offers it. Nothing is copied or merged between stores, and switching the source copies nothing.
  */
 

@@ -10,7 +10,7 @@ import {
   defineDataType,
 } from './index.ts';
 
-describe('defineDataType (ADR 0073)', () => {
+describe('defineDataType (ADR 0075)', () => {
   const note = defineDataType('test.note', z.object({ text: z.string() }).strict(), {
     set: z.object({ text: z.string() }).strict(),
     clear: z.object({}).strict(),

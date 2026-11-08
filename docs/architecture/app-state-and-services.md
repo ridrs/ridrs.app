@@ -61,8 +61,8 @@ The recorder observes the bus ([recording-and-replay.md](recording-and-replay.md
 
 | Owner | Topics (key) | Services (keyed by) | Clients |
 |---|---|---|---|
-| `ui-settings` | `app.language` (`app`, ADR 0072), `data.source` (the data type, ADR 0073); watches `athlete.profile` | `app.set-language`, `data.select` (`data.source`) | every UI plugin, `ui-area-me`, `ui-tile-ride-start` |
-| `profile-local` | `athlete.profile` (`ridrs`, ADR 0073) | `athlete.profile.update` (`athlete.profile`) | `ui-settings`, `ui-area-me`, `ui-tile-ride-start` |
+| `ui-settings` | `app.language` (`app`, ADR 0072), `data.source` (the data type, ADR 0075); watches `athlete.profile` | `app.set-language`, `data.select` (`data.source`) | every UI plugin, `ui-area-me`, `ui-tile-ride-start` |
+| `profile-local` | `athlete.profile` (`ridrs`, ADR 0075) | `athlete.profile.update` (`athlete.profile`) | `ui-settings`, `ui-area-me`, `ui-tile-ride-start` |
 | `ui-landscape-demo` | `route.offer` (`ui-landscape-demo/demo-course`) | — | `ui-area-ride` |
 | `video-source-vangestel` | `route.offer` (`video-source-vangestel/<route>`) | `route.fetch`, `route.cancel`, `route.remove` (`route.offer`) | `ui-area-ride`, `ui-world-video` |
 | `planner-intervals-icu` | `training.account`, `training.plan` (`intervals.icu`), `training.upload` (session id); watches `recording.ride` | `training.connect`, `training.disconnect`, `training.refresh`, `training.upload` (`training.account`) | `ui-training-plan`, `ui-debriefing` |
@@ -72,7 +72,7 @@ The recorder observes the bus ([recording-and-replay.md](recording-and-replay.md
 | device plugins (`@ridrs/ble-peripheral`) | `device.status` (`<plugin id>/<kind>/<n>`) | `device.connect`, `device.forget`, `device.discover` (`device.status`) | `ui-devices` |
 | `transport-ble-bridge` | `bridge.state`, `bridge.companions`, `bridge.pairing` (plugin id) | `bridge.pair`, `bridge.connect`, `bridge.disconnect`, `bridge.forget` | `ui-devices`, `ui-bridge-pairing` |
 
-## Data sources (ADR 0073)
+## Data sources (ADR 0075)
 
 A data type that several providers can offer is defined with `defineDataType(id, dataSchema, writes)` (`@ridrs/contracts`, `data-sources.ts`): the topic `<id>`, **keyed by the provider id** (`ridrs`, `intervals.icu`), with the value `{ provider, label, status: 'ready' | 'offline' | 'unavailable' | 'loading', writable, fetchedAt?, data? }`, and one service `<id>.<name>` per write, keyed by that topic, so the host routes a write to the provider that owns the key (`{ ok: true }`, or `{ ok: false, reason: 'read-only' | 'unreachable' }`: a write is refused, never queued). A provider offers a type by owning its key (`state.owns`) and providing the services; the keys of the topic are the choice on the settings page. So far one data type exists, `athlete.profile` (`athlete.ts`; write `athlete.profile.update`, a partial change without the name). The rider's choice is the app state `data.source`, keyed by the data type, with the service `data.select`; its owner is the host side of `ui-settings`, which keeps it in the user document `data-sources`. A choice whose provider is gone is not shown (`ridrs` is in use) and not forgotten.
 

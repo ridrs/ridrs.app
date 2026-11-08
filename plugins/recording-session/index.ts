@@ -99,7 +99,7 @@ interface Recorder {
   readonly connections: Map<string, Buffered>;
   /** The latest bicycle that fell out of the pre-roll window: the next ride freezes it (ADR 0060). */
   bicycle?: Buffered;
-  /** The latest athlete that fell out of the pre-roll window: the next ride freezes it (ADR 0073). */
+  /** The latest athlete that fell out of the pre-roll window: the next ride freezes it (ADR 0075). */
   athlete?: Buffered;
   ride?: Ride;
   /** The interrupted ride on offer (ADR 0057): continued by the composition root or finished. */

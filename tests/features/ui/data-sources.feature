@@ -1,6 +1,6 @@
 @ui
 Feature: The rider chooses where the athlete profile comes from
-  A data type has one source of truth, chosen from every provider that offers it (ADR 0073). The
+  A data type has one source of truth, chosen from every provider that offers it (ADR 0075). The
   settings page has a section "Data sources" with a row for the athlete profile: one button per
   provider, the chosen one pressed, and the source's status beside it. The host side of the
   settings plugin keeps the choice and hands the chosen profile to the next ride. ridrs on this

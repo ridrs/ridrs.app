@@ -45,7 +45,7 @@ const RIDDEN_HOURS = 2.5;
 
 /**
  * What the rider changed in this area, kept at once (ADR 0059). Not strict: documents kept before
- * the athlete profile (ADR 0073) still hold the FTP and weight, which the host side hands to the
+ * the athlete profile (ADR 0075) still hold the FTP and weight, which the host side hands to the
  * profile on this device.
  */
 const useMe = userDocument(
@@ -65,7 +65,7 @@ const FIRST_FTP = 200;
 const FIRST_WEIGHT = 75;
 
 /**
- * The athlete profile of the chosen data source (ADR 0073): its FTP and weight, whether it can be
+ * The athlete profile of the chosen data source (ADR 0075): its FTP and weight, whether it can be
  * changed, and a call that changes them through `athlete.profile.update`, which the host routes to
  * the provider. A step starts from the value last asked for while the source has not shown it yet
  * (two quick steps are two steps); a refused change says why and leaves the old value.

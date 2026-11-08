@@ -11,7 +11,7 @@ interface FixtureConfig {
 const CONFIG = Symbol.for('ridrs.fixture.data-source');
 
 /**
- * A second provider of the athlete profile (ADR 0073), so scenarios can show two choices. It owns
+ * A second provider of the athlete profile (ADR 0075), so scenarios can show two choices. It owns
  * the key `fixture-cloud`, cannot be written, and is ready with an athlete of 250 W and 90 kg
  * unless a scenario made it offline or unavailable (nothing to read) or changed its weight.
  */

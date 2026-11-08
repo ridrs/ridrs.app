@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 
-# ADR 0073: Data Sources for the Athlete Profile and the Training Plan
+# ADR 0075: Data Sources for the Athlete Profile and the Training Plan
 
 Status: **accepted** on 2026-11-08 by the maintainer ("Accept all as proposed": every point the proposal left open is decided as proposed), from the proposal [athlete-data-sources.md](../ideas/athlete-data-sources.md), on the maintainer's request ("pick p7, p8. p9 should be only intervals.icu. add an interface for different data types, that can be implemented by sync providers. add data source settings to the existing settings page"). Stage D0 of that proposal; D1 and D2 are built (2026-11-08, see "Implementation"), D3 to D5 are not built yet. Amends [ADR 0052](0052-persistence-domains-and-plan.md) (no SQLite and no profile history in P7) and [ADR 0060](0060-equipment-garage-and-the-frozen-bicycle.md) (the bicycle stays out of the athlete profile).
 

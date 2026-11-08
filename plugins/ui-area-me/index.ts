@@ -11,7 +11,7 @@ import {
 import { z } from 'zod';
 
 /**
- * The area's own document as it was before the athlete profile existed (ADR 0073): FTP and
+ * The area's own document as it was before the athlete profile existed (ADR 0075): FTP and
  * weight lived in it as a preview. The rest of the document is read by the client module.
  */
 const previewDocument = {

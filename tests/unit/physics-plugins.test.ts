@@ -143,7 +143,7 @@ describe('physics contributors', () => {
     expect(used).toEqual(['subscribe activity.equipment']);
   });
 
-  // ADR 0073: the rider's mass is the weight of the athlete frozen for the ride, from a lifecycle event.
+  // ADR 0075: the rider's mass is the weight of the athlete frozen for the ride, from a lifecycle event.
   it('physics-rider publishes nothing and listens only to the athlete frozen for the ride', async () => {
     const definition = await definitionOf('physics-rider');
     const { ctx, used } = recordingContext('physics-rider');

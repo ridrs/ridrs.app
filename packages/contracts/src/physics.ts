@@ -26,7 +26,7 @@ export const SURFACE_ROLLING_FACTORS: Readonly<Record<TerrainSurface, number>> =
 });
 
 /** Where a parameter value comes from. */
-/** `equipment`: from the bicycle frozen for the ride (ADR 0060); `profile`: from the athlete profile frozen for it (ADR 0073). */
+/** `equipment`: from the bicycle frozen for the ride (ADR 0060); `profile`: from the athlete profile frozen for it (ADR 0075). */
 export type PhysicsParameterOrigin = 'default' | 'equipment' | 'profile';
 
 export interface PhysicsParameter {

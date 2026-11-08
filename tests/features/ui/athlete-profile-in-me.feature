@@ -1,6 +1,6 @@
 @ui
 Feature: The Me area shows and changes the chosen source's athlete profile
-  FTP and weight in the Me area are the chosen data source's (ADR 0073), not a preview of the
+  FTP and weight in the Me area are the chosen data source's (ADR 0075), not a preview of the
   area: they are read from the profile of the source and changed through "athlete.profile.update",
   which the host routes to the provider. A change is kept at once, handed to the next ride and
   still there when ridrs restarts. Values the Me area kept in its own preview document before the

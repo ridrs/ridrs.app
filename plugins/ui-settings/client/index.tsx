@@ -111,7 +111,7 @@ const LANGUAGE_NAMES: readonly { readonly value: Language; readonly label: strin
   { value: 'de', label: 'Deutsch' },
 ];
 
-/** The data type of the row (ADR 0073): the athlete profile, chosen among its providers. */
+/** The data type of the row (ADR 0075): the athlete profile, chosen among its providers. */
 const ATHLETE_PROFILE = 'athlete.profile';
 
 /** Whether a ride is under way: a new source then applies from the next ride. */

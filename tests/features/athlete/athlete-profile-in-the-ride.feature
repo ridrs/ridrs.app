@@ -1,6 +1,6 @@
 @fake-timers
 Feature: The athlete profile is frozen for a ride
-  The chosen data source's athlete profile (ADR 0073) enters a ride as an input, as the bicycle
+  The chosen data source's athlete profile (ADR 0075) enters a ride as an input, as the bicycle
   does (ADR 0060): the owner of the data source choice, the host side of the settings plugin,
   hands over "athlete.profile-changed" at host start and after every change of the chosen profile.
   When a ride starts, the activity session freezes it for that ride ("activity.athlete"), and the

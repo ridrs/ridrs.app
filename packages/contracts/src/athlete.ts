@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { defineDataType, providerIdSchema } from './data-sources.ts';
 import { defineEvent } from './events.ts';
 
-/** The athlete profile of a source (ADR 0073): what ridrs needs, nothing more. */
+/** The athlete profile of a source (ADR 0075): what ridrs needs, nothing more. */
 export const athleteProfileSchema = z
   .object({
     /** Read only, from the provider. */
