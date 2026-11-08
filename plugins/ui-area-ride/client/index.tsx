@@ -143,10 +143,15 @@ const CATEGORY_BADGE = {
 } as const;
 
 /**
- * The climb that fills the profile's height: 3 % over the route's whole length, so a gentle route
- * looks gentle and a mountain pass steep; a steeper route fills it with its own range.
+ * How high a card's profile rises, as a share of the card: by the route's rise from its lowest to
+ * its highest point alone, 30 % for 1000 m and by the square root of that below, so 500 m still
+ * rise 21 % and a flat route stays visible. It stops at the top of its area, 42 % of the card
+ * (`.pv-teaser-backdrop` in ui-preview), from about 1960 m.
  */
-const FULL_HEIGHT_GRADE = 0.03;
+const FULL_RISE = 1000;
+const FULL_RISE_SHARE = 0.3;
+const BACKDROP_SHARE = 0.42;
+const riseShare = (rise: number) => Math.min(FULL_RISE_SHARE * Math.sqrt(Math.max(rise, 0) / FULL_RISE), BACKDROP_SHARE);
 
 /** How long the glowing dot takes to ride a card's profile from start to end. */
 const TRACE_MS = 1600;
@@ -224,9 +229,11 @@ function Profile({
 }) {
   const elevations = offer.sparkline ?? [];
   const low = Math.min(...elevations);
-  const range = Math.max(Math.max(...elevations) - low, offer.distance * FULL_HEIGHT_GRADE, 1);
+  const rise = Math.max(...elevations) - low;
+  // The hill's height in the 32 units of the profile's area, which is the card's lowest 42 %.
+  const hill = (riseShare(rise) / BACKDROP_SHARE) * 32;
   const points = elevations.map(
-    (elevation, i) => [(i / (elevations.length - 1)) * 100, (1 - (elevation - low) / range) * 30 + 2] as const,
+    (elevation, i) => [(i / (elevations.length - 1)) * 100, 32 - (rise > 0 ? ((elevation - low) / rise) * hill : 0)] as const,
   );
   const { box, dot } = useTrace(points);
   if (points.length < 2) {

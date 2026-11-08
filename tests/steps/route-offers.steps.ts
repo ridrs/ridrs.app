@@ -98,6 +98,26 @@ Then(
   },
 );
 
+/** The share of a card's height its profile area takes: `.pv-teaser-backdrop` in ui-preview. */
+const BACKDROP_SHARE = 0.42;
+
+Then(
+  'the profile on the route card {string} rises {float} % of the card',
+  async function (this: RidrsWorld, title: string, share: number) {
+    await waitFor(() => {
+      const profile = within(card(this, title)).getByRole('img', {
+        name: `Elevation profile of ${title}`,
+      });
+      const height = profile.getAttribute('viewBox')?.split(' ').map(Number)[3] ?? 0;
+      const ys = (profile.querySelector('polyline')?.getAttribute('points') ?? '')
+        .split(' ')
+        .map((point) => Number(point.split(',')[1]));
+      const rise = ((Math.max(...ys) - Math.min(...ys)) / height) * BACKDROP_SHARE * 100;
+      assert.ok(Math.abs(rise - share) < 0.06, `rises ${rise.toFixed(2)} %`);
+    });
+  },
+);
+
 const details = (world: RidrsWorld) =>
   within(ui(world)).getByRole('region', { name: (name) => name.endsWith(' details') });
 

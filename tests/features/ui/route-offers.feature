@@ -25,6 +25,21 @@ Feature: The ride page lists the routes that plugins offer
     And the route "Col de Pennes - Climb it twice!" does not read "min"
     And the route "Col de Pennes - Climb it twice!" shows a picture and an elevation profile
 
+  Scenario Outline: A route card's profile rises with the route's rise alone
+    Its height follows the rise from the lowest to the highest point only, not the route's length,
+    gradient or total climb: 1000 m rise 30 % of the card, a smaller rise by the square root of its
+    share of that, so 500 m rise about 21 %.
+
+    When I press "Ride"
+    Then the profile on the route card "<route>" rises <share> % of the card
+
+    Examples:
+      | route                                 | share |
+      | Grimone - 1 - Gorges des Gâts         | 19.5  |
+      | Grimone - 2 - Col de Grimone, Ascent  | 19.6  |
+      | Lahntal - Marburg                     | 7.9   |
+      | Menée - 3 - Vallon de Combeau         | 29.1  |
+
   Scenario: A route card leaves the credits to the route details
     When I press "Ride"
     Then the route "Col de Pennes - Climb it twice!" reads "Video"
