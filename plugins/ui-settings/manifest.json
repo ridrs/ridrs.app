@@ -13,12 +13,17 @@
   ],
   "state": {
     "owns": [
-      "app.language"
+      "app.language",
+      "data.source"
+    ],
+    "watches": [
+      "athlete.profile"
     ]
   },
   "services": {
     "provides": [
-      "app.set-language"
+      "app.set-language",
+      "data.select"
     ]
   },
   "ui": {
@@ -37,14 +42,19 @@
       }
     ],
     "events": {
-      "subscribe": [],
+      "subscribe": [
+        "activity.state-changed"
+      ],
       "publish": []
     },
     "state": [
-      "app.language"
+      "app.language",
+      "athlete.profile",
+      "data.source"
     ],
     "calls": [
-      "app.set-language"
+      "app.set-language",
+      "data.select"
     ]
   }
 }

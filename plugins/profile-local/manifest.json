@@ -1,0 +1,16 @@
+{
+  "id": "profile-local",
+  "name": "Athlete Profile (this device)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": ["user"],
+  "state": {
+    "owns": ["athlete.profile"]
+  },
+  "services": {
+    "provides": ["athlete.profile.update"]
+  }
+}

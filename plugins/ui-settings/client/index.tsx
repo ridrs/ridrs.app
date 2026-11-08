@@ -1,10 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { appLanguageSetService, type Language } from '@ridrs/contracts';
+import {
+  activityStateChangedEvent,
+  type AthleteProfile,
+  appLanguageSetService,
+  athleteProfileState,
+  type DataSource,
+  DEFAULT_PROVIDER,
+  dataSelectService,
+  dataSourceState,
+  type Language,
+} from '@ridrs/contracts';
 import { ActionButton, AreaPage, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
-import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
-import { useState } from 'react';
+import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
+import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { appVersion } from './about.generated.ts';
 import { messages } from './i18n/index.ts';
@@ -101,6 +111,80 @@ const LANGUAGE_NAMES: readonly { readonly value: Language; readonly label: strin
   { value: 'de', label: 'Deutsch' },
 ];
 
+/** The data type of the row (ADR 0073): the athlete profile, chosen among its providers. */
+const ATHLETE_PROFILE = 'athlete.profile';
+
+/** Whether a ride is under way: a new source then applies from the next ride. */
+function useRiding(ctx: UiContext): boolean {
+  const [riding, setRiding] = useState(false);
+  useEffect(
+    () =>
+      ctx.events.subscribe(activityStateChangedEvent, ({ payload }) =>
+        setRiding(payload.state === 'running' || payload.state === 'paused'),
+      ),
+    [ctx],
+  );
+  return riding;
+}
+
+/** ridrs first, then the other providers by their id. */
+function inOrder(
+  providers: ReadonlyMap<string, DataSource<AthleteProfile>>,
+): readonly DataSource<AthleteProfile>[] {
+  return [...providers.values()].sort(
+    (a, b) =>
+      Number(b.provider === DEFAULT_PROVIDER) - Number(a.provider === DEFAULT_PROVIDER) ||
+      a.provider.localeCompare(b.provider),
+  );
+}
+
+/**
+ * The athlete profile's source: one button per provider that offers it, the chosen one pressed,
+ * and the status of the chosen one beside them. A provider chooses its own name, except ridrs on
+ * this device, which is named in the app's language.
+ */
+function AthleteProfileSource({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
+  const providers = useStateEntries(ctx, athleteProfileState);
+  const chosen = useStateEntries(ctx, dataSourceState).get(ATHLETE_PROFILE)?.provider;
+  const current = chosen ?? DEFAULT_PROVIDER;
+  const status = providers.get(current);
+  const choose = (provider: string) =>
+    ctx
+      .call(dataSelectService, { key: ATHLETE_PROFILE, provider })
+      .catch((error: unknown) => ctx.logger.warn(`Could not choose the source: ${String(error)}`));
+  return (
+    <div className="pv-row" role="group" aria-label={text.athleteProfile}>
+      <span style={{ minWidth: 140 }}>{text.athleteProfile}</span>
+      {inOrder(providers).map((provider) => (
+        <button
+          key={provider.provider}
+          type="button"
+          className="pv-chip"
+          aria-pressed={provider.provider === current}
+          onClick={() => choose(provider.provider)}
+        >
+          {provider.provider === DEFAULT_PROVIDER ? text.thisDevice : provider.label}
+        </button>
+      ))}
+      {status ? (
+        <span className="pv-muted" role="status">
+          {text.status(
+            status.status,
+            status.fetchedAt === undefined
+              ? undefined
+              : new Date(status.fetchedAt).toLocaleTimeString(language, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+          )}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const [state, change] = useSettings(ctx);
@@ -109,6 +193,7 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   // in the settings (ADR 0073).
   const [licenses, setLicenses] = useState(false);
   const [chosen, setChosen] = useState<Chosen>();
+  const riding = useRiding(ctx);
   useBack(ctx, () => {
     if (chosen) {
       setChosen(undefined);
@@ -152,6 +237,11 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
             {state.sounds ? text.on : text.off}
           </Toggle>
         </div>
+      </section>
+      <section className="pv-section">
+        <h2>{text.dataSources}</h2>
+        <AthleteProfileSource ctx={ctx} />
+        {riding ? <p className="pv-muted">{text.riding}</p> : null}
       </section>
       <section className="pv-section">
         <div className="pv-row">

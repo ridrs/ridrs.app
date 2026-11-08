@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Language } from '@ridrs/contracts';
+import type { Language, StateDefinition } from '@ridrs/contracts';
 import { useEffect, useState } from 'react';
 import type { UiContext } from './contract.ts';
 import { type Catalogs, watchLanguage } from './language.ts';
@@ -22,4 +22,17 @@ export function useLanguage(ctx: UiContext): Language {
 /** The plugin's texts in the app's language (ADR 0072). */
 export function useMessages<T>(ctx: UiContext, catalogs: Catalogs<T>): T {
   return catalogs[useLanguage(ctx)];
+}
+
+/**
+ * Every entry of an app state topic (ADR 0068), by key, and again whenever it changes; empty
+ * until the first delivery. Needs the topic in the plugin's `ui.state`.
+ */
+export function useStateEntries<T>(
+  ctx: UiContext,
+  topic: StateDefinition<T>,
+): ReadonlyMap<string, T> {
+  const [entries, setEntries] = useState<ReadonlyMap<string, T>>(() => new Map());
+  useEffect(() => ctx.state.watch(topic, (view) => setEntries(view.entries)), [ctx, topic]);
+  return entries;
 }

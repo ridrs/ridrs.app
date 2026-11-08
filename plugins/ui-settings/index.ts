@@ -2,13 +2,24 @@
 
 import {
   APP_LANGUAGE_KEY,
+  activityStateChangedEvent,
   appLanguageSetService,
   appLanguageState,
+  athleteProfileChangedEvent,
+  athleteProfileState,
   DEFAULT_LANGUAGE,
+  DEFAULT_PROVIDER,
+  type DataSource,
+  type AthleteProfile,
+  dataSelectService,
+  dataSourceState,
   definePlugin,
+  hostStartedEvent,
   languageSchema,
+  type RideAthlete,
 } from '@ridrs/contracts';
 import { z } from 'zod';
+import { DATA_SOURCES_DOCUMENT } from './data-sources.ts';
 
 /** The language the rider chose (ADR 0072), kept apart from the preview's settings. */
 const languageDocument = {
@@ -17,8 +28,23 @@ const languageDocument = {
   schema: z.object({ language: languageSchema }).strict(),
 };
 
+/** The data type with a choice (ADR 0073); the calendar joins with its stage. */
+const ATHLETE_PROFILE = 'athlete.profile';
+
+/** What a ride uses of a source's profile: the values that change the ride, never the name. */
+function rideAthleteOf(source: DataSource<AthleteProfile>): RideAthlete {
+  const { ftp, weight } = source.data ?? {};
+  return {
+    provider: source.provider,
+    ...(ftp === undefined ? {} : { ftp }),
+    ...(weight === undefined ? {} : { weight }),
+  };
+}
+
 // The rest of this plugin lives in its client module (see `ui` in the manifest). The host side
 // owns the app's language: every UI plugin watches it, so it must be there before they render.
+// It owns the choice of the data sources as well (ADR 0073) and hands the chosen athlete profile
+// to the next ride as the input `athlete.profile-changed`, as the garage hands over the bicycle.
 export default definePlugin({
   async start(ctx) {
     const kept = ctx.settings.user(languageDocument);
@@ -31,6 +57,65 @@ export default definePlugin({
       await kept
         .write({ language })
         .catch((error: unknown) => ctx.logger.warn(`Could not keep the language: ${String(error)}`));
+      return {};
+    });
+
+    // The rider's choice per data type. It stays in the document when its provider is gone, so
+    // the provider comes back with the choice; the state holds the provider in use.
+    const sources = ctx.settings.user(DATA_SOURCES_DOCUMENT);
+    const chosen = new Map(Object.entries((await sources.read())?.sources ?? {}));
+    let started = false;
+    let inUse: string | undefined;
+    let handedOver: string | undefined;
+
+    /** The provider in use: the chosen one, or ridrs once the host has started and it is gone. */
+    const evaluate = (force = false): void => {
+      const entries = ctx.state.entries(athleteProfileState);
+      const choice = chosen.get(ATHLETE_PROFILE) ?? DEFAULT_PROVIDER;
+      const provider = !started || entries.has(choice) ? choice : DEFAULT_PROVIDER;
+      if (provider !== inUse) {
+        inUse = provider;
+        ctx.state.set(dataSourceState, ATHLETE_PROFILE, { provider });
+      }
+      const source = entries.get(provider);
+      if (!started || !source) {
+        return;
+      }
+      const athlete = rideAthleteOf(source);
+      const json = JSON.stringify(athlete);
+      if (force || json !== handedOver) {
+        handedOver = json;
+        ctx.inputs.accept(athleteProfileChangedEvent, athlete);
+      }
+    };
+
+    evaluate();
+    ctx.state.watch(athleteProfileState, () => evaluate());
+    // Providers start in turn: the choice counts as gone only when all of them have started.
+    ctx.events.subscribe(hostStartedEvent, () => {
+      started = true;
+      evaluate();
+    });
+    // A ride continued from its journal re-enters the athlete it recorded; the profile as it is
+    // now is handed over again when that ride finishes, for the next one (as the garage does).
+    ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
+      if (payload.state === 'finished') {
+        evaluate(true);
+      }
+    });
+
+    ctx.services.provide(dataSelectService, async ({ key, provider }) => {
+      if (key !== ATHLETE_PROFILE) {
+        throw new Error(`"${key}" is no data type with a choice`);
+      }
+      if (!ctx.state.entries(athleteProfileState).has(provider)) {
+        throw new Error(`"${provider}" does not offer ${key}`);
+      }
+      chosen.set(key, provider);
+      evaluate();
+      await sources
+        .write({ sources: Object.fromEntries(chosen) })
+        .catch((error: unknown) => ctx.logger.warn(`Could not keep the data sources: ${String(error)}`));
       return {};
     });
   },

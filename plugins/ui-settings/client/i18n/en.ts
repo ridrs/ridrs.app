@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+
+import type { DataSourceStatus } from '@ridrs/contracts';
+
 /** The settings' texts in English (ADR 0072): the shape of every language. */
 export const en = {
   title: 'Settings',
@@ -35,6 +38,17 @@ export const en = {
   componentsSection: 'Components',
   contentBy: (author: string) => `By ${author}`,
   licenseName: (license: string) => `License: ${license}`,
+  dataSources: 'Data sources',
+  athleteProfile: 'Athlete profile',
+  thisDevice: 'ridrs (this device)',
+  status: (status: DataSourceStatus, loadedAt?: string) =>
+    ({
+      ready: 'Ready',
+      offline: loadedAt === undefined ? 'Offline' : `Offline · last loaded ${loadedAt}`,
+      unavailable: 'Not available',
+      loading: 'Loading…',
+    })[status],
+  riding: 'A ride is under way: a new source applies from the next ride.',
   placeholder: 'Units, sounds and smoothing are not read yet; the ride keeps metric units.',
 };
 
