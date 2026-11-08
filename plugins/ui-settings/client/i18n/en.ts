@@ -20,6 +20,21 @@ export const en = {
   showFrameRate: 'Show the frame rate',
   shown: 'Shown',
   hidden: 'Hidden',
+  about: 'About',
+  appName: 'ridrs',
+  version: (version: string) => `Version ${version}`,
+  licensedUnder: 'Licensed under GNU AGPL v3 or later',
+  sourceCode: 'Source code',
+  licensesAndCredits: 'Licenses & credits',
+  licensesIntro:
+    'ridrs is free software. These are the third-party components and content it contains, each with its license.',
+  loading: 'Loading…',
+  back: 'Back',
+  appEntry: 'ridrs itself',
+  contentSection: 'Third-party content',
+  componentsSection: 'Components',
+  contentBy: (author: string) => `By ${author}`,
+  licenseName: (license: string) => `License: ${license}`,
   placeholder: 'Units, sounds and smoothing are not read yet; the ride keeps metric units.',
 };
 
