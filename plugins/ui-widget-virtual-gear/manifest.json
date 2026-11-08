@@ -2,7 +2,9 @@
   "id": "ui-widget-virtual-gear",
   "name": "Virtual Gear Widget",
   "version": "0.1.0",
-  "types": ["ui"],
+  "types": [
+    "ui"
+  ],
   "provides": [],
   "requires": [],
   "entry": "index.ts",
@@ -16,8 +18,16 @@
       }
     ],
     "events": {
-      "subscribe": ["drivetrain.gear-changed", "trainer.target-power"],
-      "publish": ["drivetrain.shift-requested"]
-    }
+      "subscribe": [
+        "drivetrain.gear-changed",
+        "trainer.target-power"
+      ],
+      "publish": [
+        "drivetrain.shift-requested"
+      ]
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

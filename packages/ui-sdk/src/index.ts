@@ -11,4 +11,5 @@ export type {
   UiLogger,
   Unsubscribe,
 } from './contract.ts';
+export { type Catalogs, localizeNumber, watchLanguage } from './language.ts';
 export { describeMetricReading, formatDecimal, type MetricDisplay } from './metric-display.ts';

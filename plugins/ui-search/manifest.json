@@ -29,6 +29,9 @@
     "events": {
       "subscribe": [],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

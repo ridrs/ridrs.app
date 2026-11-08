@@ -43,6 +43,15 @@ Then(
   },
 );
 
+Then('the screen shows the heading {string}', async function (this: RidrsWorld, text: string) {
+  await waitFor(() => {
+    const headings = within(shownScreen(this))
+      .getAllByRole('heading', { level: 1 })
+      .map((heading) => heading.textContent);
+    assert.ok(headings.includes(text), `Headings: ${headings.join(', ')}`);
+  });
+});
+
 Then('the button {string} is on', async function (this: RidrsWorld, name: string) {
   await waitFor(() =>
     assert.equal(

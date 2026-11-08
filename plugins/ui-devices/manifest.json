@@ -42,6 +42,7 @@
       "publish": []
     },
     "state": [
+      "app.language",
       "bridge.state",
       "device.status"
     ],

@@ -16,6 +16,9 @@
         "extensionPoint": "main/top-bar",
         "export": "TopBar"
       }
+    ],
+    "state": [
+      "app.language"
     ]
   }
 }

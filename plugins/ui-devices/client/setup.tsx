@@ -11,6 +11,7 @@ import {
   trainerControlChangedEvent,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { takeRequestedDetails } from './details-request.ts';
 import { useDeviceRequests, useDiscovery } from './links.ts';
@@ -22,7 +23,6 @@ import {
   type DeviceRow,
   describeCompanion,
   describeDevices,
-  HEART_RATE_THOUGHTS,
   inShownOrder,
   linkOf,
   overLinksInReach,
@@ -32,6 +32,7 @@ import {
   summarize,
   type Tone,
 } from './devices.ts';
+import { type Messages, messages, TextContext, useText } from './i18n/index.ts';
 import {
   ArrowIcon,
   BikeIcon,
@@ -88,6 +89,7 @@ function ButtonFace({ button }: { readonly button: ControllerButton }) {
  * each (named for screen readers by `aria-label`).
  */
 function OkBadges({ row }: { readonly row: Pick<DeviceRow, 'held'> }) {
+  const text = useText();
   if (row.held && row.held.length > 0) {
     return row.held.map((button) => (
       <span
@@ -96,7 +98,7 @@ function OkBadges({ row }: { readonly row: Pick<DeviceRow, 'held'> }) {
         data-testid="status-badge"
         data-button={button}
         data-symbol={BUTTON_FACES[button].symbol}
-        aria-label={BUTTON_FACES[button].name}
+        aria-label={text.buttons[button]}
         style={BADGE}
       >
         <ButtonFace button={button} />
@@ -188,12 +190,13 @@ const COUNT = {
 
 /** "+2": more devices of the kind were found; the details offer to connect one of them. */
 function MoreFound({ count }: { readonly count: number }) {
+  const text = useText();
   return (
     <span
       data-testid="more-found"
       role="img"
-      aria-label={`${count} more found`}
-      title={`${count} more found`}
+      aria-label={text.moreFound(count)}
+      title={text.moreFound(count)}
       style={COUNT}
     >
       {`+${count}`}
@@ -203,9 +206,10 @@ function MoreFound({ count }: { readonly count: number }) {
 
 /** "2 found": while the kind searches, the devices of the kind found, a forgotten one too. */
 function FoundCount({ count }: { readonly count: number }) {
+  const text = useText();
   return (
     <span data-testid="found-count" style={COUNT}>
-      {`${count} found`}
+      {text.found(count)}
     </span>
   );
 }
@@ -389,13 +393,14 @@ function StatusPill({ status, tone }: { readonly status: string; readonly tone: 
 }
 
 function Tip({ tip }: { readonly tip: string }) {
+  const text = useText();
   return (
     <aside style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span style={{ color: COLORS.amber }}>
         <BulbIcon />
       </span>
       <span style={{ fontSize: 14 }}>
-        <b style={{ display: 'block' }}>Tip</b>
+        <b style={{ display: 'block' }}>{text.tip}</b>
         <span data-testid="details-tip" style={{ color: COLORS.muted }}>
           {tip}
         </span>
@@ -517,15 +522,10 @@ const ICON_BUTTON = { display: 'inline-flex', alignItems: 'center', gap: 8 } as 
 /** Remove, of a device or the companion: red, with a bin icon. */
 const REMOVE = { ...BUTTON, ...ICON_BUTTON, borderColor: COLORS.red, color: COLORS.red } as const;
 
-const LINK_NAMES: Record<BleRoute, string> = { local: 'Direct', companion: 'Companion' };
-
-/** How Switch to names the link. */
-const OVER: Record<BleRoute, string> = { local: 'Bluetooth', companion: 'companion' };
-
 /** The signal of a device found: four bars, as phones show them, the strong ones lit. */
 function Signal({ rssi }: { readonly rssi: number }) {
   const bars = signalBars(rssi);
-  const name = `Signal ${bars} of 4`;
+  const name = useText().signal(bars);
   return (
     <span
       role="img"
@@ -551,7 +551,7 @@ function Signal({ rssi }: { readonly rssi: number }) {
 
 /** The battery level: a battery filled to the level, and the level in percent. */
 function Battery({ level }: { readonly level: number }) {
-  const name = `Battery ${level} %`;
+  const name = useText().battery(level);
   const low = level <= 20;
   return (
     <span
@@ -598,17 +598,14 @@ function Battery({ level }: { readonly level: number }) {
   );
 }
 
-/** Every Connect names the link it uses. */
-function connectWith(route: BleRoute): string {
-  return route === 'local' ? 'with Bluetooth' : 'with companion';
-}
 
 /** The links shown and the signal of a device found, at the right of its row. */
 function LinksAndSignal({ found }: { readonly found: DeviceCandidate }) {
+  const text = useText();
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: COLORS.muted }}>
       {found.routes.map((route) => (
-        <LinkIcon key={route} route={route} label={LINK_NAMES[route]} />
+        <LinkIcon key={route} route={route} label={text.links[route]} />
       ))}
       {found.rssi !== undefined && <Signal rssi={found.rssi} />}
     </span>
@@ -635,13 +632,14 @@ function FoundButton({
   readonly className?: string;
   readonly style?: CSSProperties;
 }) {
+  const text = useText();
   const name = found.deviceName || found.deviceId;
-  const how = connectWith(linkOf(found));
+  const how = text.connectWith[linkOf(found)];
   return (
     <button
       type="button"
       className={className}
-      aria-label={`Connect ${name} ${how}`}
+      aria-label={text.connectDevice(name, how)}
       onClick={onConnect}
       style={style}
     >
@@ -653,7 +651,7 @@ function FoundButton({
           {name}
         </b>
         <small style={{ display: 'block', color: COLORS.muted, fontSize: 13 }}>
-          Connect {how}
+          {text.connectHow(how)}
         </small>
       </span>
       <LinksAndSignal found={found} />
@@ -715,6 +713,7 @@ function FoundGroup({
   readonly onConnect: (deviceId: string) => void;
 }) {
   const [main, ...others] = [...links].sort((a, b) => routeRank(a) - routeRank(b));
+  const text = useText();
   if (!main) return null;
   const name = main.deviceName || main.deviceId;
   return (
@@ -727,19 +726,19 @@ function FoundGroup({
         style={MAIN_LINE}
       />
       {others.map((link, i) => {
-        const how = connectWith(linkOf(link));
+        const how = text.connectWith[linkOf(link)];
         const last = i === others.length - 1;
         return (
           <button
             key={link.deviceId}
             type="button"
             className="rd-row rd-line"
-            aria-label={`Connect ${name} ${how}`}
+            aria-label={text.connectDevice(name, how)}
             onClick={() => onConnect(link.deviceId)}
             style={{ ...OTHER_LINE, borderRadius: last ? '0 0 16px 16px' : 0 }}
           >
             <span aria-hidden />
-            <span>or connect {how}</span>
+            <span>{text.orConnect(how)}</span>
             <LinksAndSignal found={link} />
             {CHEVRON}
           </button>
@@ -756,21 +755,22 @@ const HELD = new Set(['connecting', 'connected', 'reconnecting']);
  * How ridrs controls the trainer, in a word or two: facts only (ADR 0056). A trainer ridrs cannot
  * control says nothing about control.
  */
-function controlFact(control: TrainerControlChangedPayload): Fact | undefined {
+function controlFact(control: TrainerControlChangedPayload, text: Messages): Fact | undefined {
   if (control.control === 'unsupported') {
     return undefined;
   }
+  const words = text.controlValues;
   const value =
     control.mode === 'erg'
-      ? `ERG ${control.targetPower ?? ''} W`
+      ? words.erg(String(control.targetPower ?? ''))
       : control.control === 'granted'
         ? control.mode === 'simulation'
-          ? 'simulation'
-          : 'ready'
-        : control.control;
+          ? words.simulation
+          : words.ready
+        : words[control.control];
   const tone: Tone =
     control.control === 'granted' ? 'ok' : control.control === 'requested' ? 'busy' : 'warn';
-  return { icon: 'status', term: 'Control', value, tone };
+  return { icon: 'status', term: text.control, value, tone };
 }
 
 /** The trainer's control state, as its device plugin published it last for the device. */
@@ -803,11 +803,12 @@ function DeviceDetails({
   /** Remove closes the details at once, Connect once the device asked for is connected. */
   readonly onClose: () => void;
 }) {
+  const text = useText();
   const kind = row.deviceKind;
   const known = row.deviceId !== '';
   const route = row.route ?? 'local';
   const control = useTrainerControl(ctx, row.deviceId, kind);
-  const controlled = control && row.state === 'connected' ? controlFact(control) : undefined;
+  const controlled = control && row.state === 'connected' ? controlFact(control, text) : undefined;
   // The signal of the device itself, as the devices found show theirs.
   const signal = row.candidates.find((c) => c.deviceId === row.deviceId)?.rssi;
   const reconnect = row.state === 'disconnected' && (route === 'local' || companion);
@@ -867,7 +868,7 @@ function DeviceDetails({
                   }}
                 >
                   <TrashIcon />
-                  Remove
+                  {text.remove}
                 </button>
               ) : (
                 reconnect && (
@@ -877,13 +878,13 @@ function DeviceDetails({
                     style={BUTTON}
                     onClick={() => connect(row.deviceId)}
                   >
-                    Connect {connectWith(route)}
+                    {text.connectHow(text.connectWith[route])}
                   </button>
                 )
               )}
               {links.map((link) => {
                 const via = linkOf(link);
-                const name = `Switch to ${OVER[via]}`;
+                const name = text.switchTo(text.over[via]);
                 return (
                   // The icon names itself: the label keeps the button's name short.
                   <button
@@ -893,7 +894,7 @@ function DeviceDetails({
                     style={{ ...BUTTON, ...ICON_BUTTON }}
                     onClick={() => connect(link.deviceId)}
                   >
-                    <LinkIcon route={via} label={LINK_NAMES[via]} />
+                    <LinkIcon route={via} label={text.links[via]} />
                     {name}
                   </button>
                 );
@@ -905,7 +906,7 @@ function DeviceDetails({
       {/* A controller pair is one row for two devices: they are not swapped one by one. */}
       {groups.length > 0 && (
         <ul
-          aria-label="Devices found"
+          aria-label={text.devicesFound}
           style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}
         >
           {groups.map((group) =>
@@ -961,8 +962,9 @@ function CompanionDetails({
   }, [awaited, companion.state, onClose]);
   useEffect(() => (pairing.current ? ctx.slot(PAIRING_SLOT, pairing.current) : undefined), [ctx]);
   const paired = companion.state !== 'unpaired' && companion.state !== 'rejected';
+  const text = useText();
   const facts: Fact[] = companion.reason
-    ? [{ icon: 'status', term: 'Reason', value: companion.reason, tone: companion.tone }]
+    ? [{ icon: 'status', term: text.reason, value: companion.reason, tone: companion.tone }]
     : [];
   const reconnect = companion.state === 'disconnected' || companion.state === 'unreachable';
   return (
@@ -986,7 +988,7 @@ function CompanionDetails({
                 setAwaited(true);
               }}
             >
-              {companion.state === 'unreachable' ? 'Try again' : 'Connect'}
+              {companion.state === 'unreachable' ? text.tryAgain : text.connect}
             </button>
           )}
           {paired && (
@@ -997,7 +999,7 @@ function CompanionDetails({
               onClick={() => callBridge(ctx, bridgeForgetService)}
             >
               <TrashIcon />
-              Remove
+              {text.remove}
             </button>
           )}
         </div>
@@ -1038,6 +1040,7 @@ export function DeviceSetupView({
   /** The companion bridge, when its transport runs. */
   readonly bridge?: BridgeStatus;
 }) {
+  const text = useMessages(ctx, messages);
   // The devices tile may have asked for the details of a kind.
   const [open, setOpen] = useState<Open | undefined>(takeRequestedDetails);
   // The row whose details were open last gets the focus back when they close.
@@ -1046,16 +1049,16 @@ export function DeviceSetupView({
   const [thought, setThought] = useState(0);
   const show = (row: Open) => {
     opened.current = row;
-    setThought(Math.floor(Math.random() * HEART_RATE_THOUGHTS.length));
+    setThought(Math.floor(Math.random() * text.thoughts.length));
     setOpen(row);
   };
   const close = () => setOpen(undefined);
   // While the setup is open, every device link looks for devices.
   useDiscovery(ctx);
 
-  const summary = summarize(devices);
-  const rows = describeDevices(overLinksInReach(devices, bridge?.state), readings);
-  const companion = bridge ? describeCompanion(bridge) : undefined;
+  const summary = summarize(devices, text);
+  const rows = describeDevices(overLinksInReach(devices, bridge?.state), readings, text);
+  const companion = bridge ? describeCompanion(bridge, text) : undefined;
   const openRow = open === 'companion' ? undefined : rows.find((r) => r.kind === open);
   const details = (open === 'companion' && companion !== undefined) || openRow !== undefined;
   const heading =
@@ -1067,7 +1070,7 @@ export function DeviceSetupView({
             title: openRow.title,
             about:
               openRow.kind === 'heart-rate'
-                ? (HEART_RATE_THOUGHTS[thought] ?? openRow.about)
+                ? (text.thoughts[thought] ?? openRow.about)
                 : openRow.about,
             // At the top right: whether ridrs looks for devices of the kind, over any link.
             searching: openRow.scanning.length > 0,
@@ -1090,6 +1093,7 @@ export function DeviceSetupView({
   leave.current = details ? close : () => ctx.leave();
   useEffect(() => ctx.onBack(() => leave.current()), [ctx]);
   return (
+    <TextContext.Provider value={text}>
     <main
       style={{
         boxSizing: 'border-box',
@@ -1130,7 +1134,7 @@ export function DeviceSetupView({
             <button
               ref={back}
               type="button"
-              aria-label="Back"
+              aria-label={text.back}
               className="rd-back"
               onClick={close}
               style={{
@@ -1150,7 +1154,7 @@ export function DeviceSetupView({
             </button>
             {'searching' in heading && (
               <StatusPill
-                status={heading.searching ? 'Searching…' : 'Not searching'}
+                status={heading.searching ? text.searching : text.notSearching}
                 tone={heading.searching ? 'busy' : 'none'}
               />
             )}
@@ -1173,7 +1177,7 @@ export function DeviceSetupView({
               <BikeIcon />
             </div>
             <h1 style={TITLE}>
-              Connect Your{' '}
+              {text.titleStart}{' '}
               <em
                 style={{
                   background: `linear-gradient(90deg, ${COLORS.cyan}, ${COLORS.lime})`,
@@ -1182,7 +1186,7 @@ export function DeviceSetupView({
                   color: 'transparent',
                 }}
               >
-                Devices
+                {text.titleEnd}
               </em>
             </h1>
             <p data-testid="device-summary" aria-live="polite" style={SUBTITLE}>
@@ -1202,7 +1206,7 @@ export function DeviceSetupView({
         ) : (
           <ul
             ref={list}
-            aria-label="Devices"
+            aria-label={text.devices}
             style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}
           >
             {rows.map((row) => (
@@ -1248,7 +1252,7 @@ export function DeviceSetupView({
               borderRadius: 14,
             }}
           >
-            {summary.settled ? 'Done' : 'Continue'}{' '}
+            {summary.settled ? text.done : text.continue}{' '}
             <span aria-hidden style={{ color: COLORS.lime }}>
               »
             </span>
@@ -1256,5 +1260,6 @@ export function DeviceSetupView({
         )}
       </div>
     </main>
+    </TextContext.Provider>
   );
 }

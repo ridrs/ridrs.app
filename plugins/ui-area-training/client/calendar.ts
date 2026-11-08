@@ -56,7 +56,7 @@ export const FIRST_WEEK: Calendar = {
   undo: [],
 };
 
-/** The title an entry of a kind gets when it is added without one. */
+/** The title an entry of a kind is kept with; the page shows the kind in the rider's language. */
 export const KIND_TITLES: Readonly<Record<Exclude<EntryKind, 'workout'>, string>> = {
   rest: 'Rest day',
   note: 'Note',

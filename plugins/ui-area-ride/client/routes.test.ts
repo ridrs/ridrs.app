@@ -2,6 +2,8 @@
 
 import type { RouteOffer } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
+import { de } from './i18n/de.ts';
+import { en } from './i18n/en.ts';
 import { describeRoute, filterRoutes, formatDuration, formatSize, gradeOf, orderOffers, stretchesOf } from './routes.ts';
 
 const offer = (id: string, distance: number, ascent: number, duration?: number): RouteOffer => ({
@@ -47,13 +49,25 @@ describe('describeRoute and formatSize', () => {
         ...offer('grimone', 25_618, 535),
         kind: 'video',
         tags: { country: 'France', tour: { name: 'Grimone', part: 1 } },
-      }),
+      }, en),
     ).toBe('Video · France · Grimone, part 1');
-    expect(describeRoute(offer('open', 4_500, 50))).toBe('Route');
-    expect(formatDuration(10_380)).toBe('about 2 h 53 min');
-    expect(formatDuration(44 * 60)).toBe('about 44 min');
-    expect(formatSize(11_213_923_126)).toBe('11.2 GB');
-    expect(formatSize(770_825_204)).toBe('771 MB');
+    expect(describeRoute(offer('open', 4_500, 50), en)).toBe('Route');
+    expect(formatDuration(10_380, en)).toBe('about 2 h 53 min');
+    expect(formatDuration(44 * 60, en)).toBe('about 44 min');
+    expect(formatSize(11_213_923_126, en)).toBe('11.2 GB');
+    expect(formatSize(770_825_204, en)).toBe('771 MB');
+  });
+
+  it('says the same in German, with a decimal comma', () => {
+    expect(
+      describeRoute({
+        ...offer('grimone', 25_618, 535),
+        kind: 'video',
+        tags: { country: 'France', tour: { name: 'Grimone', part: 1 } },
+      }, de),
+    ).toBe('Video · Frankreich · Grimone, Teil 1');
+    expect(formatDuration(10_380, de)).toBe('etwa 2 h 53 min');
+    expect(formatSize(11_213_923_126, de)).toBe('11,2 GB');
   });
 });
 

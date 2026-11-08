@@ -19,6 +19,7 @@
       "@ridrs/ui-bridge": ["./packages/ui-bridge/src/index.ts"],
       "@ridrs/ui-preview": ["./packages/ui-preview/src/index.ts"],
       "@ridrs/ui-sdk": ["./packages/ui-sdk/src/index.ts"],
+      "@ridrs/ui-sdk/react": ["./packages/ui-sdk/src/react.ts"],
       "@ridrs/ui-shell": ["./packages/ui-shell/src/index.ts"]
     }
   },

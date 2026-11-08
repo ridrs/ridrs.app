@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const TODAY = new URL('./assets/icons/sun.svg', import.meta.url).href;
@@ -39,6 +41,7 @@ const CSS = `
 `;
 
 function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const items = useRef<HTMLDivElement>(null);
   // The other screens' entries; the menu does not know them.
   useEffect(() => (items.current ? ctx.slot('menu/item', items.current) : undefined), [ctx]);
@@ -47,7 +50,7 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
   useEffect(() => ctx.onNavigated((_, shownPage) => setPage(shownPage)), [ctx]);
 
   return (
-    <nav className="mm-nav" aria-label="Main">
+    <nav className="mm-nav" aria-label={text.menu}>
       <style>{CSS}</style>
       <span className="mm-brand" aria-hidden="true">
         ridrs
@@ -61,7 +64,7 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
           onClick={() => ctx.navigate('main')}
         >
           <span data-menu-icon aria-hidden="true" style={{ '--icon': `url("${TODAY}")` } as object} />
-          <span data-menu-label>Today</span>
+          <span data-menu-label>{text.today}</span>
         </button>
         <div ref={items} className="mm-list" data-testid="slot-menu-item" />
       </div>

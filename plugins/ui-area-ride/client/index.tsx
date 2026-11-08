@@ -23,8 +23,10 @@ import {
   userDocument,
 } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import { type Messages, messages } from './i18n/index.ts';
 import { RouteProfile } from './profile.tsx';
 import {
   climbCategory,
@@ -211,10 +213,12 @@ function useTrace(points: readonly (readonly [number, number])[]) {
  */
 function Profile({
   offer,
+  text,
   height,
   trace,
 }: {
   readonly offer: RouteOffer;
+  readonly text: Messages;
   readonly height?: number;
   readonly trace?: boolean;
 }) {
@@ -233,7 +237,7 @@ function Profile({
   const svg = (
     <svg
       role="img"
-      aria-label={`Elevation profile of ${offer.title}`}
+      aria-label={text.profileOf(offer.title)}
       viewBox="0 0 100 32"
       preserveAspectRatio="none"
       style={{ width: '100%', height: height ?? '100%', color: 'var(--ridrs-accent, #b8f53b)' }}
@@ -267,12 +271,13 @@ function Profile({
 }
 
 function FavouriteToggle({ ctx, offer, label }: { readonly ctx: UiContext; readonly offer: RouteOffer; readonly label?: string }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useRide(ctx);
   const favourite = state.favourites.includes(offer.id);
   return (
     <Toggle
       className={label ? 'pv-chip pv-favourite' : 'pv-icon pv-favourite'}
-      label={label ?? `Favourite ${offer.title}`}
+      label={label ?? text.favouriteOf(offer.title)}
       on={favourite}
       onChange={(on) =>
         change((s) => ({
@@ -289,34 +294,34 @@ function FavouriteToggle({ ctx, offer, label }: { readonly ctx: UiContext; reado
 }
 
 /** How far a download is, for a route that is not ready: e.g. `Downloading: 45 %`. */
-function downloadState(offer: RouteOffer): string | undefined {
+function downloadState(offer: RouteOffer, text: Messages): string | undefined {
   const { availability } = offer;
   switch (availability.state) {
     case 'fetchable':
-      return `Not on this device yet: ${formatSize(availability.size)} to download`;
+      return text.notHere(formatSize(availability.size, text));
     case 'fetching':
-      return `Downloading: ${Math.floor((availability.received / availability.size) * 100)} %`;
+      return text.downloading(Math.floor((availability.received / availability.size) * 100));
     case 'failed':
-      return `Download failed: ${availability.reason}`;
+      return text.failedBecause(availability.reason);
     case 'ready':
       return undefined;
   }
 }
 
-const minutes = (offer: RouteOffer) =>
-  offer.duration === undefined ? undefined : formatDuration(offer.duration);
+const minutes = (offer: RouteOffer, text: Messages) =>
+  offer.duration === undefined ? undefined : formatDuration(offer.duration, text);
 
 /** What a card says under the title: the route's length and climb, each by its icon. */
-const facts = (offer: RouteOffer): CardFact[] => [
-  { icon: DISTANCE, text: formatDistance(offer) },
-  { icon: ASCENT, text: formatAscent(offer) },
+const facts = (offer: RouteOffer, text: Messages): CardFact[] => [
+  { icon: DISTANCE, text: formatDistance(offer, text) },
+  { icon: ASCENT, text: formatAscent(offer, text) },
 ];
 
 /**
  * A corner badge for a route that needs a download: the download's progress, a failure, or an icon
  * once it is on this device. A route still to download shows only its Download button.
  */
-function DownloadBadge({ offer }: { readonly offer: RouteOffer }) {
+function DownloadBadge({ offer, text }: { readonly offer: RouteOffer; readonly text: Messages }) {
   const { availability } = offer;
   switch (availability.state) {
     case 'fetchable':
@@ -324,11 +329,11 @@ function DownloadBadge({ offer }: { readonly offer: RouteOffer }) {
     case 'fetching':
       return <Badge tone="busy">{Math.floor((availability.received / availability.size) * 100)} %</Badge>;
     case 'failed':
-      return <Badge tone="warn">Download failed</Badge>;
+      return <Badge tone="warn">{text.failed}</Badge>;
     case 'ready':
       // Only a downloaded route can be removed; a world's route is always here and needs no icon.
       return availability.removable ? (
-        <Badge tone="done" label="On this device">
+        <Badge tone="done" label={text.onDevice}>
           <span className="pv-glyph" aria-hidden="true" style={iconStyle(ON_DEVICE)} />
         </Badge>
       ) : null;
@@ -340,6 +345,7 @@ function DownloadBadge({ offer }: { readonly offer: RouteOffer }) {
  * as from its details. A refused call says why in the badge's place until the offer changes.
  */
 function DownloadTool({ ctx, offer }: { readonly ctx: UiContext; readonly offer: RouteOffer }) {
+  const text = useMessages(ctx, messages);
   const { availability } = offer;
   const [refusal, setRefusal] = useState<string>();
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new state replaces the refusal.
@@ -348,15 +354,15 @@ function DownloadTool({ ctx, offer }: { readonly ctx: UiContext; readonly offer:
     setRefusal(undefined);
     run().catch((error: unknown) => setRefusal(reasonOf(error)));
   };
-  if (availability.state === 'ready') return <DownloadBadge offer={offer} />;
+  if (availability.state === 'ready') return <DownloadBadge offer={offer} text={text} />;
   const fetching = availability.state === 'fetching';
   return (
     <>
-      {refusal ? <Badge tone="warn">{refusal}</Badge> : <DownloadBadge offer={offer} />}
+      {refusal ? <Badge tone="warn">{refusal}</Badge> : <DownloadBadge offer={offer} text={text} />}
       <button
         type="button"
         className="pv-icon"
-        aria-label={fetching ? `Cancel download of ${offer.title}` : `Download ${offer.title}`}
+        aria-label={fetching ? text.cancelDownloadOf(offer.title) : text.downloadOf(offer.title)}
         onClick={() =>
           call(() => ctx.call(fetching ? routeCancelService : routeFetchService, { key: offer.id }))
         }
@@ -377,15 +383,16 @@ function RouteCard({
   readonly offer: RouteOffer;
   readonly onOpen: () => void;
 }) {
+  const text = useMessages(ctx, messages);
   return (
     <Card
       label={offer.title}
-      classifier={offer.kind === 'video' ? 'Video' : 'Route'}
+      classifier={offer.kind === 'video' ? text.video : text.route}
       icon={offer.kind === 'video' ? VIDEO : MOUNTAIN}
       title={offer.title}
-      details={facts(offer)}
+      details={facts(offer, text)}
       image={offer.thumbnail}
-      backdrop={<Profile offer={offer} trace />}
+      backdrop={<Profile offer={offer} text={text} trace />}
       tools={
         <>
           <DownloadTool ctx={ctx} offer={offer} />
@@ -425,6 +432,7 @@ function RouteDetails({
   readonly offer: RouteOffer;
   readonly onClose: () => void;
 }) {
+  const text = useMessages(ctx, messages);
   const go = useGo(ctx);
   const first = useRef<HTMLButtonElement>(null);
   const { availability, credits } = offer;
@@ -440,18 +448,19 @@ function RouteDetails({
     setRefusal(undefined);
     run().catch((error: unknown) => setRefusal(reasonOf(error)));
   };
-  const state = refusal ?? downloadState(offer);
-  const duration = minutes(offer);
+  const state = refusal ?? downloadState(offer, text);
+  const duration = minutes(offer, text);
+  const level = offer.tags.level;
   return (
     <DetailPage
-      label={`${offer.title} details`}
+      label={text.details(offer.title)}
       image={offer.thumbnail}
       onBack={onClose}
       hero={
         <>
           <span style={KICKER}>
             <span className="pv-glyph" aria-hidden="true" style={{ ...iconStyle(offer.kind === 'video' ? VIDEO : MOUNTAIN), width: 15, height: 15 }} />
-            {describeRoute(offer)}
+            {describeRoute(offer, text)}
           </span>
           <h2>{offer.title}</h2>
         </>
@@ -459,16 +468,16 @@ function RouteDetails({
     >
       <div style={SUMMARY}>
         <dl style={STATS}>
-          <Stat icon={DISTANCE} label="Distance" value={formatDistance(offer)} />
-          <Stat icon={ASCENT} label="Climb" value={formatAscent(offer)} />
-          {duration ? <Stat icon={DURATION} label="Duration" value={duration} /> : null}
-          {offer.tags.level ? <Stat icon={MOUNTAIN} label="Level" value={offer.tags.level} /> : null}
+          <Stat icon={DISTANCE} label={text.distance} value={formatDistance(offer, text)} />
+          <Stat icon={ASCENT} label={text.climb} value={formatAscent(offer, text)} />
+          {duration ? <Stat icon={DURATION} label={text.duration} value={duration} /> : null}
+          {level ? <Stat icon={MOUNTAIN} label={text.level} value={text.levels[level] ?? level} /> : null}
         </dl>
         <div className="pv-row">
           {availability.state === 'ready' ? (
             <button ref={first} type="button" className="pv-button pv-primary" onClick={() => go(offer)}>
               <span className="pv-glyph" aria-hidden="true" style={iconStyle(BIKE)} />
-              Go
+              {text.go}
             </button>
           ) : null}
           {fetchable ? (
@@ -479,7 +488,7 @@ function RouteDetails({
               onClick={() => call(() => ctx.call(routeFetchService, { key: offer.id }))}
             >
               <span className="pv-glyph" aria-hidden="true" style={iconStyle(DOWNLOAD)} />
-              Download
+              {text.download}
             </button>
           ) : null}
           {availability.state === 'fetching' ? (
@@ -490,17 +499,17 @@ function RouteDetails({
               onClick={() => call(() => ctx.call(routeCancelService, { key: offer.id }))}
             >
               <span className="pv-glyph" aria-hidden="true" style={iconStyle(CANCEL)} />
-              Cancel download
+              {text.cancelDownload}
             </button>
           ) : null}
-          <FavouriteToggle ctx={ctx} offer={offer} label="Favourite" />
+          <FavouriteToggle ctx={ctx} offer={offer} label={text.favourite} />
           {availability.state === 'ready' && availability.removable ? (
             <button
               type="button"
               className="pv-button"
               onClick={() => call(() => ctx.call(routeRemoveService, { key: offer.id }))}
             >
-              Remove from this device
+              {text.remove}
             </button>
           ) : null}
         </div>
@@ -511,23 +520,23 @@ function RouteDetails({
         </p>
       ) : null}
       {offer.sparkline ? (
-        <section className="pv-section" aria-label="Profile">
-          <h2>Profile</h2>
-          <RouteProfile offer={offer} />
+        <section className="pv-section" aria-label={text.profile}>
+          <h2>{text.profile}</h2>
+          <RouteProfile offer={offer} text={text} />
         </section>
       ) : null}
       {offer.climbs?.length ? (
-        <section className="pv-section" aria-label="Climbs">
-          <h2>Climbs</h2>
-          <ul aria-label="Climbs" style={CLIMBS}>
+        <section className="pv-section" aria-label={text.climbs}>
+          <h2>{text.climbs}</h2>
+          <ul aria-label={text.climbs} style={CLIMBS}>
             {offer.climbs.map((climb) => (
               <li key={climb.end} style={CLIMB}>
-                <span role="img" aria-label={climbCategory(climb)} style={CATEGORY_BADGE}>
+                <span role="img" aria-label={climbCategory(climb, text)} style={CATEGORY_BADGE}>
                   {climb.category}
                 </span>
                 <span style={{ display: 'grid' }}>
                   {climb.name ? <strong>{climb.name}</strong> : null}
-                  <span className={climb.name ? 'pv-muted' : undefined}>{describeClimb(climb)}</span>
+                  <span className={climb.name ? 'pv-muted' : undefined}>{describeClimb(climb, text)}</span>
                 </span>
               </li>
             ))}
@@ -536,7 +545,7 @@ function RouteDetails({
       ) : null}
       {credits ? (
         <p className="pv-muted" style={{ fontSize: 13, overflowWrap: 'anywhere' }}>
-          By {credits.author}, {credits.source}, {credits.license}. {credits.url}
+          {text.credits(credits.author, credits.source, credits.license, credits.url)}
         </p>
       ) : null}
     </DetailPage>
@@ -544,6 +553,7 @@ function RouteDetails({
 }
 
 function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useRide(ctx);
   const offers = useOffers(ctx);
   const [openId, setOpenId] = useState<string>();
@@ -563,7 +573,7 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
         <h2>{title}</h2>
         {routes.length === 0 ? (
           <p className="pv-muted">
-            {offers.some((offer) => offer.kind === kind) ? 'No route matches the filters.' : none}
+            {offers.some((offer) => offer.kind === kind) ? text.noMatch : none}
           </p>
         ) : (
           <div className="pv-cards" data-wide>
@@ -580,35 +590,35 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
     return <RouteDetails ctx={ctx} offer={open} onClose={() => setOpenId(undefined)} />;
   }
   return (
-    <AreaPage title="Ride" intro="Ride freely: worlds, routes and real video. Pick a route, then Go.">
-          <section className="pv-section" aria-label="Filters">
+    <AreaPage title={text.title} intro={text.intro}>
+          <section className="pv-section" aria-label={text.filters}>
             <div className="pv-row">
               {FILTERS.map((filter) => (
                 <Toggle
-                  key={filter.id}
-                  label={filter.label}
-                  on={state.filters.includes(filter.id)}
-                  onChange={(on) => toggleFilter(filter.id, on)}
+                  key={filter}
+                  label={text.filter[filter]}
+                  on={state.filters.includes(filter)}
+                  onChange={(on) => toggleFilter(filter, on)}
                 />
               ))}
             </div>
           </section>
-          {section('Worlds and routes', 'world', 'No world offers a route.')}
-          {section('Real video', 'video', 'No video source offers a route.')}
+          {section(text.worlds, 'world', text.noWorld)}
+          {section(text.videos, 'video', text.noVideo)}
           <section className="pv-section">
-            <h2>Map, pacers and groups</h2>
+            <h2>{text.later}</h2>
             <div className="pv-card">
               <div className="pv-row">
                 <span className="pv-glyph" aria-hidden="true" style={iconStyle(MOUNTAIN)} />
-                <span className="pv-muted">A map of every world, pacer bots and group rides come later.</span>
+                <span className="pv-muted">{text.laterAbout}</span>
               </div>
             </div>
           </section>
           <section className="pv-section">
-            <h2>On Today</h2>
+            <h2>{text.onToday}</h2>
             <div className="pv-row">
               <Toggle
-                label="Show Ride again on Today"
+                label={text.showOnToday}
                 on={state.showOnToday}
                 onChange={(on) => change((s) => ({ ...s, showOnToday: on }))}
               />
@@ -620,6 +630,7 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
 
 /** The card on Today: the route ridden last, one click to ride it again while it is on the device. */
 function RideAgainView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useRide(ctx);
   const offers = useOffers(ctx);
   const go = useGo(ctx);
@@ -628,18 +639,18 @@ function RideAgainView({ ctx }: { readonly ctx: UiContext }) {
   if (!offer || offer.availability.state !== 'ready') return null;
   return (
     <TodayCard
-      classifier="Ride again"
+      classifier={text.rideAgain}
       icon={BIKE}
       title={offer.title}
-      details={facts(offer)}
+      details={facts(offer, text)}
       image={offer.thumbnail}
-      backdrop={offer.thumbnail ? undefined : <Profile offer={offer} />}
+      backdrop={offer.thumbnail ? undefined : <Profile offer={offer} text={text} />}
       onHide={() => change((s) => ({ ...s, showOnToday: false }))}
     >
       <div className="pv-row">
         <button type="button" className="pv-button pv-primary" onClick={() => go(offer)}>
           <span className="pv-glyph" aria-hidden="true" style={iconStyle(BIKE)} />
-          Ride {offer.title} again
+          {text.rideAgainButton(offer.title)}
         </button>
       </div>
     </TodayCard>
@@ -648,6 +659,8 @@ function RideAgainView({ ctx }: { readonly ctx: UiContext }) {
 
 export const RideArea = reactComponent((ctx) => <RideAreaView ctx={ctx} />);
 export const RideAgainTile = reactComponent((ctx) => <RideAgainView ctx={ctx} />);
-export const RideMenuEntry = reactComponent((ctx) => (
-  <MenuEntry ctx={ctx} screen="ride" label="Ride" icon={BIKE} />
-));
+function RideMenuEntryView({ ctx }: { readonly ctx: UiContext }) {
+  return <MenuEntry ctx={ctx} screen="ride" label={useMessages(ctx, messages).title} icon={BIKE} />;
+}
+
+export const RideMenuEntry = reactComponent((ctx) => <RideMenuEntryView ctx={ctx} />);

@@ -185,6 +185,15 @@ export type {
   PluginHostAccess,
 } from './host.ts';
 export {
+  APP_LANGUAGE_KEY,
+  appLanguageSetService,
+  appLanguageState,
+  DEFAULT_LANGUAGE,
+  LANGUAGES,
+  type Language,
+  languageSchema,
+} from './language.ts';
+export {
   APP_CHANNEL_TYPES,
   capabilityIdSchema,
   dottedIdPattern,

@@ -5,14 +5,14 @@ import { greetingAt, msUntilNextHour } from './greeting.ts';
 
 describe('greetingAt', () => {
   it.each([
-    [0, 'Good evening'],
-    [4, 'Good evening'],
-    [5, 'Good morning'],
-    [11, 'Good morning'],
-    [12, 'Good afternoon'],
-    [17, 'Good afternoon'],
-    [18, 'Good evening'],
-    [23, 'Good evening'],
+    [0, 'evening'],
+    [4, 'evening'],
+    [5, 'morning'],
+    [11, 'morning'],
+    [12, 'afternoon'],
+    [17, 'afternoon'],
+    [18, 'evening'],
+    [23, 'evening'],
   ])('%i h is "%s"', (hour, greeting) => {
     expect(greetingAt(hour)).toBe(greeting);
   });

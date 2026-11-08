@@ -12,7 +12,8 @@ import {
   trainingPlanState,
   trainingRefreshService,
 } from '@ridrs/contracts';
-import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -23,6 +24,7 @@ import {
   stepName,
   unrolled,
 } from './format.ts';
+import { type Messages, messages } from './i18n/index.ts';
 import { COLORS, TrainingStyles } from './theme.tsx';
 
 /** The screens this plugin moves between. */
@@ -93,35 +95,36 @@ function PowerProfile({ workout }: { readonly workout: PlannedWorkout }) {
 }
 
 /** After a rejected token the rider connects again; else for the first time. */
-const connectLabel = (account: TrainingAccount): string =>
-  account.reason === 'token-rejected' ? 'Reconnect intervals.icu' : 'Connect intervals.icu';
+const connectLabel = (account: TrainingAccount, text: Messages): string =>
+  account.reason === 'token-rejected' ? text.reconnect : text.connect;
 
 /** While the sign-in runs in the system browser. */
-function Connecting({ testId }: { readonly testId: string }) {
+function Connecting({ testId, text }: { readonly testId: string; readonly text: Messages }) {
   return (
     <section className="rt-panel" data-testid={testId}>
       <TrainingStyles />
       <span className="rt-caption">
         <span className="rt-spin" aria-hidden="true" />
-        Connecting to intervals.icu…
+        {text.connecting}
       </span>
-      <span className="rt-hint">Finish the sign-in in your browser.</span>
+      <span className="rt-hint">{text.finishSignIn}</span>
     </section>
   );
 }
 
 function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const { account, plan } = useTraining(ctx);
   if (!account) {
     return null;
   }
 
   if (account.state === 'connecting') {
-    return <Connecting testId="training-account" />;
+    return <Connecting testId="training-account" text={text} />;
   }
 
   if (account.state !== 'connected') {
-    const message = accountMessage(account);
+    const message = accountMessage(account, text);
     return (
       <section className="rt-panel" data-testid="training-account">
         <TrainingStyles />
@@ -131,17 +134,17 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
           className="rt-button"
           onClick={() => callAccount(ctx, trainingConnectService)}
         >
-          {connectLabel(account)}
+          {connectLabel(account, text)}
         </button>
-        <span className="rt-hint">Your planned workouts on the main screen.</span>
+        <span className="rt-hint">{text.onMainScreen}</span>
       </section>
     );
   }
 
   const workout = nextWorkout(plan);
   const caption = [
-    account.athleteName ? `Connected as ${account.athleteName}` : 'Connected',
-    plan?.offline ? 'Offline' : undefined,
+    text.connectedAs(account.athleteName),
+    plan?.offline ? text.offline : undefined,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -154,32 +157,32 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
         data-testid="next-workout"
         aria-label={
           workout
-            ? `Next workout: ${workout.name}, ${dayLabel(workout.date, Date.now())}`
+            ? text.nextWorkoutOn(workout.name, dayLabel(workout.date, Date.now(), text))
             : plan
-              ? 'No workout planned'
-              : 'Loading your plan'
+              ? text.nonePlanned
+              : text.loading
         }
         onClick={() => ctx.navigate(DETAILS)}
       >
-        <span className="rt-classifier">Next workout</span>
+        <span className="rt-classifier">{text.nextWorkout}</span>
         {workout ? (
           <>
             <span className="rt-name" data-testid="next-workout-name">
               {workout.name}
             </span>
             <span className="rt-facts">
-              <span data-testid="next-workout-day">{dayLabel(workout.date, Date.now())}</span>
+              <span data-testid="next-workout-day">{dayLabel(workout.date, Date.now(), text)}</span>
               {workout.durationSeconds !== undefined ? (
                 <span data-testid="next-workout-duration">{durationLabel(workout.durationSeconds)}</span>
               ) : null}
               {workout.trainingLoad !== undefined ? (
-                <span data-testid="next-workout-load">Load {Math.round(workout.trainingLoad)}</span>
+                <span data-testid="next-workout-load">{text.load(Math.round(workout.trainingLoad))}</span>
               ) : null}
             </span>
             <PowerProfile workout={workout} />
           </>
         ) : (
-          <span className="rt-name rt-muted">{plan ? 'No workout planned' : 'Loading your plan…'}</span>
+          <span className="rt-name rt-muted">{plan ? text.nonePlanned : text.loadingDots}</span>
         )}
       </button>
       <span className="rt-caption">intervals.icu · {caption}</span>
@@ -187,14 +190,14 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
   );
 }
 
-function StepRows({ workout }: { readonly workout: PlannedWorkout }) {
+function StepRows({ workout, text }: { readonly workout: PlannedWorkout; readonly text: Messages }) {
   const rows: Array<{ step: string; duration: string; target: string; inner: boolean }> = [];
   for (const step of workout.steps) {
     if (step.kind === 'repeat') {
       rows.push({ step: `${step.reps}×`, duration: '', target: '', inner: false });
       for (const inner of unrolled(step.steps)) {
         rows.push({
-          step: stepName(inner),
+          step: stepName(inner, text),
           duration: durationLabel(inner.durationSeconds),
           target: inner.power ? powerLabel(inner.power) : '',
           inner: true,
@@ -202,7 +205,7 @@ function StepRows({ workout }: { readonly workout: PlannedWorkout }) {
       }
     } else {
       rows.push({
-        step: stepName(step),
+        step: stepName(step, text),
         duration: durationLabel(step.durationSeconds),
         target: step.power ? powerLabel(step.power) : '',
         inner: false,
@@ -224,6 +227,8 @@ function StepRows({ workout }: { readonly workout: PlannedWorkout }) {
 }
 
 function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const { account, plan } = useTraining(ctx);
   useEffect(() => ctx.onBack(() => ctx.navigate(MAIN)), [ctx]);
   // A ride started elsewhere (a second window) leads into the ride, as on the main screen.
@@ -245,36 +250,38 @@ function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
       <header>
         <span className="rt-caption">
           intervals.icu{account?.athleteName ? ` · ${account.athleteName}` : ''}
-          {plan?.offline ? ' · Offline' : ''}
+          {plan?.offline ? ` · ${text.offline}` : ''}
         </span>
-        <h1>{workout ? workout.name : 'No workout planned'}</h1>
+        <h1>{workout ? workout.name : text.nonePlanned}</h1>
         {workout ? (
           <span className="rt-facts">
-            <span>{dayLabel(workout.date, Date.now())}</span>
+            <span>{dayLabel(workout.date, Date.now(), text)}</span>
             {workout.durationSeconds !== undefined ? <span>{durationLabel(workout.durationSeconds)}</span> : null}
-            {workout.trainingLoad !== undefined ? <span>Load {Math.round(workout.trainingLoad)}</span> : null}
+            {workout.trainingLoad !== undefined ? <span>{text.load(Math.round(workout.trainingLoad))}</span> : null}
           </span>
         ) : (
-          <span className="rt-hint">Nothing planned for the next 14 days.</span>
+          <span className="rt-hint">{text.nothingSoon}</span>
         )}
       </header>
       {athlete ? (
         <dl className="rt-athlete">
-          <dt>FTP</dt>
+          <dt>{text.ftp}</dt>
           <dd data-testid="workout-ftp">{athlete.ftp !== undefined ? `${Math.round(athlete.ftp)} W` : '–'}</dd>
-          <dt>Weight</dt>
-          <dd data-testid="workout-weight">{athlete.weight !== undefined ? `${athlete.weight} kg` : '–'}</dd>
+          <dt>{text.weight}</dt>
+          <dd data-testid="workout-weight">
+            {athlete.weight !== undefined ? `${localizeNumber(String(athlete.weight), language)} kg` : '–'}
+          </dd>
         </dl>
       ) : null}
       {workout?.description ? <p className="rt-description">{workout.description}</p> : null}
-      {workout && workout.steps.length > 0 ? <StepRows workout={workout} /> : null}
+      {workout && workout.steps.length > 0 ? <StepRows workout={workout} text={text} /> : null}
       <footer>
         <button
           type="button"
           className="rt-button"
           onClick={() => callAccount(ctx, trainingRefreshService)}
         >
-          Refresh
+          {text.refresh}
         </button>
       </footer>
     </main>
@@ -283,28 +290,29 @@ function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
 
 /** The account in the Me area: its state, Connect or Reconnect, and Disconnect. */
 function IntervalsConnectionView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const { account } = useTraining(ctx);
   if (!account) {
     return null;
   }
 
   if (account.state === 'connecting') {
-    return <Connecting testId="intervals-connection" />;
+    return <Connecting testId="intervals-connection" text={text} />;
   }
 
   if (account.state !== 'connected') {
-    const message = accountMessage(account);
+    const message = accountMessage(account, text);
     return (
       <section className="rt-panel" data-testid="intervals-connection">
         <TrainingStyles />
-        <span className="rt-caption">intervals.icu · Not connected</span>
+        <span className="rt-caption">intervals.icu · {text.notConnected}</span>
         {message ? <span className="rt-hint rt-warn">{message}</span> : null}
         <button
           type="button"
           className="rt-button"
           onClick={() => callAccount(ctx, trainingConnectService)}
         >
-          {connectLabel(account)}
+          {connectLabel(account, text)}
         </button>
       </section>
     );
@@ -314,15 +322,15 @@ function IntervalsConnectionView({ ctx }: { readonly ctx: UiContext }) {
     <section className="rt-panel" data-testid="intervals-connection">
       <TrainingStyles />
       <span className="rt-caption">
-        intervals.icu · {account.athleteName ? `Connected as ${account.athleteName}` : 'Connected'}
+        intervals.icu · {text.connectedAs(account.athleteName)}
       </span>
-      <span className="rt-hint">Your planned workouts come from here.</span>
+      <span className="rt-hint">{text.comesFromHere}</span>
       <button
         type="button"
         className="rt-button rt-quiet"
         onClick={() => callAccount(ctx, trainingDisconnectService)}
       >
-        Disconnect intervals.icu
+        {text.disconnect}
       </button>
     </section>
   );

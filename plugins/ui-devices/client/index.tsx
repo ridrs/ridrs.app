@@ -8,9 +8,11 @@ import {
   metricPowerEvent,
 } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type BridgeStatus, describeDevices, type Readings } from './devices.ts';
+import { messages } from './i18n/index.ts';
 import { useDevices } from './links.ts';
 import { DeviceSetupView } from './setup.tsx';
 import { DevicesTileView, overall } from './tile.tsx';
@@ -74,13 +76,15 @@ const BLUETOOTH = new URL('./assets/icons/bluetooth.svg', import.meta.url).href;
 function StatusAction({ ctx }: { readonly ctx: UiContext }) {
   const [shown, setShown] = useState<string>();
   useEffect(() => ctx.onNavigated(setShown), [ctx]);
+  const text = useMessages(ctx, messages);
   const devices = useDevices(ctx);
-  const tone = devices.length === 0 ? 'none' : overall(describeDevices(devices).filter((row) => row !== undefined));
+  const tone =
+    devices.length === 0 ? 'none' : overall(describeDevices(devices, {}, text).filter((row) => row !== undefined));
   return (
     <button
       type="button"
       data-action
-      aria-label="Devices"
+      aria-label={text.devices}
       aria-current={shown === 'setup' ? 'page' : undefined}
       onClick={() => ctx.navigate('setup')}
     >

@@ -7,8 +7,10 @@ import {
   trainerTargetPowerEvent,
 } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { type KeyboardEvent, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 
 const EN_DASH = '–';
 
@@ -73,6 +75,7 @@ function Teeth({
  * screen, except in ERG, where they are the target's. It only asks (`drivetrain.shift-requested`).
  */
 function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [gear, setGear] = useState<DrivetrainGearChangedPayload>();
   const [erg, setErg] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -135,7 +138,7 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
       <section
         data-testid="widget-virtual-gear"
         data-status="available"
-        aria-label="Gear"
+        aria-label={text.gear}
         style={{
           pointerEvents: 'auto',
           minWidth: 110,
@@ -146,14 +149,14 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
           fontFamily: 'system-ui, sans-serif',
         }}
       >
-        <div style={{ fontSize: 14, opacity: 0.8 }}>Gear</div>
+        <div style={{ fontSize: 14, opacity: 0.8 }}>{text.gear}</div>
         <div data-testid="value" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.1 }}>
           {`${teeth.front}×${teeth.rear}`}
         </div>
         <div data-testid="teeth" style={{ fontSize: 18, fontWeight: 600, opacity: 0.9 }}>
-          <Teeth label="Chainring" value={teeth.chainring} onShift={shiftOn('front')} />
+          <Teeth label={text.chainring} value={teeth.chainring} onShift={shiftOn('front')} />
           {' × '}
-          <Teeth label="Sprocket" value={teeth.sprocket} onShift={shiftOn('rear')} />
+          <Teeth label={text.sprocket} value={teeth.sprocket} onShift={shiftOn('rear')} />
         </div>
       </section>
     );
@@ -167,7 +170,7 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
         ? {
             role: 'spinbutton',
             tabIndex: 0,
-            'aria-label': 'Gear',
+            'aria-label': text.gear,
             'aria-valuenow': gear.index,
             'aria-valuemin': 1,
             'aria-valuemax': gear.count,
@@ -189,18 +192,18 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
         outlineOffset: 2,
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>Gear</div>
+      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.gear}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span data-testid="value" style={{ fontSize: 44, fontWeight: 700 }}>
           {gear ? String(gear.index) : EN_DASH}
         </span>
         <span data-testid="unit" style={{ fontSize: 18 }}>
-          {gear ? `/ ${gear.count}` : ''}
+          {gear ? text.of(gear.count) : ''}
         </span>
       </div>
       {focused && (
         <div data-testid="keys" style={{ fontSize: 13, opacity: 0.8 }}>
-          ↑ ↓ shift
+          {text.keys}
         </div>
       )}
     </section>

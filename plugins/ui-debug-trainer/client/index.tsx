@@ -11,8 +11,10 @@ import {
   trainerControlChangedEvent,
 } from '@ridrs/contracts';
 import { formatDecimal, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { type Messages, messages } from './i18n/index.ts';
 
 const EN_DASH = '–';
 
@@ -34,22 +36,22 @@ function describeControl(control: TrainerControlChangedPayload | undefined): str
 
 type ModeCommand = Extract<TrainerCommand, { kind: 'target-power' | 'simulation' }>;
 
-function describeCommand(command: ModeCommand | undefined): string {
+function describeCommand(command: ModeCommand | undefined, text: Messages): string {
   if (!command) {
     return EN_DASH;
   }
   if (command.kind === 'target-power') {
-    return `target ${command.watts} W`;
+    return text.target(command.watts);
   }
   return [
-    `grade ${percent(command.gradient)}`,
+    text.grade(percent(command.gradient)),
     `Crr ${formatDecimal(command.crr, 4)}`,
     `CW ${formatDecimal(command.cw, 3)} kg/m`,
-    `wind ${formatDecimal(command.windSpeed, 1)} m/s`,
+    text.wind(formatDecimal(command.windSpeed, 1)),
   ].join(' · ');
 }
 
-function describeGear(gear: DrivetrainGearChangedPayload | undefined): string {
+function describeGear(gear: DrivetrainGearChangedPayload | undefined, text: Messages): string {
   if (!gear) {
     return EN_DASH;
   }
@@ -60,18 +62,18 @@ function describeGear(gear: DrivetrainGearChangedPayload | undefined): string {
   if (gear.chainring !== undefined && gear.sprocket !== undefined) {
     parts.push(`${gear.chainring}×${gear.sprocket}`);
   }
-  parts.push(`ratio ${formatDecimal(gear.ratio, 2)}`);
+  parts.push(text.ratio(formatDecimal(gear.ratio, 2)));
   return parts.join(' · ');
 }
 
-function describeGradient(state: PhysicsState | undefined): string {
+function describeGradient(state: PhysicsState | undefined, text: Messages): string {
   const load = state?.trainerLoad;
   if (!load) {
     return EN_DASH;
   }
   // What the trainer simulates: with the virtual gear when a gear source is there.
   const trainer = load.virtualGear ? load.resistanceWithVirtualGear : load.resistance;
-  return `road ${percent(load.resistance.gradient)} → trainer ${percent(trainer.gradient)}`;
+  return text.roadToTrainer(percent(load.resistance.gradient), percent(trainer.gradient));
 }
 
 /** Where a typed D is text, not the toggle. */
@@ -90,6 +92,7 @@ function isTextEntry(target: EventTarget | null): boolean {
  * so it changes no ride control; D hides and shows it.
  */
 function TrainerDebugHudView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [visible, setVisible] = useState(true);
   const [control, setControl] = useState<TrainerControlChangedPayload>();
   const [command, setCommand] = useState<ModeCommand>();
@@ -140,16 +143,16 @@ function TrainerDebugHudView({ ctx }: { readonly ctx: UiContext }) {
   }
 
   const rows: readonly (readonly [string, string])[] = [
-    ['Mode', describeControl(control)],
-    ['Command', describeCommand(command)],
-    ['Gear', describeGear(gear)],
-    ['Gradient', describeGradient(state)],
+    [text.mode, describeControl(control)],
+    [text.command, describeCommand(command, text)],
+    [text.gear, describeGear(gear, text)],
+    [text.gradient, describeGradient(state, text)],
   ];
 
   return (
     <section
       data-testid="debug-trainer"
-      aria-label="Trainer debug"
+      aria-label={text.title}
       style={{
         position: 'absolute',
         // Below Pause, clear of the widgets in the lower corners.

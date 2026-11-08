@@ -61,6 +61,7 @@ The recorder observes the bus ([recording-and-replay.md](recording-and-replay.md
 
 | Owner | Topics (key) | Services (keyed by) | Clients |
 |---|---|---|---|
+| `ui-settings` | `app.language` (`app`, ADR 0072) | `app.set-language` | every UI plugin |
 | `ui-landscape-demo` | `route.offer` (`ui-landscape-demo/demo-course`) | — | `ui-area-ride` |
 | `video-source-vangestel` | `route.offer` (`video-source-vangestel/<route>`) | `route.fetch`, `route.cancel`, `route.remove` (`route.offer`) | `ui-area-ride`, `ui-world-video` |
 | `planner-intervals-icu` | `training.account`, `training.plan` (`intervals.icu`), `training.upload` (session id); watches `recording.ride` | `training.connect`, `training.disconnect`, `training.refresh`, `training.upload` (`training.account`) | `ui-training-plan`, `ui-debriefing` |

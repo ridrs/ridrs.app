@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { type PhysicsState, physicsStateEvent } from '@ridrs/contracts';
-import { formatDecimal, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { formatDecimal, localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 
 const EN_DASH = '–';
 
 /** The virtual distance (m) in km, two decimals; an en dash until the first physics state. */
 function VirtualDistanceWidgetView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const [state, setState] = useState<PhysicsState>();
   useEffect(() => ctx.events.subscribe(physicsStateEvent, ({ payload }) => setState(payload)), [ctx]);
 
@@ -26,13 +30,13 @@ function VirtualDistanceWidgetView({ ctx }: { readonly ctx: UiContext }) {
         fontFamily: 'system-ui, sans-serif',
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>Distance</div>
+      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.title}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span data-testid="value" style={{ fontSize: 44, fontWeight: 700 }}>
-          {state ? formatDecimal(state.distance / 1000, 2) : EN_DASH}
+          {state ? localizeNumber(formatDecimal(state.distance / 1000, 2), language) : EN_DASH}
         </span>
         <span data-testid="unit" style={{ fontSize: 18 }}>
-          km
+          {text.unit}
         </span>
       </div>
     </section>

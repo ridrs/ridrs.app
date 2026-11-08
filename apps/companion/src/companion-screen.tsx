@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import type { Companion, CompanionView } from './companion.ts';
+import type { Messages } from './i18n/index.ts';
 import { saveCompanionName, scanQrCode } from './platform.ts';
 
 const card = {
@@ -38,7 +39,7 @@ function useRate(companion: Companion): number {
   return rate;
 }
 
-function NameEditor({ name }: { readonly name: string }) {
+function NameEditor({ name, text }: { readonly name: string; readonly text: Messages }) {
   const [value, setValue] = useState(name);
   const changed = value.trim() !== '' && value.trim() !== name;
   return (
@@ -52,13 +53,13 @@ function NameEditor({ name }: { readonly name: string }) {
       style={{ display: 'flex', gap: 8 }}
     >
       <input
-        aria-label="Companion name"
+        aria-label={text.companionName}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         style={{ flex: 1 }}
       />
       <button type="submit" disabled={!changed}>
-        Rename
+        {text.rename}
       </button>
     </form>
   );
@@ -66,9 +67,12 @@ function NameEditor({ name }: { readonly name: string }) {
 
 export function CompanionScreen({
   companion,
+  text,
   dummyPanel,
 }: {
   readonly companion: Companion;
+  /** The texts in the phone's language. */
+  readonly text: Messages;
   /** Developer build only. */
   readonly dummyPanel?: ReactNode;
 }) {
@@ -80,22 +84,20 @@ export function CompanionScreen({
     setScanError(undefined);
     try {
       if (!companion.acceptPairingQr(await scanQrCode())) {
-        setScanError('That is not a ridrs pairing code. Scan the QR code ridrs shows.');
+        setScanError(text.notAPairingCode);
       }
     } catch (error) {
-      setScanError(`Scanning failed: ${String(error)}`);
+      setScanError(text.scanFailed(String(error)));
     }
   };
-  const scanMessage =
-    scanError ??
-    (view.scannedFor ? `Scanned. Waiting for “${view.scannedFor}” to connect…` : undefined);
+  const scanMessage = scanError ?? (view.scannedFor ? text.scanned(view.scannedFor) : undefined);
 
   return (
     <main style={{ maxWidth: 520, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, margin: '0 0 12px' }}>
-        ridrs companion
+        {text.title}
         {dummyPanel && (
-          <span style={{ ...muted, marginLeft: 8, color: '#f5b942' }}>developer build</span>
+          <span style={{ ...muted, marginLeft: 8, color: '#f5b942' }}>{text.developerBuild}</span>
         )}
       </h1>
 
@@ -106,24 +108,26 @@ export function CompanionScreen({
               <div>
                 {p.clientName}:{' '}
                 {p.state === 'connected'
-                  ? 'connected'
+                  ? text.connected
                   : p.state === 'disconnected'
-                    ? `disconnected ${p.pausedBy === 'companion' ? 'here' : 'in ridrs'}`
-                    : 'not connected, waiting for it'}
+                    ? p.pausedBy === 'companion'
+                      ? text.disconnectedHere
+                      : text.disconnectedInRidrs
+                    : text.waiting}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {p.state === 'connected' && (
                   <button type="button" onClick={() => companion.disconnect(p.token)}>
-                    Disconnect
+                    {text.disconnect}
                   </button>
                 )}
                 {p.state === 'disconnected' && (
                   <button type="button" onClick={() => companion.connect(p.token)}>
-                    Connect
+                    {text.connect}
                   </button>
                 )}
                 <button type="button" onClick={() => companion.forget(p.token)}>
-                  Forget
+                  {text.forget}
                 </button>
               </div>
             </div>
@@ -133,7 +137,7 @@ export function CompanionScreen({
 
       <section style={card} data-testid="pairing">
         {connected ? (
-          <div style={muted}>Paired and connected</div>
+          <div style={muted}>{text.pairedAndConnected}</div>
         ) : (
           <>
             <button
@@ -141,14 +145,14 @@ export function CompanionScreen({
               onClick={() => void scan()}
               style={{ fontSize: 20, padding: '14px 18px', width: '100%', borderRadius: 12 }}
             >
-              Scan ridrs QR code
+              {text.scan}
             </button>
             {scanMessage && (
               <div data-testid="scan-message" style={{ marginTop: 8 }}>
                 {scanMessage}
               </div>
             )}
-            <div style={{ ...muted, marginTop: 12 }}>Or enter this code in ridrs:</div>
+            <div style={{ ...muted, marginTop: 12 }}>{text.orEnter}</div>
             <div
               data-testid="pairing-code"
               style={{ fontSize: 40, fontWeight: 700, letterSpacing: '0.15em' }}
@@ -158,31 +162,26 @@ export function CompanionScreen({
           </>
         )}
         {view.serve.addresses.length > 0 ? (
-          <div style={muted}>
-            ridrs finds “{view.name}” in the same Wi-Fi ({view.serve.addresses.join(', ')}).
-          </div>
+          <div style={muted}>{text.findsIn(view.name, view.serve.addresses.join(', '))}</div>
         ) : (
-          <div style={{ color: '#f5b942' }}>No Wi-Fi address: connect the phone to Wi-Fi.</div>
+          <div style={{ color: '#f5b942' }}>{text.noWifi}</div>
         )}
       </section>
 
       <section style={card} data-testid="status">
         <div data-testid="client">
-          {connected ? `Forwarding to ${view.status.client}` : 'Not forwarding'}
+          {connected ? text.forwardingTo(view.status.client ?? '') : text.notForwarding}
         </div>
         <div style={muted}>
-          {view.status.connectedPeripherals.length} device(s) connected ·{' '}
-          {view.status.subscriptions} subscription(s) · {rate} notifications/s
+          {text.counts(view.status.connectedPeripherals.length, view.status.subscriptions, rate)}
         </div>
       </section>
 
       {dummyPanel && <section style={card}>{dummyPanel}</section>}
 
       <section style={card}>
-        <NameEditor name={view.name} />
-        <div style={{ ...muted, marginTop: 12 }}>
-          Keep this app open: the phone forwards Bluetooth only while its screen is on.
-        </div>
+        <NameEditor name={view.name} text={text} />
+        <div style={{ ...muted, marginTop: 12 }}>{text.keepOpen}</div>
       </section>
     </main>
   );

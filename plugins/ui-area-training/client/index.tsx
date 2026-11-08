@@ -2,6 +2,7 @@
 
 import { AreaPage, iconStyle, MenuEntry, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useState } from 'react';
 import { z } from 'zod';
 import {
@@ -18,6 +19,7 @@ import {
   WORKOUTS,
   weekdayOf,
 } from './calendar.ts';
+import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
 const DUMBBELL = new URL('./assets/icons/dumbbell.svg', import.meta.url).href;
@@ -80,48 +82,53 @@ function Day({
   readonly today: boolean;
   readonly onSelect: () => void;
 }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useTraining(ctx);
   const calendar = (update: (calendar: Calendar) => Calendar) =>
     change((s) => ({ ...s, calendar: update(s.calendar) as typeof s.calendar }));
   const next = WEEKDAYS[WEEKDAYS.indexOf(day) + 1];
   return (
     <div className="tr-day" data-calendar-day={day} data-today={today || undefined}>
-      <button type="button" className="pv-chip" aria-label={day} aria-pressed={selected} onClick={onSelect}>
-        {day.slice(0, 3)}
-        {today ? <span aria-hidden="true">today</span> : null}
+      <button type="button" className="pv-chip" aria-label={text.weekdays[day]} aria-pressed={selected} onClick={onSelect}>
+        {text.short(text.weekdays[day])}
+        {today ? <span aria-hidden="true">{text.today}</span> : null}
       </button>
       {state.calendar.entries
         .filter((entry) => entry.day === day)
-        .map((entry) => (
+        .map((entry) => {
+          const title = entry.kind === 'workout' ? entry.title : text.kinds[entry.kind];
+          return (
           <div key={entry.id} className="tr-entry" data-kind={entry.kind}>
-            <span>{entry.title}</span>
+            <span>{title}</span>
             <div className="pv-row">
               {next ? (
                 <button
                   type="button"
                   className="pv-button"
-                  aria-label={`Move ${entry.title} from ${day} to ${next}`}
+                  aria-label={text.move(title, text.weekdays[day], text.weekdays[next])}
                   onClick={() => calendar((c) => moveLater(c, entry.id))}
                 >
-                  Later
+                  {text.later}
                 </button>
               ) : null}
               <button
                 type="button"
                 className="pv-button"
-                aria-label={`Remove ${entry.title} from ${day}`}
+                aria-label={text.removeFrom(title, text.weekdays[day])}
                 onClick={() => calendar((c) => removeEntry(c, entry.id))}
               >
-                Remove
+                {text.remove}
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
     </div>
   );
 }
 
 function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useTraining(ctx);
   const today = weekdayOf(new Date());
   const [selected, setSelected] = useState<Weekday>(today);
@@ -132,13 +139,10 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
     calendar((c) => addEntry(c, { day: selected, kind, title: KIND_TITLES[kind] }));
 
   return (
-    <AreaPage
-      title="Training"
-      intro="The calendar is the hub: add, move and remove entries here, schedule workouts from the library. Every change is kept at once; Undo takes it back."
-    >
+    <AreaPage title={text.title} intro={text.intro}>
       <style>{CSS}</style>
       <section className="pv-section">
-        <h2>This week</h2>
+        <h2>{text.thisWeek}</h2>
         <div className="tr-week">
           {WEEKDAYS.map((day) => (
             <Day
@@ -153,13 +157,13 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         </div>
         <div className="pv-row">
           <button type="button" className="pv-button" onClick={() => add('rest')}>
-            Add a rest day on {selected}
+            {text.addRest(text.weekdays[selected])}
           </button>
           <button type="button" className="pv-button" onClick={() => add('note')}>
-            Add a note on {selected}
+            {text.addNote(text.weekdays[selected])}
           </button>
           <button type="button" className="pv-button" onClick={() => add('outdoor')}>
-            Add an outdoor ride on {selected}
+            {text.addOutdoor(text.weekdays[selected])}
           </button>
           <button
             type="button"
@@ -168,25 +172,25 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
             onClick={() => calendar(undo)}
           >
             <span className="pv-glyph" aria-hidden="true" style={iconStyle(UNDO)} />
-            Undo
+            {text.undo}
           </button>
         </div>
-        <p className="pv-muted">Export to Google, Apple and Outlook calendars comes later.</p>
+        <p className="pv-muted">{text.exportLater}</p>
       </section>
 
       <section className="pv-section">
-        <h2>Workouts</h2>
+        <h2>{text.workouts}</h2>
         <div className="pv-cards">
           {WORKOUTS.map((workout) => (
             <article key={workout.id} className="pv-card">
               <h3>{workout.name}</h3>
               <span className="pv-muted">
-                {workout.minutes} min · TSS {workout.tss} · {workout.zone}
+                {workout.minutes} min · TSS {workout.tss} · {text.zones[workout.id] ?? workout.zone}
               </span>
               <div className="pv-row">
                 <Toggle
                   className="pv-icon"
-                  label={`Favourite ${workout.name}`}
+                  label={text.favourite(workout.name)}
                   on={state.favourites.includes(workout.id)}
                   onChange={(on) =>
                     change((s) => ({
@@ -206,7 +210,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
                     calendar((c) => addEntry(c, { day: selected, kind: 'workout', title: workout.name }))
                   }
                 >
-                  Schedule {workout.name} on {selected}
+                  {text.schedule(workout.name, text.weekdays[selected])}
                 </button>
               </div>
             </article>
@@ -215,26 +219,23 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
       </section>
 
       <section className="pv-section">
-        <h2>Training plans</h2>
+        <h2>{text.plans}</h2>
         <div className="pv-cards">
           <article className="pv-card">
             <h3>Base Builder</h3>
-            <span className="pv-muted">8 weeks · 6 h a week · builds endurance</span>
+            <span className="pv-muted">{text.baseBuilder}</span>
           </article>
           <article className="pv-card">
             <h3>FTP Builder</h3>
-            <span className="pv-muted">6 weeks · 5 h a week · raises the threshold</span>
+            <span className="pv-muted">{text.ftpBuilder}</span>
           </article>
         </div>
       </section>
 
       <section className="pv-section">
-        <h2>Suggestion</h2>
+        <h2>{text.suggestion}</h2>
         <article className="pv-card">
-          <span className="pv-muted">
-            A suggestion for today from your week and your form comes later. Until then: Endurance
-            90 suits a day without other training.
-          </span>
+          <span className="pv-muted">{text.suggestionLater}</span>
         </article>
       </section>
     </AreaPage>
@@ -242,6 +243,8 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
 }
 
 export const TrainingArea = reactComponent((ctx) => <TrainingAreaView ctx={ctx} />);
-export const TrainingMenuEntry = reactComponent((ctx) => (
-  <MenuEntry ctx={ctx} screen="training" label="Training" icon={DUMBBELL} />
-));
+function TrainingMenuEntryView({ ctx }: { readonly ctx: UiContext }) {
+  return <MenuEntry ctx={ctx} screen="training" label={useMessages(ctx, messages).title} icon={DUMBBELL} />;
+}
+
+export const TrainingMenuEntry = reactComponent((ctx) => <TrainingMenuEntryView ctx={ctx} />);

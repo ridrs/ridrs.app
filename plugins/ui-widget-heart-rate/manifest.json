@@ -24,6 +24,9 @@
         "metric.heart-rate"
       ],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

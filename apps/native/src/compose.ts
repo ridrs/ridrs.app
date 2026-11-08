@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  APP_LANGUAGE_KEY,
   activityEquipmentEvent,
   activityFinishRequestedEvent,
   activityInterruptedEvent,
@@ -8,6 +9,8 @@ import {
   activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  appLanguageSetService,
+  appLanguageState,
   authBrowserSignInCapability,
   bleBridgeConnectorCapability,
   bleCentralCapability,
@@ -20,6 +23,7 @@ import {
   bridgePairService,
   configSnapshotCapability,
   controllerButtonsChangedEvent,
+  DEFAULT_LANGUAGE,
   dataArchiveCapability,
   dataFetchCapability,
   deviceConnectionChangedEvent,
@@ -171,6 +175,7 @@ const CAPABILITIES = [
 
 /** Every app state topic the host knows (ADR 0068): owned and watched beside the bus. */
 const STATES: readonly StateDefinition[] = [
+  appLanguageState,
   routeOfferState,
   bridgeLinkState,
   bridgeCompanionsState,
@@ -186,6 +191,7 @@ const STATES: readonly StateDefinition[] = [
 
 /** Every service the host knows (ADR 0068): provided and called beside the bus. */
 const SERVICES: readonly ServiceDefinition[] = [
+  appLanguageSetService,
   routeFetchService,
   routeCancelService,
   bridgePairService,
@@ -284,6 +290,12 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
       return {};
     });
     const subscriptions = [
+      // The page speaks the app's language (ADR 0072), so screen readers pronounce it right.
+      host.watchState('ridrs-app', appLanguageState.id, ({ entries }) => {
+        const language = entries.get(APP_LANGUAGE_KEY);
+        options.root.ownerDocument.documentElement.lang =
+          typeof language === 'string' ? language : DEFAULT_LANGUAGE;
+      }),
       ...(keepAwake
         ? [
             host.subscribeEvent('ridrs-app', activityStateChangedEvent, ({ payload }) =>

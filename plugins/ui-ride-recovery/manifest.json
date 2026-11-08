@@ -23,6 +23,7 @@
       "publish": []
     },
     "state": [
+      "app.language",
       "recording.recoverable"
     ],
     "calls": [

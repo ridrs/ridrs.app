@@ -24,6 +24,9 @@
         "physics.state"
       ],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

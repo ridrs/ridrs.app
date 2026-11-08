@@ -2,7 +2,8 @@
 
 import type { RouteOffer } from '@ridrs/contracts';
 import { useEffect, useRef, useState } from 'react';
-import { type Climb, GRADES, gradeOf, km, stretchesOf } from './routes.ts';
+import type { Messages } from './i18n/index.ts';
+import { type Climb, GRADES, gradeOf, stretchesOf } from './routes.ts';
 
 /** px of the profile's own height, and of its margins for the scales. */
 const PLOT = 200;
@@ -72,19 +73,21 @@ function labelRows(xs: readonly number[]): number[] {
  * words stand left of the disc.
  */
 function Summit({
+  text,
   climb,
   x,
   y,
   labelY,
   flip,
 }: {
+  readonly text: Messages;
   readonly climb: Climb;
   readonly x: number;
   readonly y: number;
   readonly labelY: number;
   readonly flip: boolean;
 }) {
-  const altitude = `${Math.round(climb.summit)} m`;
+  const altitude = text.metres(climb.summit);
   const textX = flip ? x - 20 : x + 20;
   const anchor = flip ? 'end' : 'start';
   return (
@@ -107,7 +110,7 @@ function Summit({
         {climb.name ?? altitude}
       </text>
       <text x={textX} y={labelY + 14} textAnchor={anchor} fontSize={12} fill={MUTED}>
-        {climb.name ? `${altitude} · km ${km(climb.end)}` : `km ${km(climb.end)}`}
+        {climb.name ? `${altitude} · ${text.kmAt(text.km(climb.end))}` : text.kmAt(text.km(climb.end))}
       </text>
     </g>
   );
@@ -118,7 +121,7 @@ function Summit({
  * summit marked with its category and its name or altitude, an altitude and a km scale, and a
  * legend of the colours below. Drawn in px at the width it gets, so its words keep their size.
  */
-export function RouteProfile({ offer }: { readonly offer: RouteOffer }) {
+export function RouteProfile({ offer, text }: { readonly offer: RouteOffer; readonly text: Messages }) {
   const { box, width } = useWidth();
   const stretches = stretchesOf(offer);
   if (stretches.length === 0) return null;
@@ -159,7 +162,7 @@ export function RouteProfile({ offer }: { readonly offer: RouteOffer }) {
     <div ref={box} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10, minWidth: 0 }}>
       <svg
         role="img"
-        aria-label={`Elevation profile of ${offer.title}`}
+        aria-label={text.profileOf(offer.title)}
         width="100%"
         height={height}
         viewBox={`0 0 ${width} ${height}`}
@@ -205,12 +208,13 @@ export function RouteProfile({ offer }: { readonly offer: RouteOffer }) {
           </g>
         ))}
         <text x={right} y={base + 19} textAnchor="end" fontWeight={700} fill={INK}>
-          {km(offer.distance)} km
+          {text.km(offer.distance)} km
         </text>
         {climbs.map((climb, i) => {
           const sx = summitXs[i] ?? 0;
           return (
             <Summit
+              text={text}
               key={climb.end}
               climb={climb}
               x={sx}
@@ -221,11 +225,11 @@ export function RouteProfile({ offer }: { readonly offer: RouteOffer }) {
           );
         })}
       </svg>
-      <ul className="legend" aria-label="Gradients" style={LEGEND}>
-        {GRADES.map((grade) => (
+      <ul className="legend" aria-label={text.gradients} style={LEGEND}>
+        {GRADES.map((grade, index) => (
           <li key={grade.label} data-grade={grade.label} data-colour={grade.colour} style={LEGEND_ENTRY}>
             <span aria-hidden="true" style={{ ...SWATCH, background: grade.colour }} />
-            {grade.label}
+            {text.grades[index]}
           </li>
         ))}
       </ul>

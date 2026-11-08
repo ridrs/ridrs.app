@@ -36,6 +36,7 @@
       "publish": []
     },
     "state": [
+      "app.language",
       "training.account",
       "training.plan"
     ],

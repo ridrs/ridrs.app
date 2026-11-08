@@ -3,8 +3,12 @@
 import assert from 'node:assert/strict';
 import { type DataTable, Given, Then } from '@cucumber/cucumber';
 import { waitFor, within } from '@testing-library/dom';
+import { messages as menuMessages } from '../../plugins/ui-main-menu/client/i18n/index.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
+
+/** The main menu's name in every language (ADR 0072). */
+const MAIN_MENU = (name: string) => Object.values(menuMessages).some((text) => text.menu === name);
 
 function ui(world: RidrsWorld): HTMLElement {
   const view = world.uiViews[0];
@@ -100,7 +104,7 @@ Then('the top bar greets the rider for the time of day', async function (this: R
 Then(
   'the menu offers {string} in this order',
   async function (this: RidrsWorld, entriesCsv: string) {
-    const menu = await within(ui(this)).findByRole('navigation', { name: 'Main' });
+    const menu = await within(ui(this)).findByRole('navigation', { name: MAIN_MENU });
     await waitFor(() =>
       assert.deepEqual(
         within(menu)
@@ -116,7 +120,7 @@ Then(
   'the menu entry {string} is the current page',
   async function (this: RidrsWorld, name: string) {
     // Beneath a dialog the menu is hidden from assistive technology, yet still marks the page.
-    const menu = await within(ui(this)).findByRole('navigation', { name: 'Main', hidden: true });
+    const menu = await within(ui(this)).findByRole('navigation', { name: MAIN_MENU, hidden: true });
     await waitFor(() => {
       const current = menu.querySelectorAll('[aria-current="page"]');
       assert.deepEqual(

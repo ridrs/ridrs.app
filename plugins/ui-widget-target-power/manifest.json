@@ -30,6 +30,9 @@
       "publish": [
         "trainer.erg-requested"
       ]
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

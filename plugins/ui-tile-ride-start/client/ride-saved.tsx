@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { exportFitState, type RecordingRide, recordingRideState } from '@ridrs/contracts';
-import type { UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
+import { messages } from './i18n/index.ts';
 
 interface Saved {
   readonly sessionId: string;
@@ -26,6 +28,8 @@ function formatDuration(ms: number): string {
 
 /** "Ride saved" with distance, duration and the files, or that the ride could not be saved. */
 export function RideSaved({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const [outcome, setOutcome] = useState<RideOutcome>();
   const [fits, setFits] = useState<Readonly<Record<string, string>>>({});
 
@@ -72,7 +76,7 @@ export function RideSaved({ ctx }: { readonly ctx: UiContext }) {
   if ('failed' in outcome) {
     return (
       <section data-testid="ride-not-saved" role="status">
-        Ride could not be saved
+        {text.notSaved}
       </section>
     );
   }
@@ -84,12 +88,12 @@ export function RideSaved({ ctx }: { readonly ctx: UiContext }) {
       role="status"
       style={{ display: 'grid', gap: 4, textAlign: 'center', fontSize: 18 }}
     >
-      <strong>Ride saved</strong>
+      <strong>{text.saved}</strong>
       <span>
         <span data-testid="ride-saved-distance">
-          {saved.distance === undefined ? '–' : (saved.distance / 1000).toFixed(2)}
+          {saved.distance === undefined ? '–' : localizeNumber((saved.distance / 1000).toFixed(2), language)}
         </span>{' '}
-        km in <span data-testid="ride-saved-duration">{formatDuration(saved.durationMs)}</span>
+        {text.kmIn} <span data-testid="ride-saved-duration">{formatDuration(saved.durationMs)}</span>
       </span>
       <code data-testid="ride-saved-recording">{saved.recording}</code>
       {fit ? <code data-testid="ride-saved-fit">{fit}</code> : null}

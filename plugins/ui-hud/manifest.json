@@ -20,6 +20,9 @@
           "hud/widget"
         ]
       }
+    ],
+    "state": [
+      "app.language"
     ]
   }
 }

@@ -2,7 +2,8 @@
 
 import { activityStateChangedEvent, equipmentBicycleChangedEvent, type ShiftMode } from '@ridrs/contracts';
 import { ActionButton, iconStyle, PREVIEW_CSS, reactComponent, useBack, userDocument } from '@ridrs/ui-preview';
-import type { UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import {
   BICYCLE_DOCUMENT,
@@ -11,6 +12,7 @@ import {
   resolveBicycle,
   specificationOf,
 } from '../bicycle.ts';
+import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const WRENCH = new URL('./assets/icons/wrench.svg', import.meta.url).href;
@@ -29,19 +31,7 @@ const CSS = `
   color: var(--ridrs-warn, #ffb62e); }
 `;
 
-const MODES: readonly { readonly mode: ShiftMode; readonly label: string; readonly about: string }[] = [
-  { mode: 'manual', label: 'Manual', about: 'The left shifter moves the front derailleur, the right one the rear.' },
-  {
-    mode: 'semi-synchro',
-    label: 'Semi-synchro',
-    about: 'You shift the front; the rear shifts two sprockets the other way by itself.',
-  },
-  {
-    mode: 'full-synchro',
-    label: 'Full synchro',
-    about: 'You shift with the right shifter only; the front switches by itself at the shift points.',
-  },
-];
+const MODES: readonly ShiftMode[] = ['manual', 'semi-synchro', 'full-synchro'];
 
 /** The bicycle, kept at once; every change is handed to the next ride right away (ADR 0060). */
 const useDocument = userDocument(BICYCLE_DOCUMENT, DEFAULT_BICYCLE);
@@ -102,6 +92,8 @@ function Stepper({
 }
 
 function GarageView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const [bicycle, update] = useBicycle(ctx);
   const riding = useRiding(ctx);
   const [name, setName] = useState<string>();
@@ -117,22 +109,22 @@ function GarageView({ ctx }: { readonly ctx: UiContext }) {
       <style>{CSS}</style>
       <header className="pv-title">
         <span className="pv-glyph" aria-hidden="true" style={{ ...iconStyle(WRENCH), width: 28, height: 28 }} />
-        <h1>Garage</h1>
+        <h1>{text.title}</h1>
       </header>
-      <p className="pv-muted">Your bicycle: its weight and its drivetrain change the ride. Every change is kept at once.</p>
+      <p className="pv-muted">{text.intro}</p>
       {riding ? (
         <p className="ga-notice" role="status">
-          A ride is under way: changes apply from the next ride.
+          {text.riding}
         </p>
       ) : null}
 
       <section className="pv-section">
-        <h2>Bicycle</h2>
+        <h2>{text.bicycle}</h2>
         <label className="ga-row">
-          <span>Name</span>
+          <span>{text.name}</span>
           <input
             className="ga-field"
-            aria-label="Name"
+            aria-label={text.name}
             maxLength={40}
             value={name ?? bicycle.name}
             onChange={(event) => {
@@ -143,10 +135,10 @@ function GarageView({ ctx }: { readonly ctx: UiContext }) {
           />
         </label>
         <Stepper
-          name="Weight"
-          lower="Lower the weight"
-          raise="Raise the weight"
-          value={`${bicycle.mass.toFixed(1)} kg`}
+          name={text.weight}
+          lower={text.lowerWeight}
+          raise={text.raiseWeight}
+          value={`${localizeNumber(bicycle.mass.toFixed(1), language)} kg`}
           onStep={(d) =>
             update((b) => ({ ...b, mass: Math.min(25, Math.max(5, Math.round((b.mass + 0.5 * d) * 10) / 10)) }))
           }
@@ -154,14 +146,14 @@ function GarageView({ ctx }: { readonly ctx: UiContext }) {
       </section>
 
       <section className="pv-section">
-        <h2>Drivetrain</h2>
+        <h2>{text.drivetrain}</h2>
         <div className="pv-card">
           <h3>{spec.name}</h3>
-          <p className="ga-teeth pv-muted">Chainrings: {[...chainrings].reverse().join(' / ')}</p>
-          <p className="ga-teeth pv-muted">Cassette: {[...sprockets].reverse().join(' · ')}</p>
+          <p className="ga-teeth pv-muted">{text.chainrings([...chainrings].reverse().join(' / '))}</p>
+          <p className="ga-teeth pv-muted">{text.cassette([...sprockets].reverse().join(' · '))}</p>
         </div>
-        <div className="pv-row" role="group" aria-label="Shifting mode">
-          {MODES.map(({ mode, label }) => (
+        <div className="pv-row" role="group" aria-label={text.shiftingMode}>
+          {MODES.map((mode) => (
             <button
               key={mode}
               type="button"
@@ -169,16 +161,16 @@ function GarageView({ ctx }: { readonly ctx: UiContext }) {
               aria-pressed={bicycle.shiftMode === mode}
               onClick={() => update((b) => ({ ...b, shiftMode: mode }))}
             >
-              {label}
+              {text.modes[mode].label}
             </button>
           ))}
         </div>
-        <p className="pv-muted">{MODES.find((m) => m.mode === bicycle.shiftMode)?.about}</p>
+        <p className="pv-muted">{text.modes[bicycle.shiftMode].about}</p>
       </section>
 
       <section className="pv-section">
-        <h2>Start gear</h2>
-        <div className="pv-row" role="group" aria-label="Start chainring">
+        <h2>{text.startGear}</h2>
+        <div className="pv-row" role="group" aria-label={text.startChainring}>
           {chainrings.map((teeth, i) => (
             <button
               key={teeth}
@@ -187,14 +179,14 @@ function GarageView({ ctx }: { readonly ctx: UiContext }) {
               aria-pressed={bicycle.startGear.front === i + 1}
               onClick={() => update((b) => ({ ...b, startGear: { ...b.startGear, front: i + 1 } }))}
             >
-              {teeth} teeth
+              {text.teeth(teeth)}
             </button>
           ))}
         </div>
         <Stepper
-          name="Start gear"
-          lower="Easier start gear"
-          raise="Harder start gear"
+          name={text.startGear}
+          lower={text.easierStart}
+          raise={text.harderStart}
           value={start}
           onStep={(d) =>
             update((b) => ({
@@ -209,6 +201,8 @@ function GarageView({ ctx }: { readonly ctx: UiContext }) {
 }
 
 export const GarageScreen = reactComponent((ctx) => <GarageView ctx={ctx} />);
-export const GarageAction = reactComponent((ctx) => (
-  <ActionButton ctx={ctx} screen="garage" label="Garage" icon={WAREHOUSE} />
-));
+function GarageActionView({ ctx }: { readonly ctx: UiContext }) {
+  return <ActionButton ctx={ctx} screen="garage" label={useMessages(ctx, messages).title} icon={WAREHOUSE} />;
+}
+
+export const GarageAction = reactComponent((ctx) => <GarageActionView ctx={ctx} />);

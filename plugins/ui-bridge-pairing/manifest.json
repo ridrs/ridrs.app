@@ -23,6 +23,7 @@
       "publish": []
     },
     "state": [
+      "app.language",
       "bridge.companions",
       "bridge.pairing"
     ],

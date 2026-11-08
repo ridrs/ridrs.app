@@ -2,8 +2,10 @@
 
 import { trainerErgRequestedEvent, trainerTargetPowerEvent } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { type KeyboardEvent, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 
 /** + and - change the target without the focus: `=` is + without Shift on many keyboards. */
 const PLUS_MINUS: Readonly<Record<string, 'up' | 'down'>> = { '+': 'up', '=': 'up', '-': 'down' };
@@ -33,12 +35,13 @@ function useTarget(ctx: UiContext): number | null {
  * (`trainer.erg-requested`); the ERG driver sets the target.
  */
 function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const erg = useTarget(ctx) !== null;
   const [focused, setFocused] = useState(false);
   return (
     <button
       type="button"
-      aria-label="ERG"
+      aria-label={text.erg}
       aria-pressed={erg}
       data-testid="widget-erg"
       data-status={erg ? 'available' : 'unavailable'}
@@ -60,9 +63,9 @@ function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
         outlineOffset: 2,
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>ERG</div>
+      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.erg}</div>
       <div data-testid="value" style={{ fontSize: 28, fontWeight: 700, minHeight: 53, lineHeight: '53px' }}>
-        {erg ? 'On' : 'Off'}
+        {erg ? text.on : text.off}
       </div>
     </button>
   );
@@ -74,6 +77,7 @@ function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
  * anywhere on the screen; Back leaves ERG while it has the focus.
  */
 function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const watts = useTarget(ctx);
   const [focused, setFocused] = useState(false);
   const erg = watts !== null;
@@ -128,7 +132,7 @@ function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
       data-status="available"
       role="spinbutton"
       tabIndex={0}
-      aria-label="Target power"
+      aria-label={text.targetPower}
       aria-valuenow={watts}
       onKeyDown={onKeyDown}
       onFocus={() => setFocused(true)}
@@ -146,13 +150,13 @@ function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
         outlineOffset: 2,
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>Target</div>
+      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.target}</div>
       <div data-testid="value" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.1 }}>
-        {`${watts} W`}
+        {text.watts(watts)}
       </div>
       {focused && (
         <div data-testid="keys" style={{ fontSize: 13, opacity: 0.8 }}>
-          ↑ ↓ target
+          {text.keys}
         </div>
       )}
     </section>

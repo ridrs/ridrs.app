@@ -24,6 +24,9 @@
         "metric.power"
       ],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

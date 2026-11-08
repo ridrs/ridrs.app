@@ -7,6 +7,7 @@ export interface Result {
   readonly name: string;
   readonly kind: ResultKind;
   readonly screen: string;
+  /** In English; the details that are words come from the language files instead. */
   readonly detail: string;
 }
 

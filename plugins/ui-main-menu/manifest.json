@@ -19,6 +19,9 @@
           "menu/item"
         ]
       }
+    ],
+    "state": [
+      "app.language"
     ]
   }
 }

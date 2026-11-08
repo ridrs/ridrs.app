@@ -14,6 +14,8 @@ import {
   activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  appLanguageSetService,
+  appLanguageState,
   authBrowserSignInCapability,
   type BleCentral,
   bleBridgeConnectorCapability,
@@ -224,6 +226,7 @@ const testOfferSchema = z
   .strict();
 const testOfferState = defineState('test.offer', testOfferSchema);
 const TEST_STATES: readonly StateDefinition[] = [
+  appLanguageState,
   routeOfferState,
   bridgeLinkState,
   bridgeCompanionsState,
@@ -241,6 +244,7 @@ const TEST_STATES: readonly StateDefinition[] = [
 
 /** Services of ridrs and of the scenarios of ADR 0068. */
 const TEST_SERVICES: readonly ServiceDefinition[] = [
+  appLanguageSetService,
   routeFetchService,
   routeCancelService,
   bridgePairService,

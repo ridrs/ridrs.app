@@ -1,26 +1,44 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type { Language } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useLanguage } from '@ridrs/ui-sdk/react';
 import {
   type CSSProperties,
+  createContext,
   type ReactNode,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 import { PREVIEW_CSS } from './style.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const HIDE = new URL('./assets/icons/eye-off.svg', import.meta.url).href;
 const BACK = new URL('./assets/icons/arrow-left.svg', import.meta.url).href;
 
-/** A component rendered with React into the shell's container, unmounted with it. */
+/** The app's language for the kit's own texts (ADR 0072), set by `reactComponent`. */
+const LanguageContext = createContext<Language>('en');
+
+/** The kit's texts in the language of the component around. */
+const useKitMessages = () => messages[useContext(LanguageContext)];
+
+function InLanguage({ ctx, children }: { readonly ctx: UiContext; readonly children: ReactNode }) {
+  return <LanguageContext.Provider value={useLanguage(ctx)}>{children}</LanguageContext.Provider>;
+}
+
+/**
+ * A component rendered with React into the shell's container, unmounted with it. The kit's parts
+ * in it speak the app's language.
+ */
 export function reactComponent(render: (ctx: UiContext) => ReactNode): UiComponent {
   return (container, ctx) => {
     const root = createRoot(container);
-    root.render(render(ctx));
+    root.render(<InLanguage ctx={ctx}>{render(ctx)}</InLanguage>);
     return () => root.unmount();
   };
 }
@@ -64,7 +82,7 @@ export function useBack(ctx: UiContext, inner?: () => boolean): void {
 export function PreviewLabel() {
   return (
     <span className="pv-label" data-preview>
-      Preview
+      {useKitMessages().preview}
     </span>
   );
 }
@@ -110,6 +128,7 @@ export function DetailPage({
   readonly onBack: () => void;
   readonly children: ReactNode;
 }) {
+  const text = useKitMessages();
   // The page opens at its top, whatever the list before it was scrolled to.
   const page = useRef<HTMLElement>(null);
   useLayoutEffect(() => page.current?.scrollIntoView?.({ block: 'start' }), []);
@@ -119,7 +138,7 @@ export function DetailPage({
         {image ? <img className="pv-hero-image" src={image} alt="" /> : null}
         <button type="button" className="pv-button pv-back" onClick={onBack}>
           <span className="pv-glyph" aria-hidden="true" style={iconStyle(BACK)} />
-          Back
+          {text.back}
         </button>
         <div className="pv-hero-text">{hero}</div>
       </div>
@@ -322,6 +341,7 @@ export function TodayCard({
   tools,
   ...card
 }: Omit<CardProps, 'label'> & { readonly onHide: () => void }) {
+  const text = useKitMessages();
   return (
     <Card
       {...card}
@@ -332,7 +352,7 @@ export function TodayCard({
           <button
             type="button"
             className="pv-icon"
-            aria-label={`Hide ${card.classifier}`}
+            aria-label={text.hide(card.classifier)}
             onClick={onHide}
           >
             <span className="pv-glyph" aria-hidden="true" style={iconStyle(HIDE)} />

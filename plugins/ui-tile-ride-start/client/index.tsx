@@ -5,9 +5,11 @@ import {
   type Bicycle,
   equipmentBicycleChangedEvent,
 } from '@ridrs/contracts';
-import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 import { RideSaved } from './ride-saved.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
@@ -40,6 +42,8 @@ const CSS = `
 
 /** Start ride, the main action of the main screen, and what became of the last ride. */
 function RideStartView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   // The bicycle the next ride is ridden with, from the garage (ADR 0060); none without one.
   const [bicycle, setBicycle] = useState<Bicycle>();
   useEffect(
@@ -47,15 +51,15 @@ function RideStartView({ ctx }: { readonly ctx: UiContext }) {
     [ctx],
   );
   return (
-    <section className="rs-tile" aria-label="Ride">
+    <section className="rs-tile" aria-label={text.ride}>
       <style>{CSS}</style>
       <div>
-        <p className="rs-eyebrow">Free ride</p>
-        <h2 className="rs-title">Ready to ride?</h2>
-        <p className="rs-text">Ride at your own pace. Your devices join as they connect.</p>
+        <p className="rs-eyebrow">{text.freeRide}</p>
+        <h2 className="rs-title">{text.ready}</h2>
+        <p className="rs-text">{text.about}</p>
         {bicycle ? (
           <p className="rs-riding" data-testid="riding">
-            Riding {bicycle.name} · {bicycle.mass.toFixed(1)} kg
+            {text.riding(bicycle.name, localizeNumber(bicycle.mass.toFixed(1), language))}
           </p>
         ) : null}
       </div>
@@ -66,7 +70,7 @@ function RideStartView({ ctx }: { readonly ctx: UiContext }) {
         onClick={() => ctx.events.publish(activityStartRequestedEvent, {})}
       >
         <span className="rs-play" aria-hidden="true" />
-        Start ride
+        {text.start}
       </button>
       <RideSaved ctx={ctx} />
     </section>

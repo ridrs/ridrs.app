@@ -23,6 +23,7 @@
       "publish": []
     },
     "state": [
+      "app.language",
       "export.fit",
       "recording.ride",
       "training.account",

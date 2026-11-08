@@ -8,10 +8,12 @@ import {
   uiTerrainObservedEvent,
 } from '@ridrs/contracts';
 import { createPhysicsPresentation } from '@ridrs/presentation';
-import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type FrameDecoder, FramePlayer } from './frame-player.ts';
+import { messages } from './i18n/index.ts';
 import { loadDownloadedRoute, parseGpx, type VideoRoute } from './library.ts';
 import { buildVideoTime, type VideoTime, videoTimeAt } from './playback.ts';
 import { plausibleTrack, type Repair } from './plausible-track.ts';
@@ -246,6 +248,8 @@ function VideoWorld({
   readonly videoTime: VideoTime;
   readonly video: VideoIndex;
 }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const { canvas, finished } = useVideoWorld(ctx, route, track, videoTime, video);
   return (
     <div data-testid="video-world" data-route={route.id} style={{ position: 'absolute', inset: 0, background: '#000' }}>
@@ -257,11 +261,11 @@ function VideoWorld({
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />
       <div style={{ ...OVERLAY, top: 16 }}>
-        {route.title} · {(track.length / 1000).toFixed(1)} km
+        {route.title} · {text.km(localizeNumber((track.length / 1000).toFixed(1), language))}
       </div>
       {finished ? (
         <div data-testid="route-finished" style={{ ...OVERLAY, top: '40%', fontSize: 32 }}>
-          Route complete
+          {text.complete}
         </div>
       ) : null}
     </div>
@@ -269,6 +273,7 @@ function VideoWorld({
 }
 
 function VideoLandscapeView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const { id, loaded } = useRoute(ctx);
   // Another world's ride, or a free ride: this landscape shows and tells nothing.
   if (id === undefined) {
@@ -281,7 +286,7 @@ function VideoLandscapeView({ ctx }: { readonly ctx: UiContext }) {
         data-status={loaded.status}
         style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#0b1220', color: '#93a1b8' }}
       >
-        {loaded.status === 'loading' ? 'Loading the video…' : `The video cannot be shown: ${loaded.message}`}
+        {loaded.status === 'loading' ? text.loading : text.cannotShow(loaded.message)}
       </div>
     );
   }

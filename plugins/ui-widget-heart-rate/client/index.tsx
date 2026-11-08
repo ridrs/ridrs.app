@@ -2,13 +2,17 @@
 
 import { type MetricReading, metricHeartRateEvent } from '@ridrs/contracts';
 import { describeMetricReading, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 
 function HeartRateWidgetView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const [reading, setReading] = useState<MetricReading>();
   useEffect(() => ctx.events.subscribe(metricHeartRateEvent, ({ payload }) => setReading(payload)), [ctx]);
-  const display = describeMetricReading(reading);
+  const display = describeMetricReading(reading, language);
 
   return (
     <section
@@ -24,13 +28,13 @@ function HeartRateWidgetView({ ctx }: { readonly ctx: UiContext }) {
         fontFamily: 'system-ui, sans-serif',
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>Heart rate</div>
+      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.title}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span data-testid="value" style={{ fontSize: 44, fontWeight: 700 }}>
           {display.text}
         </span>
         <span data-testid="unit" style={{ fontSize: 18 }}>
-          bpm
+          {text.unit}
         </span>
       </div>
       {display.reason !== undefined && (

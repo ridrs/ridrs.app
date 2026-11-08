@@ -24,6 +24,9 @@
         "metric.power-heart-rate-ratio"
       ],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

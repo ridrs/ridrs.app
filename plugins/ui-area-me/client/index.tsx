@@ -9,9 +9,11 @@ import {
   useBack,
   userDocument,
 } from '@ridrs/ui-preview';
-import type { UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef } from 'react';
 import { z } from 'zod';
+import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const USER = new URL('./assets/icons/user.svg', import.meta.url).href;
@@ -56,26 +58,29 @@ const useMe = userDocument(
 
 /** A value changed in steps with two buttons: usable with arrows and Enter alone. */
 function Stepper({
+  ctx,
   name,
   value,
   testId,
   onStep,
 }: {
+  readonly ctx: UiContext;
   readonly name: string;
   readonly value: string;
   readonly testId: string;
   readonly onStep: (direction: 1 | -1) => void;
 }) {
+  const text = useMessages(ctx, messages);
   return (
     <div className="me-stepper">
       <span>{name}</span>
-      <button type="button" className="pv-icon" aria-label={`Lower ${name}`} onClick={() => onStep(-1)}>
+      <button type="button" className="pv-icon" aria-label={text.lower(name)} onClick={() => onStep(-1)}>
         −
       </button>
       <output data-testid={testId} aria-label={name}>
         {value}
       </output>
-      <button type="button" className="pv-icon" aria-label={`Raise ${name}`} onClick={() => onStep(1)}>
+      <button type="button" className="pv-icon" aria-label={text.raise(name)} onClick={() => onStep(1)}>
         +
       </button>
     </div>
@@ -88,70 +93,75 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const CONNECTION_SLOT = 'me/connection';
 
 function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const [state, change] = useMe(ctx);
   const connections = useRef<HTMLDivElement>(null);
   useBack(ctx);
   useEffect(() => (connections.current ? ctx.slot(CONNECTION_SLOT, connections.current) : undefined), [ctx]);
-  const wattsPerKg = (state.ftp / state.weight).toFixed(2);
+  const wattsPerKg = localizeNumber((state.ftp / state.weight).toFixed(2), language);
   return (
-    <AreaPage title="Me" intro="Your rides, your progress and your account.">
+    <AreaPage title={text.title} intro={text.intro}>
       <style>{CSS}</style>
       <section className="pv-section">
-        <h2>Progress and FTP</h2>
+        <h2>{text.progress}</h2>
         <Stepper
-          name="FTP"
+          ctx={ctx}
+          name={text.ftp}
           testId="ftp"
           value={`${state.ftp} W`}
           onStep={(d) => change((s) => ({ ...s, ftp: clamp(s.ftp + 5 * d, 50, 600) }))}
         />
         <Stepper
-          name="Weight"
+          ctx={ctx}
+          name={text.weight}
           testId="weight"
-          value={`${state.weight.toFixed(1)} kg`}
+          value={`${localizeNumber(state.weight.toFixed(1), language)} kg`}
           onStep={(d) => change((s) => ({ ...s, weight: clamp(s.weight + 0.5 * d, 30, 200) }))}
         />
         <Stepper
-          name="Weekly goal"
+          ctx={ctx}
+          name={text.weeklyGoal}
           testId="weekly-goal"
-          value={`${state.weeklyHours} h`}
+          value={`${localizeNumber(String(state.weeklyHours), language)} h`}
           onStep={(d) => change((s) => ({ ...s, weeklyHours: clamp(s.weeklyHours + 0.5 * d, 0.5, 30) }))}
         />
-        <p className="pv-muted">{wattsPerKg} W/kg. The ride does not use these values yet.</p>
+        <p className="pv-muted">{text.notUsed(wattsPerKg)}</p>
       </section>
       <section className="pv-section">
-        <h2>Activities</h2>
+        <h2>{text.activities}</h2>
         <div className="pv-card">
-          <span className="pv-muted">Your recorded rides with their FIT files will be listed here.</span>
+          <span className="pv-muted">{text.activitiesSoon}</span>
         </div>
       </section>
       <section className="pv-section">
-        <h2>Achievements</h2>
+        <h2>{text.achievements}</h2>
         <div className="pv-cards">
           <article className="pv-card">
-            <h3>First 100 km</h3>
-            <span className="pv-muted">Ride 100 km in total</span>
+            <h3>{text.first100}</h3>
+            <span className="pv-muted">{text.first100About}</span>
           </article>
           <article className="pv-card">
-            <h3>Climber</h3>
-            <span className="pv-muted">Climb 1,000 m in one ride</span>
+            <h3>{text.climber}</h3>
+            <span className="pv-muted">{text.climberAbout}</span>
           </article>
         </div>
       </section>
       <section className="pv-section">
-        <h2>Account and subscription</h2>
+        <h2>{text.account}</h2>
         <div className="pv-card">
-          <span className="pv-muted">Sign-in, profile and subscription come with the athlete profile.</span>
+          <span className="pv-muted">{text.accountSoon}</span>
         </div>
       </section>
       <section className="pv-section">
-        <h2>Connected services</h2>
+        <h2>{text.connected}</h2>
         <div ref={connections} data-testid="slot-me-connection" />
       </section>
       <section className="pv-section">
-        <h2>On Today</h2>
+        <h2>{text.onToday}</h2>
         <div className="pv-row">
           <Toggle
-            label="Show Weekly goal on Today"
+            label={text.showOnToday}
             on={state.showOnToday}
             onChange={(on) => change((s) => ({ ...s, showOnToday: on }))}
           />
@@ -163,23 +173,28 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
 
 /** The card on Today: this week's hours against the goal. */
 function WeeklyGoalView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const [state, change] = useMe(ctx);
   if (!state.showOnToday) return null;
   const share = Math.min(1, RIDDEN_HOURS / state.weeklyHours);
   return (
     <TodayCard
-      classifier="Weekly goal"
+      classifier={text.weeklyGoal}
       icon={USER}
-      title={`${RIDDEN_HOURS} of ${state.weeklyHours} h`}
-      details={[`${Math.round(share * 100)} % of this week's goal`]}
+      title={text.hoursOf(
+        localizeNumber(String(RIDDEN_HOURS), language),
+        localizeNumber(String(state.weeklyHours), language),
+      )}
+      details={[text.shareOfGoal(Math.round(share * 100))]}
       onHide={() => change((s) => ({ ...s, showOnToday: false }))}
     >
-      <div role="progressbar" aria-label="Weekly goal" aria-valuenow={Math.round(share * 100)} style={BAR}>
+      <div role="progressbar" aria-label={text.weeklyGoal} aria-valuenow={Math.round(share * 100)} style={BAR}>
         <i style={{ ...FILL, width: `${share * 100}%` }} />
       </div>
       <div className="pv-row">
         <button type="button" className="pv-button" onClick={() => ctx.navigate('me')}>
-          Change the goal
+          {text.changeGoal}
         </button>
       </div>
     </TodayCard>
@@ -188,6 +203,8 @@ function WeeklyGoalView({ ctx }: { readonly ctx: UiContext }) {
 
 export const MeArea = reactComponent((ctx) => <MeAreaView ctx={ctx} />);
 export const WeeklyGoalTile = reactComponent((ctx) => <WeeklyGoalView ctx={ctx} />);
-export const ProfileAction = reactComponent((ctx) => (
-  <ActionButton ctx={ctx} screen="me" label="Profile" icon={USER} />
-));
+function ProfileActionView({ ctx }: { readonly ctx: UiContext }) {
+  return <ActionButton ctx={ctx} screen="me" label={useMessages(ctx, messages).profile} icon={USER} />;
+}
+
+export const ProfileAction = reactComponent((ctx) => <ProfileActionView ctx={ctx} />);

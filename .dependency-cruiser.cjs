@@ -356,11 +356,11 @@ module.exports = {
     {
       name: 'react-only-in-ui-code',
       comment:
-        'React is an implementation detail of UI plugin clients, the native app entry and the companion app UI.',
+        "React is an implementation detail of UI plugin clients, the native app entry and the companion app UI. The SDK's optional React bindings (`@ridrs/ui-sdk/react`, ADR 0072) are the one exception; its main entry stays framework-neutral.",
       severity: 'error',
       from: {
         pathNot:
-          '^(plugins/ui-[^/]+/client/|packages/ui-preview/src/|apps/(native|companion)/src/|tests/)',
+          '^(plugins/ui-[^/]+/client/|packages/ui-preview/src/|packages/ui-sdk/src/react\\.ts$|apps/(native|companion)/src/|tests/)',
       },
       to: { path: '(^|/)node_modules/.*/(react|react-dom)/' },
     },

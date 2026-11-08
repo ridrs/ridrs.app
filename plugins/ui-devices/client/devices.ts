@@ -9,6 +9,7 @@ import type {
   DeviceKind,
   DeviceStatus,
 } from '@ridrs/contracts';
+import type { Messages } from './i18n/index.ts';
 
 /** Colour and symbol of a state; the text always goes with it, colour is never the only signal. */
 export type Tone = 'ok' | 'busy' | 'warn' | 'none';
@@ -69,83 +70,42 @@ export interface Readings {
   readonly buttons?: Readonly<Record<string, readonly ControllerButton[]>>;
 }
 
-/** What the heart rate monitor's details say in place of what it is for: one, picked on open. */
-export const HEART_RATE_THOUGHTS: readonly string[] = [
-  'Your heart is a muscle, not a machine. Train it consistently, challenge it progressively, and give it time to adapt.',
-  "A stronger heart doesn't always beat faster. One of the beautiful signs of endurance adaptation is delivering more blood with fewer beats.",
-  "Don't chase your heart rate. Understand it. Power tells you what you produce; heart rate tells you how your body responds.",
-  'The heart remembers consistency. One heroic ride changes little. Hundreds of ordinary rides change everything.',
-  'Easy rides build a strong heart, too. The discipline to ride slowly is often more valuable than the courage to ride hard.',
-  'Heart rate is a conversation, not a command. Heat, fatigue, stress, hydration and sleep all influence what your heart tells you.',
-  'A drifting heart rate is a message. When the same power requires more effort over time, your body is telling you something about its current limits.',
-  'Recovery is when the heart gets stronger. Training provides the stimulus; adaptation happens afterward.',
-  "Your heart has no interest in your FTP. It doesn't care about segments, rankings or personal records. It cares about staying healthy enough to keep going.",
-  "The ultimate goal is not a lower heart rate. It's a longer life in motion. The best training is the training that allows you to keep riding, exploring and enjoying the road for decades.",
-  'Train your legs to climb mountains. Train your heart to enjoy the journey.',
-];
-
-const KINDS: Record<RowKind, { title: string; label: string; examples: string; about: string }> =
-  {
-    power: {
-      title: 'Power Meter',
-      label: 'Power',
-      examples: 'e.g. Assioma, Favero, Stages',
-      about: 'Your power, measured by the trainer for now.',
-    },
-    trainer: {
-      title: 'Smart Trainer',
-      label: 'Trainer',
-      examples: 'e.g. Wahoo, Tacx, Elite',
-      about: 'Power, cadence and speed; sets the climb resistance.',
-    },
-    'heart-rate': {
-      title: 'Heart Rate Monitor',
-      label: 'Heart rate',
-      examples: 'e.g. Polar, Garmin, Apple Watch',
-      about: 'Your heart rate.',
-    },
-    controller: {
-      title: 'Controller',
-      label: 'Controller',
-      examples: 'e.g. Zwift Ride',
-      about: 'Its buttons steer ridrs.',
-    },
-  };
-
-/** How a held button shows in the badge, and its name for screen readers. */
-export const BUTTON_FACES: Record<ControllerButton, { readonly symbol: string; readonly name: string }> =
-  {
-    left: { symbol: '←', name: 'D-pad left' },
-    up: { symbol: '↑', name: 'D-pad up' },
-    right: { symbol: '→', name: 'D-pad right' },
-    down: { symbol: '↓', name: 'D-pad down' },
-    a: { symbol: 'A', name: 'A' },
-    b: { symbol: 'B', name: 'B' },
-    y: { symbol: 'Y', name: 'Y' },
-    z: { symbol: 'Z', name: 'Z' },
-    'shift-up-left': { symbol: '+', name: 'Left shift up' },
-    'shift-down-left': { symbol: '−', name: 'Left shift down' },
-    'power-up-left': { symbol: '⚡', name: 'Left power-up' },
-    'on-off-left': { symbol: '⏻', name: 'Left on/off' },
-    'shift-up-right': { symbol: '+', name: 'Right shift up' },
-    'shift-down-right': { symbol: '−', name: 'Right shift down' },
-    'power-up-right': { symbol: '⚡', name: 'Right power-up' },
-    'on-off-right': { symbol: '⏻', name: 'Right on/off' },
-  };
-
-const STATES: Record<DeviceRow['state'], { status: string; tone: Tone; tip?: string }> = {
-  none: { status: 'Not set up', tone: 'none' },
-  searching: {
-    status: 'Searching…',
-    tone: 'busy',
-    tip: 'Wake the device and keep it close.',
-  },
-  connecting: { status: 'Connecting…', tone: 'busy' },
-  connected: { status: 'Connected', tone: 'ok' },
-  // "Reconnecting…" says it all: no tip.
-  reconnecting: { status: 'Reconnecting…', tone: 'busy' },
-  disconnected: { status: 'Disconnected', tone: 'warn' },
+/** How a held button shows in the badge; its name for screen readers is in `Messages.buttons`. */
+export const BUTTON_FACES: Record<ControllerButton, { readonly symbol: string }> = {
+  left: { symbol: '←' },
+  up: { symbol: '↑' },
+  right: { symbol: '→' },
+  down: { symbol: '↓' },
+  a: { symbol: 'A' },
+  b: { symbol: 'B' },
+  y: { symbol: 'Y' },
+  z: { symbol: 'Z' },
+  'shift-up-left': { symbol: '+' },
+  'shift-down-left': { symbol: '−' },
+  'power-up-left': { symbol: '⚡' },
+  'on-off-left': { symbol: '⏻' },
+  'shift-up-right': { symbol: '+' },
+  'shift-down-right': { symbol: '−' },
+  'power-up-right': { symbol: '⚡' },
+  'on-off-right': { symbol: '⏻' },
 };
+
+/** The tone of a state; its words, and a tip where the rider can do something, are in `Messages.states`. */
+const TONES: Record<DeviceRow['state'], Tone> = {
+  none: 'none',
+  searching: 'busy',
+  connecting: 'busy',
+  connected: 'ok',
+  // "Reconnecting…" says it all: no tip.
+  reconnecting: 'busy',
+  disconnected: 'warn',
+};
+
+/** A state's status, tone and tip in the rider's language. */
+function stateOf(state: DeviceRow['state'], text: Messages): Pick<DeviceRow, 'status' | 'tone' | 'tip'> {
+  const words = text.states[state] ?? { status: state };
+  return { status: words.status, tone: TONES[state], ...(words.tip ? { tip: words.tip } : {}) };
+}
 
 type Proof = Pick<DeviceRow, 'held'> & { readonly status?: string };
 
@@ -153,7 +113,12 @@ type Proof = Pick<DeviceRow, 'held'> & { readonly status?: string };
  * Only a reading of the device in the row, and only while it is connected, proves the row: the
  * watts and the heart rate replace "Connected", held buttons replace the check.
  */
-function proofOf(kind: RowKind, device: DeviceStatus | undefined, readings: Readings): Proof {
+function proofOf(
+  kind: RowKind,
+  device: DeviceStatus | undefined,
+  readings: Readings,
+  text: Messages,
+): Proof {
   if (device?.state !== 'connected') {
     return {};
   }
@@ -162,11 +127,11 @@ function proofOf(kind: RowKind, device: DeviceStatus | undefined, readings: Read
   switch (kind) {
     case 'power': {
       const power = own(readings.power);
-      return power ? { status: `${Math.round(power.watts)} W` } : {};
+      return power ? { status: text.watts(Math.round(power.watts)) } : {};
     }
     case 'heart-rate': {
       const bpm = own(readings.heartRate)?.bpm;
-      return bpm ? { status: `${Math.round(bpm)} bpm` } : {};
+      return bpm ? { status: text.bpm(Math.round(bpm)) } : {};
     }
     case 'controller': {
       const all = new Set(Object.values(readings.buttons ?? {}).flat());
@@ -178,7 +143,12 @@ function proofOf(kind: RowKind, device: DeviceStatus | undefined, readings: Read
   }
 }
 
-function row(kind: RowKind, device: DeviceStatus | undefined, readings: Readings): DeviceRow {
+function row(
+  kind: RowKind,
+  device: DeviceStatus | undefined,
+  readings: Readings,
+  text: Messages,
+): DeviceRow {
   const state = device?.state ?? 'none';
   const deviceKind: DeviceKind = kind === 'power' ? 'trainer' : kind;
   const candidates = device?.candidates ?? [];
@@ -201,14 +171,14 @@ function row(kind: RowKind, device: DeviceStatus | undefined, readings: Readings
             .length
         : 0,
     found: own && searching ? byDevice(candidates).length : 0,
-    title: KINDS[kind].title,
-    label: KINDS[kind].label,
-    detail: device?.deviceName || device?.lastDeviceName || KINDS[kind].examples,
-    type: KINDS[deviceKind].title,
-    about: KINDS[kind].about,
+    title: text.kinds[kind].title,
+    label: text.kinds[kind].label,
+    detail: device?.deviceName || device?.lastDeviceName || text.kinds[kind].examples,
+    type: text.kinds[deviceKind].title,
+    about: text.kinds[kind].about,
     state,
-    ...STATES[state],
-    ...proofOf(kind, device, readings),
+    ...stateOf(state, text),
+    ...proofOf(kind, device, readings, text),
   };
 }
 
@@ -226,15 +196,16 @@ function shown(devices: readonly DeviceStatus[]): DeviceStatus[] {
  */
 export function describeDevices(
   devices: readonly DeviceStatus[],
-  readings: Readings = {},
+  readings: Readings,
+  text: Messages,
 ): DeviceRow[] {
   const trainer = devices.find((d) => d.kind === 'trainer');
   const controller = shown(devices).find((d) => d.kind === 'controller');
   return [
-    row('power', trainer, readings),
-    row('trainer', trainer, readings),
-    row('heart-rate', devices.find((d) => d.kind === 'heart-rate'), readings),
-    ...(controller ? [row('controller', controller, readings)] : []),
+    row('power', trainer, readings, text),
+    row('trainer', trainer, readings, text),
+    row('heart-rate', devices.find((d) => d.kind === 'heart-rate'), readings, text),
+    ...(controller ? [row('controller', controller, readings, text)] : []),
   ];
 }
 
@@ -314,18 +285,18 @@ export function signalBars(rssi: number): number {
 }
 
 /** What the setup says under its title. */
-export function summarize(all: readonly DeviceStatus[]): {
+export function summarize(all: readonly DeviceStatus[], text: Messages): {
   readonly text: string;
   readonly settled: boolean;
 } {
   const devices = shown(all);
   if (devices.length > 0 && devices.every((d) => d.state === 'connected')) {
-    return { text: 'Everything is connected.', settled: true };
+    return { text: text.allConnected, settled: true };
   }
   if (devices.some((d) => d.state !== 'connected' && d.state !== 'disconnected')) {
-    return { text: 'Connecting your devices. You can ride without waiting.', settled: false };
+    return { text: text.connecting, settled: false };
   }
-  return { text: 'You can ride without devices.', settled: false };
+  return { text: text.withoutDevices, settled: false };
 }
 
 /** The companion phone's row: its own kind of row, from the bridge state. */
@@ -344,38 +315,16 @@ export interface CompanionRow {
   readonly tip?: string;
 }
 
-const BRIDGE_STATES: Record<BridgeState, { status: string; tone: Tone; tip?: string }> = {
-  unpaired: { status: 'Not connected', tone: 'none' },
-  connecting: { status: 'Connecting…', tone: 'busy' },
-  connected: { status: 'Connected', tone: 'ok' },
+/** The tone of the companion's state; its words and tips are in `Messages.bridgeStates`. */
+const BRIDGE_TONES: Record<BridgeState, Tone> = {
+  unpaired: 'none',
+  connecting: 'busy',
+  connected: 'ok',
   // "Reconnecting…" says it all: no tip.
-  reconnecting: { status: 'Reconnecting…', tone: 'busy' },
-  unreachable: { status: 'Not reachable', tone: 'warn' },
-  disconnected: { status: 'Disconnected', tone: 'warn' },
-  rejected: { status: 'Pairing failed', tone: 'warn', tip: 'Check the code on the phone.' },
-};
-
-/** What the rider can check when the companion cannot be reached, by the reason. */
-const UNREACHABLE_TIPS: Record<string, string> = {
-  refused: 'Open the companion app and keep the screen on.',
-  network: 'Use the same Wi-Fi; on a Mac, allow Local Network access.',
-  timeout: 'Use the same Wi-Fi and open the companion app.',
-  error: 'Open the companion app and keep the screen on.',
-};
-
-export const BRIDGE_REASONS: Record<string, string> = {
-  'bad-code': 'wrong code',
-  'bad-token': 'pairing was revoked',
-  locked: 'too many wrong codes, wait a minute',
-  incompatible: 'app versions do not match',
-  busy: 'the companion is in use by another ridrs',
-  unreachable: 'companion not reachable',
-  'by-ridrs': 'by ridrs',
-  'by-companion': 'on the phone',
-  refused: 'the companion app is not open on the phone',
-  network: 'not in this network',
-  timeout: 'no answer',
-  error: 'connection failed',
+  reconnecting: 'busy',
+  unreachable: 'warn',
+  disconnected: 'warn',
+  rejected: 'warn',
 };
 
 export interface BridgeStatus {
@@ -384,17 +333,19 @@ export interface BridgeStatus {
   readonly reason?: string;
 }
 
-export function describeCompanion(bridge: BridgeStatus): CompanionRow {
+export function describeCompanion(bridge: BridgeStatus, text: Messages): CompanionRow {
+  const words = text.bridgeStates[bridge.state] ?? { status: bridge.state };
+  const tips = text.unreachableTips;
   return {
-    title: 'Companion App',
-    detail: bridge.companionName ?? 'Phone with the ridrs companion',
+    title: text.companion.title,
+    detail: bridge.companionName ?? text.companion.detail,
     state: bridge.state,
     ...(bridge.companionName ? { companionName: bridge.companionName } : {}),
-    about: 'Brings the phone’s Bluetooth devices over Wi-Fi.',
-    ...BRIDGE_STATES[bridge.state],
-    ...(bridge.state === 'unreachable'
-      ? { tip: UNREACHABLE_TIPS[bridge.reason ?? 'error'] ?? UNREACHABLE_TIPS.error }
-      : {}),
-    ...(bridge.reason ? { reason: BRIDGE_REASONS[bridge.reason] ?? bridge.reason } : {}),
+    about: text.companion.about,
+    status: words.status,
+    tone: BRIDGE_TONES[bridge.state],
+    ...(words.tip ? { tip: words.tip } : {}),
+    ...(bridge.state === 'unreachable' ? { tip: tips[bridge.reason ?? 'error'] ?? tips.error } : {}),
+    ...(bridge.reason ? { reason: text.bridgeReasons[bridge.reason] ?? bridge.reason } : {}),
   };
 }

@@ -39,6 +39,7 @@
       ]
     },
     "state": [
+      "app.language",
       "route.offer"
     ],
     "calls": [

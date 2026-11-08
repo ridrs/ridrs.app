@@ -30,6 +30,9 @@
       "publish": [
         "ui.terrain-observed"
       ]
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

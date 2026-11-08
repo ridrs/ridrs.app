@@ -11,6 +11,16 @@
   "persistence": [
     "user"
   ],
+  "state": {
+    "owns": [
+      "app.language"
+    ]
+  },
+  "services": {
+    "provides": [
+      "app.set-language"
+    ]
+  },
   "ui": {
     "client": "client/index.tsx",
     "screens": [
@@ -29,6 +39,12 @@
     "events": {
       "subscribe": [],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ],
+    "calls": [
+      "app.set-language"
+    ]
   }
 }

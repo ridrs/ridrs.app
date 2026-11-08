@@ -13,9 +13,11 @@ import {
   trainingUploadService,
   trainingUploadState,
 } from '@ridrs/contracts';
-import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 
 /** The planning service the rides go to: its key in the app state (ADR 0068). */
 const SERVICE = 'intervals.icu';
@@ -65,13 +67,6 @@ type Recording =
   | { readonly state: 'pending' }
   | { readonly state: 'saved'; readonly file: string; readonly distance?: number; readonly durationMs: number }
   | { readonly state: 'failed' };
-
-const FAILURES: Record<NonNullable<TrainingUpload['reason']>, string> = {
-  'not-connected': 'intervals.icu is not connected.',
-  'token-rejected': 'intervals.icu asks you to connect again.',
-  unreachable: 'intervals.icu could not be reached.',
-  rejected: 'intervals.icu did not accept the ride.',
-};
 
 /** `h:mm:ss`, or `m:ss` under an hour. */
 function durationLabel(ms: number): string {
@@ -150,6 +145,8 @@ function useDebriefing(ctx: UiContext) {
 }
 
 function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const { sessionId, recording, fit, upload, account } = useDebriefing(ctx);
   const save = useRef<HTMLButtonElement>(null);
   // How often Save (or Try again) was pressed: each attempt uploads once the FIT file is written.
@@ -233,57 +230,61 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
   return (
     <main className="db-screen" data-testid="debriefing">
       <style>{CSS}</style>
-      <h1>Ride finished</h1>
+      <h1>{text.finished}</h1>
       {recording.state === 'saved' ? (
         <dl className="db-facts">
           <div>
-            <dt>Distance</dt>
+            <dt>{text.distance}</dt>
             <dd data-testid="debriefing-distance">
-              {recording.distance === undefined ? '–' : `${(recording.distance / 1000).toFixed(2)} km`}
+              {recording.distance === undefined
+                ? '–'
+                : text.km(localizeNumber((recording.distance / 1000).toFixed(2), language))}
             </dd>
           </div>
           <div>
-            <dt>Time</dt>
+            <dt>{text.time}</dt>
             <dd data-testid="debriefing-duration">{durationLabel(recording.durationMs)}</dd>
           </div>
         </dl>
       ) : null}
       <div role="status" data-testid="debriefing-status">
         {recording.state === 'failed' ? (
-          <p className="db-note db-warn">The ride could not be recorded.</p>
+          <p className="db-note db-warn">{text.notRecorded}</p>
         ) : uploading ? (
           <p className="db-note">
             <span className="db-spin" aria-hidden="true" />
-            Uploading to intervals.icu…
+            {text.uploading}
           </p>
         ) : refused !== undefined ? (
-          <p className="db-note db-warn">{refused} The ride is kept on this device.</p>
+          <p className="db-note db-warn">
+            {refused} {text.kept}
+          </p>
         ) : failed ? (
           <p className="db-note db-warn">
-            {failed.reason ? FAILURES[failed.reason] : 'The upload failed.'} The ride is kept on this device.
+            {failed.reason ? text.failures[failed.reason] : text.uploadFailed} {text.kept}
           </p>
         ) : connected ? (
           <p className="db-note">
-            Save uploads the ride to intervals.icu{account?.athleteName ? ` as ${account.athleteName}` : ''}.
+            {text.saveUploads(account?.athleteName)}
           </p>
         ) : (
-          <p className="db-note">Save keeps the ride on this device. Connect intervals.icu in Me to upload rides.</p>
+          <p className="db-note">{text.saveKeeps}</p>
         )}
       </div>
       {confirmDelete ? (
-        <div className="db-actions" role="group" aria-label="Delete this ride?">
+        <div className="db-actions" role="group" aria-label={text.deleteQuestion}>
           <p className="db-note db-warn" style={{ flexBasis: '100%' }}>
-            Delete this ride? It cannot be brought back.
+            {text.deleteWarning}
           </p>
           <button type="button" className="db-button db-delete" onClick={onDelete}>
-            Delete ride
+            {text.deleteRide}
           </button>
           <button
             type="button"
             className="db-button"
             onClick={() => setConfirmDelete(false)}
           >
-            Keep ride
+            {text.keepRide}
           </button>
         </div>
       ) : (
@@ -295,7 +296,7 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
             disabled={saveDisabled}
             onClick={onSave}
           >
-            {tryAgain ? 'Try again' : 'Save'}
+            {tryAgain ? text.tryAgain : text.save}
           </button>
           {reconnect ? (
             <button
@@ -308,12 +309,12 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
                   .catch((error: unknown) => ctx.logger.warn('intervals.icu: connecting was refused', error))
               }
             >
-              {failed?.reason === 'token-rejected' ? 'Reconnect intervals.icu' : 'Connect intervals.icu'}
+              {failed?.reason === 'token-rejected' ? text.reconnect : text.connect}
             </button>
           ) : null}
           {tryAgain ? (
             <button type="button" className="db-button" onClick={() => ctx.navigate(MAIN)}>
-              Save without upload
+              {text.withoutUpload}
             </button>
           ) : null}
           <button
@@ -322,7 +323,7 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
             disabled={uploading || deleting}
             onClick={() => setConfirmDelete(true)}
           >
-            Delete
+            {text.delete}
           </button>
         </div>
       )}

@@ -3,8 +3,10 @@
 import { activityStateChangedEvent, type TerrainSurface, uiTerrainObservedEvent } from '@ridrs/contracts';
 import { createPhysicsPresentation, type PresentedPhysics } from '@ridrs/presentation';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { messages } from './i18n/index.ts';
 import { DEMO_LANDSCAPE, type LandscapeModel, surfaceAt } from './landscape-model.ts';
 import { laneDashes, type Quad } from './lane-markings.ts';
 import { roadSections } from './road-sections.ts';
@@ -96,6 +98,7 @@ function useLandscape(ctx: UiContext, model: LandscapeModel) {
 }
 
 function LandscapeView({ ctx, model }: { readonly ctx: UiContext; readonly model: LandscapeModel }) {
+  const text = useMessages(ctx, messages);
   const { svg, road, markings, dashes } = useLandscape(ctx, model);
   return (
     <svg
@@ -108,7 +111,7 @@ function LandscapeView({ ctx, model }: { readonly ctx: UiContext; readonly model
       preserveAspectRatio="none"
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
       role="img"
-      aria-label="Landscape"
+      aria-label={text.landscape}
     >
       <defs>
         <linearGradient id="ridrs-sky" x1="0" y1="0" x2="0" y2="1">

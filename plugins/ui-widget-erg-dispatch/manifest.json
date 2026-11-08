@@ -2,7 +2,9 @@
   "id": "ui-widget-erg-dispatch",
   "name": "ERG Dispatch Widget",
   "version": "0.1.0",
-  "types": ["ui"],
+  "types": [
+    "ui"
+  ],
   "provides": [],
   "requires": [],
   "entry": "index.ts",
@@ -14,12 +16,20 @@
         "extensionPoint": "hud/widget",
         "export": "ErgDispatchWidget",
         "order": 7,
-        "extensionPoints": ["hud/erg-off", "hud/erg-on"]
+        "extensionPoints": [
+          "hud/erg-off",
+          "hud/erg-on"
+        ]
       }
     ],
     "events": {
-      "subscribe": ["trainer.target-power"],
+      "subscribe": [
+        "trainer.target-power"
+      ],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

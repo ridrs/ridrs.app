@@ -1,30 +1,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { appLanguageSetService, type Language } from '@ridrs/contracts';
 import { ActionButton, AreaPage, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useState } from 'react';
 import { z } from 'zod';
+import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const SETTINGS = new URL('./assets/icons/settings.svg', import.meta.url).href;
 
-const settingsSchema = z
-  .object({
-    units: z.enum(['metric', 'imperial']),
-    language: z.enum(['en', 'de']),
-    sounds: z.boolean(),
-    smoothing: z.enum(['off', '3s', '10s']),
-    frameRate: z.boolean(),
-  })
-  .strict();
+// Not strict: documents kept before ADR 0072 still hold the language, which lives apart now.
+const settingsSchema = z.object({
+  units: z.enum(['metric', 'imperial']),
+  sounds: z.boolean(),
+  smoothing: z.enum(['off', '3s', '10s']),
+  frameRate: z.boolean(),
+});
 
 type Settings = z.infer<typeof settingsSchema>;
 
-const DEFAULTS: Settings = { units: 'metric', language: 'en', sounds: true, smoothing: '3s', frameRate: false };
+const DEFAULTS: Settings = { units: 'metric', sounds: true, smoothing: '3s', frameRate: false };
+
+/** The language the app starts in and goes back to with Reset. */
+const DEFAULT_LANGUAGE: Language = 'en';
 
 /**
  * The settings, kept at once (ADR 0059). Placeholders of the early alpha: nothing reads them yet;
- * the HUD keeps its metric units and English.
+ * the HUD keeps its metric units. The language is the app's (ADR 0072): app state of this plugin's
+ * host side, changed through `app.set-language`.
  */
 const useSettings = userDocument({ name: 'preview', version: 1, schema: settingsSchema }, DEFAULTS);
 
@@ -59,7 +64,40 @@ function Choice<K extends keyof Settings>({
   );
 }
 
+/** The app's language: each language a button named in its own language, the chosen one pressed. */
+function LanguageChoice({ ctx, name }: { readonly ctx: UiContext; readonly name: string }) {
+  const language = useLanguage(ctx);
+  const choose = (next: Language) =>
+    ctx
+      .call(appLanguageSetService, { language: next })
+      .catch((error: unknown) => ctx.logger.warn(`Could not change the language: ${String(error)}`));
+  return (
+    <div className="pv-row" role="group" aria-label={name}>
+      <span style={{ minWidth: 140 }}>{name}</span>
+      {LANGUAGE_NAMES.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className="pv-chip"
+          lang={option.value}
+          aria-pressed={language === option.value}
+          onClick={() => choose(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Every language by its own name, so that anyone finds theirs. */
+const LANGUAGE_NAMES: readonly { readonly value: Language; readonly label: string }[] = [
+  { value: 'en', label: 'English' },
+  { value: 'de', label: 'Deutsch' },
+];
+
 function SettingsView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useSettings(ctx);
   const [advanced, setAdvanced] = useState(false);
   useBack(ctx, () => {
@@ -68,31 +106,23 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
     return true;
   });
   return (
-    <AreaPage title="Settings" intro="Every change takes effect at once.">
+    <AreaPage title={text.title} intro={text.intro}>
       <section className="pv-section">
-        <h2>Basics</h2>
+        <h2>{text.basics}</h2>
         <Choice
           ctx={ctx}
-          name="Units"
+          name={text.units}
           setting="units"
           options={[
-            { value: 'metric', label: 'Metric' },
-            { value: 'imperial', label: 'Imperial' },
+            { value: 'metric', label: text.metric },
+            { value: 'imperial', label: text.imperial },
           ]}
         />
-        <Choice
-          ctx={ctx}
-          name="Language"
-          setting="language"
-          options={[
-            { value: 'en', label: 'English' },
-            { value: 'de', label: 'Deutsch' },
-          ]}
-        />
+        <LanguageChoice ctx={ctx} name={text.language} />
         <div className="pv-row">
-          <span style={{ minWidth: 140 }}>Sounds</span>
-          <Toggle label="Sounds" on={state.sounds} onChange={(on) => change((s) => ({ ...s, sounds: on }))}>
-            {state.sounds ? 'On' : 'Off'}
+          <span style={{ minWidth: 140 }}>{text.sounds}</span>
+          <Toggle label={text.sounds} on={state.sounds} onChange={(on) => change((s) => ({ ...s, sounds: on }))}>
+            {state.sounds ? text.on : text.off}
           </Toggle>
         </div>
       </section>
@@ -104,43 +134,57 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
             aria-expanded={advanced}
             onClick={() => setAdvanced((open) => !open)}
           >
-            Advanced
+            {text.advanced}
           </button>
-          <button type="button" className="pv-button" onClick={() => change(() => DEFAULTS)}>
-            Reset to defaults
+          <button
+            type="button"
+            className="pv-button"
+            onClick={() => {
+              change(() => DEFAULTS);
+              ctx
+                .call(appLanguageSetService, { language: DEFAULT_LANGUAGE })
+                .catch((error: unknown) =>
+                  ctx.logger.warn(`Could not change the language: ${String(error)}`),
+                );
+            }}
+          >
+            {text.reset}
           </button>
         </div>
         {advanced ? (
           <>
             <Choice
               ctx={ctx}
-              name="Power smoothing"
+              name={text.smoothing}
               setting="smoothing"
               options={[
-                { value: 'off', label: 'Off' },
-                { value: '3s', label: '3 s' },
-                { value: '10s', label: '10 s' },
+                { value: 'off', label: text.off },
+                { value: '3s', label: text.seconds(3) },
+                { value: '10s', label: text.seconds(10) },
               ]}
             />
             <div className="pv-row">
-              <span style={{ minWidth: 140 }}>Frame rate</span>
+              <span style={{ minWidth: 140 }}>{text.frameRate}</span>
               <Toggle
-                label="Show the frame rate"
+                label={text.showFrameRate}
                 on={state.frameRate}
                 onChange={(on) => change((s) => ({ ...s, frameRate: on }))}
               >
-                {state.frameRate ? 'Shown' : 'Hidden'}
+                {state.frameRate ? text.shown : text.hidden}
               </Toggle>
             </div>
           </>
         ) : null}
       </section>
-      <p className="pv-muted">Nothing reads these settings yet; the ride keeps metric units and English.</p>
+      <p className="pv-muted">{text.placeholder}</p>
     </AreaPage>
   );
 }
 
 export const SettingsScreen = reactComponent((ctx) => <SettingsView ctx={ctx} />);
-export const SettingsAction = reactComponent((ctx) => (
-  <ActionButton ctx={ctx} screen="settings" label="Settings" icon={SETTINGS} />
-));
+function SettingsActionView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  return <ActionButton ctx={ctx} screen="settings" label={text.title} icon={SETTINGS} />;
+}
+
+export const SettingsAction = reactComponent((ctx) => <SettingsActionView ctx={ctx} />);

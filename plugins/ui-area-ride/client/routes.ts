@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { RouteOffer } from '@ridrs/contracts';
+import type { Messages } from './i18n/index.ts';
 
 /** The route ridden last until the rider rides another: the demo course, always on the device. */
 export const FIRST_ROUTE = 'ui-landscape-demo/demo-course';
 
 export type Filter = 'flat' | 'hilly' | 'short' | 'favourites';
 
-export const FILTERS: readonly { readonly id: Filter; readonly label: string }[] = [
-  { id: 'flat', label: 'Flat' },
-  { id: 'hilly', label: 'Hilly' },
-  { id: 'short', label: 'Under 45 min' },
-  { id: 'favourites', label: 'Favourites' },
-];
+export const FILTERS: readonly Filter[] = ['flat', 'hilly', 'short', 'favourites'];
 
 const providerOf = (offer: RouteOffer) => offer.id.slice(0, offer.id.indexOf('/'));
 
@@ -53,33 +49,41 @@ export function filterRoutes(
 }
 
 /** A route's length as the rider reads it: `46.1 km`. */
-export const formatDistance = (offer: RouteOffer): string => `${(offer.distance / 1000).toFixed(1)} km`;
+export const formatDistance = (offer: RouteOffer, text: Messages): string => `${text.km(offer.distance)} km`;
 
 /** A route's climb as the rider reads it: `1216 m`. */
-export const formatAscent = (offer: RouteOffer): string => `${Math.round(offer.ascent)} m`;
+export const formatAscent = (offer: RouteOffer, text: Messages): string => text.metres(offer.ascent);
 
 /** A categorised climb's name: `HC` or `Cat 1` to `Cat 4` (ADR 0070). */
 export type Climb = NonNullable<RouteOffer['climbs']>[number];
-export const climbCategory = (climb: Climb): string => (climb.category === 'HC' ? 'HC' : `Cat ${climb.category}`);
-
-/** m along the route as the rider reads it: `14.3`. */
-export const km = (distance: number): string => (distance / 1000).toFixed(1);
+export const climbCategory = (climb: Climb, text: Messages): string => text.category(climb.category);
 
 /** A categorised climb in the route details, e.g. `Cat 1: summit 1244 m at km 14.3 · 14.3 km at 4.9 %`. */
-export function describeClimb(climb: Climb): string {
-  return `${climbCategory(climb)}: summit ${Math.round(climb.summit)} m at km ${km(climb.end)} · ${km(climb.end - climb.start)} km at ${climb.grade.toFixed(1)} %`;
+export function describeClimb(climb: Climb, text: Messages): string {
+  return text.describeClimb(
+    climbCategory(climb, text),
+    climb.summit,
+    text.km(climb.end),
+    text.km(climb.end - climb.start),
+    climb.grade,
+  );
 }
 
 /** What the route details say over its picture: what it is and where, e.g. `Video · France · Grimone, part 1`. */
-export function describeRoute(offer: RouteOffer): string {
+export function describeRoute(offer: RouteOffer, text: Messages): string {
   const { country, tour } = offer.tags;
-  return [offer.kind === 'video' ? 'Video' : 'Route', country, tour && `${tour.name}, part ${tour.part}`]
+  return [
+    offer.kind === 'video' ? text.video : text.route,
+    country && (text.countries[country] ?? country),
+    tour && text.part(tour.name, tour.part),
+  ]
     .filter((part) => part !== undefined)
     .join(' · ');
 }
 
 /**
- * The gradient bands of a route's profile, from the flattest up, as in the catalog's profile
+ * The gradient bands of a route's profile, from the flattest up. A band's `label` names it in
+ * the page's data; the rider reads `Messages.grades` at the same index, as in the catalog's profile
  * picture (ADR 0070); a descent counts as flat. The steepest band is a dark purple instead of the
  * picture's black, which would vanish on the app's dark background.
  */
@@ -146,12 +150,11 @@ export function stretchesOf(offer: RouteOffer): Stretch[] {
 }
 
 /** How long a ride takes about, as the rider reads it: `about 2 h 53 min`, `about 44 min`. */
-export function formatDuration(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  return minutes < 60 ? `about ${minutes} min` : `about ${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+export function formatDuration(seconds: number, text: Messages): string {
+  return text.about(Math.round(seconds / 60));
 }
 
 /** A download's size as the rider reads it: `11.2 GB`, `770 MB`. */
-export function formatSize(bytes: number): string {
-  return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+export function formatSize(bytes: number, text: Messages): string {
+  return text.size(bytes);
 }

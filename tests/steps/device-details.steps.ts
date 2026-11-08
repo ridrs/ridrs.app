@@ -17,7 +17,7 @@ import {
   type PluginContext,
 } from '@ridrs/contracts';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
-import { HEART_RATE_THOUGHTS } from '../../plugins/ui-devices/client/devices.ts';
+import { messages as deviceMessages } from '../../plugins/ui-devices/client/i18n/index.ts';
 import {
   asked,
   deviceStatuses,
@@ -520,7 +520,7 @@ Then(
 Then('the details say one of the thoughts on the heart', async function (this: RidrsWorld) {
   const about = await within(ui(this)).findByTestId('details-about');
   assert.ok(
-    HEART_RATE_THOUGHTS.includes(about.textContent ?? ''),
+    Object.values(deviceMessages).some((text) => text.thoughts.includes(about.textContent ?? '')),
     `"${about.textContent}" is no thought on the heart`,
   );
 });

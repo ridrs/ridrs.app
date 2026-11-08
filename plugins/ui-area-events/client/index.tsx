@@ -10,37 +10,28 @@ import {
   userDocument,
 } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { z } from 'zod';
+import { type Messages, messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const TROPHY = new URL('./assets/icons/trophy.svg', import.meta.url).href;
 
 type Kind = 'race' | 'group' | 'challenge' | 'club';
 
-/** Placeholders of the early alpha, in the order they take place. */
-interface RidrsEvent {
-  readonly id: string;
-  readonly name: string;
-  readonly kind: Kind;
-  readonly when: string;
-  readonly about: string;
-}
+type EventId = keyof Messages['events'];
 
-const EVENTS: readonly RidrsEvent[] = [
-  { id: 'tempo', name: 'Tuesday Tempo Ride', kind: 'group', when: 'Tue 18:30', about: '60 min at 2.8 W/kg, no drop' },
-  { id: 'crit', name: 'Thursday Crit Series', kind: 'race', when: 'Thu 19:00', about: '25 km, categories A–D' },
-  { id: 'club-race', name: 'Sunday Club Race', kind: 'race', when: 'Sun 10:00', about: '42 km on the Alpine Loop' },
-  { id: 'everest', name: 'Everest Challenge', kind: 'challenge', when: 'This month', about: '8,848 m of climbing' },
-  { id: 'distance', name: '500 km in November', kind: 'challenge', when: 'This month', about: 'Ride 500 km' },
-  { id: 'club', name: 'ridrs Riders Club', kind: 'club', when: 'Always', about: 'Weekly rides and a team chat' },
+/** Placeholders of the early alpha, in the order they take place; their texts are in `i18n`. */
+const EVENTS: readonly { readonly id: EventId; readonly kind: Kind }[] = [
+  { id: 'tempo', kind: 'group' },
+  { id: 'crit', kind: 'race' },
+  { id: 'club-race', kind: 'race' },
+  { id: 'everest', kind: 'challenge' },
+  { id: 'distance', kind: 'challenge' },
+  { id: 'club', kind: 'club' },
 ];
 
-const SECTIONS: readonly { readonly kind: Kind; readonly title: string }[] = [
-  { kind: 'race', title: 'Races' },
-  { kind: 'group', title: 'Group rides' },
-  { kind: 'challenge', title: 'Challenges' },
-  { kind: 'club', title: 'Clubs and teams' },
-];
+const SECTIONS: readonly Kind[] = ['race', 'group', 'challenge', 'club'];
 
 /** What the rider changed in this area, kept at once (ADR 0059). */
 const useEvents = userDocument(
@@ -53,25 +44,27 @@ const useEvents = userDocument(
 );
 
 function EventsAreaView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useEvents(ctx);
   useBack(ctx);
   return (
-    <AreaPage title="Events" intro="Ride together: races, group rides, challenges and clubs.">
+    <AreaPage title={text.title} intro={text.intro}>
       {SECTIONS.map((section) => (
-        <section key={section.kind} className="pv-section">
-          <h2>{section.title}</h2>
+        <section key={section} className="pv-section">
+          <h2>{text.sections[section]}</h2>
           <div className="pv-cards">
-            {EVENTS.filter((event) => event.kind === section.kind).map((event) => {
+            {EVENTS.filter((event) => event.kind === section).map((event) => {
               const joined = state.joined.includes(event.id);
+              const about = text.events[event.id];
               return (
                 <article key={event.id} className="pv-card">
-                  <h3>{event.name}</h3>
+                  <h3>{about.name}</h3>
                   <span className="pv-muted">
-                    {event.when} · {event.about}
+                    {about.when} · {about.about}
                   </span>
                   <div className="pv-row">
                     <Toggle
-                      label={`Join ${event.name}`}
+                      label={text.join(about.name)}
                       on={joined}
                       onChange={(on) =>
                         change((s) => ({
@@ -80,7 +73,7 @@ function EventsAreaView({ ctx }: { readonly ctx: UiContext }) {
                         }))
                       }
                     >
-                      {joined ? 'Joined' : 'Join'}
+                      {joined ? text.joined : text.joinShort}
                     </Toggle>
                   </div>
                 </article>
@@ -90,10 +83,10 @@ function EventsAreaView({ ctx }: { readonly ctx: UiContext }) {
         </section>
       ))}
       <section className="pv-section">
-        <h2>On Today</h2>
+        <h2>{text.onToday}</h2>
         <div className="pv-row">
           <Toggle
-            label="Show Next event on Today"
+            label={text.showOnToday}
             on={state.showOnToday}
             onChange={(on) => change((s) => ({ ...s, showOnToday: on }))}
           />
@@ -105,20 +98,22 @@ function EventsAreaView({ ctx }: { readonly ctx: UiContext }) {
 
 /** The card on Today: the first event the rider joined, or an invitation to join one. */
 function NextEventView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useEvents(ctx);
   if (!state.showOnToday) return null;
-  const next = EVENTS.find((event) => state.joined.includes(event.id));
+  const found = EVENTS.find((event) => state.joined.includes(event.id));
+  const next = found && text.events[found.id];
   return (
     <TodayCard
-      classifier="Next event"
+      classifier={text.nextEvent}
       icon={TROPHY}
-      title={next ? next.name : 'No event joined yet'}
-      details={next ? [next.when, next.about] : ['Races, group rides and challenges']}
+      title={next ? next.name : text.noneJoined}
+      details={next ? [next.when, next.about] : [text.invitation]}
       onHide={() => change((s) => ({ ...s, showOnToday: false }))}
     >
       <div className="pv-row">
         <button type="button" className="pv-button" onClick={() => ctx.navigate('events')}>
-          {next ? 'All events' : 'Find an event'}
+          {next ? text.allEvents : text.findEvent}
         </button>
       </div>
     </TodayCard>
@@ -127,6 +122,8 @@ function NextEventView({ ctx }: { readonly ctx: UiContext }) {
 
 export const EventsArea = reactComponent((ctx) => <EventsAreaView ctx={ctx} />);
 export const NextEventTile = reactComponent((ctx) => <NextEventView ctx={ctx} />);
-export const EventsMenuEntry = reactComponent((ctx) => (
-  <MenuEntry ctx={ctx} screen="events" label="Events" icon={TROPHY} />
-));
+function EventsMenuEntryView({ ctx }: { readonly ctx: UiContext }) {
+  return <MenuEntry ctx={ctx} screen="events" label={useMessages(ctx, messages).title} icon={TROPHY} />;
+}
+
+export const EventsMenuEntry = reactComponent((ctx) => <EventsMenuEntryView ctx={ctx} />);

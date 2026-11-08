@@ -29,6 +29,9 @@
         "activity.pause-requested",
         "activity.resume-requested"
       ]
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

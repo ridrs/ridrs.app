@@ -2,7 +2,9 @@
   "id": "ui-debug-trainer",
   "name": "Trainer Debug HUD",
   "version": "0.1.0",
-  "types": ["ui"],
+  "types": [
+    "ui"
+  ],
   "provides": [],
   "requires": [],
   "entry": "index.ts",
@@ -24,6 +26,9 @@
         "physics.state"
       ],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

@@ -2,9 +2,11 @@
 
 import { activityStateChangedEvent } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import configured from '../layout.json' with { type: 'json' };
+import { messages } from './i18n/index.ts';
 import { BREAKPOINTS, type Breakpoint, breakpointAt, columnsAt, type Layout, layoutSchema, type Tile } from './layout.ts';
 
 /**
@@ -192,6 +194,7 @@ function Dialog({
   readonly open: boolean;
   readonly container: RefObject<HTMLDivElement | null>;
 }) {
+  const text = useMessages(ctx, messages);
   const panel = useRef<HTMLDivElement>(null);
   const opener = useRef<Element | null>(null);
   // In the effect, not its cleanup: the page beneath is no longer inert only once it committed.
@@ -221,7 +224,7 @@ function Dialog({
     >
       <div ref={panel} className="ms-dialog-panel" tabIndex={-1}>
         {open ? (
-          <button type="button" className="ms-dialog-close" aria-label="Close" onClick={() => ctx.leave()} />
+          <button type="button" className="ms-dialog-close" aria-label={text.close} onClick={() => ctx.leave()} />
         ) : null}
         <div ref={container} className="ms-dialog-body" />
       </div>

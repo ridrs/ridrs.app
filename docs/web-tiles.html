@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RIDRS // Windows 8 Kachel Edition — Open-Source Cycling Platform</title>
-  <meta name="description" content="RIDRS is the ultimate open source, extendable, crowd-coded cycling and indoor cycling platform. Fused Cyber-Telemetry & Windows 8 Kachel (Live Tile) interface.">
+  <title>RIDRS // Windows 8 Tile Edition — Open-Source Cycling Platform</title>
+  <meta name="description" content="RIDRS is the ultimate open source, extendable, crowd-coded cycling and indoor cycling platform. Fused Cyber-Telemetry & Windows 8 Live Tile interface.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,700&family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -175,7 +175,7 @@
     }
 
     /* Windows 8 Panorama / Group Headers */
-    .kachel-group-bar {
+    .tile-group-bar {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
       gap: var(--tile-gap);
@@ -203,8 +203,8 @@
       gap: 0.5rem;
     }
 
-    /* Master Windows 8 Kachel Grid (12 Columns) */
-    .kachel-board {
+    /* Master Windows 8 Tile Grid (12 Columns) */
+    .tile-board {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
       grid-auto-rows: minmax(158px, auto);
@@ -213,8 +213,8 @@
       margin-bottom: 2.5rem;
     }
 
-    /* Base Kachel (Live Tile) Styling */
-    .kachel {
+    /* Base Live Tile Styling */
+    .tile {
       position: relative;
       background: var(--surface);
       border: 2px solid rgba(255, 255, 255, 0.1);
@@ -235,7 +235,7 @@
     }
 
     /* Subtle Metro top-edge inner sheen */
-    .kachel::before {
+    .tile::before {
       content: "";
       position: absolute;
       inset: 0;
@@ -250,27 +250,27 @@
       z-index: 1;
     }
 
-    .kachel:hover::before {
+    .tile:hover::before {
       opacity: 1;
     }
 
-    .kachel:hover {
+    .tile:hover {
       border-color: var(--accent-neon);
       box-shadow: 0 14px 32px -12px rgba(0, 240, 255, 0.32);
       z-index: 3;
     }
 
-    .kachel:active {
+    .tile:active {
       transform: scale(0.985) !important;
     }
 
-    .kachel > * {
+    .tile > * {
       position: relative;
       z-index: 2;
     }
 
-    /* Kachel Color Variants (Metro Accents + Dark Cyber Surfaces) */
-    .kachel--hero {
+    /* Tile Color Variants (Metro Accents + Dark Cyber Surfaces) */
+    .tile--hero {
       grid-column: span 7;
       grid-row: span 2;
       background:
@@ -279,33 +279,33 @@
       padding: 2rem 2.2rem 2.75rem;
     }
 
-    .kachel--cyan {
+    .tile--cyan {
       background: linear-gradient(145deg, #0096c7 0%, #006488 100%);
       border-color: rgba(255, 255, 255, 0.28);
     }
 
-    .kachel--cyan:hover {
+    .tile--cyan:hover {
       border-color: #ffffff;
       box-shadow: 0 14px 34px -10px rgba(0, 240, 255, 0.55);
     }
 
-    .kachel--volt {
+    .tile--volt {
       background: linear-gradient(145deg, #b5e600 0%, #86ad00 100%);
       color: #05080d;
       border-color: rgba(255, 255, 255, 0.35);
     }
 
-    .kachel--volt:hover {
+    .tile--volt:hover {
       border-color: #ffffff;
       box-shadow: 0 14px 34px -10px rgba(204, 255, 0, 0.5);
     }
 
-    .kachel--dark-neon {
+    .tile--dark-neon {
       background: linear-gradient(160deg, #0f172a 0%, #090d16 100%);
       border-color: rgba(56, 189, 248, 0.24);
     }
 
-    .kachel--terminal {
+    .tile--terminal {
       background: #060a11;
       border-color: rgba(0, 240, 255, 0.38);
     }
@@ -318,8 +318,8 @@
     .span-6 { grid-column: span 6; }
     .span-8 { grid-column: span 8; }
 
-    /* Signature Windows 8 Bottom-Left Kachel Footer Bar */
-    .kachel-footer {
+    /* Signature Windows 8 Bottom-Left Tile Footer Bar */
+    .tile-footer {
       position: absolute;
       bottom: 0.65rem;
       left: 1rem;
@@ -336,18 +336,18 @@
       z-index: 4;
     }
 
-    .kachel--volt .kachel-footer {
+    .tile--volt .tile-footer {
       color: #07090e;
       font-weight: 700;
     }
 
-    .kachel-badge-count {
+    .tile-badge-count {
       font-weight: 800;
       font-size: 0.75rem;
       opacity: 0.9;
     }
 
-    /* Hero Kachel Content */
+    /* Hero Tile Content */
     .tag-badge {
       display: inline-flex;
       align-items: center;
@@ -443,7 +443,7 @@
       font-weight: 700;
     }
 
-    /* Live Power Spectrum Bars inside Power Wide Kachel */
+    /* Live Power Spectrum Bars inside Power Wide Tile */
     .power-bars {
       display: grid;
       grid-template-columns: repeat(16, 1fr);
@@ -486,7 +486,7 @@
     }
 
     /* Windows 8 Live Tile Flip / Peek Container for Architecture Pillars */
-    .kachel--live-pillar {
+    .tile--live-pillar {
       padding: 0;
       min-height: 195px;
     }
@@ -521,8 +521,8 @@
       border-top: 2px solid var(--accent-neon);
     }
 
-    .kachel--live-pillar.is-flipped .live-tile-peek,
-    .kachel--live-pillar:hover .live-tile-peek {
+    .tile--live-pillar.is-flipped .live-tile-peek,
+    .tile--live-pillar:hover .live-tile-peek {
       transform: translateY(0%);
     }
 
@@ -564,7 +564,7 @@
       line-height: 1.5;
     }
 
-    /* Terminal / Git Kachel */
+    /* Terminal / Git Tile */
     .cta-header {
       display: flex;
       justify-content: space-between;
@@ -625,8 +625,8 @@
       color: #000;
     }
 
-    /* Action CTA Kacheln (Star / Contribute) */
-    .action-kachel-center {
+    /* Action CTA Tiles (Star / Contribute) */
+    .action-tile-center {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -637,12 +637,12 @@
       padding-top: 0.5rem;
     }
 
-    .action-kachel-icon {
+    .action-tile-icon {
       font-size: 2.35rem;
       line-height: 1;
     }
 
-    .action-kachel-title {
+    .action-tile-title {
       font-family: var(--display);
       font-weight: 700;
       font-size: 1.2rem;
@@ -675,13 +675,13 @@
       text-decoration: underline;
     }
 
-    /* Responsive Kachel Layout */
+    /* Responsive Tile Layout */
     @media (max-width: 1024px) {
-      .kachel--hero { grid-column: span 12; }
+      .tile--hero { grid-column: span 12; }
       .span-5, .span-4, .span-3, .span-2, .span-6, .span-8 {
         grid-column: span 6;
       }
-      .kachel-group-bar { display: none; }
+      .tile-group-bar { display: none; }
       .hud-telemetry .telemetry-hide-md { display: none; }
     }
 
@@ -705,7 +705,7 @@
         <div class="win8-start-title">Start</div>
         <div class="hud-brand">
           <div class="hud-status-dot"></div>
-          <div class="hud-logo">RIDRS<span>//</span>KACHEL</div>
+          <div class="hud-logo">RIDRS<span>//</span>TILE</div>
         </div>
       </div>
 
@@ -733,16 +733,16 @@
     </header>
 
     <!-- Windows 8 Panorama Group Titles -->
-    <div class="kachel-group-bar">
+    <div class="tile-group-bar">
       <div class="group-label-left">// 01 MISSION &amp; MANIFESTO</div>
-      <div class="group-label-right">// 02 LIVE TELEMETRY KACHELN</div>
+      <div class="group-label-right">// 02 LIVE TELEMETRY TILES</div>
     </div>
 
-    <!-- Main Windows 8 Kachel Mosaic -->
-    <main class="kachel-board" id="kachel-board">
+    <!-- Main Windows 8 Tile Mosaic -->
+    <main class="tile-board" id="tile-board">
 
-      <!-- HERO KACHEL (7x2) -->
-      <section class="kachel kachel--hero">
+      <!-- HERO TILE (7x2) -->
+      <section class="tile tile--hero">
         <div>
           <div class="tag-badge">
             <span>⚡</span> The Open Protocol For Cycling
@@ -755,14 +755,14 @@
             Stay tuned for <strong>RIDRS</strong>: the ultimate open-source, fully extendable, and crowd-coded cycling &amp; indoor cycling platform. Engineered for real riders, modders, and developers who refuse subscription lock-ins.
           </p>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>RIDRS.CORE // MANIFESTO</span>
-          <span class="kachel-badge-count">AGPLv3 + APACHE-2.0</span>
+          <span class="tile-badge-count">AGPLv3 + APACHE-2.0</span>
         </div>
       </section>
 
-      <!-- TELEMETRY WIDE KACHEL: POWER OUTPUT (5x1) -->
-      <section class="kachel kachel--cyan span-5">
+      <!-- TELEMETRY WIDE TILE: POWER OUTPUT (5x1) -->
+      <section class="tile tile--cyan span-5">
         <div class="metric-header">
           <span>Trainer Power Output</span>
           <span class="metric-zone-pill" id="power-zone">Z4 // THRESHOLD</span>
@@ -771,14 +771,14 @@
           <span id="metric-power">342</span><span class="dial-unit">WATTS</span>
         </div>
         <div class="power-bars" id="power-bars" aria-hidden="true"></div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>FTMS.POWER.STREAM</span>
-          <span class="kachel-badge-count">LIVE</span>
+          <span class="tile-badge-count">LIVE</span>
         </div>
       </section>
 
-      <!-- TELEMETRY MEDIUM KACHEL: VIRTUAL VELOCITY (3x1) -->
-      <section class="kachel kachel--dark-neon span-3">
+      <!-- TELEMETRY MEDIUM TILE: VIRTUAL VELOCITY (3x1) -->
+      <section class="tile tile--dark-neon span-3">
         <div class="metric-header">
           <span>Virtual Velocity</span>
           <span style="color: var(--accent-neon)">Aero Sim</span>
@@ -791,14 +791,14 @@
             <div class="mini-meter-fill" id="speed-bar"></div>
           </div>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>PHYSICS // SPEED</span>
-          <span class="kachel-badge-count">01</span>
+          <span class="tile-badge-count">01</span>
         </div>
       </section>
 
-      <!-- TELEMETRY MEDIUM KACHEL: PEDAL CADENCE (2x1) -->
-      <section class="kachel kachel--dark-neon span-2">
+      <!-- TELEMETRY MEDIUM TILE: PEDAL CADENCE (2x1) -->
+      <section class="tile tile--dark-neon span-2">
         <div class="metric-header">
           <span>Cadence</span>
         </div>
@@ -810,14 +810,14 @@
             <div class="mini-meter-fill mini-meter-fill--volt" id="cadence-bar"></div>
           </div>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>CRANK // RPM</span>
-          <span class="kachel-badge-count">02</span>
+          <span class="tile-badge-count">02</span>
         </div>
       </section>
 
       <!-- ARCHITECTURE PILLAR 1 (3x1 Live Flip Tile) -->
-      <article class="kachel kachel--live-pillar span-3" data-live-tile>
+      <article class="tile tile--live-pillar span-3" data-live-tile>
         <div class="live-tile-viewport">
           <div class="live-tile-face">
             <span class="pillar-icon">🔓</span>
@@ -829,14 +829,14 @@
             <div class="peek-detail">Core &amp; Official Plugins under AGPL-3.0-or-later. Reusable SDK contracts under Apache-2.0. Zero paywalls.</div>
           </div>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>PILLAR // LIBRE</span>
-          <span class="kachel-badge-count">01</span>
+          <span class="tile-badge-count">01</span>
         </div>
       </article>
 
       <!-- ARCHITECTURE PILLAR 2 (3x1 Live Flip Tile) -->
-      <article class="kachel kachel--live-pillar span-3" data-live-tile>
+      <article class="tile tile--live-pillar span-3" data-live-tile>
         <div class="live-tile-viewport">
           <div class="live-tile-face">
             <span class="pillar-icon">🛠️</span>
@@ -848,14 +848,14 @@
             <div class="peek-detail">Every vertical use case starts with executable Cucumber scenarios and deterministic clock-driven specs.</div>
           </div>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>PILLAR // COMMUNITY</span>
-          <span class="kachel-badge-count">02</span>
+          <span class="tile-badge-count">02</span>
         </div>
       </article>
 
       <!-- ARCHITECTURE PILLAR 3 (3x1 Live Flip Tile) -->
-      <article class="kachel kachel--live-pillar span-3" data-live-tile>
+      <article class="tile tile--live-pillar span-3" data-live-tile>
         <div class="live-tile-viewport">
           <div class="live-tile-face">
             <span class="pillar-icon">🧩</span>
@@ -867,14 +867,14 @@
             <div class="peek-detail">Plugins communicate strictly via Zod-validated EventBus &amp; Capabilities. Enforced by dependency-cruiser.</div>
           </div>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>PILLAR // PLUGINS</span>
-          <span class="kachel-badge-count">03</span>
+          <span class="tile-badge-count">03</span>
         </div>
       </article>
 
       <!-- ARCHITECTURE PILLAR 4 (3x1 Live Flip Tile) -->
-      <article class="kachel kachel--live-pillar span-3" data-live-tile>
+      <article class="tile tile--live-pillar span-3" data-live-tile>
         <div class="live-tile-viewport">
           <div class="live-tile-face">
             <span class="pillar-icon">🌐</span>
@@ -886,14 +886,14 @@
             <div class="peek-detail">Domain simulation runs headlessly at deterministic ticks; 3D worlds and HUDs plug in as pure consumers.</div>
           </div>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>PILLAR // WORLDS</span>
-          <span class="kachel-badge-count">04</span>
+          <span class="tile-badge-count">04</span>
         </div>
       </article>
 
-      <!-- TERMINAL / GIT CLONE WIDE KACHEL (8x1) -->
-      <section class="kachel kachel--terminal span-8">
+      <!-- TERMINAL / GIT CLONE WIDE TILE (8x1) -->
+      <section class="tile tile--terminal span-8">
         <div>
           <div class="cta-header">
             <div class="cta-title">Join The Build on GitHub</div>
@@ -907,33 +907,33 @@
             <button class="copy-btn" id="copy-btn" onclick="copyGitCmd()">Copy</button>
           </div>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>GIT // WORKSPACE</span>
-          <span class="kachel-badge-count">PNPM + TSX</span>
+          <span class="tile-badge-count">PNPM + TSX</span>
         </div>
       </section>
 
-      <!-- ACTION KACHEL: STAR ON GITHUB (2x1 Volt Metro Tile) -->
-      <a href="https://github.com/ridrs/ridrs.app" target="_blank" rel="noopener noreferrer" class="kachel kachel--volt span-2">
-        <div class="action-kachel-center">
-          <span class="action-kachel-icon">⭐</span>
-          <span class="action-kachel-title">Star On GitHub</span>
+      <!-- ACTION TILE: STAR ON GITHUB (2x1 Volt Metro Tile) -->
+      <a href="https://github.com/ridrs/ridrs.app" target="_blank" rel="noopener noreferrer" class="tile tile--volt span-2">
+        <div class="action-tile-center">
+          <span class="action-tile-icon">⭐</span>
+          <span class="action-tile-title">Star On GitHub</span>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>GITHUB // REPO</span>
-          <span class="kachel-badge-count">↗</span>
+          <span class="tile-badge-count">↗</span>
         </div>
       </a>
 
-      <!-- ACTION KACHEL: CONTRIBUTE IDEAS (2x1 Cyan Metro Tile) -->
-      <a href="https://github.com/ridrs/ridrs.app/issues" target="_blank" rel="noopener noreferrer" class="kachel kachel--cyan span-2">
-        <div class="action-kachel-center">
-          <span class="action-kachel-icon">💬</span>
-          <span class="action-kachel-title">Contribute Ideas</span>
+      <!-- ACTION TILE: CONTRIBUTE IDEAS (2x1 Cyan Metro Tile) -->
+      <a href="https://github.com/ridrs/ridrs.app/issues" target="_blank" rel="noopener noreferrer" class="tile tile--cyan span-2">
+        <div class="action-tile-center">
+          <span class="action-tile-icon">💬</span>
+          <span class="action-tile-title">Contribute Ideas</span>
         </div>
-        <div class="kachel-footer">
+        <div class="tile-footer">
           <span>ISSUES // RFC</span>
-          <span class="kachel-badge-count">↗</span>
+          <span class="tile-badge-count">↗</span>
         </div>
       </a>
 
@@ -941,7 +941,7 @@
 
     <!-- Footer -->
     <footer>
-      <div>RIDRS &copy; 2026 // The Open-Source Cycling Movement (Windows 8 Kachel Fusion Layout)</div>
+      <div>RIDRS &copy; 2026 // The Open-Source Cycling Movement (Windows 8 Tile Fusion Layout)</div>
       <div>
         <a href="https://github.com/ridrs/ridrs.app" target="_blank" rel="noopener">github.com/ridrs/ridrs.app</a>
       </div>
@@ -965,7 +965,7 @@
       });
     }
 
-    // Initialize 16 live power spectrum bars inside the Power Kachel
+    // Initialize 16 live power spectrum bars inside the Power Tile
     const powerBarsContainer = document.getElementById("power-bars");
     const barCount = 16;
     const barHistory = Array.from({ length: barCount }, () => 300 + Math.random() * 80);
@@ -1050,8 +1050,8 @@
       }
     }
 
-    // Windows 8 Authentic 3D Edge-Tilt & Reveal Effect on Kacheln
-    document.querySelectorAll(".kachel").forEach((tile) => {
+    // Windows 8 Authentic 3D Edge-Tilt & Reveal Effect on Tiles
+    document.querySelectorAll(".tile").forEach((tile) => {
       tile.addEventListener("mousemove", (e) => {
         const rect = tile.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -1061,7 +1061,7 @@
 
         const normX = (x / rect.width - 0.5) * 2;
         const normY = (y / rect.height - 0.5) * 2;
-        const maxTilt = tile.classList.contains("kachel--hero") ? 2.2 : 4.5;
+        const maxTilt = tile.classList.contains("tile--hero") ? 2.2 : 4.5;
 
         const rotateY = normX * maxTilt;
         const rotateX = -normY * maxTilt;

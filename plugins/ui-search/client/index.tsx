@@ -2,9 +2,11 @@
 
 import { ActionButton, AreaPage, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { CATALOGUE, type Result, type ResultKind, search } from './catalogue.ts';
+import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const SEARCH = new URL('./assets/icons/search.svg', import.meta.url).href;
@@ -19,11 +21,7 @@ const CSS = `
   background: var(--ridrs-surface, #131c2e); }
 `;
 
-const KINDS: readonly { readonly kind: ResultKind; readonly label: string }[] = [
-  { kind: 'route', label: 'Routes' },
-  { kind: 'workout', label: 'Workouts' },
-  { kind: 'event', label: 'Events' },
-];
+const KINDS: readonly ResultKind[] = ['route', 'workout', 'event'];
 
 /** The chosen kinds and the last searches that led somewhere, kept at once (ADR 0059). */
 const useSearch = userDocument(
@@ -38,6 +36,7 @@ const useSearch = userDocument(
 );
 
 function SearchView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [state, change] = useSearch(ctx);
   const [query, setQuery] = useState('');
   const field = useRef<HTMLInputElement>(null);
@@ -51,22 +50,22 @@ function SearchView({ ctx }: { readonly ctx: UiContext }) {
   };
 
   return (
-    <AreaPage title="Search" intro="One search for routes, workouts and events.">
+    <AreaPage title={text.title} intro={text.intro}>
       <style>{CSS}</style>
       <input
         ref={field}
         type="search"
         className="se-field"
-        aria-label="Search"
-        placeholder="Route, workout or event"
+        aria-label={text.field}
+        placeholder={text.placeholder}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
-      <div className="pv-row" aria-label="Kinds">
-        {KINDS.map(({ kind, label }) => (
+      <div className="pv-row" aria-label={text.kinds}>
+        {KINDS.map((kind) => (
           <Toggle
             key={kind}
-            label={label}
+            label={text.kindsPlural[kind]}
             on={state.kinds.includes(kind)}
             onChange={(on) =>
               change((s) => ({ ...s, kinds: on ? [...s.kinds, kind] : s.kinds.filter((k) => k !== kind) }))
@@ -74,7 +73,7 @@ function SearchView({ ctx }: { readonly ctx: UiContext }) {
           />
         ))}
       </div>
-      <p className="pv-muted">Filters by duration, TSS, zone, gradient and country, and sorting, come later.</p>
+      <p className="pv-muted">{text.later}</p>
       <div className="se-results" data-testid="search-results">
         {results.map((result) => (
           <button
@@ -86,15 +85,15 @@ function SearchView({ ctx }: { readonly ctx: UiContext }) {
           >
             <strong>{result.name}</strong>
             <span className="pv-muted">
-              {KINDS.find((k) => k.kind === result.kind)?.label.slice(0, -1)} · {result.detail}
+              {text.kindSingular[result.kind]} · {text.details[result.name] ?? result.detail}
             </span>
           </button>
         ))}
-        {query.trim() !== '' && results.length === 0 ? <p className="pv-muted">Nothing found.</p> : null}
+        {query.trim() !== '' && results.length === 0 ? <p className="pv-muted">{text.nothing}</p> : null}
       </div>
       {query.trim() === '' && state.recent.length > 0 ? (
         <section className="pv-section">
-          <h2>Recent searches</h2>
+          <h2>{text.recent}</h2>
           <div className="pv-row">
             {state.recent.map((recent) => (
               <button key={recent} type="button" className="pv-chip" onClick={() => setQuery(recent)}>
@@ -109,6 +108,8 @@ function SearchView({ ctx }: { readonly ctx: UiContext }) {
 }
 
 export const SearchScreen = reactComponent((ctx) => <SearchView ctx={ctx} />);
-export const SearchAction = reactComponent((ctx) => (
-  <ActionButton ctx={ctx} screen="search" label="Search" icon={SEARCH} />
-));
+function SearchActionView({ ctx }: { readonly ctx: UiContext }) {
+  return <ActionButton ctx={ctx} screen="search" label={useMessages(ctx, messages).title} icon={SEARCH} />;
+}
+
+export const SearchAction = reactComponent((ctx) => <SearchActionView ctx={ctx} />);

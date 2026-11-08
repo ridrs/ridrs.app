@@ -26,6 +26,8 @@ export default defineConfig({
       '@ridrs/recording': workspace('packages/recording/src/index.ts'),
       '@ridrs/ui-bridge': workspace('packages/ui-bridge/src/index.ts'),
       '@ridrs/ui-preview': workspace('packages/ui-preview/src/index.ts'),
+      // Before the package itself: an alias also matches the package's subpaths.
+      '@ridrs/ui-sdk/react': workspace('packages/ui-sdk/src/react.ts'),
       '@ridrs/ui-sdk': workspace('packages/ui-sdk/src/index.ts'),
       '@ridrs/ui-shell': workspace('packages/ui-shell/src/index.ts'),
     },

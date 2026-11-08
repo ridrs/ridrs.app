@@ -28,6 +28,7 @@
       ]
     },
     "state": [
+      "app.language",
       "route.offer"
     ]
   }

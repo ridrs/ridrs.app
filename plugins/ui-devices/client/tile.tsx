@@ -2,8 +2,10 @@
 
 import type { DeviceStatus } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { requestDetails } from './details-request.ts';
 import { type DeviceRow, describeDevices, type Tone } from './devices.ts';
+import { messages } from './i18n/index.ts';
 import { KindIcon } from './theme.tsx';
 
 /** The screen the tile opens. */
@@ -83,16 +85,17 @@ export function DevicesTileView({
   readonly ctx: UiContext;
   readonly devices: readonly DeviceStatus[];
 }) {
+  const text = useMessages(ctx, messages);
   const openSetup = () => ctx.navigate(SETUP);
-  const [power, trainer, heartRate] = describeDevices(devices);
+  const [power, trainer, heartRate] = describeDevices(devices, {}, text);
   const rows = devices.length === 0 ? [] : [trainer, power, heartRate].filter((row) => row !== undefined);
 
   return (
-    <section className="dt-tile" data-testid="devices-tile" aria-label="Devices">
+    <section className="dt-tile" data-testid="devices-tile" aria-label={text.devices}>
       <style>{CSS}</style>
       <h2 className="dt-title">
         <i data-tone={overall(rows)} aria-hidden="true" />
-        Devices
+        {text.devices}
       </h2>
       {rows.map((row) => (
         <Row key={row.kind} ctx={ctx} row={row} />
@@ -103,7 +106,7 @@ export function DevicesTileView({
         data-testid="devices-open"
         onClick={openSetup}
       >
-        {rows.length === 0 ? 'Set up your devices' : 'All devices'}
+        {rows.length === 0 ? text.setUp : text.allDevices}
       </button>
     </section>
   );

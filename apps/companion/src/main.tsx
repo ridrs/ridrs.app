@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { suppressBrowserChrome } from './browser-chrome.ts';
 import { startCompanion } from './companion.ts';
 import { CompanionScreen } from './companion-screen.tsx';
+import { messages, phoneLanguage } from './i18n/index.ts';
 import {
   companionName,
   createCompanionIpc,
@@ -15,6 +16,11 @@ import {
   keepScreenOn,
   secretPairingStore,
 } from './platform.ts';
+
+/** The phone's language decides the companion's (ADR 0072). */
+const language = phoneLanguage(navigator.languages ?? [navigator.language]);
+const text = messages[language];
+document.documentElement.lang = language;
 
 async function main(): Promise<void> {
   const root = document.getElementById('companion');
@@ -49,13 +55,15 @@ async function main(): Promise<void> {
   window.addEventListener('pagehide', () => {
     void companion.stop();
   });
-  createRoot(root).render(<CompanionScreen companion={companion} dummyPanel={dummyPanel} />);
+  createRoot(root).render(
+    <CompanionScreen companion={companion} text={text} dummyPanel={dummyPanel} />,
+  );
 }
 
 main().catch((error: unknown) => {
   console.error('ridrs companion failed to start', error);
   const root = document.getElementById('companion');
   if (root) {
-    root.textContent = `The companion could not start: ${String(error)}`;
+    root.textContent = text.couldNotStart(String(error));
   }
 });

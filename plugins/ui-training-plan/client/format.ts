@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { TrainingAccount, WorkoutInterval, WorkoutPower, WorkoutStep } from '@ridrs/contracts';
+import type { Messages } from './i18n/index.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -10,21 +11,20 @@ function localMidnight(date: string): Date {
   return new Date(y, m - 1, d);
 }
 
-const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-
-/** "Today", "Tomorrow", else "Fri 6 Nov". */
-export function dayLabel(date: string, now: number): string {
+/** "Today", "Tomorrow", else "Fri 6 Nov", in the rider's language. */
+export function dayLabel(date: string, now: number, text: Messages): string {
   const today = new Date(now);
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const day = localMidnight(date);
   // Rounded: a day with a clock change is 23 or 25 hours long.
   const days = Math.round((day.getTime() - startOfToday) / DAY_MS);
   if (days === 0) {
-    return 'Today';
+    return text.today;
   }
   if (days === 1) {
-    return 'Tomorrow';
+    return text.tomorrow;
   }
+  const weekday = new Intl.DateTimeFormat(text.dateLocale, { weekday: 'short', day: 'numeric', month: 'short' });
   return weekday.format(day).replace(',', '');
 }
 
@@ -55,12 +55,12 @@ export function powerLabel(power: WorkoutPower): string {
   return `${percent} · ${range(power.lowWatts, power.highWatts, 'W')}`;
 }
 
-export function stepName(step: WorkoutInterval): string {
+export function stepName(step: WorkoutInterval, text: Messages): string {
   if (step.phase === 'warm-up') {
-    return 'Warm-up';
+    return text.warmUp;
   }
   if (step.phase === 'cool-down') {
-    return 'Cool-down';
+    return text.coolDown;
   }
   return step.text ?? '';
 }
@@ -75,17 +75,6 @@ export function unrolled(steps: readonly WorkoutStep[]): WorkoutInterval[] {
 }
 
 /** What the panel says about the account, if anything. */
-export function accountMessage(account: TrainingAccount): string | undefined {
-  switch (account.reason) {
-    case 'sign-in-cancelled':
-      return 'Sign-in cancelled';
-    case 'sign-in-rejected':
-      return 'Sign-in failed. Please try again.';
-    case 'token-rejected':
-      return 'intervals.icu no longer accepts this connection.';
-    case 'unreachable':
-      return 'intervals.icu could not be reached.';
-    default:
-      return undefined;
-  }
+export function accountMessage(account: TrainingAccount, text: Messages): string | undefined {
+  return account.reason === undefined ? undefined : text.accountReasons[account.reason];
 }

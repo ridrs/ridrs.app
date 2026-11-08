@@ -24,6 +24,9 @@
         "metric.cadence"
       ],
       "publish": []
-    }
+    },
+    "state": [
+      "app.language"
+    ]
   }
 }

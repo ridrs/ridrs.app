@@ -2,9 +2,11 @@
 
 import { bridgeCompanionsState, bridgePairingState, bridgePairService } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderSVG } from 'uqr';
+import { type Messages, messages } from './i18n/index.ts';
 
 interface Companion {
   readonly companionId: string;
@@ -38,9 +40,11 @@ const HEADING = { margin: 0, fontSize: 15, fontWeight: 700 } as const;
  * pairs, with nothing to press; Enter tries a full code again.
  */
 function PairForm({
+  text,
   companion,
   onPair,
 }: {
+  readonly text: Messages;
   readonly companion: Companion;
   readonly onPair: (address: string, code: string) => void;
 }) {
@@ -76,7 +80,7 @@ function PairForm({
         {companion.name}
       </span>
       <input
-        aria-label={`Pairing code for ${companion.name}`}
+        aria-label={text.codeFor(companion.name)}
         inputMode="numeric"
         autoComplete="one-time-code"
         pattern={`[0-9]{${CODE_LENGTH}}`}
@@ -102,13 +106,13 @@ function PairForm({
 }
 
 /** The pairing QR code; the companion app scans it. The URI stays readable for tests and tools. */
-function PairingQr({ uri }: { readonly uri: string }) {
+function PairingQr({ uri, text }: { readonly uri: string; readonly text: Messages }) {
   const svg = renderSVG(uri, { ecc: 'M', border: 2, pixelSize: 6 });
   return (
     <img
       data-testid="pairing-qr"
       data-uri={uri}
-      alt="Pairing QR code: scan it with the ridrs companion app"
+      alt={text.qrAlt}
       src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
       style={{ width: 132, height: 132, background: '#fff', borderRadius: 8 }}
     />
@@ -121,6 +125,7 @@ function PairingQr({ uri }: { readonly uri: string }) {
  * Nothing once a companion is paired; the setup shows its status and its buttons.
  */
 function BridgePairingView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
   const [companions, setCompanions] = useState<readonly Companion[]>([]);
   const [offer, setOffer] = useState<string | null>(null);
   // App state (ADR 0069): the companions found and the QR code on offer, if any.
@@ -152,24 +157,24 @@ function BridgePairingView({ ctx }: { readonly ctx: UiContext }) {
       data-testid="bridge-pairing"
       style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 10 }}
     >
-      <div role="group" aria-label="Scan the QR code" style={TILE}>
-        <h4 style={HEADING}>Scan the QR code</h4>
-        <PairingQr uri={offer} />
+      <div role="group" aria-label={text.scan} style={TILE}>
+        <h4 style={HEADING}>{text.scan}</h4>
+        <PairingQr uri={offer} text={text} />
       </div>
       <span
         aria-hidden
         style={{ alignSelf: 'center', color: COLORS.muted, fontSize: 13, fontStyle: 'normal' }}
       >
-        or
+        {text.or}
       </span>
-      <div role="group" aria-label="Enter the code" style={TILE}>
-        <h4 style={HEADING}>Enter the code</h4>
+      <div role="group" aria-label={text.enter} style={TILE}>
+        <h4 style={HEADING}>{text.enter}</h4>
         {companions.map((c) => (
-          <PairForm key={c.address} companion={c} onPair={pair} />
+          <PairForm key={c.address} text={text} companion={c} onPair={pair} />
         ))}
         {companions.length === 0 && (
           <span style={{ color: COLORS.muted, fontSize: 13, textAlign: 'center' }}>
-            Looking for phones on this Wi-Fi…
+            {text.looking}
           </span>
         )}
       </div>

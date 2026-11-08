@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type Language,
   type RecoverableRide,
   recordingContinueService,
   recordingFinishService,
   recordingRecoverableState,
 } from '@ridrs/contracts';
-import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { type Messages, messages } from './i18n/index.ts';
 
 const CSS = `
 .rr-card { display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
@@ -25,10 +28,10 @@ const CSS = `
 .rr-button:focus-visible { outline: 2px solid #8dff2a; outline-offset: 2px; }
 `;
 
-function facts(ride: RecoverableRide): string {
+function facts(ride: RecoverableRide, text: Messages, language: Language): string {
   const minutes = Math.max(0, Math.round((ride.lastRecordAt - ride.startedAt) / 60_000));
-  const distance = ride.distance === undefined ? '' : ` · ${(ride.distance / 1000).toFixed(2)} km`;
-  return `${minutes} min${distance}`;
+  const km = ride.distance === undefined ? undefined : localizeNumber((ride.distance / 1000).toFixed(2), language);
+  return text.facts(minutes, km);
 }
 
 /**
@@ -36,6 +39,8 @@ function facts(ride: RecoverableRide): string {
  * so Enter continues. The composition root continues it; the recorder finishes it.
  */
 function InterruptedRideView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
   const [ride, setRide] = useState<RecoverableRide>();
   const [asked, setAsked] = useState(false);
   const continueButton = useRef<HTMLButtonElement>(null);
@@ -66,10 +71,10 @@ function InterruptedRideView({ ctx }: { readonly ctx: UiContext }) {
     return null;
   }
   return (
-    <section className="rr-card" aria-label="Interrupted ride">
+    <section className="rr-card" aria-label={text.title}>
       <style>{CSS}</style>
-      <div className="rr-title">Your last ride was interrupted</div>
-      <div className="rr-facts">{facts(ride)}</div>
+      <div className="rr-title">{text.interrupted}</div>
+      <div className="rr-facts">{facts(ride, text, language)}</div>
       <div className="rr-actions">
         <button
           ref={continueButton}
@@ -78,7 +83,7 @@ function InterruptedRideView({ ctx }: { readonly ctx: UiContext }) {
           disabled={asked}
           onClick={() => ask(() => ctx.call(recordingContinueService, { sessionId: ride.sessionId }))}
         >
-          Continue ride
+          {text.continue}
         </button>
         <button
           type="button"
@@ -86,7 +91,7 @@ function InterruptedRideView({ ctx }: { readonly ctx: UiContext }) {
           disabled={asked}
           onClick={() => ask(() => ctx.call(recordingFinishService, { key: ride.sessionId }))}
         >
-          Finish ride
+          {text.finish}
         </button>
       </div>
     </section>
