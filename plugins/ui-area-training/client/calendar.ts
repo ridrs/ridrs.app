@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type { PlannedWorkout } from '@ridrs/contracts';
+
 export const WEEKDAYS = [
   'Monday',
   'Tuesday',
@@ -103,4 +105,32 @@ export function undo(calendar: Calendar): Calendar {
 /** Today's weekday in the local time zone. */
 export function weekdayOf(date: Date): Weekday {
   return WEEKDAYS[(date.getDay() + 6) % 7] ?? 'Monday';
+}
+
+/**
+ * The workouts of the calendar as the data type `training.calendar` has them (ADR 0075): the
+ * entries of kind workout, each on its day of the week that holds `today` (`YYYY-MM-DD`, Monday
+ * first), from today on. Rest days, notes and outdoor rides are no planned workouts, and the
+ * entries have no steps.
+ */
+export function plannedWorkouts(entries: readonly Entry[], today: string): PlannedWorkout[] {
+  const [year = 0, month = 1, day = 1] = today.split('-').map(Number);
+  const monday = new Date(Date.UTC(year, month - 1, day));
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  return entries
+    .filter((entry) => entry.kind === 'workout')
+    .map((entry) => {
+      const date = new Date(monday);
+      date.setUTCDate(monday.getUTCDate() + WEEKDAYS.indexOf(entry.day));
+      return { entry, date: date.toISOString().slice(0, 10) };
+    })
+    .filter(({ date }) => date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ entry, date }) => ({
+      id: entry.id,
+      date,
+      name: entry.title,
+      sport: 'ride' as const,
+      steps: [],
+    }));
 }

@@ -23,6 +23,7 @@ export const en = {
   connectedAs: (athlete?: string) => (athlete ? `Connected as ${athlete}` : 'Connected'),
   notConnected: 'Not connected',
   offline: 'Offline',
+  thisDevice: 'ridrs (this device)',
   nextWorkoutOn: (name: string, day: string) => `Next workout: ${name}, ${day}`,
   nonePlanned: 'No workout planned',
   loading: 'Loading your plan',

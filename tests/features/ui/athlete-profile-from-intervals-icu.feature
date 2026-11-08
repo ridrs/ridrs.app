@@ -38,7 +38,7 @@ Feature: intervals.icu is a source of the athlete profile
     When I press "Settings"
     Then the row "Athlete profile" offers "ridrs (this device), intervals.icu"
     And the row "Athlete profile" has "ridrs (this device)" chosen
-    When I press "intervals.icu"
+    When I press the chip "intervals.icu" of the row "Athlete profile"
     Then the row "Athlete profile" shows the status "Not available"
 
   Scenario: A choice the rider made is kept at the next start
@@ -129,5 +129,5 @@ Feature: intervals.icu is a source of the athlete profile
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Settings"
-    And I press "intervals.icu"
+    And I press the chip "intervals.icu" of the row "Athlete profile"
     Then the row "Athlete profile" shows the status "Not available"

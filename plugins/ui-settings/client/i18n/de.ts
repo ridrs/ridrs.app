@@ -40,6 +40,7 @@ export const de: Messages = {
   licenseName: (license: string) => `Lizenz: ${license}`,
   dataSources: 'Datenquellen',
   athleteProfile: 'Athletenprofil',
+  plannedWorkouts: 'Geplante Trainings',
   thisDevice: 'ridrs (dieses Gerät)',
   status: (status: DataSourceStatus, loadedAt?: string) =>
     ({

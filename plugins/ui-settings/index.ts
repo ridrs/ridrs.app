@@ -10,6 +10,7 @@ import {
   DEFAULT_LANGUAGE,
   DEFAULT_PROVIDER,
   type DataSource,
+  type DataSourceStatus,
   type AthleteProfile,
   dataSelectService,
   dataSourceState,
@@ -18,6 +19,7 @@ import {
   languageSchema,
   type RideAthlete,
   trainingAccountState,
+  trainingCalendarState,
 } from '@ridrs/contracts';
 import { z } from 'zod';
 import { DATA_SOURCES_DOCUMENT } from './data-sources.ts';
@@ -29,8 +31,9 @@ const languageDocument = {
   schema: z.object({ language: languageSchema }).strict(),
 };
 
-/** The data type with a choice (ADR 0075); the calendar joins with its stage. */
+/** The data types with a choice (ADR 0075); the library has none. */
 const ATHLETE_PROFILE = 'athlete.profile';
+const DATA_TYPES: readonly string[] = [ATHLETE_PROFILE, 'training.calendar'];
 
 /** What a ride uses of a source's profile: the values that change the ride, never the name. */
 function rideAthleteOf(source: DataSource<AthleteProfile>): RideAthlete {
@@ -70,7 +73,7 @@ export default definePlugin({
     // service the rider already connected, so they keep seeing what they saw before.
     let firstStart = document === undefined;
     let started = false;
-    let inUse: string | undefined;
+    const inUse = new Map<string, string>();
     let handedOver: string | undefined;
 
     const keepChoices = () =>
@@ -78,24 +81,35 @@ export default definePlugin({
         .write({ sources: Object.fromEntries(chosen) })
         .catch((error: unknown) => ctx.logger.warn(`Could not keep the data sources: ${String(error)}`));
 
+    /** The providers of each data type with a choice. */
+    const providersOf = (type: string): ReadonlyMap<string, { readonly status: DataSourceStatus }> =>
+      type === ATHLETE_PROFILE
+        ? ctx.state.entries(athleteProfileState)
+        : ctx.state.entries(trainingCalendarState);
+
     /**
-     * Once every provider has started and none still loads: the connected service of the
-     * profile, else nothing. The document is written either way, so it happens once: connecting
-     * a service later changes no choice.
+     * Once every provider has started and none still loads: the connected service of each data
+     * type, else nothing. The document is written either way, so it happens once: connecting a
+     * service later changes no choice.
      */
     const chooseFirst = (): void => {
-      const providers = ctx.state.entries(athleteProfileState);
-      if ([...providers.values()].some((source) => source.status === 'loading')) {
+      if (
+        DATA_TYPES.some((type) =>
+          [...providersOf(type).values()].some((source) => source.status === 'loading'),
+        )
+      ) {
         return;
       }
       firstStart = false;
       const accounts = ctx.state.entries(trainingAccountState);
-      const connected = [...providers.keys()]
-        .filter((provider) => provider !== DEFAULT_PROVIDER)
-        .sort()
-        .find((provider) => accounts.get(provider)?.state === 'connected');
-      if (connected !== undefined) {
-        chosen.set(ATHLETE_PROFILE, connected);
+      for (const type of DATA_TYPES) {
+        const connected = [...providersOf(type).keys()]
+          .filter((provider) => provider !== DEFAULT_PROVIDER)
+          .sort()
+          .find((provider) => accounts.get(provider)?.state === 'connected');
+        if (connected !== undefined) {
+          chosen.set(type, connected);
+        }
       }
       void keepChoices();
     };
@@ -105,14 +119,18 @@ export default definePlugin({
       if (started && firstStart) {
         chooseFirst();
       }
-      const entries = ctx.state.entries(athleteProfileState);
-      const choice = chosen.get(ATHLETE_PROFILE) ?? DEFAULT_PROVIDER;
-      const provider = !started || entries.has(choice) ? choice : DEFAULT_PROVIDER;
-      if (provider !== inUse) {
-        inUse = provider;
-        ctx.state.set(dataSourceState, ATHLETE_PROFILE, { provider });
+      for (const type of DATA_TYPES) {
+        const entries = providersOf(type);
+        const choice = chosen.get(type) ?? DEFAULT_PROVIDER;
+        const provider = !started || entries.has(choice) ? choice : DEFAULT_PROVIDER;
+        if (provider !== inUse.get(type)) {
+          inUse.set(type, provider);
+          ctx.state.set(dataSourceState, type, { provider });
+        }
       }
-      const source = entries.get(provider);
+      // The profile of the provider in use goes to the next ride.
+      const profiles = ctx.state.entries(athleteProfileState);
+      const source = profiles.get(inUse.get(ATHLETE_PROFILE) ?? DEFAULT_PROVIDER);
       if (!started || !source) {
         return;
       }
@@ -126,6 +144,7 @@ export default definePlugin({
 
     evaluate();
     ctx.state.watch(athleteProfileState, () => evaluate());
+    ctx.state.watch(trainingCalendarState, () => evaluate());
     // Providers start in turn: the choice counts as gone only when all of them have started.
     ctx.events.subscribe(hostStartedEvent, () => {
       started = true;
@@ -140,10 +159,10 @@ export default definePlugin({
     });
 
     ctx.services.provide(dataSelectService, async ({ key, provider }) => {
-      if (key !== ATHLETE_PROFILE) {
+      if (!DATA_TYPES.includes(key)) {
         throw new Error(`"${key}" is no data type with a choice`);
       }
-      if (!ctx.state.entries(athleteProfileState).has(provider)) {
+      if (!providersOf(key).has(provider)) {
         throw new Error(`"${provider}" does not offer ${key}`);
       }
       chosen.set(key, provider);

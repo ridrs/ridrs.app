@@ -447,6 +447,7 @@ export {
   type TrainingUpload,
   trainingAccountSchema,
   trainingAccountState,
+  trainingCalendarHandOverService,
   trainingCalendarSchema,
   trainingCalendarState,
   trainingCalendarType,

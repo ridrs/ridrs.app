@@ -23,6 +23,7 @@ export const de: Messages = {
   connectedAs: (athlete?: string) => (athlete ? `Verbunden als ${athlete}` : 'Verbunden'),
   notConnected: 'Nicht verbunden',
   offline: 'Offline',
+  thisDevice: 'ridrs (dieses Gerät)',
   nextWorkoutOn: (name: string, day: string) => `Nächstes Workout: ${name}, ${day}`,
   nonePlanned: 'Kein Workout geplant',
   loading: 'Dein Plan wird geladen',

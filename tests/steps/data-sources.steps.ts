@@ -2,8 +2,8 @@
 
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { Given, Then } from '@cucumber/cucumber';
-import { waitFor, within } from '@testing-library/dom';
+import { Given, Then, When } from '@cucumber/cucumber';
+import { fireEvent, waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
 
@@ -49,6 +49,15 @@ Then('the page says {string}', async function (this: RidrsWorld, text: string) {
     ),
   );
 });
+
+When(
+  'I press the chip {string} of the row {string}',
+  async function (this: RidrsWorld, chip: string, name: string) {
+    const button = await waitFor(() => within(row(this, name)).getByRole('button', { name: chip }));
+    fireEvent.click(button);
+    await this.settle();
+  },
+);
 
 Then(
   'the row {string} offers {string}',

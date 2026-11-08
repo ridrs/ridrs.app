@@ -40,6 +40,7 @@ export const en = {
   licenseName: (license: string) => `License: ${license}`,
   dataSources: 'Data sources',
   athleteProfile: 'Athlete profile',
+  plannedWorkouts: 'Planned workouts',
   thisDevice: 'ridrs (this device)',
   status: (status: DataSourceStatus, loadedAt?: string) =>
     ({

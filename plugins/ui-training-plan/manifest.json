@@ -39,6 +39,7 @@
       "app.language",
       "training.account",
       "athlete.profile",
+      "data.source",
       "training.calendar"
     ],
     "calls": [

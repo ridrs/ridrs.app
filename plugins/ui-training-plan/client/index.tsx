@@ -5,6 +5,7 @@ import {
   type AthleteProfile,
   athleteProfileState,
   type DataSource,
+  dataSourceState,
   type PlannedWorkout,
   type ServiceDefinition,
   type TrainingAccount,
@@ -54,20 +55,28 @@ interface Plan {
 function useTraining(ctx: UiContext): {
   readonly account?: TrainingAccount;
   readonly plan?: Plan;
+  /** The provider of the calendar in use: the chosen one, else intervals.icu. */
+  readonly source: string;
 } {
   const [account, setAccount] = useState<TrainingAccount>();
-  const [calendar, setCalendar] = useState<DataSource<TrainingCalendar>>();
-  const [profile, setProfile] = useState<DataSource<AthleteProfile>>();
+  const [calendars, setCalendars] = useState<ReadonlyMap<string, DataSource<TrainingCalendar>>>(new Map());
+  const [profiles, setProfiles] = useState<ReadonlyMap<string, DataSource<AthleteProfile>>>(new Map());
+  const [chosen, setChosen] = useState<string>();
   useLayoutEffect(() => {
     const subscriptions = [
       ctx.state.watch(trainingAccountState, ({ entries }) => setAccount(entries.get(SERVICE))),
-      ctx.state.watch(trainingCalendarState, ({ entries }) => setCalendar(entries.get(SERVICE))),
-      ctx.state.watch(athleteProfileState, ({ entries }) => setProfile(entries.get(SERVICE))),
+      ctx.state.watch(trainingCalendarState, ({ entries }) => setCalendars(new Map(entries))),
+      ctx.state.watch(athleteProfileState, ({ entries }) => setProfiles(new Map(entries))),
+      ctx.state.watch(dataSourceState, ({ entries }) => setChosen(entries.get('training.calendar')?.provider)),
     ];
     return () => {
       for (const unsubscribe of subscriptions) unsubscribe();
     };
   }, [ctx]);
+  // The chosen source; where it offers no calendar at all, the service this plugin is for.
+  const source = chosen !== undefined && calendars.has(chosen) ? chosen : SERVICE;
+  const calendar = calendars.get(source);
+  const profile = profiles.get(source);
   const plan = calendar?.data
     ? {
         offline: calendar.status === 'offline',
@@ -75,7 +84,7 @@ function useTraining(ctx: UiContext): {
         ...(profile?.data ? { athlete: profile.data } : {}),
       }
     : undefined;
-  return { account, plan };
+  return { account, plan, source };
 }
 
 /** Calls a service of the account; the planner answers once the work started, its state follows. */
@@ -136,7 +145,11 @@ function Connecting({ testId, text }: { readonly testId: string; readonly text: 
 
 function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
-  const { account, plan } = useTraining(ctx);
+  const { account, plan, source } = useTraining(ctx);
+  if (source !== SERVICE) {
+    // The calendar of ridrs on this device has no account to connect.
+    return <NextWorkoutCard ctx={ctx} text={text} plan={plan} caption={text.thisDevice} />;
+  }
   if (!account) {
     return null;
   }
@@ -163,13 +176,30 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
     );
   }
 
-  const workout = nextWorkout(plan);
   const caption = [
     text.connectedAs(account.athleteName),
     plan?.offline ? text.offline : undefined,
   ]
     .filter(Boolean)
     .join(' · ');
+  return (
+    <NextWorkoutCard ctx={ctx} text={text} plan={plan} caption={`intervals.icu · ${caption}`} />
+  );
+}
+
+/** The card of the next workout, with the source it comes from under it. */
+function NextWorkoutCard({
+  ctx,
+  text,
+  plan,
+  caption,
+}: {
+  readonly ctx: UiContext;
+  readonly text: Messages;
+  readonly plan: Plan | undefined;
+  readonly caption: string;
+}) {
+  const workout = nextWorkout(plan);
   return (
     <section className="rt-panel" data-testid="training-account">
       <TrainingStyles />
@@ -207,7 +237,7 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
           <span className="rt-name rt-muted">{plan ? text.nonePlanned : text.loadingDots}</span>
         )}
       </button>
-      <span className="rt-caption">intervals.icu · {caption}</span>
+      <span className="rt-caption">{caption}</span>
     </section>
   );
 }
@@ -251,7 +281,7 @@ function StepRows({ workout, text }: { readonly workout: PlannedWorkout; readonl
 function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);
-  const { account, plan } = useTraining(ctx);
+  const { account, plan, source } = useTraining(ctx);
   useEffect(() => ctx.onBack(() => ctx.navigate(MAIN)), [ctx]);
   // A ride started elsewhere (a second window) leads into the ride, as on the main screen.
   useEffect(
@@ -271,7 +301,8 @@ function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
       <TrainingStyles />
       <header>
         <span className="rt-caption">
-          intervals.icu{account?.athleteName ? ` · ${account.athleteName}` : ''}
+          {source === SERVICE ? 'intervals.icu' : text.thisDevice}
+          {source === SERVICE && account?.athleteName ? ` · ${account.athleteName}` : ''}
           {plan?.offline ? ` · ${text.offline}` : ''}
         </span>
         <h1>{workout ? workout.name : text.nonePlanned}</h1>

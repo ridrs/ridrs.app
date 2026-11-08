@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { AreaPage, iconStyle, MenuEntry, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
+import { trainingCalendarHandOverService } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useMessages } from '@ridrs/ui-sdk/react';
-import { useState } from 'react';
-import { z } from 'zod';
+import { useEffect, useState } from 'react';
 import {
   addEntry,
   type Calendar,
-  type Entry,
   FIRST_WEEK,
   KIND_TITLES,
   moveLater,
+  plannedWorkouts,
   removeEntry,
   undo,
   WEEKDAYS,
@@ -19,6 +19,7 @@ import {
   WORKOUTS,
   weekdayOf,
 } from './calendar.ts';
+import { INITIAL_TRAINING, TRAINING_DOCUMENT } from '../document.ts';
 import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
@@ -47,29 +48,8 @@ const CSS = `
 .tr-entry .pv-button { min-height: 28px; padding: 2px 8px; font-size: 12px; }
 `;
 
-const entrySchema = z
-  .object({
-    id: z.string(),
-    day: z.enum(WEEKDAYS),
-    kind: z.enum(['workout', 'rest', 'note', 'outdoor']),
-    title: z.string(),
-  })
-  .strict();
-
 /** What the rider changed in this area, kept at once (ADR 0059). */
-const useTraining = userDocument(
-  {
-    name: 'preview',
-    version: 1,
-    schema: z
-      .object({
-        calendar: z.object({ entries: z.array(entrySchema), undo: z.array(z.array(entrySchema)) }).strict(),
-        favourites: z.array(z.string()),
-      })
-      .strict(),
-  },
-  { calendar: FIRST_WEEK as { entries: Entry[]; undo: Entry[][] }, favourites: [] as string[] },
-);
+const useTraining = userDocument(TRAINING_DOCUMENT, INITIAL_TRAINING);
 
 function Day({
   ctx,
@@ -135,6 +115,17 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   const today = weekdayOf(new Date());
   const [selected, setSelected] = useState<Weekday>(today);
   useBack(ctx);
+  // The calendar is a data source (ADR 0075): its owner learns of every change. Not of the
+  // initial entries, which its owner has read from the same document.
+  useEffect(() => {
+    if (state.calendar.entries === FIRST_WEEK.entries) return;
+    const date = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const iso = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    ctx
+      .call(trainingCalendarHandOverService, { workouts: plannedWorkouts(state.calendar.entries, iso) })
+      .catch((error: unknown) => ctx.logger.warn(`Could not hand over the calendar: ${String(error)}`));
+  }, [ctx, state.calendar.entries]);
   const calendar = (update: (calendar: Calendar) => Calendar) =>
     change((s) => ({ ...s, calendar: update(s.calendar) as typeof s.calendar }));
   const add = (kind: 'rest' | 'note' | 'outdoor') =>

@@ -11,6 +11,17 @@
   "persistence": [
     "user"
   ],
+  "state": {
+    "owns": [
+      "training.calendar"
+    ]
+  },
+  "services": {
+    "provides": [
+      "training.calendar.hand-over"
+    ],
+    "calls": []
+  },
   "ui": {
     "client": "client/index.tsx",
     "screens": [
@@ -33,6 +44,9 @@
     },
     "state": [
       "app.language"
+    ],
+    "calls": [
+      "training.calendar.hand-over"
     ]
   }
 }

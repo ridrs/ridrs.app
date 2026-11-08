@@ -154,6 +154,16 @@ export const trainingCalendarType = defineDataType('training.calendar', training
 /** Topic `training.calendar`, keyed by provider. */
 export const trainingCalendarState = trainingCalendarType.topic;
 
+/**
+ * Hands the calendar of ridrs on this device to its owner: the Training area keeps its entries in
+ * its client module, and the owner of the key `ridrs` of `training.calendar` (its host side)
+ * publishes them. `workouts` are the entries of kind workout on their dates (ADR 0075).
+ */
+export const trainingCalendarHandOverService = defineService('training.calendar.hand-over', {
+  request: z.object({ workouts: z.array(plannedWorkoutSchema) }).strict(),
+  response: z.object({}).strict(),
+});
+
 /** Calls for an account: `key` is the service, routed to the plugin that owns its account. */
 const accountRequest = z.object({ key: z.string().min(1) }).strict();
 const done = z.object({}).strict();

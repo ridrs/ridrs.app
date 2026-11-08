@@ -2,7 +2,6 @@
 
 import {
   activityStateChangedEvent,
-  type AthleteProfile,
   appLanguageSetService,
   athleteProfileState,
   type DataSource,
@@ -10,6 +9,8 @@ import {
   dataSelectService,
   dataSourceState,
   type Language,
+  type StateDefinition,
+  trainingCalendarState,
 } from '@ridrs/contracts';
 import { ActionButton, AreaPage, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
@@ -111,9 +112,6 @@ const LANGUAGE_NAMES: readonly { readonly value: Language; readonly label: strin
   { value: 'de', label: 'Deutsch' },
 ];
 
-/** The data type of the row (ADR 0075): the athlete profile, chosen among its providers. */
-const ATHLETE_PROFILE = 'athlete.profile';
-
 /** Whether a ride is under way: a new source then applies from the next ride. */
 function useRiding(ctx: UiContext): boolean {
   const [riding, setRiding] = useState(false);
@@ -128,9 +126,7 @@ function useRiding(ctx: UiContext): boolean {
 }
 
 /** ridrs first, then the other providers by their id. */
-function inOrder(
-  providers: ReadonlyMap<string, DataSource<AthleteProfile>>,
-): readonly DataSource<AthleteProfile>[] {
+function inOrder<D>(providers: ReadonlyMap<string, DataSource<D>>): readonly DataSource<D>[] {
   return [...providers.values()].sort(
     (a, b) =>
       Number(b.provider === DEFAULT_PROVIDER) - Number(a.provider === DEFAULT_PROVIDER) ||
@@ -139,24 +135,35 @@ function inOrder(
 }
 
 /**
- * The athlete profile's source: one button per provider that offers it, the chosen one pressed,
- * and the status of the chosen one beside them. A provider chooses its own name, except ridrs on
- * this device, which is named in the app's language.
+ * The source of a data type with a choice (ADR 0075): one button per provider that offers it, the
+ * chosen one pressed, and the status of the chosen one beside them. A provider chooses its own
+ * name, except ridrs on this device, which is named in the app's language.
  */
-function AthleteProfileSource({ ctx }: { readonly ctx: UiContext }) {
+function SourceRow<D>({
+  ctx,
+  type,
+  topic,
+  name,
+}: {
+  readonly ctx: UiContext;
+  /** The data type, the key of `data.source`. */
+  readonly type: string;
+  readonly topic: StateDefinition<DataSource<D>>;
+  readonly name: string;
+}) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);
-  const providers = useStateEntries(ctx, athleteProfileState);
-  const chosen = useStateEntries(ctx, dataSourceState).get(ATHLETE_PROFILE)?.provider;
+  const providers = useStateEntries(ctx, topic);
+  const chosen = useStateEntries(ctx, dataSourceState).get(type)?.provider;
   const current = chosen ?? DEFAULT_PROVIDER;
   const status = providers.get(current);
   const choose = (provider: string) =>
     ctx
-      .call(dataSelectService, { key: ATHLETE_PROFILE, provider })
+      .call(dataSelectService, { key: type, provider })
       .catch((error: unknown) => ctx.logger.warn(`Could not choose the source: ${String(error)}`));
   return (
-    <div className="pv-row" role="group" aria-label={text.athleteProfile}>
-      <span style={{ minWidth: 140 }}>{text.athleteProfile}</span>
+    <div className="pv-row" role="group" aria-label={name}>
+      <span style={{ minWidth: 140 }}>{name}</span>
       {inOrder(providers).map((provider) => (
         <button
           key={provider.provider}
@@ -240,7 +247,8 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
       </section>
       <section className="pv-section">
         <h2>{text.dataSources}</h2>
-        <AthleteProfileSource ctx={ctx} />
+        <SourceRow ctx={ctx} type="athlete.profile" topic={athleteProfileState} name={text.athleteProfile} />
+        <SourceRow ctx={ctx} type="training.calendar" topic={trainingCalendarState} name={text.plannedWorkouts} />
         {riding ? <p className="pv-muted">{text.riding}</p> : null}
       </section>
       <section className="pv-section">

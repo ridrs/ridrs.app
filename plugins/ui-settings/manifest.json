@@ -18,6 +18,7 @@
     ],
     "watches": [
       "athlete.profile",
+      "training.calendar",
       "training.account"
     ]
   },
@@ -51,7 +52,8 @@
     "state": [
       "app.language",
       "athlete.profile",
-      "data.source"
+      "data.source",
+      "training.calendar"
     ],
     "calls": [
       "app.set-language",
