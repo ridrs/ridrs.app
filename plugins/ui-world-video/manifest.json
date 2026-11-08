@@ -15,11 +15,6 @@
         "id": "landscape",
         "extensionPoint": "activity/landscape",
         "export": "VideoLandscape"
-      },
-      {
-        "id": "video-rides",
-        "extensionPoint": "main/tile",
-        "export": "VideoRidesTile"
       }
     ],
     "events": {
@@ -28,7 +23,6 @@
         "physics.state-batch"
       ],
       "publish": [
-        "activity.start-requested",
         "ui.terrain-observed",
         "ui.position-observed"
       ]

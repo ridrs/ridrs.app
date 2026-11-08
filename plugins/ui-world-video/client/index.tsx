@@ -2,19 +2,17 @@
 
 import {
   type ActivityState,
-  activityStartRequestedEvent,
   activityStateChangedEvent,
   routeOfferState,
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
 } from '@ridrs/contracts';
 import { createPhysicsPresentation } from '@ridrs/presentation';
-import { Card } from '@ridrs/ui-preview';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type FrameDecoder, FramePlayer } from './frame-player.ts';
-import { loadDownloadedRoute, loadLibrary, parseGpx, type VideoRoute } from './library.ts';
+import { loadDownloadedRoute, parseGpx, type VideoRoute } from './library.ts';
 import { buildVideoTime, type VideoTime, videoTimeAt } from './playback.ts';
 import { plausibleTrack, type Repair } from './plausible-track.ts';
 import type { Track } from './track.ts';
@@ -70,23 +68,14 @@ function webCodecsDecoder(video: VideoIndex) {
   };
 }
 
-/** A downloaded route from its `route.json`, else a route of the dev server's library. */
-async function findRoute(id: string, files: Readonly<Record<string, string>> | undefined): Promise<VideoRoute> {
-  if (files) {
-    return loadDownloadedRoute(id, files);
-  }
-  const route = (await loadLibrary()).find((candidate) => candidate.id === id);
-  if (!route) {
-    throw new Error(`The video library has no route "${id}"`);
-  }
-  return route;
-}
-
 async function loadRoute(
   id: string,
   files: Readonly<Record<string, string>> | undefined,
 ): Promise<{ route: VideoRoute; track: Track; repairs: readonly Repair[]; videoTime: VideoTime; video: VideoIndex }> {
-  const route = await findRoute(id, files);
+  if (!files) {
+    throw new Error(`The route "${id}" is not downloaded`);
+  }
+  const route = await loadDownloadedRoute(id, files);
   const [{ track, repairs }, video] = await Promise.all([
     fetch(route.gpxUrl).then(async (response) => plausibleTrack(parseGpx(await response.text()))),
     readVideoIndex(httpRangeReader(route.videoUrl)),
@@ -304,66 +293,5 @@ function VideoLandscapeView({ ctx }: { readonly ctx: UiContext }) {
 export const VideoLandscape: UiComponent = (container, ctx) => {
   const root = createRoot(container);
   root.render(<VideoLandscapeView ctx={ctx} />);
-  return () => root.unmount();
-};
-
-/** Drawn with the main screen's tokens (ADR 0058); the fallbacks keep it readable without them. */
-const TILE_CSS = `
-.vr-tile { display: flex; flex-direction: column; gap: 16px; height: 100%; padding: 24px 28px;
-  border: 1px solid var(--ridrs-line, #24324d); border-radius: var(--ridrs-radius, 16px);
-  background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa); }
-.vr-eyebrow { margin: 0; color: var(--ridrs-text-muted, #93a1b8); font-size: 14px; font-weight: 600;
-  letter-spacing: .08em; text-transform: uppercase; }
-.vr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;
-  margin: 0; padding: 0; list-style: none; }
-.vr-list .pv-teaser { background: var(--ridrs-surface-raised, #1a2540); }
-`;
-
-/** The routes of the video library, each a card that starts a ride along it. */
-function VideoRidesView({ ctx }: { readonly ctx: UiContext }) {
-  const [routes, setRoutes] = useState<readonly VideoRoute[]>([]);
-  useEffect(() => {
-    let current = true;
-    loadLibrary().then(
-      (loaded) => current && setRoutes(loaded),
-      (error: unknown) => ctx.logger.warn('The video library could not be read', error),
-    );
-    return () => {
-      current = false;
-    };
-  }, [ctx]);
-  // Without videos the tile shows nothing, and the main screen leaves no gap for it.
-  if (routes.length === 0) {
-    return null;
-  }
-  return (
-    <section className="vr-tile" aria-label="Video rides" data-testid="video-rides">
-      <style>{TILE_CSS}</style>
-      <p className="vr-eyebrow">Video rides</p>
-      <ul className="vr-list">
-        {routes.map((route) => (
-          <li key={route.id}>
-            <Card
-              testId={`ride-video-${route.id}`}
-              label={`Ride ${route.title}`}
-              classifier="Video"
-              title={route.title}
-              details={[route.summary]}
-              onOpen={() =>
-                ctx.events.publish(activityStartRequestedEvent, {
-                  world: { landscape: `${ctx.pluginId}/${LANDSCAPE}`, route: route.id },
-                })
-              }
-            />
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-export const VideoRidesTile: UiComponent = (container, ctx) => {
-  const root = createRoot(container);
-  root.render(<VideoRidesView ctx={ctx} />);
   return () => root.unmount();
 };

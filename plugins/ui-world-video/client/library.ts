@@ -1,21 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /*
- * The video library: one folder per route, each with an Incyclist control file (`gpx-import`),
- * the video and the GPX track it names. The app serves the library under `LIBRARY_URL`; its
- * index lists the folders and their control files.
+ * Video routes: Incyclist control files (`gpx-import`) and GPX tracks, and downloaded routes in
+ * the unified format (`route.json`).
  */
 
 import { VIDEO_ROUTE_FILE, videoRouteSchema } from '@ridrs/contracts';
 
-/** Where the app serves the library; `index.json` lists it. */
-export const LIBRARY_URL = '/videos/';
-
-export interface LibraryIndex {
-  readonly routes: readonly { readonly folder: string; readonly control: string }[];
-}
-
-/** A route of the library, as its control file describes it. */
+/** A video route. */
 export interface VideoRoute {
   /** The folder: the route's id in a ride's world. */
   readonly id: string;
@@ -62,8 +54,8 @@ export function xml(text: string): Document {
 const textOf = (parent: Document | Element, tag: string) =>
   parent.getElementsByTagName(tag)[0]?.textContent?.trim() ?? undefined;
 
-/** The route of a control file in `folder`, its files resolved against the library's URL. */
-export function parseControlFile(text: string, folder: string, base = LIBRARY_URL): VideoRoute {
+/** The route of a control file in `folder`, its files resolved against `base`. */
+export function parseControlFile(text: string, folder: string, base = ''): VideoRoute {
   const control = xml(text);
   const video = textOf(control, 'video-file-path');
   const gpx = textOf(control, 'gpx-file-path');
@@ -126,20 +118,4 @@ export async function loadDownloadedRoute(id: string, files: Readonly<Record<str
     framerate: route.video.framerate,
     startFrame: route.video.startFrame,
   };
-}
-
-/** Fetches the library's index and every control file in it; a broken route is left out. */
-export async function loadLibrary(base = LIBRARY_URL): Promise<VideoRoute[]> {
-  const index = (await (await fetch(`${base}index.json`)).json()) as LibraryIndex;
-  const routes = await Promise.all(
-    index.routes.map(async ({ folder, control }) => {
-      try {
-        const response = await fetch(`${base}${encodeURIComponent(folder)}/${encodeURIComponent(control)}`);
-        return parseControlFile(await response.text(), folder, base);
-      } catch {
-        return undefined;
-      }
-    }),
-  );
-  return routes.filter((route): route is VideoRoute => route !== undefined);
 }
