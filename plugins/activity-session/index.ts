@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  activityAthleteEvent,
   activityEquipmentEvent,
   type ActivityState,
   activityFinishRequestedEvent,
@@ -9,10 +10,12 @@ import {
   activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  athleteProfileChangedEvent,
   type Bicycle,
   definePlugin,
   equipmentBicycleChangedEvent,
   type PluginContext,
+  type RideAthlete,
 } from '@ridrs/contracts';
 
 const states = new WeakMap<PluginContext, ActivityState>();
@@ -38,7 +41,9 @@ const worldOf = (state: ActivityState) => ('world' in state && state.world ? { w
  * Ride lifecycle `idle -> running <-> paused -> finished`, driven by request events (ADR 0056).
  * Knows nothing about any UI. Freezes the latest bicycle (`equipment.bicycle-changed`) for every
  * new session and announces it as `activity.equipment` right before the session runs; pause,
- * resume and a continued ride keep it (ADR 0060). Without a bicycle it announces none. The world a
+ * resume and a continued ride keep it (ADR 0060). The athlete is frozen the same way, from
+ * `athlete.profile-changed` into `activity.athlete` (ADR 0073). Without a bicycle or an athlete
+ * it announces none. The world a
  start asks for (a landscape and its route) stays with the ride in every state until it ends.
  */
 export default definePlugin({
@@ -48,6 +53,10 @@ export default definePlugin({
     let bicycle: Bicycle | undefined;
     ctx.events.subscribe(equipmentBicycleChangedEvent, ({ payload }) => {
       bicycle = payload;
+    });
+    let athlete: RideAthlete | undefined;
+    ctx.events.subscribe(athleteProfileChangedEvent, ({ payload }) => {
+      athlete = payload;
     });
 
     ctx.events.subscribe(activityStartRequestedEvent, ({ payload }) => {
@@ -59,6 +68,9 @@ export default definePlugin({
       const sessionId = ctx.ids.next();
       if (bicycle) {
         ctx.events.publish(activityEquipmentEvent, { sessionId, bicycle });
+      }
+      if (athlete) {
+        ctx.events.publish(activityAthleteEvent, { sessionId, athlete });
       }
       transition(ctx, {
         state: 'running',

@@ -122,16 +122,17 @@ function recordingContext(id: string) {
 }
 
 describe('physics contributors', () => {
-  it.each(CONTRIBUTORS.filter((id) => id !== 'physics-bicycle' && id !== 'physics-virtual-speed'))(
-    '%s publishes nothing and listens to nothing',
-    async (id) => {
-      const definition = await definitionOf(id);
-      const { ctx, used } = recordingContext(id);
-      await definition.initialize?.(ctx);
-      await definition.start?.(ctx);
-      expect(used).toEqual([]);
-    },
-  );
+  it.each(
+    CONTRIBUTORS.filter(
+      (id) => !['physics-bicycle', 'physics-rider', 'physics-virtual-speed'].includes(id),
+    ),
+  )('%s publishes nothing and listens to nothing', async (id) => {
+    const definition = await definitionOf(id);
+    const { ctx, used } = recordingContext(id);
+    await definition.initialize?.(ctx);
+    await definition.start?.(ctx);
+    expect(used).toEqual([]);
+  });
 
   // ADR 0060: the bicycle's mass is the one frozen for the ride, from a lifecycle event.
   it('physics-bicycle publishes nothing and listens only to the bicycle frozen for the ride', async () => {
@@ -140,6 +141,15 @@ describe('physics contributors', () => {
     await definition.initialize?.(ctx);
     await definition.start?.(ctx);
     expect(used).toEqual(['subscribe activity.equipment']);
+  });
+
+  // ADR 0073: the rider's mass is the weight of the athlete frozen for the ride, from a lifecycle event.
+  it('physics-rider publishes nothing and listens only to the athlete frozen for the ride', async () => {
+    const definition = await definitionOf('physics-rider');
+    const { ctx, used } = recordingContext('physics-rider');
+    await definition.initialize?.(ctx);
+    await definition.start?.(ctx);
+    expect(used).toEqual(['subscribe activity.athlete']);
   });
 
   // A ride with a world stands still until the world's first window: the ride's world, from a

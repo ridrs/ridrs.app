@@ -11,6 +11,7 @@ import {
   type Diagnostic,
   definePlugin,
   deviceConnectionChangedEvent,
+  athleteProfileChangedEvent,
   equipmentBicycleChangedEvent,
   type EventEnvelope,
   type HostDescription,
@@ -76,6 +77,11 @@ interface Ride {
   syncTimer?: ReturnType<typeof setInterval>;
   /** A lifecycle event waits for its line to be on the disk. */
   syncSoon: boolean;
+  /**
+   * The configuration snapshot is taken once the bus delivered what the start published (the
+   * frozen bicycle and athlete): until then nothing is written.
+   */
+  awaitingSnapshot?: boolean;
   /** The `finished` state was observed; the rest of its run-to-completion cascade still belongs to the ride. */
   finishing: boolean;
   endedAt?: number;
@@ -93,6 +99,8 @@ interface Recorder {
   readonly connections: Map<string, Buffered>;
   /** The latest bicycle that fell out of the pre-roll window: the next ride freezes it (ADR 0060). */
   bicycle?: Buffered;
+  /** The latest athlete that fell out of the pre-roll window: the next ride freezes it (ADR 0073). */
+  athlete?: Buffered;
   ride?: Ride;
   /** The interrupted ride on offer (ADR 0057): continued by the composition root or finished. */
   offered?: { readonly openPath: string; readonly sessionId: string };
@@ -115,7 +123,7 @@ function reason(error: unknown): string {
 
 /**
  * Drops buffered events older than `from`, keeping the latest connection state per device and the
- * latest bicycle.
+ * latest bicycle and athlete.
  */
 function prune(recorder: Recorder, from: number): void {
   let drop = 0;
@@ -129,6 +137,8 @@ function prune(recorder: Recorder, from: number): void {
       recorder.connections.set(payload.deviceId, item);
     } else if (item.envelope.type === equipmentBicycleChangedEvent.id) {
       recorder.bicycle = item;
+    } else if (item.envelope.type === athleteProfileChangedEvent.id) {
+      recorder.athlete = item;
     }
     drop += 1;
   }
@@ -162,7 +172,7 @@ function setRide(ctx: PluginContext, ride: RecordingRide): void {
 
 /** Hands the pending lines to storage; never blocks the bus. */
 function flush(ctx: PluginContext, recorder: Recorder, ride: Ride): void {
-  if (ride.failed || ride.pending.length === 0) {
+  if (ride.failed || ride.pending.length === 0 || ride.awaitingSnapshot) {
     return;
   }
   const text = ride.pending.join('');
@@ -175,7 +185,7 @@ function flush(ctx: PluginContext, recorder: Recorder, ride: Ride): void {
 
 /** Flushes what storage was handed to the disk, in the write chain: never on the turn queue. */
 function sync(ctx: PluginContext, recorder: Recorder, ride: Ride): void {
-  if (ride.failed) {
+  if (ride.failed || ride.awaitingSnapshot) {
     return;
   }
   ride.writes = ride.writes
@@ -215,20 +225,16 @@ function startRide(
     }
   }
   const preroll = [
-    ...[...recorder.connections.values(), ...(recorder.bicycle ? [recorder.bicycle] : [])].sort(
-      (a, b) => a.index - b.index,
-    ),
+    ...[
+      ...recorder.connections.values(),
+      ...(recorder.bicycle ? [recorder.bicycle] : []),
+      ...(recorder.athlete ? [recorder.athlete] : []),
+    ].sort((a, b) => a.index - b.index),
     ...recorder.buffer.slice(0, split),
   ];
   const live = recorder.buffer.slice(split);
 
   const description = ctx.host.describe();
-  const failedSections: Array<{ section: string; message: string }> = [];
-  const snapshot = buildConfigSnapshot(
-    description,
-    ctx.capabilities.getAll(configSnapshotCapability),
-    (section, message) => failedSections.push({ section, message }),
-  );
   const writer = new RecordingWriter();
   const { ridrsVersion, runtime, os, appVersion } = description.platform;
   const name = recordingName(startedAt, sessionId);
@@ -250,7 +256,8 @@ function startRide(
         platform: { runtime, os, appVersion },
         prerollMs: RECORDING_DEFAULTS.prerollMs,
       }),
-      writer.snapshot(snapshot),
+      // Replaced by the configuration snapshot below.
+      '',
       ...preroll.map((item) => writer.event(item.envelope, true)),
       ...live.map((item) => writer.event(item.envelope, false)),
       writer.event(running, false),
@@ -261,17 +268,31 @@ function startRide(
     closed: false,
     failed: false,
     syncSoon: false,
+    awaitingSnapshot: true,
   };
   recorder.ride = ride;
-  for (const { section, message } of failedSections) {
-    ctx.reportDiagnostic(
-      'config-snapshot-failed',
-      `The configuration section "${section}" failed: ${message}`,
-      { section },
+  // The recorder sees `running` when it is published, before the plugins have the bicycle and the
+  // athlete that were published just before it: the snapshot of their frozen values follows the
+  // delivery of this turn's events.
+  queueMicrotask(() => {
+    const failedSections: Array<{ section: string; message: string }> = [];
+    const snapshot = buildConfigSnapshot(
+      description,
+      ctx.capabilities.getAll(configSnapshotCapability),
+      (section, message) => failedSections.push({ section, message }),
     );
-  }
-  flush(ctx, recorder, ride);
-  sync(ctx, recorder, ride);
+    ride.pending[1] = writer.snapshot(snapshot);
+    ride.awaitingSnapshot = false;
+    for (const { section, message } of failedSections) {
+      ctx.reportDiagnostic(
+        'config-snapshot-failed',
+        `The configuration section "${section}" failed: ${message}`,
+        { section },
+      );
+    }
+    flush(ctx, recorder, ride);
+    sync(ctx, recorder, ride);
+  });
   ride.timer = setInterval(() => flush(ctx, recorder, ride), RECORDING_DEFAULTS.flushIntervalMs);
   ride.syncTimer = setInterval(() => sync(ctx, recorder, ride), RECORDING_DEFAULTS.syncIntervalMs);
 }
