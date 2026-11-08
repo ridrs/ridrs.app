@@ -39,6 +39,7 @@ This project incorporates third-party open-source dependencies under the followi
 | `@zip.js/zip.js` | 2.24.0 | BSD-3-Clause | ZIP entries by HTTP range for the video catalog tool (`scripts/fetch-video-catalog.ts`); unpacking downloaded video packages (`data-archive-node`) (ADR 0065) |
 | `fast-xml-parser` | 5.11.2 | MIT | Reading Incyclist control files (`video-import-incyclist`, ADR 0066); its dependencies `strnum`, `@nodable/entities`, `path-expression-matcher`, `fast-xml-builder`, `is-unsafe`, `xml-naming` are MIT |
 | `entities` | 8.1.0 | BSD-2-Clause | HTML's named entities in Incyclist control files (`video-import-incyclist`, ADR 0066) |
+| Fonts Chakra Petch, Plus Jakarta Sans, JetBrains Mono (`@fontsource/chakra-petch`, `@fontsource/plus-jakarta-sans`, `@fontsource/jetbrains-mono`) | 5.3.0 | OFL-1.1 | The draft Kinetic theme of the main screen (`ui-main-screen`, ADR 0074); latin subsets bundled into the app, license texts in `plugins/ui-main-screen/licenses/` |
 
 Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/src-tauri/Cargo.lock`):
 

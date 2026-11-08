@@ -7,6 +7,7 @@ import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 're
 import { createRoot } from 'react-dom/client';
 import configured from '../layout.json' with { type: 'json' };
 import { messages } from './i18n/index.ts';
+import { ThemePicker } from './themes.tsx';
 import { BREAKPOINTS, type Breakpoint, breakpointAt, columnsAt, type Layout, layoutSchema, type Tile } from './layout.ts';
 
 /**
@@ -291,6 +292,7 @@ function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readon
         <div className="ms-outlet" data-testid="main-outlet" ref={outlet} hidden={!framing} />
       </div>
       <Dialog ctx={ctx} open={open} container={dialog} />
+      <ThemePicker doc={view.document} />
     </div>
   );
 }

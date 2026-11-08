@@ -5,6 +5,9 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "dependencies": {
+    "@fontsource/chakra-petch": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/plus-jakarta-sans": "5.3.0",
     "@ridrs/contracts": "workspace:*",
     "@ridrs/ui-sdk": "workspace:*",
     "react": "19.3.1",
