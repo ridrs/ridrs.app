@@ -51,6 +51,34 @@ Feature: The Me area shows and changes the chosen source's athlete profile
     Then the FTP reads "235 W"
     And the weight reads "80.5 kg"
 
+  # The preview kept 200 W and 72 kg as soon as anything in Me changed: not the rider's values.
+  Scenario Outline: Me's old placeholder values are not handed to the profile
+    Given the Me area kept an FTP of <ftp> W and a weight of <weight> kg before the athlete profile existed
+    When ridrs restarted
+    And I reload the UI
+    And I press "Profile"
+    Then the Me area keeps no FTP and no weight of its own any more
+    And the athlete profile on this device keeps the FTP "<kept ftp>" and the weight "<kept weight>"
+    And the FTP reads "<shown ftp>"
+    And the weight reads "<shown weight>"
+
+    Examples:
+      | ftp | weight | kept ftp | kept weight | shown ftp | shown weight |
+      | 200 | 72.0   | none     | none        | –         | –            |
+      | 200 | 80.5   | none     | 80.5        | –         | 80.5 kg      |
+      | 230 | 72.0   | 230      | none        | 230 W     | –            |
+
+  Scenario: Me's old values never replace a profile that already has values
+    Given the athlete profile on this device holds an FTP of 250 W and a weight of 78.0 kg
+    And the Me area kept an FTP of 230 W and a weight of 80.5 kg before the athlete profile existed
+    When ridrs restarted
+    And I reload the UI
+    And I press "Profile"
+    Then the Me area keeps no FTP and no weight of its own any more
+    And the athlete profile on this device keeps the FTP "250" and the weight "78"
+    And the FTP reads "250 W"
+    And the weight reads "78.0 kg"
+
   Scenario: The chosen source's values are shown and cannot be changed here when it is read only
     When I press "Settings"
     And I press "Fixture cloud"

@@ -175,3 +175,16 @@ Then(
     assert.deepEqual(value?.mass, { value: mass, origin });
   },
 );
+
+/** `none` for a value the profile on this device does not hold; no document holds none. */
+Then(
+  'the athlete profile on this device keeps the FTP {string} and the weight {string}',
+  function (this: RidrsWorld, ftp: string, weight: string) {
+    const file = this.settingsFiles.files.get(ATHLETE_PATH);
+    const value = file
+      ? (JSON.parse(new TextDecoder().decode(file)) as { value: Partial<AthleteDocument> }).value
+      : {};
+    const kept = (v: number | undefined) => (v === undefined ? 'none' : String(v));
+    assert.deepEqual({ ftp: kept(value.ftp), weight: kept(value.weight) }, { ftp, weight });
+  },
+);

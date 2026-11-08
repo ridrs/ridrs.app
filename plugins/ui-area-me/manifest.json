@@ -11,6 +11,11 @@
   "persistence": [
     "user"
   ],
+  "state": {
+    "watches": [
+      "athlete.profile"
+    ]
+  },
   "services": {
     "calls": [
       "athlete.profile.update"
