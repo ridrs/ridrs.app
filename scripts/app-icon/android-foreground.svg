@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="slash" gradientUnits="userSpaceOnUse" x1="248" y1="0" x2="776" y2="0"><stop offset="0" stop-color="#00f0ff"/><stop offset="1" stop-color="#ccff00"/></linearGradient>
+  </defs>
+  <path d="M248 657H388.8L582.4 367H441.6ZM441.6 657H582.4L776 367H635.2Z" fill="url(#slash)"/>
+</svg>
