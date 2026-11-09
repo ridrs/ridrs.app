@@ -9,3 +9,21 @@ custom_domain = true
 [[routes]]
 pattern = "www.ridrs.app"
 custom_domain = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ridrs-mailbox-intervals"
+database_id = "55872195-b1a4-4a30-b474-35388d2ae5fe"
+migrations_dir = "migrations"
+
+[triggers]
+crons = ["17 3 * * *"]
+
+# Push fast path: one Durable Object per device holds its WebSocket.
+[[durable_objects.bindings]]
+name = "MAILBOX_HUB"
+class_name = "MailboxHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MailboxHub"]

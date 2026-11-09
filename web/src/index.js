@@ -1,5 +1,11 @@
+import { route, scheduled } from "./router.js";
+
+export { MailboxHub } from "./hub.js";
+
 export default {
   async fetch(request, env, ctx) {
+    const routed = await route(request, env);
+    if (routed) return routed;
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -697,5 +703,9 @@ export default {
         "cache-control": "no-cache",
       },
     });
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(scheduled(env));
   },
 };
