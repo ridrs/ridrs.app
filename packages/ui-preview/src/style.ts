@@ -132,16 +132,23 @@ export const PREVIEW_CSS = `
 .pv-hero-text h2 { margin: 0; font: 800 34px/1.15 system-ui, sans-serif; overflow-wrap: anywhere; }
 [data-breakpoint="compact"] .pv-hero-text h2 { font-size: 24px; }
 
-/* An area's picture: taller than a detail's, right under the top bar, the title over its foot. */
-.pv-area-hero { height: clamp(340px, 58vh, 620px); margin-top: -24px; padding-bottom: 40px;
-  color: #f2f5fa; }
-[data-breakpoint="compact"] .pv-area-hero { height: clamp(280px, 48vh, 420px); margin-top: -16px;
-  padding-bottom: 28px; }
+/* An area's title stands where the greeting of Today does: 40 px from the top, 40 px from the left
+   (12 px and 16 px when compact), at the same size and trimmed to its letters. */
+.pv-area { --pv-top: var(--ridrs-page-top, 40px); padding-top: var(--pv-top); }
+[data-breakpoint="compact"] .pv-area { --pv-top: 12px; }
+.pv-area .pv-title { gap: 12px 14px; }
+.pv-area .pv-title h1 { font: 800 40px/1.1 system-ui, sans-serif; text-box: trim-both cap alphabetic; }
+.pv-area > .pv-muted { margin-top: -14px; font-size: 20px; }
+/* An area's picture: taller than a detail's, right under the top bar, the title over its top. */
+.pv-area-hero { height: clamp(340px, 58vh, 620px); margin-top: calc(-1 * var(--pv-top));
+  justify-content: space-between; gap: 14px; padding: var(--pv-top) 40px 40px; color: #f2f5fa; }
+/* The title stays at the top, the introduction goes to the foot of the picture. */
+.pv-area-hero .pv-hero-text { display: contents; }
+[data-breakpoint="compact"] .pv-area-hero { height: clamp(280px, 48vh, 420px);
+  padding: var(--pv-top) 16px 28px; }
 .pv-area-hero .pv-hero-image { object-position: 55% 10%; }
 .pv-area-hero::after { content: ""; position: absolute; inset: 0; z-index: -1;
   background: linear-gradient(to right, rgb(11 18 32 / .7), rgb(11 18 32 / 0) 60%); }
-.pv-area-hero .pv-title h1 { font-size: 52px; line-height: 1.05; letter-spacing: -.01em; }
-[data-breakpoint="compact"] .pv-area-hero .pv-title h1 { font-size: 34px; }
 .pv-area-intro { margin: 0; max-width: 620px; color: rgb(242 245 250 / .88); font-size: 16px; }
 [data-breakpoint="compact"] .pv-area-intro { font-size: 14px; }
 .pv-credits { position: absolute; right: 40px; bottom: 10px; color: rgb(242 245 250 / .6);

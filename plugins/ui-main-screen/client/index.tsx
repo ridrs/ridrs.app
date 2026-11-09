@@ -54,11 +54,11 @@ const CSS = `
 .ms-root[data-breakpoint="compact"] .ms-actions { margin-top: 0; }
 .ms-root[data-breakpoint="compact"] .ms-head { padding: 12px 16px 0; }
 /* A screen without the page head keeps the actions' row free above it, unless it starts with a
-   picture across its top (\`[data-hero]\`): that runs under the actions, which stand over it on a
+   picture across its towp (\`[data-hero]\`): that runs under the actions, which stand over it on a
    glass of their own. */
-.ms-column:not(:has(> .ms-head)):not(:has(> .ms-outlet:not([hidden]) [data-hero]))::before {
+.ms-column:not(:has(> .ms-head)):not(:has(> .ms-outlet:not([hidden]) :is([data-hero], [data-page-head])))::before {
   content: ""; flex: none; height: calc(var(--ridrs-page-top) + 44px); }
-.ms-root[data-breakpoint="compact"] .ms-column:not(:has(> .ms-outlet:not([hidden]) [data-hero]))::before {
+.ms-root[data-breakpoint="compact"] .ms-column:not(:has(> .ms-outlet:not([hidden]) :is([data-hero], [data-page-head])))::before {
   content: ""; flex: none; height: 56px; }
 .ms-root:has(> .ms-column > .ms-outlet:not([hidden]) [data-hero]) .ms-actions [data-action] {
   border-color: rgb(255 255 255 / .14); background: rgb(11 18 32 / .55); backdrop-filter: blur(8px); }

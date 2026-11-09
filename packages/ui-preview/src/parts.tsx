@@ -115,11 +115,11 @@ export function AreaPage({
     </header>
   );
   return (
-    <div className="pv-page">
+    <div className="pv-page pv-area" data-page-head>
       <style>{PREVIEW_CSS}</style>
       {picture ? (
         <div className="pv-hero pv-area-hero" data-hero>
-          <img className="pv-hero-image" src={picture.image} alt="" />
+          <img className="pv-hero-image" src={picture.image} alt="" decoding="async" />
           <div className="pv-hero-text">
             {heading}
             {intro ? <p className="pv-area-intro">{intro}</p> : null}
