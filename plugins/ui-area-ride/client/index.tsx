@@ -240,8 +240,9 @@ function Profile({
   const elevations = offer.sparkline ?? [];
   const low = Math.min(...elevations);
   const rise = Math.max(...elevations) - low;
-  // The hill's height in the 32 units of the profile's area, which is the card's lowest 42 %.
-  const hill = (riseShare(rise) / BACKDROP_SHARE) * (32 - PROFILE_LIFT);
+  // The hill's height in the 32 units of the profile's area, which is the card's lowest 42 %. The
+  // lift only moves it up, so the height still follows the rise alone, up to the area's top.
+  const hill = Math.min((riseShare(rise) / BACKDROP_SHARE) * 32, 32 - PROFILE_LIFT);
   const points = elevations.map(
     (elevation, i) =>
       [(i / (elevations.length - 1)) * 100, 32 - PROFILE_LIFT - (rise > 0 ? ((elevation - low) / rise) * hill : 0)] as const,
