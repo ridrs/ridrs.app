@@ -198,6 +198,42 @@ export const trainingCalendarHandOverService = defineService('training.calendar.
   response: z.object({}).strict(),
 });
 
+/**
+ * A ride that was done (ADR 0076): what the Training area shows in a day's "Done" column. The
+ * same ride can be known by several providers (a ride of ridrs that was uploaded to intervals.icu),
+ * so a reader merges them by `externalId` and by the start time.
+ */
+export const completedWorkoutSchema = z
+  .object({
+    id: z.string().min(1),
+    /** The rider's local date, `YYYY-MM-DD`. */
+    date: localDateSchema,
+    /** When the ride started, epoch ms; the merge of providers matches rides by it. */
+    startedAt: z.number().optional(),
+    name: z.string(),
+    sport: z.enum(['ride', 'virtual-ride']),
+    durationSeconds: z.number().nonnegative().optional(),
+    trainingLoad: z.number().nonnegative().optional(),
+    /** The id of the ridrs session the ride was recorded in, when the provider knows it. */
+    externalId: z.string().min(1).optional(),
+  })
+  .strict();
+export type CompletedWorkout = z.infer<typeof completedWorkoutSchema>;
+
+/**
+ * The rides a provider has done, newest last: the data type `training.history`. Unlike the
+ * calendar it is not one chosen source: every provider that offers it adds to what the area
+ * shows (ADR 0076).
+ */
+export const trainingHistoryType = defineDataType(
+  'training.history',
+  z.object({ workouts: z.array(completedWorkoutSchema) }).strict(),
+  {},
+);
+
+/** Topic `training.history`, keyed by provider. */
+export const trainingHistoryState = trainingHistoryType.topic;
+
 /** Calls for an account: `key` is the service, routed to the plugin that owns its account. */
 const accountRequest = z.object({ key: z.string().min(1) }).strict();
 const done = z.object({}).strict();

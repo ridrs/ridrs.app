@@ -435,6 +435,8 @@ export {
   type VirtualGearCapability,
 } from './trainer.ts';
 export {
+  type CompletedWorkout,
+  completedWorkoutSchema,
   type LibraryWorkout,
   libraryWorkoutSchema,
   type PlannedWorkout,
@@ -458,6 +460,8 @@ export {
   trainingCalendarType,
   trainingConnectService,
   trainingDisconnectService,
+  trainingHistoryState,
+  trainingHistoryType,
   trainingLibraryState,
   trainingLibraryType,
   trainingRefreshService,

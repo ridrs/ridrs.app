@@ -64,6 +64,8 @@ export class SimulatedIntervalsIcu {
   /** Wellness weights by date (`GET …/wellness/{date}`); a day without one answers 404. */
   readonly wellnessWeights = new Map<string, number>();
   events: PlannedEvent[] = [];
+  /** The activities `GET …/activities` returns (the fields ridrs reads). */
+  activities: Array<Record<string, unknown>> = [];
   /** The writes to events, in order: the method, the name of the event and the body. */
   readonly eventLog: Array<{ method: string; name: string; body: Record<string, unknown> }> = [];
   /** The workouts of the library as `GET …/workouts` returns them, and its folders. */
@@ -76,6 +78,13 @@ export class SimulatedIntervalsIcu {
   uploadsReachable = true;
   /** Writes answer this status (403: the token lacks the scope); 200 accepts them. */
   writeStatus = 200;
+  /** Writes wait here until `answerWrites` lets them through: the answer is still on its way. */
+  holdWrites = false;
+  private readonly held: Array<() => void> = [];
+  answerWrites(): void {
+    this.holdWrites = false;
+    for (const release of this.held.splice(0)) release();
+  }
   /** Writes fail as if the network were gone, while reads answer. */
   writesReachable = true;
   /** The status of the next uploads; 201 creates the activity. */
@@ -129,6 +138,9 @@ export class SimulatedIntervalsIcu {
           ],
         });
       }
+      if (this.holdWrites && request.method !== 'GET' && url.pathname.includes('/events')) {
+        await new Promise<void>((resolve) => this.held.push(resolve));
+      }
       const write = this.write(request, url);
       if (write) {
         return write;
@@ -150,6 +162,17 @@ export class SimulatedIntervalsIcu {
           return json(403, { error: 'Forbidden' });
         }
         return json(200, url.pathname.endsWith('/workouts') ? this.library : this.folders);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/athlete/0/activities') {
+        const oldest = url.searchParams.get('oldest') ?? '';
+        const newest = url.searchParams.get('newest') ?? '';
+        return json(
+          200,
+          this.activities.filter((activity) => {
+            const date = String(activity.start_date_local).slice(0, 10);
+            return date >= oldest && date <= newest;
+          }),
+        );
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/athlete/0/events') {
         const oldest = url.searchParams.get('oldest') ?? '';

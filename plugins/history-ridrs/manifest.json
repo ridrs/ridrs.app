@@ -1,0 +1,21 @@
+{
+  "id": "history-ridrs",
+  "name": "Ride History",
+  "version": "0.1.0",
+  "types": [
+    "export"
+  ],
+  "provides": [],
+  "requires": [
+    "storage.app-files"
+  ],
+  "entry": "index.ts",
+  "state": {
+    "owns": [
+      "training.history"
+    ],
+    "watches": [
+      "recording.ride"
+    ]
+  }
+}

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { athleteProfileSchema, libraryWorkoutSchema, plannedWorkoutSchema } from '@ridrs/contracts';
+import { athleteProfileSchema, completedWorkoutSchema, libraryWorkoutSchema, plannedWorkoutSchema } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { ftpField, libraryDocs, localDate, toAthlete, toLibrary, toSteps, toWorkouts } from './intervals.ts';
+import { ftpField, libraryDocs, localDate, toActivities, toAthlete, toLibrary, toSteps, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 describe('toAthlete', () => {
@@ -242,5 +242,28 @@ describe('PKCE', () => {
     expect(await codeChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk')).toBe(
       'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
     );
+  });
+});
+
+describe('toActivities', () => {
+  it('takes the cycling rides that were done, with the session id of an upload, oldest first', () => {
+    const rides = toActivities([
+      { id: 'i2', type: 'VirtualRide', name: 'Evening', start_date_local: '2026-11-04T18:00:00', start_date: '2026-11-04T17:00:00Z', moving_time: 3600, icu_training_load: 55, external_id: 'session-1' },
+      { id: 'i1', type: 'Ride', start_date_local: '2026-11-02T08:00:00' },
+      { id: 'i3', type: 'Run', name: 'Jog', start_date_local: '2026-11-03T08:00:00' },
+      { type: 'Ride', start_date_local: '2026-11-03T08:00:00' },
+    ]);
+    expect(rides.map((ride) => ride.id)).toEqual(['i1', 'i2']);
+    expect(rides[1]).toEqual({
+      id: 'i2',
+      date: '2026-11-04',
+      startedAt: Date.parse('2026-11-04T17:00:00Z'),
+      name: 'Evening',
+      sport: 'virtual-ride',
+      durationSeconds: 3600,
+      trainingLoad: 55,
+      externalId: 'session-1',
+    });
+    expect(rides.every((ride) => completedWorkoutSchema.safeParse(ride).success)).toBe(true);
   });
 });

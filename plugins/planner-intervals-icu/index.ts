@@ -11,6 +11,8 @@ import {
   definePlugin,
   type HttpClient,
   type HttpResponse,
+  type CompletedWorkout,
+  completedWorkoutSchema,
   type LibraryWorkout,
   type DataSourceStatus,
   type DataWriteResult,
@@ -31,13 +33,14 @@ import {
   trainingCalendarState,
   trainingConnectService,
   trainingDisconnectService,
+  trainingHistoryState,
   trainingLibraryState,
   trainingRefreshService,
   type TrainingUpload,
   trainingUploadService,
   trainingUploadState,
 } from '@ridrs/contracts';
-import { ftpField, libraryDocs, localDate, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
+import { ftpField, libraryDocs, localDate, toActivities, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
@@ -60,6 +63,9 @@ const CACHE_FILE = 'training/intervals-icu-plan.json';
 const SERVICE = 'intervals.icu';
 const LABEL = 'intervals.icu';
 
+/** How many days of done rides are read. */
+const HISTORY_DAYS = 14;
+
 /** The service answered 401 or 403: the token is no longer valid. */
 class TokenRejected extends Error {}
 
@@ -70,6 +76,8 @@ interface Cache {
   /** The field of the Ride settings the FTP was read from, which a change is written to. */
   readonly ftpField: 'indoor_ftp' | 'ftp';
   readonly workouts: PlannedWorkout[];
+  /** The rides done in the last days (ADR 0076); none from before, or without the scope. */
+  readonly history?: CompletedWorkout[];
   /** None when the token lacks the scope of the library. */
   readonly library?: LibraryWorkout[];
   /** The `workout_doc` of each library workout by its id, as intervals.icu has it. */
@@ -507,8 +515,9 @@ async function writeCalendar(
       .entries(trainingLibraryState)
       .get(from)
       ?.data?.workouts.find((candidate) => candidate.id === workoutId);
+    // A workout of another library (the built-in workouts of ridrs) has no document: it is planned by its name and length.
     const doc = from === SERVICE ? held.libraryDocs[workoutId] : undefined;
-    if (!workout || doc === undefined) {
+    if (!workout || (from === SERVICE && doc === undefined)) {
       throw new Error(`The library of "${SERVICE}" has no workout "${workoutId}" of "${from}"`);
     }
     const sent = await send(ctx, services, held, 'POST', '/api/v1/athlete/0/events', {
@@ -518,7 +527,7 @@ async function writeCalendar(
       name: workout.name,
       ...(workout.description !== undefined ? { description: workout.description } : {}),
       ...(workout.durationSeconds !== undefined ? { moving_time: workout.durationSeconds } : {}),
-      workout_doc: doc,
+      ...(doc !== undefined ? { workout_doc: doc } : {}),
     });
     if (!sent.ok) {
       return sent;
@@ -566,6 +575,7 @@ function setSources(
     readonly fetchedAt: number;
     readonly athlete: AthleteProfile;
     readonly workouts: PlannedWorkout[];
+    readonly history?: CompletedWorkout[];
     readonly library?: LibraryWorkout[];
   },
   writable = status === 'ready' || status === 'offline',
@@ -585,6 +595,14 @@ function setSources(
     ...common,
     ...(loaded ? { data: { workouts: loaded.workouts } } : {}),
   });
+  // The rides done are read only too (ADR 0076).
+  ctx.state.set(
+    trainingHistoryState,
+    SERVICE,
+    loaded && !loaded.history
+      ? { provider: SERVICE, label: LABEL, status: 'unavailable', writable: false }
+      : { ...common, writable: false, ...(loaded?.history ? { data: { workouts: loaded.history } } : {}) },
+  );
   // The library is read only, and unavailable where the token lacks its scope.
   const library = loaded?.library;
   ctx.state.set(
@@ -674,17 +692,37 @@ async function loadPlan(
     return [JSON.parse(workouts.body), JSON.parse(folders.body)];
   };
 
+  /** The rides of the last days; none where the token lacks the scope. */
+  const historyOf = async (): Promise<CompletedWorkout[] | undefined> => {
+    const query = new URLSearchParams({
+      oldest: localDate(now, -(HISTORY_DAYS - 1)),
+      newest: localDate(now),
+    });
+    const response = await request(`/api/v1/athlete/0/activities?${query}`);
+    if (response.status === 401) {
+      throw new TokenRejected();
+    }
+    if (response.status === 403) {
+      return undefined;
+    }
+    if (response.status !== 200) {
+      throw new Error(`intervals.icu answered ${response.status} for the activities`);
+    }
+    return toActivities(JSON.parse(response.body));
+  };
+
   try {
     const query = new URLSearchParams({
       oldest: localDate(now),
       newest: localDate(now, PLAN_DAYS - 1),
       category: 'WORKOUT',
     });
-    const [athleteBody, eventsBody, weight, libraryBodies] = await Promise.all([
+    const [athleteBody, eventsBody, weight, libraryBodies, history] = await Promise.all([
       get('/api/v1/athlete/0'),
       get(`/api/v1/athlete/0/events?${query}`),
       wellnessWeight(),
       libraryBodiesOf(),
+      historyOf(),
     ]);
     const athlete = toAthlete(athleteBody, weight);
     held.ftpField = ftpField(athleteBody);
@@ -694,6 +732,7 @@ async function loadPlan(
       athlete,
       ftpField: held.ftpField,
       workouts: toWorkouts(eventsBody, athlete.ftp),
+      ...(history ? { history } : {}),
       ...(libraryBodies
         ? {
             library: toLibrary(libraryBodies[0], libraryBodies[1], athlete.ftp),
@@ -739,12 +778,14 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
       ftpField?: unknown;
       athlete?: { name?: unknown };
       workouts?: unknown;
+      history?: unknown;
       library?: unknown;
       libraryDocs?: unknown;
     };
     const { name, ...rest } = parsed.athlete ?? {};
     const athlete = athleteProfileSchema.safeParse({ ...rest, ...(name ? { name } : {}) });
     const calendar = trainingCalendarSchema.safeParse({ workouts: parsed.workouts });
+    const history = completedWorkoutSchema.array().safeParse(parsed.history);
     const library = trainingCalendarSchema
       .extend({ workouts: libraryWorkoutSchema.array() })
       .safeParse({ workouts: parsed.library });
@@ -754,6 +795,7 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
           athlete: athlete.data,
           ftpField: parsed.ftpField === 'indoor_ftp' ? 'indoor_ftp' : 'ftp',
           workouts: calendar.data.workouts,
+          ...(history.success ? { history: history.data } : {}),
           ...(library.success ? { library: library.data.workouts } : {}),
           ...(isRecord(parsed.libraryDocs) ? { libraryDocs: parsed.libraryDocs } : {}),
         }

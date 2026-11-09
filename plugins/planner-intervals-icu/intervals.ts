@@ -2,6 +2,7 @@
 
 import type {
   AthleteProfile,
+  CompletedWorkout,
   LibraryWorkout,
   PlannedWorkout,
   WorkoutInterval,
@@ -104,6 +105,36 @@ export function toWorkouts(body: unknown, ftp: number | undefined): PlannedWorko
     })
     .sort((a, b) => a.start.localeCompare(b.start))
     .map(({ start: _start, ...workout }) => workout);
+}
+
+/** `GET /api/v1/athlete/0/activities`: the cycling rides that were done, oldest first. */
+export function toActivities(body: unknown): CompletedWorkout[] {
+  return (Array.isArray(body) ? body.filter(isObject) : [])
+    .flatMap((activity): CompletedWorkout[] => {
+      const sport = typeof activity.type === 'string' ? SPORTS[activity.type] : undefined;
+      const local = typeof activity.start_date_local === 'string' ? activity.start_date_local : '';
+      const date = local.slice(0, 10);
+      if (!sport || !/^\d{4}-\d{2}-\d{2}$/.test(date) || activity.id === undefined) {
+        return [];
+      }
+      const utc = typeof activity.start_date === 'string' ? Date.parse(activity.start_date) : Number.NaN;
+      const durationSeconds = nonNegative(activity.moving_time);
+      const trainingLoad = nonNegative(activity.icu_training_load);
+      const externalId = text(activity.external_id);
+      return [
+        {
+          id: String(activity.id),
+          date,
+          ...(Number.isFinite(utc) ? { startedAt: utc } : {}),
+          name: text(activity.name) ?? 'Ride',
+          sport,
+          ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+          ...(trainingLoad !== undefined ? { trainingLoad } : {}),
+          ...(externalId !== undefined ? { externalId } : {}),
+        },
+      ];
+    })
+    .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0) || a.date.localeCompare(b.date));
 }
 
 /**
