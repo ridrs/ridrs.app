@@ -7,6 +7,7 @@ Feature: Changes in the app's areas take effect at once and are kept
 
   Background:
     Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-devices, ui-area-ride, ui-area-training, ui-area-events, ui-area-me, ui-search, ui-settings, profile-local" together with a test device plugin "test-device"
+    And the local time is "2026-11-04 08:00"
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
@@ -44,23 +45,56 @@ Feature: Changes in the app's areas take effect at once and are kept
     And I press "Today"
     Then the tile "ui-area-ride/ride-again" names "Ride again"
 
-  Scenario: A rest day added to the calendar is kept, and can be undone
+  Scenario: A workout dragged onto a day is kept
     When I press "Training"
-    And I press "Wednesday"
-    And I press "Add a rest day on Wednesday"
-    Then the calendar day "Wednesday" lists "Rest day"
+    And I drag the workout "Recovery Spin" onto "Friday"
+    Then the calendar day "Friday" lists "Recovery Spin"
     When ridrs restarted
     And I reload the UI
     And I press "Training"
-    Then the calendar day "Wednesday" lists "Rest day"
-    When I press "Undo"
-    Then the calendar day "Wednesday" lists no "Rest day"
-
-  Scenario: A workout is scheduled from the library
-    When I press "Training"
-    And I press "Friday"
-    And I press "Schedule Recovery Spin on Friday"
     Then the calendar day "Friday" lists "Recovery Spin"
+
+  Scenario: A planned workout is moved to another day by dragging
+    When I press "Training"
+    And I drag the planned workout "VO2 Max 5×4" onto "Friday"
+    Then the calendar day "Friday" lists "VO2 Max 5×4"
+    And the calendar day "Thursday" lists no "VO2 Max 5×4"
+
+  Scenario: A day that has passed takes no workout and its workouts stay
+    When I press "Training"
+    And I drag the workout "Recovery Spin" onto "Monday"
+    Then the calendar day "Monday" lists no "Recovery Spin"
+    And the planned workout "Sweet Spot 3×12" cannot be dragged
+
+  Scenario: The calendar shows the days side by side with nothing to select
+    When I press "Training"
+    Then the calendar shows the week starting "2026-11-02"
+    And the Training area has no button "Wednesday"
+    And the Training area has no button "Later"
+    And the Training area has no button "Undo"
+
+  Scenario: The arrows page through the weeks
+    When I press "Training"
+    And I press "Next week"
+    Then the calendar shows the week starting "2026-11-09"
+    When I press "Previous week"
+    And I press "Previous week"
+    Then the calendar shows the week starting "2026-10-26"
+
+  Scenario: The calendar of ridrs takes workouts in this week only
+    When I press "Training"
+    And I press "Next week"
+    And I drag the workout "Recovery Spin" onto "Friday"
+    Then the calendar day "Friday" lists no "Recovery Spin"
+
+  Scenario: The large calendar is a page of its own
+    When I press "Training"
+    And I press "Open large calendar"
+    Then the large calendar is shown
+    And the calendar day "Thursday" lists "VO2 Max 5×4"
+    And the Training area has no button "Open large calendar"
+    When I press Back
+    Then the Training area has the button "Open large calendar"
 
   Scenario: The FTP is changed in steps and kept
     When I press "Profile"

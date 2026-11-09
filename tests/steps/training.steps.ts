@@ -196,6 +196,49 @@ Given('intervals.icu rejects the token', function (this: RidrsWorld) {
   intervals(this).validToken = undefined;
 });
 
+Given('intervals.icu holds back its answers to writes', function (this: RidrsWorld) {
+  intervals(this).holdWrites = true;
+});
+
+When('intervals.icu answers its writes', async function (this: RidrsWorld) {
+  intervals(this).answerWrites();
+  await this.settle();
+});
+
+let nextActivityId = 70_001;
+
+Given('intervals.icu has done:', function (this: RidrsWorld, table: DataTable) {
+  intervals(this).activities = table.hashes().map((row) => ({
+    id: `i${nextActivityId++}`,
+    start_date_local: `${row.date}T${row.time ?? '08:00'}:00`,
+    // No UTC start: the ride is placed by its date, and by the session id where it has one.
+    type: row.type ?? 'Ride',
+    name: row.name ?? '',
+    moving_time: parseDuration(row.duration ?? '0s'),
+    icu_training_load: Number(row.load),
+    ...(row['external id'] ? { external_id: row['external id'] } : {}),
+  }));
+});
+
+Given(
+  'intervals.icu has the uploaded ride as an activity named {string}',
+  function (this: RidrsWorld, name: string) {
+    const upload = intervals(this).uploads.at(-1);
+    assert.ok(upload?.externalId, 'No upload with an external id');
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    intervals(this).activities.push({
+      id: `i${nextActivityId++}`,
+      start_date_local: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:00`,
+      type: 'VirtualRide',
+      name,
+      moving_time: 60,
+      icu_training_load: 40,
+      external_id: upload.externalId,
+    });
+  },
+);
+
 let nextEventId = 90_001;
 
 Given('intervals.icu plans:', function (this: RidrsWorld, table: DataTable) {

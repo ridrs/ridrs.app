@@ -4,9 +4,9 @@ Feature: A library workout is planned on a day in the chosen calendar
   (ADR 0075): in intervals.icu it is an event created with its steps, and a planned workout can be
   moved to another day or removed again. A write is refused, never queued: when intervals.icu
   cannot be reached nothing changes, and a token without the scope asks the rider to connect
-  again. On the calendar of ridrs on this device the workout becomes an entry of the Training area
-  on that weekday; the area's own entries (rest days, notes, outdoor rides) are never written to
-  intervals.icu. A weekday that has passed this week is the one of next week.
+  again. The workout is dragged from the library onto a day of this week's table in the Training
+  area, and a planned workout onto another day; a day that has passed takes none. On the calendar
+  of ridrs on this device the workout becomes an entry of the Training area on that weekday.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
   2026.
@@ -34,8 +34,7 @@ Feature: A library workout is planned on a day in the chosen calendar
 
   Scenario: A library workout is planned on a day with its steps
     When I press "Training"
-    And I press "Thursday"
-    And I press "Plan Sweet Spot 3x12 on Thursday"
+    And I drag the workout "Sweet Spot 3x12" onto "Thursday"
     Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
       | category         | WORKOUT             |
       | start_date_local | 2026-11-05T00:00:00 |
@@ -54,6 +53,30 @@ Feature: A library workout is planned on a day in the chosen calendar
       | name | Sweet Spot 3x12 |
     And the next workout card shows a power profile of 8 bars
 
+  Scenario: A workout dropped on a day is shown at once, as saving, until intervals.icu answers
+    Given intervals.icu holds back its answers to writes
+    When I press "Training"
+    And I drag the workout "Sweet Spot 3x12" onto "Thursday"
+    Then the calendar day "Thursday" lists "Sweet Spot 3x12"
+    And the calendar day "Thursday" lists "Saving…"
+    When intervals.icu answers its writes
+    Then the calendar day "Thursday" lists no "Saving…"
+    And the calendar day "Thursday" lists "Sweet Spot 3x12"
+
+  Scenario: A workout of this device is planned in intervals.icu without steps
+    When I press "Training"
+    And I drag the workout "Recovery Spin" onto "Thursday"
+    Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
+      | category         | WORKOUT             |
+      | start_date_local | 2026-11-05T00:00:00 |
+      | type             | VirtualRide         |
+      | name             | Recovery Spin       |
+      | moving_time      | 2400                |
+    When I press Back
+    Then the next workout card shows:
+      | day  | Tomorrow      |
+      | name | Recovery Spin |
+
   Scenario: The workout is planned with the steps exactly as the library has them
     Given the library workout "Sweet Spot 3x12" of intervals.icu has the workout document:
       """
@@ -69,8 +92,7 @@ Feature: A library workout is planned on a day in the chosen calendar
     And I press "Refresh"
     And I press Back
     When I press "Training"
-    And I press "Thursday"
-    And I press "Plan Sweet Spot 3x12 on Thursday"
+    And I drag the workout "Sweet Spot 3x12" onto "Thursday"
     Then the event created in intervals.icu has the workout document of the library workout "Sweet Spot 3x12"
 
   Scenario: A planned workout is moved to another day
@@ -104,15 +126,16 @@ Feature: A library workout is planned on a day in the chosen calendar
   Scenario: When intervals.icu cannot be reached nothing is planned
     Given intervals.icu cannot be reached for writes
     When I press "Training"
-    And I press "Plan Sweet Spot 3x12 on Wednesday"
+    And I drag the workout "Sweet Spot 3x12" onto "Wednesday"
     Then the page says "intervals.icu could not be reached: nothing was planned."
+    And the calendar day "Wednesday" lists no "Sweet Spot 3x12"
     When I press Back
     Then the training tile shows "No workout planned"
 
   Scenario: A token without the scope asks the rider to connect again
     Given intervals.icu rejects writes with 403
     When I press "Training"
-    And I press "Plan Sweet Spot 3x12 on Wednesday"
+    And I drag the workout "Sweet Spot 3x12" onto "Wednesday"
     Then the page says "intervals.icu cannot be changed from the library."
     And the secret store holds no intervals.icu token
 
@@ -121,8 +144,7 @@ Feature: A library workout is planned on a day in the chosen calendar
     And I press the chip "ridrs (this device)" of the row "Planned workouts"
     And I press Back
     And I press "Training"
-    And I press "Thursday"
-    And I press "Plan Sweet Spot 3x12 on Thursday"
+    And I drag the workout "Sweet Spot 3x12" onto "Thursday"
     Then the calendar day "Thursday" lists "Sweet Spot 3x12"
     And intervals.icu received no write to its events
     When I press Back
@@ -130,23 +152,40 @@ Feature: A library workout is planned on a day in the chosen calendar
       | day  | Tomorrow        |
       | name | Sweet Spot 3x12 |
 
-  Scenario: A weekday that has passed this week is the one of next week
+  Scenario: A day that has passed takes no workout
     When I press "Training"
-    And I press "Tuesday"
-    And I press "Plan Sweet Spot 3x12 on Tuesday"
-    Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
-      | start_date_local | 2026-11-10T00:00:00 |
+    And I drag the workout "Sweet Spot 3x12" onto "Tuesday"
+    Then intervals.icu received no write to its events
 
-  Scenario: The Training area's own entries are not written to intervals.icu
+  Scenario: A planned workout of intervals.icu is moved by dragging it to another day
+    Given intervals.icu plans:
+      | date       | type | name         | duration | load |
+      | 2026-11-05 | Ride | Threshold 20 | 1h       | 80   |
+    And I open the next workout
+    And I press "Refresh"
+    And I press Back
     When I press "Training"
-    And I press "Add a rest day on Wednesday"
-    And I press "Add an outdoor ride on Wednesday"
-    Then the calendar day "Wednesday" lists "Rest day"
-    And intervals.icu received no write to its events
+    And I drag the planned workout "Threshold 20" onto "Saturday"
+    Then intervals.icu received "PUT" for the event "Threshold 20" with the body:
+      | start_date_local | 2026-11-07T00:00:00 |
 
-  Scenario: The plan button is in German
+  Scenario: A planned workout of next week is moved by dragging it
+    Given intervals.icu plans:
+      | date       | type | name         | duration | load |
+      | 2026-11-10 | Ride | Threshold 20 | 1h       | 80   |
+    And I open the next workout
+    And I press "Refresh"
+    And I press Back
+    When I press "Training"
+    And I press "Next week"
+    Then the calendar day "Tuesday" lists "Threshold 20"
+    When I drag the planned workout "Threshold 20" onto "Friday"
+    Then intervals.icu received "PUT" for the event "Threshold 20" with the body:
+      | start_date_local | 2026-11-13T00:00:00 |
+
+  Scenario: The calendar is in German
     When I press "Settings"
     And I press "Deutsch"
     And I press Back
     And I press "Training"
-    Then the Training area offers the button "Sweet Spot 3x12 am Mittwoch einplanen"
+    Then the Training area has the button "Nächste Woche"

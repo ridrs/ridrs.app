@@ -136,9 +136,99 @@ Then(
 );
 
 Then(
+  'the calendar day {string} shows {string} as done',
+  async function (this: RidrsWorld, day: string, ride: string) {
+    await waitFor(() =>
+      assert.ok(
+        [...calendarDay(this, day).querySelectorAll('li[data-done]')].some((li) =>
+          li.textContent?.includes(ride),
+        ),
+      ),
+    );
+  },
+);
+
+Then(
+  'the calendar day {string} shows {int} done ride(s)',
+  async function (this: RidrsWorld, day: string, count: number) {
+    await waitFor(() =>
+      assert.equal(calendarDay(this, day).querySelectorAll('li[data-done]').length, count),
+    );
+  },
+);
+
+Then(
   'the calendar day {string} lists no {string}',
   async function (this: RidrsWorld, day: string, entry: string) {
     await waitFor(() => assert.ok(!calendarDay(this, day).textContent?.includes(entry)));
+  },
+);
+
+/** Drags `source` onto the calendar day `day`, as the pointer does: start, over, drop, end. */
+async function dragOnto(world: RidrsWorld, source: HTMLElement, day: string): Promise<void> {
+  const target = calendarDay(world, day);
+  fireEvent.dragStart(source);
+  await world.settle();
+  fireEvent.dragOver(target);
+  await world.settle();
+  fireEvent.drop(target);
+  fireEvent.dragEnd(source);
+  await world.settle();
+}
+
+/** The element to drag, once the screen has it. */
+const draggable = (world: RidrsWorld, selector: string, name: string): Promise<HTMLElement> =>
+  waitFor(() => {
+    const element = [...shownScreen(world).querySelectorAll<HTMLElement>(selector)].find(
+      (candidate) => candidate.textContent?.includes(name),
+    );
+    assert.ok(element, `Nothing to drag named "${name}"`);
+    return element;
+  });
+
+When(
+  'I drag the workout {string} onto {string}',
+  async function (this: RidrsWorld, name: string, day: string) {
+    await dragOnto(this, await draggable(this, 'article[draggable="true"]', name), day);
+  },
+);
+
+When(
+  'I drag the planned workout {string} onto {string}',
+  async function (this: RidrsWorld, name: string, day: string) {
+    await dragOnto(this, await draggable(this, 'li[draggable="true"]', name), day);
+  },
+);
+
+Then('the planned workout {string} cannot be dragged', function (this: RidrsWorld, name: string) {
+  const entry = [...shownScreen(this).querySelectorAll<HTMLElement>('li.tr-entry')].find((e) =>
+    e.textContent?.includes(name),
+  );
+  assert.ok(entry, `No planned workout "${name}"`);
+  assert.notEqual(entry.getAttribute('draggable'), 'true');
+});
+
+Then('the Training area has no button {string}', function (this: RidrsWorld, name: string) {
+  assert.equal(within(shownScreen(this)).queryByRole('button', { name }), null);
+});
+
+Then('the Training area has the button {string}', async function (this: RidrsWorld, name: string) {
+  await waitFor(() => within(shownScreen(this)).getByRole('button', { name }));
+});
+
+Then('the large calendar is shown', async function (this: RidrsWorld) {
+  await waitFor(() => assert.ok(shownScreen(this).querySelector('[data-testid="large-calendar"]')));
+});
+
+Then(
+  'the calendar shows the week starting {string}',
+  async function (this: RidrsWorld, date: string) {
+    await waitFor(() =>
+      assert.equal(
+        shownScreen(this).querySelector('[data-week-start]')?.getAttribute('data-week-start'),
+        date,
+      ),
+    );
   },
 );
 
