@@ -318,7 +318,7 @@ export function Card({
       data-media={image === undefined && backdrop === undefined ? undefined : ''}
     >
       <style>{PREVIEW_CSS}</style>
-      {image ? <img className="pv-teaser-image" src={image} alt="" /> : null}
+      {image ? <img className="pv-teaser-image" src={image} alt="" decoding="async" /> : null}
       {backdrop ? <div className="pv-teaser-backdrop">{backdrop}</div> : null}
       <span className="pv-teaser-classifier">
         {icon ? <span className="pv-glyph" aria-hidden="true" style={iconStyle(icon)} /> : null}
