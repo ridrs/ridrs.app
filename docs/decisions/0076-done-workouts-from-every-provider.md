@@ -2,7 +2,7 @@
 
 # ADR 0076: Done Workouts from Every Provider
 
-Status: **proposed** on 2026-11-09, on the maintainer's request for the Training area ("workouts (geplante und durchgeführte) sollen gezeigt werden", answered: "eine Zusammenführung aller Provider und lokaler Daten inklusive Duplikatserkennung"). Builds on [ADR 0075](0075-data-sources-for-the-athlete-profile-and-the-training-plan.md).
+Status: **accepted** on 2026-11-09 by the maintainer, on their request for the Training area ("workouts (geplante und durchgeführte) sollen gezeigt werden", answered: "eine Zusammenführung aller Provider und lokaler Daten inklusive Duplikatserkennung"). Builds on [ADR 0075](0075-data-sources-for-the-athlete-profile-and-the-training-plan.md).
 
 ## Context
 
@@ -14,4 +14,4 @@ The Training area's calendar shows the planned workouts of the chosen source (AD
 - **No choice, like the library:** every provider adds to what the area shows. A ride is one that was done, so there is no source of truth to choose; the rider has nothing to configure.
 - **Merged by the reader, not stored.** The Training area merges the providers' entries when it renders; nothing is copied between providers (ADR 0075 still holds for the data types with a source).
 - **Duplicate rule.** Two entries are the same ride when they share an `externalId` (a ride of ridrs that was uploaded to intervals.icu has the session id as `external_id`), or, without one, when their sports match and their start times are less than five minutes apart. The merged entry takes the richer fields: the name and training load of the service, the id of the session.
-- **Providers.** `planner-intervals-icu` offers the activities of the last 14 days (`GET /api/v1/athlete/0/activities`, scope `ACTIVITY:READ`). `recording-session` offers the rides saved on this device, read from the header and footer of the sealed recordings.
+- **Providers.** `planner-intervals-icu` offers the activities of the last 14 days (`GET /api/v1/athlete/0/activities`, scope `ACTIVITY:READ`). `history-ridrs` offers the rides saved on this device, read from the sealed `.ridrs` recordings.

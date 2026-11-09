@@ -64,7 +64,7 @@ The maintainer wants a source per data type chosen on the settings page from eve
 
 - **No SQLite and no effective-dated history** in P7: a ride freezes its own values, and intervals.icu keeps its own history. Both wait for a use case (charts of FTP or weight) behind the same access.
 - **The calendar write** is "plan a library workout on a day" (with its steps), then move and remove. The Training area's own entries (rest, note, outdoor) stay in the ridrs calendar and are not written to intervals.icu (maintainer).
-- **Built-in ridrs workouts**: not in these stages (maintainer); the ridrs library stays empty until riding a workout gives them a use, then they ship as files like the drivetrain specifications.
+- **Built-in ridrs workouts**: not in these stages (maintainer); the ridrs library stays empty until riding a workout gives them a use, then they ship as files like the drivetrain specifications. *Superseded on 2026-11-09, see the addendum at the end.*
 - **Riding a workout** (steps to `trainer.target-power` inputs with the frozen FTP), the use case that makes the library and the calendar worth more than a list: proposed as the next stage, with its own ADR.
 - **Ride uploads as a data type** with chosen targets, once a second target exists.
 - The bicycle stays a ridrs-only user document, not part of the profile.
@@ -115,3 +115,12 @@ Each starts with failing scenarios (rule 1); scenarios as in the proposal, secti
   - **`athlete.profile-changed` also goes out without values** (`{ provider }` for an unavailable source), so the ride records where its defaults came from; it goes out only if the provider in use has an entry at all.
   - **The configuration snapshot is taken a microtask after `running`.** The recorder sees `running` when it is published, before the plugins have the frozen bicycle and athlete published just before it, so the `config.snapshot` section of `physics-rider` showed the defaults (the bicycle's, which ADR 0060 promises to be frozen, takes the same path). `recording-session` writes nothing of a new ride until the snapshot is taken.
   - **ridrs is named in the UI's language** ("ridrs (this device)", "ridrs (dieses Gerät)") by the plugin that shows it; the name of any other provider is the `label` its plugin gives.
+
+## Addendum, 2026-11-09: the ridrs library, and the week as a table
+
+On the maintainer's request for the Training area (a table-like week, planned and done workouts, drag and drop):
+
+- **The ridrs library is no longer empty.** The host side of `ui-area-training` offers the built-in workouts as the library of the key `ridrs` (virtual rides with duration and training load, no steps yet). This replaces "no built-in workouts" above and the library offered "with no workouts" in Stage D5. Riding a workout will give them steps later.
+- **A library workout is planned by dragging it onto a day** of the week; the buttons "Plan <workout> on <day>" are gone. Planning a ridrs workout into an intervals.icu calendar sends the event without a `workout_doc`; only a workout of intervals.icu's own library carries its steps (`from === SERVICE`).
+- **Moving is drag and drop inside the week**; removing and editing wait for the entry's own page. The area shows a change at once as a pending entry and replaces it in place when the provider answers.
+- **Done workouts** come from every provider, merged by the reader: [ADR 0076](0076-done-workouts-from-every-provider.md).
