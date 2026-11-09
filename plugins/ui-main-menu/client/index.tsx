@@ -8,6 +8,8 @@ import { messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const TODAY = new URL('./assets/icons/sun.svg', import.meta.url).href;
+/** The ridrs wordmark: chrome letters and two slashes in the cyan-to-volt gradient. */
+const LOGO = new URL('./assets/logo.svg', import.meta.url).href;
 
 /**
  * Entries of `menu/item` follow one contract (ADR 0058): a `button[data-menu-item]` holding an
@@ -16,8 +18,7 @@ const TODAY = new URL('./assets/icons/sun.svg', import.meta.url).href;
  */
 const CSS = `
 .mm-nav { display: flex; flex-direction: column; gap: 28px; height: 100%; padding: 28px 12px; }
-.mm-brand { margin: 0 12px; color: var(--ridrs-text, #f2f5fa); font: italic 900 26px system-ui, sans-serif;
-  letter-spacing: .04em; }
+.mm-brand { display: block; width: 140px; height: auto; margin: 0 12px; }
 .mm-list { display: flex; flex-direction: column; gap: 6px; }
 .mm-list .mm-list, .mm-list [data-contribution] { display: contents; }
 .mm-nav [data-menu-item] { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px;
@@ -29,7 +30,7 @@ const CSS = `
 .mm-nav [data-menu-icon] { flex: none; width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 [data-breakpoint="medium"] .mm-nav { align-items: center; padding: 24px 10px; }
-[data-breakpoint="medium"] .mm-brand { margin: 0; font-size: 18px; }
+[data-breakpoint="medium"] .mm-brand { width: 60px; margin: 0; }
 [data-breakpoint="medium"] .mm-nav [data-menu-item] { justify-content: center; }
 [data-breakpoint="compact"] .mm-nav { flex-direction: row; padding: 6px 8px; }
 [data-breakpoint="compact"] .mm-brand { display: none; }
@@ -52,9 +53,7 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
   return (
     <nav className="mm-nav" aria-label={text.menu}>
       <style>{CSS}</style>
-      <span className="mm-brand" aria-hidden="true">
-        ridrs
-      </span>
+      <img className="mm-brand" src={LOGO} alt="" aria-hidden="true" />
       <div className="mm-list">
         {/* Today is the main screen, where the menu lives; the areas mark their own entries. */}
         <button
