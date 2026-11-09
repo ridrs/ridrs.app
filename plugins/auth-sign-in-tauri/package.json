@@ -7,6 +7,7 @@
   "dependencies": {
     "@fabianlars/tauri-plugin-oauth": "2.1.0",
     "@ridrs/contracts": "workspace:*",
+    "@tauri-apps/plugin-deep-link": "2.6.3",
     "@tauri-apps/plugin-opener": "2.7.2"
   }
 }

@@ -14,6 +14,7 @@ export const en = {
     'sign-in-rejected': 'Sign-in failed. Please try again.',
     'token-rejected': 'intervals.icu no longer accepts this connection.',
     unreachable: 'intervals.icu could not be reached.',
+    'rate-limited': 'intervals.icu asks for a pause: too many requests.',
   } as Readonly<Record<string, string>>,
   reconnect: 'Reconnect intervals.icu',
   connect: 'Connect intervals.icu',

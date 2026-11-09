@@ -11,6 +11,13 @@ import { defineCapability } from './capabilities.ts';
  */
 export interface BrowserSignIn {
   signIn(request: BrowserSignInRequest): Promise<BrowserSignInResult>;
+  /**
+   * True when the provider receives `ridrs://` deep links (ADR 0079): a sign-in may then use the
+   * redirect URI of the relay (`relayRedirectUri`), which bounces to `ridrs://oauth/…`. False or
+   * absent where the scheme is not registered (`tauri dev` on the Mac, headless): the loopback
+   * redirect is used.
+   */
+  readonly deepLink?: boolean;
 }
 
 export interface BrowserSignInRequest {
@@ -18,6 +25,11 @@ export interface BrowserSignInRequest {
   authorizationUrl(redirectUri: string): string;
   /** The path of the redirect URI, e.g. `/oauth/callback`. */
   readonly callbackPath: string;
+  /**
+   * The redirect URI of a relay that bounces the answer to the app's deep link. Used only by a
+   * provider with `deepLink`, which then resolves with the deep link as `callbackUrl`.
+   */
+  readonly relayRedirectUri?: string;
 }
 
 export interface BrowserSignInResult {

@@ -178,3 +178,7 @@ Answered on 2026-11-08: "Accept all as proposed". 1 data sources; 2 chips; 3 def
 6. Ship built-in ridrs workouts for the library (C.10)?
 7. Ride uploads as a data type with chosen targets, now or later (C.12)?
 8. Accept that history and SQLite wait (C.4, amends ADR 0052)?
+
+## Addendum, 2026-11-09: drafts and a request budget for external sources
+
+C.13 says an offline write to an external source is refused, not queued. [ADR 0078](../decisions/0077-drafts-for-external-data-sources-and-request-budget.md) adds the other half for sources behind an external API (`DataSource.remote`): the Me and Training pages collect changes in a local draft and send them with one explicit Save (the pages of the local provider keep changing at once), and every read has a validity (athlete 1 h, planned events and done rides 15 min, library 24 h and only when shown) with stale-while-revalidate, one gateway for all requests (5 a second, `Retry-After` honoured, no automatic retry), and a counter by purpose. [ADR 0079](../decisions/0078-relay-and-mailbox-client.md) lets a relay's mailbox tell the app what changed instead of the app asking.

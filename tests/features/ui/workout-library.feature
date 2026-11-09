@@ -30,8 +30,12 @@ Feature: The workout library lists the workouts of every provider
     Then the row "Workout library" lists "ridrs (this device), intervals.icu"
     And the page says "all providers, read only"
 
-  Scenario: The library is read from intervals.icu
-    When the host has started
+  Scenario: The library is read when the Training area shows it, not at start (ADR 0078)
+    Given the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    Then intervals.icu received 0 requests "GET /api/v1/athlete/0/workouts"
+    When I press "Training"
     Then intervals.icu received "GET /api/v1/athlete/0/workouts" with the token
     And intervals.icu received "GET /api/v1/athlete/0/folders" with the token
 
@@ -62,10 +66,15 @@ Feature: The workout library lists the workouts of every provider
 
   Scenario: Offline, the last library stands in
     Given the host has started
-    And the host is restarted while intervals.icu is unreachable
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Training"
+    Then the library lists the workout "Tempo 40" of "intervals.icu"
+    When I press Back
+    And the local time is "2026-11-05 09:30"
+    And the host is restarted while intervals.icu is unreachable
+    And I reload the UI
+    And I press "Training"
     Then the library lists these workouts of "intervals.icu":
       | name            | details                |
       | Tempo 40        | 40 min · 60 TSS        |

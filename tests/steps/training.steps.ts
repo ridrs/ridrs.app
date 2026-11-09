@@ -4,13 +4,18 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
 import {
+  appLinkState,
   exportFitState,
+  linkIdOf,
   recordingRideState,
   trainingCalendarMoveService,
   trainingCalendarRemoveService,
 } from '@ridrs/contracts';
 import FakeTimers from '@sinonjs/fake-timers';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
+import { parseDeepLink, sessionForLink } from '../../plugins/auth-sign-in-tauri/deep-link.ts';
+import { pacing } from '../../plugins/planner-intervals-icu/gateway.ts';
+import { socketConfig } from '../../plugins/planner-intervals-icu/mailbox-socket.ts';
 import {
   type PlannedEvent,
   parseDuration,
@@ -75,6 +80,9 @@ Given(
   'the ridrs plugins {string} together with the simulated intervals.icu',
   async function (this: RidrsWorld, pluginsCsv: string) {
     await useRealPlugins(this, splitCsv(pluginsCsv));
+    // The scenarios do not wait for the pacing of the gateway; its unit test covers it (ADR 0078).
+    pacing.minIntervalMs = 0;
+    pacing.writeSpacingMs = 0;
     const simulation = new SimulatedIntervalsIcu();
     simulations.set(this, simulation);
     const behavior = this.getBehavior('simulated-intervals-icu');
@@ -829,7 +837,9 @@ Then(
     assert.equal(simulation.uploads.length, 1);
     const [upload] = simulation.uploads;
     const session = this.stateValues<{ sessionId: string }>(exportFitState.id).at(-1);
-    assert.equal(upload?.externalId, session?.sessionId);
+    assert.equal(upload?.externalId, linkIdOf(session?.sessionId ?? ''));
+    // The relay carries only this form of an external id.
+    assert.match(upload?.externalId ?? '', /^[A-Za-z0-9._-]{1,128}$/);
     assert.equal(upload?.fileName, fit.slice(fit.lastIndexOf('/') + 1));
     assert.deepEqual(upload?.bytes, this.memoryFiles?.files.get(fit));
   },
@@ -889,4 +899,498 @@ Given('the app files are written slowly from now on', function (this: RidrsWorld
 When('the app files are written again', async function (this: RidrsWorld) {
   this.useMemoryStorage().release();
   await this.settle();
+});
+
+// ---- The request budget (ADR 0078) -------------------------------------------------------
+
+/** The file the planner caches its last reads in (ADR 0048). */
+const CACHE_FILE = 'training/intervals-icu-plan.json';
+
+function writeCache(files: Map<string, Uint8Array>, cache: Record<string, unknown>): void {
+  files.set(CACHE_FILE, new TextEncoder().encode(JSON.stringify(cache)));
+}
+
+function cachedPlan(world: RidrsWorld, name: string, date: string): Record<string, unknown> {
+  const now = Date.now();
+  return {
+    fetchedAt: now - 60_000,
+    athlete: { name: 'Alex Rider', ftp: 250, weight: 72 },
+    ftpField: 'ftp',
+    workouts: [{ id: '4001', date, name, sport: 'ride', steps: [] }],
+    history: [],
+  };
+}
+
+Given(
+  'the plan cache of intervals.icu was read {int} minutes ago and plans {string} on {string}',
+  function (this: RidrsWorld, minutes: number, name: string, date: string) {
+    const at = Date.now() - minutes * 60_000;
+    writeCache(this.useMemoryStorage().files, {
+      ...cachedPlan(this, name, date),
+      fetchedAt: at,
+      fetched: { athlete: at, events: at },
+    });
+  },
+);
+
+Given(
+  'the plan cache of intervals.icu is from before its resources had times and plans {string} on {string}',
+  function (this: RidrsWorld, name: string, date: string) {
+    writeCache(this.useMemoryStorage().files, cachedPlan(this, name, date));
+  },
+);
+
+Given('the simulated intervals.icu forgets the requests so far', async function (this: RidrsWorld) {
+  await this.settle();
+  intervals(this).requests.length = 0;
+  intervals(this).requestTimes.length = 0;
+});
+
+Given('intervals.icu holds back its answers to reads', function (this: RidrsWorld) {
+  intervals(this).holdReads = true;
+});
+
+When('intervals.icu answers its reads', async function (this: RidrsWorld) {
+  intervals(this).answerReads();
+  await this.settle();
+});
+
+Given('intervals.icu asks for {int} seconds of rest', function (this: RidrsWorld, seconds: number) {
+  intervals(this).rateLimit = { retryAfterSeconds: seconds };
+});
+
+Given('intervals.icu no longer asks for rest', function (this: RidrsWorld) {
+  intervals(this).rateLimit = undefined;
+});
+
+/** Waits until the count has been reached, then until nothing more comes: the budget is exact. */
+async function requestsSettled(
+  world: RidrsWorld,
+  count: (s: SimulatedIntervalsIcu) => number,
+  expected: number,
+) {
+  const simulation = intervals(world);
+  await world.settle();
+  // In real time: the paced requests of a scenario wait for their turn.
+  for (
+    let waited = 0;
+    expected > 0 && count(simulation) < expected && waited < 8000;
+    waited += 20
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await world.settle();
+  }
+  await world.settle();
+  return count(simulation);
+}
+
+Then('intervals.icu received {int} requests', async function (this: RidrsWorld, expected: number) {
+  assert.equal(
+    await requestsSettled(this, (s) => s.requests.length, expected),
+    expected,
+    `Requests: ${intervals(this).requestLines().join(', ')}`,
+  );
+});
+
+Then(
+  'intervals.icu received {int} requests {string}',
+  async function (this: RidrsWorld, expected: number, call: string) {
+    assert.equal(
+      await requestsSettled(this, (s) => s.countRequests(call), expected),
+      expected,
+      `Requests: ${intervals(this).requestLines().join(', ')}`,
+    );
+  },
+);
+
+Then('intervals.icu received no write', async function (this: RidrsWorld) {
+  await this.settle();
+  const writes = intervals(this).requests.filter((request) => request.method !== 'GET');
+  assert.deepEqual(
+    writes.map((request) => `${request.method} ${request.url}`),
+    [],
+  );
+});
+
+When(
+  'the rider asks the athlete profile of {string} to change to an FTP of {int} W and a weight of {float} kg',
+  async function (this: RidrsWorld, provider: string, ftp: number, weight: number) {
+    const answer = await this.ensureHost().callService('athlete.profile.update', {
+      key: provider,
+      ftp,
+      weight,
+    });
+    assert.deepEqual(answer, { ok: true });
+    await this.flushState();
+  },
+);
+
+When('the library of {string} is asked for', async function (this: RidrsWorld, provider: string) {
+  await this.ensureHost().callService('training.library.load', { key: provider });
+  await this.settle();
+});
+
+When('the plan of {string} is refreshed', async function (this: RidrsWorld, provider: string) {
+  await this.ensureHost().callService('training.refresh', { key: provider });
+  await this.settle();
+});
+
+Then(
+  'the account of {string} is {string} because {string}',
+  async function (this: RidrsWorld, service: string, state: string, reason: string) {
+    await this.waitForIo(() => {
+      const account = this.stateValues<{ service: string; state: string; reason?: string }>(
+        'training.account',
+      ).findLast((value) => value.service === service);
+      return account?.state === state && account.reason === reason;
+    }, `the account to be ${state} because ${reason}`);
+  },
+);
+
+Then(
+  'the account of {string} is {string}',
+  async function (this: RidrsWorld, service: string, state: string) {
+    await this.waitForIo(
+      () =>
+        this.stateValues<{ service: string; state: string }>('training.account').findLast(
+          (value) => value.service === service,
+        )?.state === state,
+      `the account to be ${state}`,
+    );
+  },
+);
+
+Given('the requests to intervals.icu are paced as in the app', function (this: RidrsWorld) {
+  pacing.minIntervalMs = 200;
+  pacing.writeSpacingMs = 250;
+});
+
+Then(
+  'the writes reached intervals.icu at least {int} ms apart',
+  async function (this: RidrsWorld, gap: number) {
+    const simulation = intervals(this);
+    await this.settle();
+    const times = simulation.requests.flatMap((request, index) =>
+      request.method === 'GET' ? [] : [simulation.requestTimes[index] ?? 0],
+    );
+    assert.ok(times.length >= 2, `Expected several writes, got ${times.length}`);
+    for (let i = 1; i < times.length; i++) {
+      // The wall clock of the test runs on a fake Date that ticks every 20 ms.
+      assert.ok(
+        (times[i] ?? 0) - (times[i - 1] ?? 0) >= gap - 25,
+        `Writes ${i - 1} and ${i} were ${(times[i] ?? 0) - (times[i - 1] ?? 0)} ms apart`,
+      );
+    }
+  },
+);
+
+// ---- The relay and its mailbox (ADR 0079) ------------------------------------------------
+
+/** `<id:Name>` in a payload is the id of the planned event of that name. */
+function withEventIds(world: RidrsWorld, json: string): Record<string, unknown> {
+  return JSON.parse(
+    json.replace(/<id:([^>]+)>/g, (_, name: string) => eventNamed(world, name)),
+  ) as Record<string, unknown>;
+}
+
+When(
+  'intervals.icu sends the webhook {string}:',
+  function (this: RidrsWorld, type: string, json: string) {
+    intervals(this).mailbox.push(type, withEventIds(this, json));
+  },
+);
+
+When(
+  'intervals.icu sends the webhook {string} at {string}:',
+  function (this: RidrsWorld, type: string, timestamp: string, json: string) {
+    intervals(this).mailbox.push(type, withEventIds(this, json), timestamp);
+  },
+);
+
+When('the relay delivers the last event again', function (this: RidrsWorld) {
+  const mailbox = intervals(this).mailbox;
+  const last = mailbox.events.at(-1);
+  assert.ok(last, 'The relay holds no event');
+  mailbox.duplicate(last);
+});
+
+Given('the relay cannot be reached', function (this: RidrsWorld) {
+  intervals(this).mailbox.reachable = false;
+});
+
+When('the relay can be reached again', function (this: RidrsWorld) {
+  intervals(this).mailbox.reachable = true;
+});
+
+Given('the relay forgets the requests so far', function (this: RidrsWorld) {
+  intervals(this).mailbox.requests.length = 0;
+});
+
+Then('the relay registered a device', async function (this: RidrsWorld) {
+  const mailbox = intervals(this).mailbox;
+  await this.waitForIo(() => mailbox.device !== undefined, 'the device to be registered');
+});
+
+Then('the relay got the token once, in the registration', async function (this: RidrsWorld) {
+  const simulation = intervals(this);
+  await this.settle();
+  assert.deepEqual(simulation.mailbox.tokensSeen, [simulation.token]);
+  assert.equal(simulation.mailbox.count('POST /devices'), 1);
+});
+
+Then(
+  'the relay received {int} requests {string}',
+  async function (this: RidrsWorld, expected: number, call: string) {
+    const mailbox = intervals(this).mailbox;
+    for (
+      let waited = 0;
+      expected > 0 && mailbox.count(call) < expected && waited < 5000;
+      waited += 20
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await this.settle();
+    }
+    await this.settle();
+    assert.equal(mailbox.count(call), expected, `Relay requests: ${mailbox.requests.join(', ')}`);
+  },
+);
+
+Then('the relay holds {int} events', async function (this: RidrsWorld, expected: number) {
+  const mailbox = intervals(this).mailbox;
+  for (let waited = 0; mailbox.events.length !== expected && waited < 5000; waited += 20) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await this.settle();
+  }
+  assert.equal(mailbox.events.length, expected);
+});
+
+Then('the relay forgot the device', async function (this: RidrsWorld) {
+  const mailbox = intervals(this).mailbox;
+  await this.waitForIo(() => mailbox.deleted, 'the device to be deleted at the relay');
+  assert.equal(mailbox.device, undefined);
+});
+
+/** The mailbox's entries in the secret store (ADR 0079). */
+const MAILBOX_SECRETS = [
+  'ridrs-mailbox.sign-private',
+  'ridrs-mailbox.enc-private',
+  'ridrs-mailbox.device-id',
+];
+
+Then(
+  'the secret store holds the keys and the device id of the mailbox',
+  async function (this: RidrsWorld) {
+    const simulation = intervals(this);
+    await this.waitForIo(
+      () => MAILBOX_SECRETS.every((key) => simulation.secrets.has(key)),
+      'the mailbox keys in the secret store',
+    );
+  },
+);
+
+Then(
+  'the secret store holds no keys and no device id of the mailbox',
+  async function (this: RidrsWorld) {
+    const simulation = intervals(this);
+    await this.waitForIo(
+      () => MAILBOX_SECRETS.every((key) => !simulation.secrets.has(key)),
+      'the mailbox keys to be gone from the secret store',
+    );
+  },
+);
+
+Then('no app file holds a key or a token', async function (this: RidrsWorld) {
+  await this.settle();
+  const simulation = intervals(this);
+  const secrets = [...simulation.secrets.values()];
+  const stored = this.useMemoryStorage().files;
+  for (const [name, bytes] of stored) {
+    const text = new TextDecoder().decode(bytes);
+    for (const secret of secrets) {
+      assert.ok(!text.includes(secret), `The app file "${name}" holds a secret`);
+    }
+  }
+});
+
+Given('the system hands ridrs deep links to the app', function (this: RidrsWorld) {
+  intervals(this).deepLinks = true;
+});
+
+Then('the sign-in came back as a deep link', function (this: RidrsWorld) {
+  assert.match(intervals(this).lastCallbackUrl ?? '', /^ridrs:\/\/oauth\/intervals\?/);
+});
+
+Given('a test link plugin', async function (this: RidrsWorld) {
+  await this.writeProbePluginFolder({
+    folder: 'test-link',
+    id: 'test-link',
+    types: ['transport'],
+    state: { owns: [appLinkState.id] },
+  });
+});
+
+When('a link opens the last ride', async function (this: RidrsWorld) {
+  await this.waitForIo(() => this.stateOf(recordingRideState.id).length > 0, 'a recorded ride');
+  const ride = { sessionId: String(this.stateOf(recordingRideState.id).at(-1)?.key) };
+  const context = this.ensureHost().getPluginContext('test-link');
+  assert.ok(context, 'Expected the test link plugin');
+  context.state.set(appLinkState, 'activity', { sessionId: ride.sessionId, at: Date.now() });
+  await this.flushState();
+});
+
+// ---- The socket to the relay (ADR 0079) --------------------------------------------------
+
+Given('the relay offers a socket', async function (this: RidrsWorld) {
+  // The delays of a real connection are shortened; the unit test covers the real ones.
+  Object.assign(socketConfig, {
+    reconnectBaseMs: 20,
+    reconnectMaxMs: 200,
+    pingMs: 30_000,
+    stableMs: 60_000,
+  });
+  this.getBehavior('simulated-relay-socket').providedImplementations.set(
+    'net.websocket',
+    intervals(this).mailbox.webSocket,
+  );
+  await this.writeProbePluginFolder({
+    folder: 'simulated-relay-socket',
+    id: 'simulated-relay-socket',
+    types: ['test'],
+    provides: ['net.websocket'],
+  });
+});
+
+Then('the app holds a socket to the relay', async function (this: RidrsWorld) {
+  const mailbox = intervals(this).mailbox;
+  for (let waited = 0; !mailbox.socketOpen && waited < 5000; waited += 20) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await this.settle();
+  }
+  assert.equal(mailbox.socketOpen, true);
+});
+
+Then('the app holds no socket to the relay', async function (this: RidrsWorld) {
+  const mailbox = intervals(this).mailbox;
+  for (let waited = 0; mailbox.socketOpen && waited < 2000; waited += 20) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await this.settle();
+  }
+  assert.equal(mailbox.socketOpen, false);
+});
+
+When('the network drops the socket', function (this: RidrsWorld) {
+  intervals(this).mailbox.dropSocket();
+});
+
+When('another connection of the device replaces the socket', function (this: RidrsWorld) {
+  intervals(this).mailbox.replaceSocket();
+});
+
+When('a moment passes', async function (this: RidrsWorld) {
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  await this.settle();
+});
+
+Then('the relay accepted {int} sockets', async function (this: RidrsWorld, expected: number) {
+  const mailbox = intervals(this).mailbox;
+  for (let waited = 0; mailbox.accepted < expected && waited < 5000; waited += 20) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await this.settle();
+  }
+  assert.equal(mailbox.accepted, expected);
+});
+
+Then(
+  'the next workout card shows {string} at once',
+  async function (this: RidrsWorld, name: string) {
+    await waitFor(
+      () => assert.equal(textOf(within(ui(this)).getByTestId('next-workout')).includes(name), true),
+      { timeout: 4000 },
+    );
+  },
+);
+
+Then(
+  'the upload of the last ride has an external id the relay accepts',
+  async function (this: RidrsWorld) {
+    const simulation = intervals(this);
+    await this.waitForIo(() => simulation.uploads.length > 0, 'an upload');
+    const externalId = simulation.uploads.at(-1)?.externalId ?? '';
+    assert.match(externalId, /^[A-Za-z0-9._-]{1,128}$/);
+    const session = String(this.stateOf(recordingRideState.id).at(-1)?.key);
+    assert.ok(session.includes(':'), 'The session id of the host holds colons');
+    assert.equal(externalId, linkIdOf(session));
+  },
+);
+
+Then('the link to the last ride names it by that external id', function (this: RidrsWorld) {
+  const externalId = intervals(this).uploads.at(-1)?.externalId ?? '';
+  const session = String(this.stateOf(recordingRideState.id).at(-1)?.key);
+  const link = parseDeepLink(`ridrs://activity/${externalId}`);
+  assert.equal(link?.kind, 'activity');
+  assert.equal(sessionForLink([session], link?.kind === 'activity' ? link.sessionId : ''), session);
+});
+
+// ---- 401s of the relay (ADR 0079) -----------------------------------------------------------
+
+Given(
+  'the relay answers {int} requests with a 401 for the time of the request',
+  function (this: RidrsWorld, count: number) {
+    intervals(this).mailbox.skewedRequests = count;
+  },
+);
+
+When('the relay no longer knows the device', function (this: RidrsWorld) {
+  intervals(this).mailbox.forgetDevice();
+});
+
+Then(
+  'the secret store still holds the keys and the device id of the mailbox',
+  async function (this: RidrsWorld) {
+    await this.settle();
+    const simulation = intervals(this);
+    assert.ok(
+      MAILBOX_SECRETS.every((key) => simulation.secrets.has(key)),
+      'The mailbox keys were forgotten',
+    );
+  },
+);
+
+const notedKeys = new WeakMap<RidrsWorld, { signPrivate?: string; deviceId?: string }>();
+
+Given('the keys and the device id of the mailbox are noted', function (this: RidrsWorld) {
+  const secrets = intervals(this).secrets;
+  notedKeys.set(this, {
+    signPrivate: secrets.get('ridrs-mailbox.sign-private'),
+    deviceId: secrets.get('ridrs-mailbox.device-id'),
+  });
+});
+
+Then(
+  'the mailbox has other keys and another device id than noted',
+  async function (this: RidrsWorld) {
+    const simulation = intervals(this);
+    const before = notedKeys.get(this);
+    assert.ok(before?.deviceId, 'Nothing was noted');
+    await this.waitForIo(
+      () => simulation.secrets.get('ridrs-mailbox.device-id') !== before.deviceId,
+      'a new device id',
+    );
+    assert.notEqual(simulation.secrets.get('ridrs-mailbox.sign-private'), before.signPrivate);
+  },
+);
+
+Then('the relay deleted the noted device', async function (this: RidrsWorld) {
+  const simulation = intervals(this);
+  const before = notedKeys.get(this);
+  await this.waitForIo(
+    () => simulation.mailbox.deletedIds.includes(before?.deviceId ?? '-'),
+    'the old device to be deleted',
+  );
+});
+
+Then('the relay registered {int} devices', async function (this: RidrsWorld, count: number) {
+  const mailbox = intervals(this).mailbox;
+  await this.waitForIo(() => mailbox.registered.length >= count, `${count} devices`);
+  assert.equal(mailbox.registered.length, count);
 });

@@ -37,6 +37,10 @@ export const de: Messages = {
     reason === 'read-only'
       ? `${source} kann nicht aus der Bibliothek geändert werden.`
       : `${source} war nicht erreichbar: Es wurde nichts eingeplant.`,
+  save: 'Speichern',
+  discard: 'Verwerfen',
+  notSaved: 'Noch nicht gespeichert',
+  changesOpen: (count: number) => `${count} ${count === 1 ? 'offene Änderung' : 'offene Änderungen'}`,
   saving: 'Wird gespeichert…',
   writeFailed: (source: string) => `${source} hat die Änderung nicht angenommen.`,
   libraryEmpty: 'Deine Quellen haben noch keine Workouts.',

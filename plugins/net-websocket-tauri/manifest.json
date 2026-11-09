@@ -1,0 +1,9 @@
+{
+  "id": "net-websocket-tauri",
+  "name": "WebSocket (Tauri)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": ["net.websocket"],
+  "requires": [],
+  "entry": "index.ts"
+}

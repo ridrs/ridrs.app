@@ -435,6 +435,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@tauri-apps/plugin-deep-link':
+        specifier: 2.6.3
+        version: 2.6.3
       '@tauri-apps/plugin-opener':
         specifier: 2.7.2
         version: 2.7.2
@@ -586,6 +589,15 @@ importers:
         specifier: 2.8.3
         version: 2.8.3
 
+  plugins/net-websocket-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/plugin-websocket':
+        specifier: 2.5.0
+        version: 2.5.0
+
   plugins/output-console:
     dependencies:
       '@ridrs/contracts':
@@ -663,9 +675,21 @@ importers:
 
   plugins/planner-intervals-icu:
     dependencies:
+      '@noble/ciphers':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@noble/hashes':
+        specifier: 2.2.0
+        version: 2.2.0
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   plugins/profile-local:
     dependencies:
@@ -1678,6 +1702,18 @@ packages:
     resolution: {integrity: sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ==}
     hasBin: true
 
+  '@noble/ciphers@2.2.0':
+    resolution: {integrity: sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/curves@2.2.0':
+    resolution: {integrity: sha512-T/BoHgFXirb0ENSPBquzX0rcjXeM6Lo892a2jlYJkqk83LqZx0l1Of7DzlKJ6jkpvMrkHSnAcgb5JegL8SeIkQ==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/hashes@2.2.0':
+    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
+    engines: {node: '>= 20.19.0'}
+
   '@nodable/entities@3.1.0':
     resolution: {integrity: sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ==}
 
@@ -1893,6 +1929,9 @@ packages:
   '@tauri-apps/plugin-barcode-scanner@2.5.3':
     resolution: {integrity: sha512-Ienqx/XkIcxkf6oM7CCy5FnWNUtiuWC5mkLtM7GughgrYvd5EIGPGxuISboFhvtgiNSJZF8hSan8+dSznlsdBQ==}
 
+  '@tauri-apps/plugin-deep-link@2.6.3':
+    resolution: {integrity: sha512-L+fjyGe5RPBtfh3VUSl1HslC0/xW7frDvdsZk37d9UdqOpKwD9P0PmblSk7Q/WCiAEHZ9J9Pn7VyiecBBdiy/A==}
+
   '@tauri-apps/plugin-fs@2.7.1':
     resolution: {integrity: sha512-4TBVjpi/q8PuNzjpkAc2iBGXMTLjOrAyfTiiOL8ORaJCZJRG3tjzmQ4sqs2CMG75FvLyRkOkERfP7AyY4iBNwQ==}
 
@@ -1901,6 +1940,9 @@ packages:
 
   '@tauri-apps/plugin-opener@2.7.2':
     resolution: {integrity: sha512-LyybP1VSzTMQiaFYcsbAse47KpivlyXdLZMQzGLEnkgQacGESnpjAfFoQ6h5sqWgAdZDH9szYjPzHMpv0Sz+TQ==}
+
+  '@tauri-apps/plugin-websocket@2.5.0':
+    resolution: {integrity: sha512-uy6skY9NgCNwRoFd2kueTR3Ygw+2sW0V5gfY3IHxwpTVbtRpH+0A1B94VBWBQ97Y3E4eo6C1zVVfXj1NAuR1Qg==}
 
   '@teppeis/multimaps@3.0.0':
     resolution: {integrity: sha512-ID7fosbc50TbT0MK0EG12O+gAP3W3Aa/Pz4DaTtQtEvlc9Odaqi0de+xuZ7Li2GtK4HzEX7IuRWS/JmZLksR3Q==}
@@ -3655,6 +3697,14 @@ snapshots:
       - supports-color
     optional: true
 
+  '@noble/ciphers@2.2.0': {}
+
+  '@noble/curves@2.2.0':
+    dependencies:
+      '@noble/hashes': 2.2.0
+
+  '@noble/hashes@2.2.0': {}
+
   '@nodable/entities@3.1.0': {}
 
   '@npmcli/agent@2.2.2':
@@ -3792,6 +3842,10 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.12.4
 
+  '@tauri-apps/plugin-deep-link@2.6.3':
+    dependencies:
+      '@tauri-apps/api': 2.12.4
+
   '@tauri-apps/plugin-fs@2.7.1':
     dependencies:
       '@tauri-apps/api': 2.12.4
@@ -3801,6 +3855,10 @@ snapshots:
       '@tauri-apps/api': 2.12.4
 
   '@tauri-apps/plugin-opener@2.7.2':
+    dependencies:
+      '@tauri-apps/api': 2.12.4
+
+  '@tauri-apps/plugin-websocket@2.5.0':
     dependencies:
       '@tauri-apps/api': 2.12.4
 

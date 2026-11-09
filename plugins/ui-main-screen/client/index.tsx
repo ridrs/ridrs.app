@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { activityStateChangedEvent } from '@ridrs/contracts';
+import { activityStateChangedEvent, appLinkState } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useMessages } from '@ridrs/ui-sdk/react';
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -323,6 +323,23 @@ function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readon
           })
         : undefined,
     [ctx, layout],
+  );
+  // A link `ridrs://activity/<id>` to a ride of this device opens its debriefing (ADR 0079), only from
+  // the main screen: a link never takes the rider out of a ride. The first delivery is the link that
+  // is there already; one that is older than this page is not news.
+  const mountedAt = useRef(Date.now());
+  const seenLink = useRef(0);
+  const onMain = shown === undefined || shown.screen === 'main';
+  useEffect(
+    () =>
+      ctx.state.watch(appLinkState, ({ entries }) => {
+        const link = entries.get('activity');
+        if (link && link.at > seenLink.current && link.at >= mountedAt.current - 5000 && onMain) {
+          seenLink.current = link.at;
+          ctx.navigate('debriefing');
+        }
+      }),
+    [ctx, onMain],
   );
   const framing = shown !== undefined && layout.screens.includes(shown.page);
   const open = shown !== undefined && shown.screen !== shown.page && layout.dialogs.includes(shown.screen);

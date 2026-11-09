@@ -129,6 +129,33 @@ function PowerProfile({ workout }: { readonly workout: PlannedWorkout }) {
 const connectLabel = (account: TrainingAccount, text: Messages): string =>
   account.reason === 'token-rejected' ? text.reconnect : text.connect;
 
+/** The refresh reads at most once a minute (ADR 0078): the button rests for that long. */
+const REFRESH_COOLDOWN_MS = 60_000;
+
+function RefreshButton({ ctx, text }: { readonly ctx: UiContext; readonly text: Messages }) {
+  const [resting, setResting] = useState(false);
+  useEffect(() => {
+    if (!resting) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setResting(false), REFRESH_COOLDOWN_MS);
+    return () => clearTimeout(timer);
+  }, [resting]);
+  return (
+    <button
+      type="button"
+      className="rt-button"
+      disabled={resting}
+      onClick={() => {
+        setResting(true);
+        callAccount(ctx, trainingRefreshService);
+      }}
+    >
+      {text.refresh}
+    </button>
+  );
+}
+
 /** While the sign-in runs in the system browser. */
 function Connecting({ testId, text }: { readonly testId: string; readonly text: Messages }) {
   return (
@@ -177,13 +204,15 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
       <section className="rt-panel" data-testid="training-account">
         <TrainingStyles />
         {message ? <span className="rt-hint rt-warn">{message}</span> : null}
-        <button
-          type="button"
-          className="rt-button"
-          onClick={() => callAccount(ctx, trainingConnectService)}
-        >
-          {connectLabel(account, text)}
-        </button>
+        {account.reason === 'rate-limited' ? null : (
+          <button
+            type="button"
+            className="rt-button"
+            onClick={() => callAccount(ctx, trainingConnectService)}
+          >
+            {connectLabel(account, text)}
+          </button>
+        )}
         <span className="rt-hint">{text.onMainScreen}</span>
       </section>
     );
@@ -346,13 +375,7 @@ function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
       {workout?.description ? <p className="rt-description">{workout.description}</p> : null}
       {workout && workout.steps.length > 0 ? <StepRows workout={workout} text={text} /> : null}
       <footer>
-        <button
-          type="button"
-          className="rt-button"
-          onClick={() => callAccount(ctx, trainingRefreshService)}
-        >
-          {text.refresh}
-        </button>
+        <RefreshButton ctx={ctx} text={text} />
       </footer>
     </main>
   );
@@ -375,15 +398,19 @@ function IntervalsConnectionView({ ctx }: { readonly ctx: UiContext }) {
     return (
       <section className="rt-panel" data-testid="intervals-connection">
         <TrainingStyles />
-        <span className="rt-caption">intervals.icu · {text.notConnected}</span>
+        <span className="rt-caption">
+          intervals.icu · {account.reason === 'rate-limited' ? text.connectedAs(account.athleteName) : text.notConnected}
+        </span>
         {message ? <span className="rt-hint rt-warn">{message}</span> : null}
-        <button
-          type="button"
-          className="rt-button"
-          onClick={() => callAccount(ctx, trainingConnectService)}
-        >
-          {connectLabel(account, text)}
-        </button>
+        {account.reason === 'rate-limited' ? null : (
+          <button
+            type="button"
+            className="rt-button"
+            onClick={() => callAccount(ctx, trainingConnectService)}
+          >
+            {connectLabel(account, text)}
+          </button>
+        )}
       </section>
     );
   }

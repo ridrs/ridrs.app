@@ -7,9 +7,9 @@ import {
   athleteProfileState,
   athleteProfileUpdateService,
   libraryWorkoutSchema,
+  linkIdOf,
   authBrowserSignInCapability,
   definePlugin,
-  type HttpClient,
   type HttpResponse,
   type CompletedWorkout,
   completedWorkoutSchema,
@@ -17,6 +17,7 @@ import {
   type DataSourceStatus,
   type DataWriteResult,
   netHttpCapability,
+  netWebSocketCapability,
   type PlannedWorkout,
   type PluginContext,
   RidrsError,
@@ -34,13 +35,18 @@ import {
   trainingConnectService,
   trainingDisconnectService,
   trainingHistoryState,
+  trainingLibraryLoadService,
   trainingLibraryState,
   trainingRefreshService,
   type TrainingUpload,
   trainingUploadService,
   trainingUploadState,
 } from '@ridrs/contracts';
+import { createGateway, type Gateway, type Purpose, RateLimited } from './gateway.ts';
 import { ftpField, libraryDocs, localDate, toActivities, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
+import { createMailbox, mailboxConfig } from './mailbox.ts';
+import { createMailboxSocket } from './mailbox-socket.ts';
+import { type Applied, interpret, newApplied } from './mailbox-events.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
@@ -56,6 +62,8 @@ const CLIENT_ID = '1697';
 const SCOPES = 'SETTINGS:WRITE,CALENDAR:WRITE,WELLNESS:WRITE,LIBRARY:READ,ACTIVITY:WRITE';
 const SITE = 'https://intervals.icu';
 const CALLBACK_PATH = '/oauth/callback';
+/** The redirect URI of the relay, registered with the OAuth client: it bounces to `ridrs://oauth/intervals`. */
+const RELAY_CALLBACK_PATH = '/intervals/oauth/callback';
 /** The planned workouts of today and the next 13 days. */
 const PLAN_DAYS = 14;
 const TOKEN_KEY = 'intervals-icu.token';
@@ -66,38 +74,71 @@ const LABEL = 'intervals.icu';
 /** How many days of done rides are read. */
 const HISTORY_DAYS = 14;
 
+/**
+ * How long what was read stays valid (ADR 0078). `events` are the planned workouts with the rides
+ * done (the plan and its mirror), `library` the workouts and folders. Nothing reloads on a timer
+ * or on focus: a stale resource is read when it is asked for (start, refresh, saved ride, library
+ * shown), and shown from the cache meanwhile.
+ */
+const VALIDITY_MS = { athlete: 60 * 60_000, events: 15 * 60_000, library: 24 * 60 * 60_000 } as const;
+type Stamped = keyof typeof VALIDITY_MS;
+/** `settings` is the athlete's settings alone (one request): the mailbox says they changed (ADR 0079). */
+type Resource = Stamped | 'settings';
+
+/** The refresh button reads again at most once a minute. */
+const REFRESH_COOLDOWN_MS = 60_000;
+
+/** The open socket of each running plugin, closed when it stops. */
+const sockets = new WeakMap<PluginContext, { stop(): void }>();
+
 /** The service answered 401 or 403: the token is no longer valid. */
 class TokenRejected extends Error {}
 
 /** What is kept for a start without network. */
 interface Cache {
+  /** When the latest resource was read. Old readers of the file need it. */
   readonly fetchedAt: number;
+  /** When each resource was read; a cache from before has none, and every resource is stale. */
+  readonly fetched?: Partial<Record<Stamped, number>>;
   readonly athlete: AthleteProfile;
   /** The field of the Ride settings the FTP was read from, which a change is written to. */
   readonly ftpField: 'indoor_ftp' | 'ftp';
   readonly workouts: PlannedWorkout[];
   /** The rides done in the last days (ADR 0076); none from before, or without the scope. */
   readonly history?: CompletedWorkout[];
-  /** None when the token lacks the scope of the library. */
+  /** None when the token lacks the scope of the library, or before it was loaded. */
   readonly library?: LibraryWorkout[];
   /** The `workout_doc` of each library workout by its id, as intervals.icu has it. */
   readonly libraryDocs?: Record<string, unknown>;
 }
 
-/** What the last load read for the writes (see `Cache`). */
+/** What the plugin holds between two requests. */
 interface Held {
   ftpField: Cache['ftpField'];
   libraryDocs: Record<string, unknown>;
+  /** What is shown, and kept: none before the first load. */
+  cache?: Cache;
 }
 
-interface Services {
-  readonly http: HttpClient;
+interface Env {
+  readonly ctx: PluginContext;
+  readonly gateway: Gateway;
   readonly secrets: Secrets;
   readonly files: AppFiles;
+  readonly held: Held;
 }
 
+/** Whether a resource is there and still valid at `now`. */
+const isFresh = (cache: Cache | undefined, resource: Resource, now: number): boolean => {
+  if (resource === 'settings') {
+    return false;
+  }
+  const at = cache?.fetched?.[resource];
+  return at !== undefined && now - at < VALIDITY_MS[resource] && now >= at;
+};
+
 /**
- * The rider's intervals.icu account, athlete profile and plan (ADR 0048, 0075). Signs in with PKCE as a public client,
+ * The rider's intervals.icu account, athlete profile and plan (ADR 0048, 0075, 0077). Signs in with PKCE as a public client,
  * keeps the token in `storage.secrets`, and loads the athlete and the planned cycling workouts
  * at start, after a saved ride and on request. The account, the plan and every upload are app
  * state beside the bus (ADR 0068): the keys `intervals.icu` of `training.account`, of the
@@ -105,19 +146,36 @@ interface Services {
  * source of), and a ride's session id in `training.upload`; the token never is. Connect,
  * disconnect, refresh and upload are services that answer once the work started: none of them
  * is recorded, so a continued ride never does them again. The last plan is cached in app files
- * for a start without network.
+ * for a start without network. Every request goes through the gateway (ADR 0078).
  */
 export default definePlugin({
+  stop(ctx) {
+    sockets.get(ctx)?.stop();
+  },
   start(ctx) {
-    const services: Services = {
-      http: ctx.capabilities.get(netHttpCapability),
-      secrets: ctx.capabilities.get(storageSecretsCapability),
-      files: ctx.capabilities.get(storageAppFilesCapability),
-    };
-    const signIn = ctx.capabilities.get(authBrowserSignInCapability);
-    let busy = false;
-    /** What the last load read, for the writes. */
+    const http = ctx.capabilities.get(netHttpCapability);
+    const secrets = ctx.capabilities.get(storageSecretsCapability);
+    const files = ctx.capabilities.get(storageAppFilesCapability);
+    // Pacing and the rest `Retry-After` asks for are wall-clock time of I/O, not simulation time: the
+    // logical clock stands still inside a turn, and no ride depends on this.
+    const gateway = createGateway({ http, now: () => Date.now(), logger: ctx.logger });
     const held: Held = { ftpField: 'ftp', libraryDocs: {} };
+    const env: Env = { ctx, gateway, secrets, files, held };
+    const signIn = ctx.capabilities.get(authBrowserSignInCapability);
+    const mailbox = createMailbox({
+      http,
+      secrets,
+      files,
+      logger: ctx.logger,
+      nowSeconds: () => Math.floor(Date.now() / 1000),
+    });
+    const applied = newApplied();
+    /** The session ids this device uploaded as `external_id`: their echo from the mailbox is not news. */
+    const sentExternalIds = new Set<string>();
+    let busy = false;
+    /** What is asked for and not yet read: one piece of work reads all of it. */
+    const pending = new Set<Resource>();
+    let lastRefreshAt: number | undefined;
 
     // The sources are there from the start, so the rider can choose them while they load.
     setSources(ctx, 'loading');
@@ -134,11 +192,100 @@ export default definePlugin({
         .catch((error: unknown) => ctx.logger.error({ error }, 'intervals.icu: unexpected failure'))
         .finally(() => {
           busy = false;
+          if (pending.size > 0) {
+            drain();
+          }
         });
     };
 
-    // Read when asked: the time of the request decides what "today" is.
-    const load = (now: number) => run(() => loadPlan(ctx, services, held, now, { fromStart: false }));
+    /** Reads what was asked for while other work ran, once, together. */
+    const drain = () =>
+      run(async () => {
+        const resources = [...pending];
+        pending.clear();
+        await loadResources(env, resources, ctx.clock.now());
+      });
+
+    /** Reads the stale ones of `resources`; a fresh one costs nothing. `force` reads them all. */
+    const want = (resources: readonly Resource[], force = false) => {
+      const now = ctx.clock.now();
+      for (const resource of resources) {
+        if (force || !isFresh(held.cache, resource, now)) {
+          pending.add(resource);
+        }
+      }
+      if (pending.size > 0) {
+        drain();
+      }
+    };
+
+    /** Fetches what the mailbox holds, applies it, and acknowledges it. Silent when the relay is not there. */
+    let mailboxWork: Promise<unknown> = Promise.resolve();
+    const pickUp = (): Promise<void> => {
+      const work = mailboxWork.then(async () => {
+        const picked = await mailbox.pickup();
+        if (!picked) {
+          return;
+        }
+        await applyMailbox(env, picked.events, { clientId: CLIENT_ID, externalIds: sentExternalIds }, applied, want);
+        if (picked.next > (await mailbox.cursor())) {
+          await mailbox.acknowledge(picked.next);
+        }
+      });
+      mailboxWork = work.catch((error: unknown) => ctx.logger.warn({ error }, 'mailbox: pickup failed'));
+      return mailboxWork as Promise<void>;
+    };
+
+    // The socket is a fast path beside the pickup; without the capability there is none (ADR 0079).
+    const webSocket = ctx.capabilities.find(netWebSocketCapability);
+    const socket = webSocket
+      ? createMailboxSocket({
+          socket: webSocket,
+          url: async () => {
+            const query = await mailbox.signSocketQuery();
+            return query ? `${mailboxConfig.baseUrl.replace(/^http/, 'ws')}/updates/ws?${query}` : undefined;
+          },
+          // The same path as a pickup: opened, checked, applied once (by cursor), acknowledged.
+          onEvent: async (raw) => {
+            mailboxWork = mailboxWork.then(async () => {
+              const opened = await mailbox.open(raw);
+              if (!opened || opened.cursor <= (await mailbox.cursor())) {
+                return;
+              }
+              await applyMailbox(env, [opened], { clientId: CLIENT_ID, externalIds: sentExternalIds }, applied, want);
+              await mailbox.keepCursor(opened.cursor);
+              if (!socket?.ack(opened.cursor)) {
+                await mailbox.acknowledge(opened.cursor);
+              }
+            });
+            await mailboxWork;
+          },
+          catchUp: pickUp,
+          onInvalid: () => mailbox.checkRegistration(),
+          logger: ctx.logger,
+        })
+      : undefined;
+    if (socket) {
+      sockets.set(ctx, socket);
+    }
+    /** The socket lives while the account is connected and the device registered. */
+    const syncSocket = async () => {
+      const token = await secrets.get(TOKEN_KEY).catch(() => undefined);
+      if (token && (await mailbox.registered())) {
+        socket?.start();
+      } else {
+        socket?.stop();
+      }
+    };
+    // In a webview, a hidden app closes the socket; coming back opens it and catches up.
+    const page = (globalThis as { document?: { hidden: boolean; addEventListener(type: string, listener: () => void): void } }).document;
+    page?.addEventListener('visibilitychange', () => {
+      if (page.hidden) {
+        socket?.stop();
+      } else {
+        void syncSocket();
+      }
+    });
 
     // A connect during other work of the plugin is dropped, like a second press.
     ctx.services.provide(trainingConnectService, () => {
@@ -155,6 +302,8 @@ export default definePlugin({
         try {
           const result = await signIn.signIn({
             callbackPath: CALLBACK_PATH,
+            // With deep links the relay's page bounces the answer to the app; else the loopback (ADR 0079).
+            ...(signIn.deepLink ? { relayRedirectUri: `${mailboxConfig.baseUrl}${RELAY_CALLBACK_PATH}` } : {}),
             authorizationUrl: (redirectUri) => {
               const url = new URL('/oauth/authorize', SITE);
               url.search = new URLSearchParams({
@@ -190,7 +339,7 @@ export default definePlugin({
         }
         let response: HttpResponse;
         try {
-          response = await services.http.request({
+          response = await gateway.request('auth', {
             method: 'POST',
             url: `${SITE}/api/oauth/token`,
             headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -200,8 +349,8 @@ export default definePlugin({
               code_verifier: verifier,
             }).toString(),
           });
-        } catch {
-          account('failed', { reason: 'unreachable' });
+        } catch (error) {
+          account('failed', { reason: error instanceof RateLimited ? 'rate-limited' : 'unreachable' });
           return;
         }
         const token = response.status === 200 ? accessToken(response.body) : undefined;
@@ -210,8 +359,15 @@ export default definePlugin({
           account('failed', { reason: 'sign-in-rejected' });
           return;
         }
-        await services.secrets.set(TOKEN_KEY, token);
-        await loadPlan(ctx, services, held, now, { fromStart: false });
+        await secrets.set(TOKEN_KEY, token);
+        // The relay learns the athlete from the token, once, over TLS, and keeps the public keys.
+        socket?.stop();
+        await mailbox.register(token).catch(() => false);
+        // A new connection reads everything it shows again.
+        held.cache = undefined;
+        await loadResources(env, ['athlete', 'events'], now);
+        await pickUp();
+        await syncSocket();
       });
       return {};
     });
@@ -220,19 +376,24 @@ export default definePlugin({
       // Not queued behind a running sign-in or load: the rider wants out now. Whatever that work
       // reports later is overtaken by the "disconnected" of this one, or by the next start.
       void (async () => {
-        const token = await services.secrets.get(TOKEN_KEY).catch(() => undefined);
+        const token = await secrets.get(TOKEN_KEY).catch(() => undefined);
         if (token) {
-          // Best effort: offline, the token is still forgotten here.
-          await services.http
-            .request({
+          // Best effort: offline, or while rate limited, the token is still forgotten here.
+          await gateway
+            .request('auth', {
               method: 'DELETE',
               url: `${SITE}/api/v1/disconnect-app`,
               headers: { authorization: `Bearer ${token}` },
             })
             .catch(() => undefined);
         }
-        await services.secrets.remove(TOKEN_KEY);
-        await services.files.remove(CACHE_FILE).catch(() => undefined);
+        socket?.stop();
+        await mailbox.disconnect().catch(() => undefined);
+        await secrets.remove(TOKEN_KEY);
+        await files.remove(CACHE_FILE).catch(() => undefined);
+        held.cache = undefined;
+        held.libraryDocs = {};
+        pending.clear();
         account('disconnected');
         setSources(ctx, 'unavailable');
       })().catch((error: unknown) =>
@@ -243,44 +404,167 @@ export default definePlugin({
 
     ctx.services.provide(trainingUploadService, ({ sessionId, file }) => {
       ctx.state.set(trainingUploadState, sessionId, { service: SERVICE, sessionId, state: 'uploading' });
-      // Not queued behind a load: the rider waits for this one.
-      void uploadActivity(ctx, services, sessionId, file);
+      // Not queued behind a load by `busy`: the rider waits for this one (the gateway orders the requests).
+      sentExternalIds.add(linkIdOf(sessionId));
+      void uploadActivity(env, sessionId, file);
       return {};
     });
 
     ctx.services.provide(athleteProfileUpdateService, ({ key: _key, ...change }) =>
-      writeProfile(ctx, services, held, change),
+      writeProfile(env, change),
     );
 
     ctx.services.provide(trainingCalendarPlanService, ({ key: _key, ...plan }) =>
-      writeCalendar(ctx, services, held, { plan }),
+      writeCalendar(env, { plan }),
     );
     ctx.services.provide(trainingCalendarMoveService, ({ key: _key, ...move }) =>
-      writeCalendar(ctx, services, held, { move }),
+      writeCalendar(env, { move }),
     );
     ctx.services.provide(trainingCalendarRemoveService, ({ key: _key, ...remove }) =>
-      writeCalendar(ctx, services, held, { remove }),
+      writeCalendar(env, { remove }),
     );
 
+    // The refresh button: the athlete and the plan, at most once a minute.
     ctx.services.provide(trainingRefreshService, () => {
-      load(ctx.clock.now());
+      const now = ctx.clock.now();
+      if (lastRefreshAt === undefined || now - lastRefreshAt >= REFRESH_COOLDOWN_MS || now < lastRefreshAt) {
+        lastRefreshAt = now;
+        want(['athlete', 'events'], true);
+      }
       return {};
     });
-    // A saved ride may complete a planned workout: load again once one is saved. The first
-    // delivery is every ride of the run so far; the plan loads at start anyway.
+    // The library is read when it is shown, if it is not there or a day old.
+    ctx.services.provide(trainingLibraryLoadService, () => {
+      want(['library']);
+      return {};
+    });
+    // A saved ride may complete a planned workout: read the plan again once one is saved. The
+    // first delivery is every ride of the run so far; the plan loads at start anyway.
     let first = true;
     ctx.state.watch(recordingRideState, ({ entries, changed }) => {
       const saved = changed.some((key) => entries.get(key)?.state === 'saved');
       if (!first && saved) {
-        load(ctx.clock.now());
+        want(['events'], true);
       }
       first = false;
     });
 
-    const startedAt = ctx.clock.now();
-    run(() => loadPlan(ctx, services, held, startedAt, { fromStart: true }));
+    run(async () => {
+      await startUp(env, ctx.clock.now(), want);
+      await pickUp();
+      await syncSocket();
+    });
   },
 });
+
+/**
+ * At start: the cache is shown at once, and what in it is stale is read in the background. Without
+ * a cache, the athlete and the plan are read. A fresh cache costs no request.
+ */
+async function startUp(
+  env: Env,
+  now: number,
+  want: (resources: readonly Resource[]) => void,
+): Promise<void> {
+  const { ctx, secrets, files, held } = env;
+  let token: string | undefined;
+  try {
+    token = await secrets.get(TOKEN_KEY);
+  } catch (error) {
+    ctx.logger.warn({ error }, 'intervals.icu: the secret store could not be read');
+  }
+  if (!token) {
+    ctx.state.set(trainingAccountState, SERVICE, { service: SERVICE, state: 'disconnected' });
+    setSources(ctx, 'unavailable');
+    return;
+  }
+  const cached = await readCache(files);
+  if (cached) {
+    held.cache = cached;
+    held.ftpField = cached.ftpField;
+    held.libraryDocs = cached.libraryDocs ?? {};
+    ctx.state.set(trainingAccountState, SERVICE, {
+      service: SERVICE,
+      state: 'connected',
+      ...(cached.athlete.name ? { athleteName: cached.athlete.name } : {}),
+    });
+    setSources(ctx, 'ready', cached);
+  }
+  // Called after this work: `run` is busy until it ends, so what is wanted is read right after.
+  want(['athlete', 'events']);
+}
+
+/**
+ * Takes over what the mailbox reported (ADR 0079): planned events change the calendar at once, an
+ * FTP in the payload changes the profile, and what the payload cannot say is read again, together
+ * (one piece of work for a whole batch). Nothing here sends a request by itself.
+ */
+async function applyMailbox(
+  env: Env,
+  events: Parameters<typeof interpret>[0],
+  own: Parameters<typeof interpret>[1],
+  applied: Applied,
+  want: (resources: readonly Resource[], force?: boolean) => void,
+): Promise<void> {
+  const effects = interpret(events, own, applied);
+  const cache = env.held.cache;
+  if (cache) {
+    let next = cache;
+    const { events: changed, deleted } = effects.calendar;
+    if (changed.length > 0 || deleted.length > 0) {
+      const incoming = toWorkouts(changed, cache.athlete.ftp);
+      // An event that is no longer a planned ride (another category or sport) leaves the calendar too.
+      const replaced = new Set([...deleted, ...changed.map((entry) => String(entry.id))]);
+      const first = localDate(env.ctx.clock.now());
+      const last = localDate(env.ctx.clock.now(), PLAN_DAYS - 1);
+      next = {
+        ...next,
+        workouts: [...cache.workouts.filter((workout) => !replaced.has(workout.id)), ...incoming]
+          .filter((workout) => workout.date >= first && workout.date <= last)
+          .sort((a, b) => a.date.localeCompare(b.date)),
+      };
+    }
+    if (effects.ftp) {
+      env.held.ftpField = effects.ftp.field;
+      next = { ...next, athlete: { ...next.athlete, ftp: effects.ftp.value }, ftpField: effects.ftp.field };
+    }
+    if (next !== cache) {
+      await keep(env, next);
+    }
+  }
+  const stale: Resource[] = [
+    ...(effects.refreshAthlete ? (['athlete'] as const) : []),
+    ...(effects.refreshSettings ? (['settings'] as const) : []),
+    ...(effects.refreshEvents ? (['events'] as const) : []),
+  ];
+  if (stale.length > 0) {
+    want(stale, true);
+  }
+}
+
+/** The text of the account state for a token; the rider is asked to connect again. */
+async function rejectToken(env: Env): Promise<void> {
+  await env.secrets.remove(TOKEN_KEY);
+  env.ctx.state.set(trainingAccountState, SERVICE, {
+    service: SERVICE,
+    state: 'failed',
+    reason: 'token-rejected',
+  });
+}
+
+/** The service asked for rest: what is shown stays, as the last copy, and the account says why. */
+function rateLimited(env: Env): void {
+  const { ctx, held } = env;
+  ctx.state.set(trainingAccountState, SERVICE, {
+    service: SERVICE,
+    state: 'failed',
+    reason: 'rate-limited',
+    ...(held.cache?.athlete.name ? { athleteName: held.cache.athlete.name } : {}),
+  });
+  if (held.cache) {
+    setSources(ctx, 'offline', held.cache);
+  }
+}
 
 /**
  * Uploads a ride's FIT file as a done activity (`ACTIVITY:WRITE`). The session id goes along as
@@ -288,12 +572,8 @@ export default definePlugin({
  * creates no second activity. A rejected token is forgotten like on a load: the rider connects
  * again, which asks for the scope as well.
  */
-async function uploadActivity(
-  ctx: PluginContext,
-  { http, secrets, files }: Services,
-  sessionId: string,
-  file: string,
-): Promise<void> {
+async function uploadActivity(env: Env, sessionId: string, file: string): Promise<void> {
+  const { ctx, gateway, secrets, files } = env;
   const upload = (state: TrainingUpload['state'], reason?: TrainingUpload['reason']) =>
     ctx.state.set(trainingUploadState, sessionId, {
       service: SERVICE,
@@ -324,10 +604,11 @@ async function uploadActivity(
   );
   const encoded = new Request(SITE, { method: 'POST', body: form });
   const body = new Uint8Array(await encoded.arrayBuffer());
-  const query = new URLSearchParams({ external_id: sessionId });
+  // The relay's links name a ride by this form of the session id (ADR 0079).
+  const query = new URLSearchParams({ external_id: linkIdOf(sessionId) });
   let response: HttpResponse;
   try {
-    response = await http.request({
+    response = await gateway.request('upload', {
       method: 'POST',
       url: `${SITE}/api/v1/athlete/0/activities?${query}`,
       headers: {
@@ -337,7 +618,10 @@ async function uploadActivity(
       },
       body,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof RateLimited) {
+      rateLimited(env);
+    }
     upload('failed', 'unreachable');
     return;
   }
@@ -346,12 +630,7 @@ async function uploadActivity(
     return;
   }
   if (response.status === 401 || response.status === 403) {
-    await secrets.remove(TOKEN_KEY);
-    ctx.state.set(trainingAccountState, SERVICE, {
-      service: SERVICE,
-      state: 'failed',
-      reason: 'token-rejected',
-    });
+    await rejectToken(env);
     upload('failed', 'token-rejected');
     return;
   }
@@ -369,28 +648,13 @@ function accessToken(body: string): string | undefined {
   }
 }
 
-/** What is shown now, for a state that changes only part of it; none before the first load. */
-function shown(ctx: PluginContext, held: Held): Cache | undefined {
-  const profile = ctx.state.entries(athleteProfileState).get(SERVICE);
-  const calendar = ctx.state.entries(trainingCalendarState).get(SERVICE);
-  const library = ctx.state.entries(trainingLibraryState).get(SERVICE)?.data?.workouts;
-  return profile?.data && calendar?.data
-    ? {
-        fetchedAt: profile.fetchedAt ?? ctx.clock.now(),
-        athlete: profile.data,
-        ftpField: held.ftpField,
-        workouts: calendar.data.workouts,
-        ...(library ? { library, libraryDocs: held.libraryDocs } : {}),
-      }
-    : undefined;
-}
-
 /** Shows what an accepted change made of the data, and keeps it for a start without network. */
-async function keep(ctx: PluginContext, { files }: Services, loaded: Cache): Promise<void> {
-  setSources(ctx, 'ready', loaded);
-  await files
+async function keep(env: Env, loaded: Cache, status: DataSourceStatus = 'ready'): Promise<void> {
+  env.held.cache = loaded;
+  setSources(env.ctx, status, loaded);
+  await env.files
     .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(loaded)))
-    .catch((error: unknown) => ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
+    .catch((error: unknown) => env.ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
 }
 
 type Sent = { readonly ok: true; readonly body: unknown } | { readonly ok: false; readonly reason: 'read-only' | 'unreachable' };
@@ -402,20 +666,20 @@ type Sent = { readonly ok: true; readonly body: unknown } | { readonly ok: false
  * the last copy of the service and read only until then.
  */
 async function send(
-  ctx: PluginContext,
-  { http, secrets }: Services,
-  held: Held,
+  env: Env,
+  purpose: Purpose,
   method: 'POST' | 'PUT' | 'DELETE',
   path: string,
   body?: unknown,
 ): Promise<Sent> {
+  const { ctx, gateway, secrets, held } = env;
   const token = await secrets.get(TOKEN_KEY).catch(() => undefined);
   if (!token) {
     return { ok: false, reason: 'unreachable' };
   }
   let response: HttpResponse;
   try {
-    response = await http.request({
+    response = await gateway.request(purpose, {
       method,
       url: `${SITE}${path}`,
       headers: {
@@ -425,19 +689,16 @@ async function send(
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof RateLimited) {
+      rateLimited(env);
+    }
     return { ok: false, reason: 'unreachable' };
   }
   if (response.status === 401 || response.status === 403) {
-    await secrets.remove(TOKEN_KEY);
-    ctx.state.set(trainingAccountState, SERVICE, {
-      service: SERVICE,
-      state: 'failed',
-      reason: 'token-rejected',
-    });
-    const loaded = shown(ctx, held);
-    if (loaded) {
-      setSources(ctx, 'offline', loaded, false);
+    await rejectToken(env);
+    if (held.cache) {
+      setSources(ctx, 'offline', held.cache, false);
     }
     return { ok: false, reason: 'read-only' };
   }
@@ -456,16 +717,21 @@ async function send(
 
 /**
  * Writes a change of the profile: the weight to today's wellness record, the FTP to the Ride
- * settings, into the field it was read from. `icu_weight` is never written.
+ * settings, into the field it was read from. `icu_weight` is never written. A value the profile
+ * already has is not sent (ADR 0078): at most two requests, none for no change.
  */
 async function writeProfile(
-  ctx: PluginContext,
-  services: Services,
-  held: Held,
-  change: { readonly ftp?: number; readonly weight?: number },
+  env: Env,
+  asked: { readonly ftp?: number; readonly weight?: number },
 ): Promise<DataWriteResult> {
+  const { ctx, held } = env;
+  const current = held.cache?.athlete;
+  const change = {
+    ...(asked.weight !== undefined && asked.weight !== current?.weight ? { weight: asked.weight } : {}),
+    ...(asked.ftp !== undefined && asked.ftp !== current?.ftp ? { ftp: asked.ftp } : {}),
+  };
   if (change.weight !== undefined) {
-    const sent = await send(ctx, services, held, 'PUT', `/api/v1/athlete/0/wellness/${localDate(ctx.clock.now())}`, {
+    const sent = await send(env, 'profile-write', 'PUT', `/api/v1/athlete/0/wellness/${localDate(ctx.clock.now())}`, {
       weight: change.weight,
     });
     if (!sent.ok) {
@@ -473,16 +739,15 @@ async function writeProfile(
     }
   }
   if (change.ftp !== undefined) {
-    const sent = await send(ctx, services, held, 'PUT', '/api/v1/athlete/0/sport-settings/Ride', {
+    const sent = await send(env, 'profile-write', 'PUT', '/api/v1/athlete/0/sport-settings/Ride', {
       [held.ftpField]: change.ftp,
     });
     if (!sent.ok) {
       return sent;
     }
   }
-  const loaded = shown(ctx, held);
-  if (loaded) {
-    await keep(ctx, services, { ...loaded, athlete: { ...loaded.athlete, ...change } });
+  if (held.cache && Object.keys(change).length > 0) {
+    await keep(env, { ...held.cache, athlete: { ...held.cache.athlete, ...change } });
   }
   return { ok: true };
 }
@@ -496,16 +761,13 @@ type CalendarChange =
 /**
  * Writes a change of the calendar to the events of intervals.icu (`POST`, `PUT`, `DELETE`). A
  * planned library workout is created with its steps. The calendar shown follows an accepted change
- * at once: it holds the planned rides of the next 14 days, as a load does.
+ * at once: it holds the planned rides of the next 14 days, as a load does. A move to the day the
+ * workout is on sends nothing (ADR 0078).
  */
-async function writeCalendar(
-  ctx: PluginContext,
-  services: Services,
-  held: Held,
-  change: CalendarChange,
-): Promise<DataWriteResult> {
+async function writeCalendar(env: Env, change: CalendarChange): Promise<DataWriteResult> {
+  const { ctx, held } = env;
   const now = ctx.clock.now();
-  const loaded = shown(ctx, held);
+  const loaded = held.cache;
   let workouts = loaded?.workouts ?? [];
   if ('plan' in change) {
     const { date, workoutId, from } = change.plan;
@@ -520,7 +782,7 @@ async function writeCalendar(
     if (!workout || (from === SERVICE && doc === undefined)) {
       throw new Error(`The library of "${SERVICE}" has no workout "${workoutId}" of "${from}"`);
     }
-    const sent = await send(ctx, services, held, 'POST', '/api/v1/athlete/0/events', {
+    const sent = await send(env, 'calendar-write', 'POST', '/api/v1/athlete/0/events', {
       category: 'WORKOUT',
       start_date_local: `${date}T00:00:00`,
       type: workout.sport === 'virtual-ride' ? 'VirtualRide' : 'Ride',
@@ -536,7 +798,10 @@ async function writeCalendar(
     workouts = [...workouts, ...created];
   } else if ('move' in change) {
     const { id, date } = change.move;
-    const sent = await send(ctx, services, held, 'PUT', `/api/v1/athlete/0/events/${encodeURIComponent(id)}`, {
+    if (workouts.find((workout) => workout.id === id)?.date === date) {
+      return { ok: true };
+    }
+    const sent = await send(env, 'calendar-write', 'PUT', `/api/v1/athlete/0/events/${encodeURIComponent(id)}`, {
       start_date_local: `${date}T00:00:00`,
     });
     if (!sent.ok) {
@@ -545,7 +810,7 @@ async function writeCalendar(
     workouts = workouts.map((workout) => (workout.id === id ? { ...workout, date } : workout));
   } else {
     const { id } = change.remove;
-    const sent = await send(ctx, services, held, 'DELETE', `/api/v1/athlete/0/events/${encodeURIComponent(id)}`);
+    const sent = await send(env, 'calendar-write', 'DELETE', `/api/v1/athlete/0/events/${encodeURIComponent(id)}`);
     if (!sent.ok) {
       return sent;
     }
@@ -554,7 +819,7 @@ async function writeCalendar(
   if (loaded) {
     const first = localDate(now);
     const last = localDate(now, PLAN_DAYS - 1);
-    await keep(ctx, services, {
+    await keep(env, {
       ...loaded,
       workouts: workouts
         .filter((workout) => workout.date >= first && workout.date <= last)
@@ -566,18 +831,13 @@ async function writeCalendar(
 
 /**
  * Both data types of this provider, with the data when there is any. `unavailable` has none: a
- * disconnected or rejected account is not served from the cache.
+ * disconnected or rejected account is not served from the cache. The library is `loading` until
+ * the first time it was asked for, and `unavailable` where the token lacks its scope.
  */
 function setSources(
   ctx: PluginContext,
   status: DataSourceStatus,
-  loaded?: {
-    readonly fetchedAt: number;
-    readonly athlete: AthleteProfile;
-    readonly workouts: PlannedWorkout[];
-    readonly history?: CompletedWorkout[];
-    readonly library?: LibraryWorkout[];
-  },
+  loaded?: Cache,
   writable = status === 'ready' || status === 'offline',
 ): void {
   const common = {
@@ -585,6 +845,8 @@ function setSources(
     label: LABEL,
     status,
     writable,
+    // Behind an external API: a page collects changes in a draft (ADR 0078).
+    remote: true,
     ...(loaded ? { fetchedAt: loaded.fetchedAt } : {}),
   };
   ctx.state.set(athleteProfileState, SERVICE, {
@@ -600,31 +862,28 @@ function setSources(
     trainingHistoryState,
     SERVICE,
     loaded && !loaded.history
-      ? { provider: SERVICE, label: LABEL, status: 'unavailable', writable: false }
+      ? { provider: SERVICE, label: LABEL, status: 'unavailable', writable: false, remote: true }
       : { ...common, writable: false, ...(loaded?.history ? { data: { workouts: loaded.history } } : {}) },
   );
-  // The library is read only, and unavailable where the token lacks its scope.
+  // The library is read only.
   const library = loaded?.library;
-  ctx.state.set(
-    trainingLibraryState,
-    SERVICE,
-    loaded && !library
-      ? { provider: SERVICE, label: LABEL, status: 'unavailable', writable: false }
-      : { ...common, writable: false, ...(library ? { data: { workouts: library } } : {}) },
-  );
+  const asked = loaded?.fetched?.library !== undefined;
+  const librarySource =
+    loaded && !library && asked
+      ? { provider: SERVICE, label: LABEL, status: 'unavailable' as const, writable: false, remote: true }
+      : loaded && !library
+        ? { provider: SERVICE, label: LABEL, status: 'loading' as const, writable: false, remote: true }
+        : { ...common, writable: false, ...(library ? { data: { workouts: library } } : {}) };
+  ctx.state.set(trainingLibraryState, SERVICE, librarySource);
 }
 
 /**
- * Loads the athlete and the plan with the stored token. Without a token the rider is
- * disconnected. Offline, the cached plan stands in, marked `offline`.
+ * Reads `resources` with the stored token and keeps each as soon as it is read. Without a token
+ * the rider is disconnected. Offline, what is held stands in, marked `offline`; rate limited, the
+ * same, and the account says so.
  */
-async function loadPlan(
-  ctx: PluginContext,
-  { http, secrets, files }: Services,
-  held: Held,
-  now: number,
-  { fromStart }: { readonly fromStart: boolean },
-): Promise<void> {
+async function loadResources(env: Env, resources: readonly Resource[], now: number): Promise<void> {
+  const { ctx, gateway, secrets, files, held } = env;
   const account = (state: TrainingAccount['state'], extra: Partial<TrainingAccount> = {}) =>
     ctx.state.set(trainingAccountState, SERVICE, { service: SERVICE, state, ...extra });
 
@@ -635,21 +894,17 @@ async function loadPlan(
     ctx.logger.warn({ error }, 'intervals.icu: the secret store could not be read');
   }
   if (!token) {
-    if (fromStart) {
-      account('disconnected');
-      setSources(ctx, 'unavailable');
-    }
     return;
   }
 
-  const request = (path: string) =>
-    http.request({
+  const request = (purpose: Purpose, path: string) =>
+    gateway.request(purpose, {
       method: 'GET',
       url: `${SITE}${path}`,
       headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
     });
-  const get = async (path: string): Promise<unknown> => {
-    const response = await request(path);
+  const get = async (purpose: Purpose, path: string): Promise<unknown> => {
+    const response = await request(purpose, path);
     if (response.status === 401 || response.status === 403) {
       throw new TokenRejected();
     }
@@ -660,7 +915,7 @@ async function loadPlan(
   };
   /** Today's wellness weight; none on a day without a record or with a token without the scope. */
   const wellnessWeight = async (): Promise<number | undefined> => {
-    const response = await request(`/api/v1/athlete/0/wellness/${localDate(now)}`);
+    const response = await request('athlete', `/api/v1/athlete/0/wellness/${localDate(now)}`);
     if (response.status === 401) {
       throw new TokenRejected();
     }
@@ -676,10 +931,8 @@ async function loadPlan(
 
   /** The library and its folders; none where the token lacks the scope. */
   const libraryBodiesOf = async (): Promise<[unknown, unknown] | undefined> => {
-    const [workouts, folders] = await Promise.all([
-      request('/api/v1/athlete/0/workouts'),
-      request('/api/v1/athlete/0/folders'),
-    ]);
+    const workouts = await request('library', '/api/v1/athlete/0/workouts');
+    const folders = await request('library', '/api/v1/athlete/0/folders');
     if (workouts.status === 401 || folders.status === 401) {
       throw new TokenRejected();
     }
@@ -698,7 +951,7 @@ async function loadPlan(
       oldest: localDate(now, -(HISTORY_DAYS - 1)),
       newest: localDate(now),
     });
-    const response = await request(`/api/v1/athlete/0/activities?${query}`);
+    const response = await request('history', `/api/v1/athlete/0/activities?${query}`);
     if (response.status === 401) {
       throw new TokenRejected();
     }
@@ -712,49 +965,88 @@ async function loadPlan(
   };
 
   try {
-    const query = new URLSearchParams({
-      oldest: localDate(now),
-      newest: localDate(now, PLAN_DAYS - 1),
-      category: 'WORKOUT',
-    });
-    const [athleteBody, eventsBody, weight, libraryBodies, history] = await Promise.all([
-      get('/api/v1/athlete/0'),
-      get(`/api/v1/athlete/0/events?${query}`),
-      wellnessWeight(),
-      libraryBodiesOf(),
-      historyOf(),
-    ]);
-    const athlete = toAthlete(athleteBody, weight);
-    held.ftpField = ftpField(athleteBody);
-    held.libraryDocs = libraryBodies ? libraryDocs(libraryBodies[0]) : {};
-    const loaded: Cache = {
+    const wanted = new Set(resources);
+    // Without anything held, the athlete and the plan come first: they are what everything shows.
+    if (!held.cache) {
+      wanted.add('athlete');
+      wanted.add('events');
+    }
+    let next: Cache = held.cache ?? {
       fetchedAt: now,
-      athlete,
-      ftpField: held.ftpField,
-      workouts: toWorkouts(eventsBody, athlete.ftp),
-      ...(history ? { history } : {}),
-      ...(libraryBodies
-        ? {
-            library: toLibrary(libraryBodies[0], libraryBodies[1], athlete.ftp),
-            libraryDocs: held.libraryDocs,
-          }
-        : {}),
+      athlete: {},
+      ftpField: 'ftp',
+      workouts: [],
     };
-    account('connected', { athleteName: athlete.name });
-    setSources(ctx, 'ready', loaded);
-    await files
-      .write(CACHE_FILE, new TextEncoder().encode(JSON.stringify(loaded)))
-      .catch((error: unknown) => ctx.logger.warn({ error }, 'intervals.icu: plan not cached'));
+    const stamp = (resource: Stamped): Cache['fetched'] => ({ ...next.fetched, [resource]: now });
+
+    if (wanted.has('settings') && !wanted.has('athlete') && held.cache) {
+      // Only the settings changed: the weight stays as it was read, one request.
+      const athleteBody = await get('athlete', '/api/v1/athlete/0');
+      const athlete = toAthlete(athleteBody, held.cache.athlete.weight);
+      held.ftpField = ftpField(athleteBody);
+      next = { ...next, athlete, ftpField: held.ftpField };
+      await keep(env, next);
+    }
+    if (wanted.has('athlete')) {
+      const athleteBody = await get('athlete', '/api/v1/athlete/0');
+      const weight = await wellnessWeight();
+      const athlete = toAthlete(athleteBody, weight);
+      held.ftpField = ftpField(athleteBody);
+      next = { ...next, fetchedAt: now, fetched: stamp('athlete'), athlete, ftpField: held.ftpField };
+      account('connected', { athleteName: athlete.name });
+      await keep(env, next);
+    }
+    if (wanted.has('events')) {
+      const query = new URLSearchParams({
+        oldest: localDate(now),
+        newest: localDate(now, PLAN_DAYS - 1),
+        category: 'WORKOUT',
+      });
+      const eventsBody = await get('events', `/api/v1/athlete/0/events?${query}`);
+      const history = await historyOf();
+      next = {
+        ...next,
+        fetchedAt: now,
+        fetched: stamp('events'),
+        workouts: toWorkouts(eventsBody, next.athlete.ftp),
+        ...(history ? { history } : {}),
+      };
+      account('connected', { athleteName: next.athlete.name });
+      await keep(env, next);
+    }
+    if (wanted.has('library')) {
+      const bodies = await libraryBodiesOf();
+      held.libraryDocs = bodies ? libraryDocs(bodies[0]) : {};
+      const { library: _old, libraryDocs: _docs, ...rest } = next;
+      next = {
+        ...rest,
+        fetchedAt: now,
+        fetched: stamp('library'),
+        ...(bodies
+          ? { library: toLibrary(bodies[0], bodies[1], next.athlete.ftp), libraryDocs: held.libraryDocs }
+          : {}),
+      };
+      await keep(env, next);
+    }
   } catch (error) {
     if (error instanceof TokenRejected) {
-      await secrets.remove(TOKEN_KEY);
-      account('failed', { reason: 'token-rejected' });
+      await rejectToken(env);
+      held.cache = undefined;
       setSources(ctx, 'unavailable');
       return;
     }
+    if (error instanceof RateLimited) {
+      ctx.logger.warn({ retryAfterMs: error.retryAfterMs }, 'intervals.icu: rate limited, nothing more is sent for now');
+      rateLimited(env);
+      if (!held.cache) {
+        setSources(ctx, 'unavailable');
+      }
+      return;
+    }
     ctx.logger.warn({ error }, 'intervals.icu: the plan could not be loaded');
-    const cached = await readCache(files);
+    const cached = held.cache ?? (await readCache(files));
     if (cached) {
+      held.cache = cached;
       held.ftpField = cached.ftpField;
       held.libraryDocs = cached.libraryDocs ?? {};
       account('connected', { athleteName: cached.athlete.name });
@@ -768,13 +1060,15 @@ async function loadPlan(
 
 /**
  * The last load, if it can be read. A cache from before the data sources (ADR 0075) has the same
- * fields, plus a plan state and an athlete name that may be empty.
+ * fields, plus a plan state and an athlete name that may be empty; one from before the budget
+ * (ADR 0078) has no `fetched`, and every resource is stale.
  */
 async function readCache(files: AppFiles): Promise<Cache | undefined> {
   try {
     const bytes = await files.read(CACHE_FILE);
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as {
       fetchedAt?: unknown;
+      fetched?: unknown;
       ftpField?: unknown;
       athlete?: { name?: unknown };
       workouts?: unknown;
@@ -789,9 +1083,16 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
     const library = trainingCalendarSchema
       .extend({ workouts: libraryWorkoutSchema.array() })
       .safeParse({ workouts: parsed.library });
+    const fetched = Object.fromEntries(
+      (['athlete', 'events', 'library'] as const).flatMap((resource) => {
+        const at = isRecord(parsed.fetched) ? parsed.fetched[resource] : undefined;
+        return typeof at === 'number' ? [[resource, at] as const] : [];
+      }),
+    );
     return athlete.success && calendar.success && typeof parsed.fetchedAt === 'number'
       ? {
           fetchedAt: parsed.fetchedAt,
+          ...(Object.keys(fetched).length > 0 ? { fetched } : {}),
           athlete: athlete.data,
           ftpField: parsed.ftpField === 'indoor_ftp' ? 'indoor_ftp' : 'ftp',
           workouts: calendar.data.workouts,

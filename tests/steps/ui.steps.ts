@@ -117,6 +117,17 @@ When('I press {string}', async function (this: RidrsWorld, label: string) {
   await this.settle();
 });
 
+When(
+  'I press {string} {int} times',
+  async function (this: RidrsWorld, label: string, times: number) {
+    for (let i = 0; i < times; i++) {
+      const button = await within(ui(this)).findByRole('button', { name: label });
+      fireEvent.click(button);
+      await this.settle();
+    }
+  },
+);
+
 Given(
   'the plugin directory {string} is added and its plugin {string} is started',
   async function (this: RidrsWorld, relativeDir: string, pluginId: string) {

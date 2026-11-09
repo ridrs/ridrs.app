@@ -12,6 +12,9 @@
     "storage.secrets",
     "storage.app-files"
   ],
+  "optionalRequires": [
+    "net.websocket"
+  ],
   "entry": "index.ts",
   "state": {
     "owns": [
@@ -34,6 +37,7 @@
       "training.calendar.remove",
       "training.connect",
       "training.disconnect",
+      "training.library.load",
       "training.refresh",
       "training.upload"
     ]

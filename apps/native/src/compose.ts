@@ -12,6 +12,7 @@ import {
   activityStateChangedEvent,
   appLanguageSetService,
   appLanguageState,
+  appLinkState,
   athleteProfileChangedEvent,
   athleteProfileState,
   athleteProfileUpdateService,
@@ -61,6 +62,7 @@ import {
   metricPowerHeartRateRatioCapability,
   metricPowerHeartRateRatioEvent,
   netHttpCapability,
+  netWebSocketCapability,
   type PluginLogger,
   physicsBicycleCapability,
   physicsEnvironmentCapability,
@@ -102,6 +104,7 @@ import {
   trainingConnectService,
   trainingDisconnectService,
   trainingHistoryState,
+  trainingLibraryLoadService,
   trainingLibraryState,
   trainingRefreshService,
   trainingUploadService,
@@ -179,6 +182,7 @@ const CAPABILITIES = [
   storageAppFilesCapability,
   spatialTerrainCapability,
   netHttpCapability,
+  netWebSocketCapability,
   authBrowserSignInCapability,
   storageSecretsCapability,
   storageMediaCapability,
@@ -205,6 +209,7 @@ const STATES: readonly StateDefinition[] = [
   trainingHistoryState,
   trainingLibraryState,
   trainingUploadState,
+  appLinkState,
 ];
 
 /** Every service the host knows (ADR 0068): provided and called beside the bus. */
@@ -231,6 +236,7 @@ const SERVICES: readonly ServiceDefinition[] = [
   trainingCalendarRemoveService,
   trainingConnectService,
   trainingDisconnectService,
+  trainingLibraryLoadService,
   trainingRefreshService,
   trainingUploadService,
 ];

@@ -138,6 +138,7 @@ Feature: The next planned workout on the main screen
       | date       | type | name     | duration | load |
       | 2026-11-04 | Ride | Tempo 40 | 1h       | 60   |
     And the host has started
+    And the local time is "2026-11-04 09:30"
     And the host is restarted while intervals.icu is unreachable
     When the ridrs UI is shown
     Then the next workout card shows:

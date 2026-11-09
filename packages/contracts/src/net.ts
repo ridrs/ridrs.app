@@ -29,3 +29,29 @@ export interface HttpResponse {
 export const netHttpCapability = defineCapability<HttpClient, 'single', 'net.http'>('net.http', {
   cardinality: 'single',
 });
+
+/**
+ * A WebSocket to a service ridrs connects to (ADR 0079), behind a port so that the native app can
+ * run it in Rust (the webview's CSP stays closed) and scenarios can simulate it. Text messages
+ * only. `connect` resolves once the socket is open and rejects when it cannot be opened (an
+ * HTTP error before the upgrade, such as 401, is in the message); `listener.close` gets the
+ * close code when the peer or the network ends it.
+ */
+export interface WebSocketClient {
+  connect(url: string, listener: WebSocketListener): Promise<WebSocketConnection>;
+}
+
+export interface WebSocketListener {
+  message(text: string): void;
+  close(code: number | undefined): void;
+}
+
+export interface WebSocketConnection {
+  send(text: string): Promise<void>;
+  close(): Promise<void>;
+}
+
+export const netWebSocketCapability = defineCapability<WebSocketClient, 'single', 'net.websocket'>(
+  'net.websocket',
+  { cardinality: 'single' },
+);

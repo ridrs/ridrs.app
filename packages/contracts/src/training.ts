@@ -52,6 +52,8 @@ export const TRAINING_ACCOUNT_REASONS = [
   'sign-in-rejected',
   'token-rejected',
   'unreachable',
+  /** The service answered 429 (too many requests): nothing is sent until its `Retry-After` has passed. */
+  'rate-limited',
 ] as const;
 
 export const trainingAccountSchema = z
@@ -257,6 +259,17 @@ export const trainingDisconnectService = defineService('training.disconnect', {
 
 /** Loads the plan again. */
 export const trainingRefreshService = defineService('training.refresh', {
+  request: accountRequest,
+  response: done,
+  keyedBy: trainingAccountState,
+});
+
+/**
+ * Loads the library of the service when it is not there or older than a day (ADR 0078, with the
+ * drafts): the library is read only while it is shown, not at start. Answers once the work
+ * started; a fresh library costs no request.
+ */
+export const trainingLibraryLoadService = defineService('training.library.load', {
   request: accountRequest,
   response: done,
   keyedBy: trainingAccountState,

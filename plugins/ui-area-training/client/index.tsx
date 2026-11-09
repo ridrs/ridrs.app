@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { AreaPage, iconStyle, PREVIEW_CSS, MenuEntry, reactComponent, Toggle, useBack } from '@ridrs/ui-preview';
-import { DEFAULT_PROVIDER, trainingLibraryState } from '@ridrs/contracts';
+import { DEFAULT_PROVIDER, trainingLibraryLoadService, trainingLibraryState } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { WORKOUTS } from './calendar.ts';
 import { messages } from './i18n/index.ts';
@@ -67,14 +67,34 @@ function Library({ ctx, week }: { readonly ctx: UiContext; readonly week: Week }
 
 function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
+  // The libraries of other providers are read when the area shows them, not at start (ADR 0078):
+  // a provider with a valid library answers without a request.
+  const libraryProviders = [...useStateEntries(ctx, trainingLibraryState).keys()]
+    .filter((provider) => provider !== DEFAULT_PROVIDER)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    for (const key of libraryProviders.split(',').filter((provider) => provider !== '')) {
+      ctx
+        .call(trainingLibraryLoadService, { key })
+        .catch((error: unknown) => ctx.logger.warn(`The library of "${key}" could not be asked for: ${String(error)}`));
+    }
+  }, [ctx, libraryProviders]);
   const week = useWeek(ctx);
   const { setDrag } = week;
   // The large calendar is a subpage of the area: Back leaves it for the area first.
   const [large, setLarge] = useState(false);
   useBack(ctx, () => {
-    if (!large) return false;
-    setLarge(false);
-    return true;
+    if (large) {
+      setLarge(false);
+      return true;
+    }
+    // Open changes are never thrown away by Back, nor sent: it offers Save (ADR 0078).
+    if (week.draft.length > 0) {
+      week.saveButton.current?.focus();
+      return true;
+    }
+    return false;
   });
 
   if (large) {

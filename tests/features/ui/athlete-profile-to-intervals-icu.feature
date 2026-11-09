@@ -6,6 +6,9 @@ Feature: The Me area writes the athlete profile to intervals.icu
   of the athlete is never written. A write is refused, never queued: when intervals.icu cannot be
   reached, or the token lacks the scope (403, the rider connects again), the old value stays.
 
+  The Me area collects the changes of a source behind an external API in a draft and sends them
+  with one "Save" (ADR 0078); the scenarios press it.
+
   Here intervals.icu, the browser and the secret store are simulated.
 
   Background:
@@ -30,6 +33,7 @@ Feature: The Me area writes the athlete profile to intervals.icu
     When I press "Profile"
     Then the FTP reads "250 W"
     When I press "Raise Weight"
+    And I press "Save"
     Then intervals.icu received "PUT /api/v1/athlete/0/wellness/2026-11-04" with the body:
       | weight | 72.5 |
     And the weight reads "72.5 kg"
@@ -44,6 +48,7 @@ Feature: The Me area writes the athlete profile to intervals.icu
     When I press "Profile"
     Then the FTP reads "250 W"
     When I press "Raise FTP"
+    And I press "Save"
     Then intervals.icu received "PUT /api/v1/athlete/0/sport-settings/Ride" with the body:
       | ftp | 255 |
     And the FTP reads "255 W"
@@ -51,11 +56,13 @@ Feature: The Me area writes the athlete profile to intervals.icu
 
   Scenario: Where an indoor FTP is set, it is the one written
     Given intervals.icu keeps an indoor FTP of 240 W
+    And the local time is "2026-11-04 10:00"
     And ridrs restarted
     And I reload the UI
     When I press "Profile"
     Then the FTP reads "240 W"
     When I press "Lower FTP"
+    And I press "Save"
     Then intervals.icu received "PUT /api/v1/athlete/0/sport-settings/Ride" with the body:
       | indoor_ftp | 235 |
     And the FTP reads "235 W"
@@ -65,41 +72,48 @@ Feature: The Me area writes the athlete profile to intervals.icu
     When I press "Profile"
     Then the FTP reads "250 W"
     When I press "Raise Weight"
+    And I press "Save"
     Then the FTP reads "250 W"
-    And the weight reads "72.0 kg"
+    And the weight reads "72.5 kg"
     And the Me area offers a "Reconnect intervals.icu" button
     And the secret store holds no intervals.icu token
     And the latest athlete handed to the next ride is from "intervals.icu" with an FTP of 250 W and a weight of 72 kg
 
-  Scenario: Connecting again allows the change
+  Scenario: Connecting again allows the change, and the draft is still there
     Given intervals.icu rejects writes with 403
     When I press "Profile"
     Then the FTP reads "250 W"
     When I press "Raise Weight"
+    And I press "Save"
     And intervals.icu accepts writes
     And I press "Reconnect intervals.icu"
     And the athlete approves the sign-in
     Then the Me area shows "Connected as Alex Rider"
-    And the button "Raise Weight" is enabled
-    When I press "Raise Weight"
+    And the button "Save" is enabled
+    When I press "Save"
     Then the weight reads "72.5 kg"
+    And the button "Save" is disabled
 
-  Scenario: When intervals.icu cannot be reached the change is refused and the old value stays
+  Scenario: When intervals.icu cannot be reached the save is refused and the draft stays
     Given intervals.icu cannot be reached for writes
     When I press "Profile"
     Then the FTP reads "250 W"
     When I press "Raise Weight"
+    And I press "Save"
     Then the page says "intervals.icu could not be reached: the value stays as it was."
-    And the weight reads "72.0 kg"
+    And the weight reads "72.5 kg"
     When intervals.icu can be reached for writes
-    And I press "Raise Weight"
+    And I press "Save"
     Then the weight reads "72.5 kg"
+    And the button "Save" is disabled
 
-  Scenario: Offline, the change is refused as well
-    Given the host is restarted while intervals.icu is unreachable
+  Scenario: Offline, the save is refused as well
+    And the local time is "2026-11-04 09:30"
+    And the host is restarted while intervals.icu is unreachable
     And I reload the UI
     When I press "Profile"
     Then the FTP reads "250 W"
     When I press "Raise Weight"
+    And I press "Save"
     Then the page says "intervals.icu could not be reached: the value stays as it was."
-    And the weight reads "72.0 kg"
+    And the weight reads "72.5 kg"

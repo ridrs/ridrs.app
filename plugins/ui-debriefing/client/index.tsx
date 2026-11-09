@@ -2,6 +2,7 @@
 
 import {
   activityStateChangedEvent,
+  appLinkState,
   exportFitState,
   type RecordingRide,
   recordingDeleteService,
@@ -128,6 +129,11 @@ function useDebriefing(ctx: UiContext) {
       ctx.state.watch(exportFitState, ({ entries }) =>
         setFits(Object.fromEntries([...entries].map(([key, fit]) => [key, fit.file]))),
       ),
+      // A link to a ride of this device chooses its session (ADR 0079).
+      ctx.state.watch(appLinkState, ({ entries }) => {
+        const link = entries.get('activity');
+        if (link) setSessionId(link.sessionId);
+      }),
       ctx.state.watch(trainingUploadState, ({ entries }) => setUploads(Object.fromEntries(entries))),
       ctx.state.watch(trainingAccountState, ({ entries }) => setAccount(entries.get(SERVICE))),
     ];

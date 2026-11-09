@@ -30,6 +30,12 @@
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: ridrs-media: http://ridrs-media.localhost; media-src 'self' ridrs-media: http://ridrs-media.localhost; connect-src 'self' ipc: http://ipc.localhost ridrs-media: http://ridrs-media.localhost"
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["ridrs"] },
+      "mobile": [{ "scheme": ["ridrs"], "appLink": false }]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

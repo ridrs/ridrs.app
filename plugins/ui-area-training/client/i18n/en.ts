@@ -38,6 +38,10 @@ export const en = {
     reason === 'read-only'
       ? `${source} cannot be changed from the library.`
       : `${source} could not be reached: nothing was planned.`,
+  save: 'Save',
+  discard: 'Discard',
+  notSaved: 'Not saved yet',
+  changesOpen: (count: number) => `${count} ${count === 1 ? 'change' : 'changes'} open`,
   saving: 'Saving…',
   writeFailed: (source: string) => `${source} did not take the change.`,
   libraryEmpty: 'Your sources have no workouts yet.',

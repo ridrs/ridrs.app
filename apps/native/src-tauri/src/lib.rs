@@ -32,6 +32,9 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_oauth::init())
+        // The relay of ridrs (ADR 0079): `ridrs://` links, and the socket of the mailbox.
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_websocket::init())
         // The media storage's files for the WebView, by range (ADR 0067): the video world reads
         // downloaded routes through it. Answered off the main thread; a request is at most 16 MB.
         .register_asynchronous_uri_scheme_protocol(media_protocol::SCHEME, |context, request, responder| {

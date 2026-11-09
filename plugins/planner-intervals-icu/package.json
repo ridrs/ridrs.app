@@ -5,6 +5,10 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "dependencies": {
-    "@ridrs/contracts": "workspace:*"
+    "@noble/ciphers": "2.2.0",
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.2.0",
+    "@ridrs/contracts": "workspace:*",
+    "zod": "4.6.7"
   }
 }

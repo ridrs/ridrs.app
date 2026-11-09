@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { createHash } from 'node:crypto';
+import { SimulatedMailbox } from './simulated-mailbox.ts';
 
 /**
  * intervals.icu, the system browser and the secret store for the training scenarios (ADR 0048).
@@ -25,6 +26,7 @@ export interface HttpResponse {
 export interface SignInRequest {
   authorizationUrl(redirectUri: string): string;
   readonly callbackPath: string;
+  readonly relayRedirectUri?: string;
 }
 
 export interface SignInResult {
@@ -74,6 +76,8 @@ export class SimulatedIntervalsIcu {
   /** The token has the scope of the library; without it the library answers 403. */
   libraryScope = true;
   reachable = true;
+  /** The relay of ridrs (ADR 0079), reached through the same `net.http`; its requests are not intervals.icu's. */
+  readonly mailbox = new SimulatedMailbox(() => this.validToken);
   /** Uploads fail as if the network were gone, while everything else answers. */
   uploadsReachable = true;
   /** Writes answer this status (403: the token lacks the scope); 200 accepts them. */
@@ -94,6 +98,31 @@ export class SimulatedIntervalsIcu {
   validToken: string | undefined = ISSUED_TOKEN;
   readonly token = ISSUED_TOKEN;
   readonly requests: HttpRequest[] = [];
+  /** When each request arrived (epoch ms), in the order of `requests`. */
+  readonly requestTimes: number[] = [];
+  /** Every request answers 429 with this `Retry-After` (seconds) while it is set. */
+  rateLimit: { readonly retryAfterSeconds: number } | undefined;
+
+  /** Reads wait here until `answerReads` lets them through: the answers are still on their way. */
+  holdReads = false;
+  private readonly heldReads: Array<() => void> = [];
+  answerReads(): void {
+    this.holdReads = false;
+    for (const release of this.heldReads.splice(0)) release();
+  }
+
+  /** The requests so far as `METHOD /path` (without the query), for the counting steps. */
+  requestLines(): string[] {
+    return this.requests.map((request) => `${request.method} ${new URL(request.url).pathname}`);
+  }
+
+  /** How many requests matched `METHOD /path`; `*` at the end of the path matches any rest. */
+  countRequests(call: string): number {
+    const pattern = new RegExp(
+      `^${call.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
+    );
+    return this.requestLines().filter((line) => pattern.test(line)).length;
+  }
   readonly openedUrls: string[] = [];
   readonly secrets = new Map<string, string>();
   private pendingSignIn?: {
@@ -107,7 +136,12 @@ export class SimulatedIntervalsIcu {
 
   readonly http = {
     request: async (request: HttpRequest): Promise<HttpResponse> => {
+      const relay = this.mailbox.handle(request);
+      if (relay) {
+        return relay;
+      }
       this.requests.push(request);
+      this.requestTimes.push(Date.now());
       if (!this.reachable) {
         throw new Error('getaddrinfo ENOTFOUND intervals.icu');
       }
@@ -118,8 +152,18 @@ export class SimulatedIntervalsIcu {
       if (request.method === 'POST' && url.pathname === '/api/oauth/token') {
         return this.exchange(request);
       }
+      if (this.rateLimit) {
+        return {
+          status: 429,
+          headers: { 'retry-after': String(this.rateLimit.retryAfterSeconds) },
+          body: '',
+        };
+      }
       if (!this.authorized(request)) {
         return json(401, { error: 'Unauthorized' });
+      }
+      if (this.holdReads && request.method === 'GET') {
+        await new Promise<void>((resolve) => this.heldReads.push(resolve));
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/athlete/0') {
         return json(200, {
@@ -332,9 +376,19 @@ export class SimulatedIntervalsIcu {
   /** The authorization URL the browser was opened at last. */
   lastAuthorization?: URL;
 
+  /** The system receives `ridrs://` links: the sign-in uses the relay's redirect URI (ADR 0079). */
+  deepLinks = false;
+
   readonly signIn = {
+    get deepLink(): boolean {
+      return this.owner.deepLinks;
+    },
+    owner: this as SimulatedIntervalsIcu,
     signIn: (request: SignInRequest): Promise<SignInResult> => {
-      const redirectUri = `http://127.0.0.1:${LOOPBACK_PORT}${request.callbackPath}`;
+      const redirectUri =
+        this.deepLinks && request.relayRedirectUri
+          ? request.relayRedirectUri
+          : `http://127.0.0.1:${LOOPBACK_PORT}${request.callbackPath}`;
       const url = new URL(request.authorizationUrl(redirectUri));
       this.openedUrls.push(url.toString());
       this.lastAuthorization = url;
@@ -343,6 +397,9 @@ export class SimulatedIntervalsIcu {
       });
     },
   };
+
+  /** What the sign-in resolved with last. */
+  lastCallbackUrl?: string;
 
   /** True while the browser shows the sign-in page. */
   get signInWaiting(): boolean {
@@ -355,10 +412,14 @@ export class SimulatedIntervalsIcu {
       throw new Error('No sign-in is waiting for the athlete');
     }
     this.pendingSignIn = undefined;
-    const callback = new URL(pending.redirectUri);
+    // Through the relay the browser ends in the app's deep link, with the same query.
+    const callback = new URL(
+      pending.redirectUri.startsWith('https://') ? 'ridrs://oauth/intervals' : pending.redirectUri,
+    );
     for (const [name, value] of Object.entries(params)) {
       callback.searchParams.set(name, value);
     }
+    this.lastCallbackUrl = callback.toString();
     pending.resolve({ redirectUri: pending.redirectUri, callbackUrl: callback.toString() });
   }
 

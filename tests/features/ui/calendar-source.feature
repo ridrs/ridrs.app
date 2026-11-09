@@ -116,6 +116,7 @@ Feature: The rider chooses where the planned workouts come from
   Scenario: Offline, the calendar of intervals.icu is marked
     Given the secret store holds a token for intervals.icu
     And the host has started
+    And the local time is "2026-11-04 09:30"
     And the host is restarted while intervals.icu is unreachable
     And the main screen is 1400 px wide
     And the ridrs UI is shown

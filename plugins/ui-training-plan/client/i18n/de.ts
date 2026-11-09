@@ -14,6 +14,7 @@ export const de: Messages = {
     'sign-in-rejected': 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.',
     'token-rejected': 'intervals.icu akzeptiert diese Verbindung nicht mehr.',
     unreachable: 'intervals.icu war nicht erreichbar.',
+    'rate-limited': 'intervals.icu bittet um eine Pause: zu viele Anfragen.',
   },
   reconnect: 'intervals.icu neu verbinden',
   connect: 'intervals.icu verbinden',

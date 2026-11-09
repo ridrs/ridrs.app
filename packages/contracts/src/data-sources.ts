@@ -35,6 +35,12 @@ export interface DataSource<D> {
   readonly status: DataSourceStatus;
   /** False for a read-only provider, or one whose token lacks the scope. */
   readonly writable: boolean;
+  /**
+   * True for a provider whose data lives behind an external API (ADR 0078): a change
+   * to it costs requests, so a page collects changes in a draft and saves them once. Absent or
+   * false for a provider on this device, whose changes are kept at once.
+   */
+  readonly remote?: boolean;
   /** When the provider last loaded the data, epoch ms. */
   readonly fetchedAt?: number;
   readonly data?: D;
@@ -81,6 +87,7 @@ export function defineDataType<D, W extends Record<string, z.ZodObject>>(
       label: z.string().min(1),
       status: dataSourceStatusSchema,
       writable: z.boolean(),
+      remote: z.boolean().optional(),
       fetchedAt: z.number().nonnegative().optional(),
       data: data.optional(),
     })

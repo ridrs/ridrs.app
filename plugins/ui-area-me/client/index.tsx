@@ -75,6 +75,13 @@ function useAthleteProfile(ctx: UiContext) {
   const chosen = useStateEntries(ctx, dataSourceState).get('athlete.profile')?.provider;
   const provider = chosen ?? DEFAULT_PROVIDER;
   const source = providers.get(provider);
+  /**
+   * A source behind an external API takes one explicit save (ADR 0078): the steppers change a
+   * draft only. The values of the draft are the ones that differ from the source's.
+   */
+  const remote = source?.remote === true;
+  const [draft, setDraft] = useState<{ ftp?: number; weight?: number }>({});
+  const [saving, setSaving] = useState(false);
   const [refusal, setRefusal] = useState<DataWriteResult & { ok: false }>();
   const asked = useRef<{ ftp?: number; weight?: number }>({});
   // The source shows what was asked for: the value is its own again.
@@ -85,25 +92,61 @@ function useAthleteProfile(ctx: UiContext) {
       }
     }
   }, [source]);
-  const update = (change: { ftp?: number; weight?: number }) => {
+  const send = (change: { ftp?: number; weight?: number }): Promise<boolean> => {
     asked.current = { ...asked.current, ...change };
-    ctx.call(athleteProfileUpdateService, { key: provider, ...change }).then(
+    return ctx.call(athleteProfileUpdateService, { key: provider, ...change }).then(
       (answer) => {
         setRefusal(answer.ok ? undefined : answer);
         if (!answer.ok) asked.current = {};
+        return answer.ok;
       },
       (error: unknown) => {
         asked.current = {};
         ctx.logger.warn(`Could not change the athlete profile: ${String(error)}`);
+        return false;
       },
     );
   };
+  const update = (change: { ftp?: number; weight?: number }) => {
+    if (!remote) {
+      void send(change);
+      return;
+    }
+    setDraft((open) => {
+      const next = { ...open, ...change };
+      for (const name of ['ftp', 'weight'] as const) {
+        if (next[name] === source?.data?.[name]) delete next[name];
+      }
+      return next;
+    });
+  };
+  const changed = {
+    ...(draft.ftp !== undefined && draft.ftp !== source?.data?.ftp ? { ftp: draft.ftp } : {}),
+    ...(draft.weight !== undefined && draft.weight !== source?.data?.weight ? { weight: draft.weight } : {}),
+  };
+  const dirty = remote && Object.keys(changed).length > 0;
   return {
     source,
     update,
     refusal,
+    remote,
+    dirty,
+    saving,
+    /** One call with every value of the draft; a refusal keeps the draft. */
+    save: () => {
+      if (!dirty || saving) return;
+      setSaving(true);
+      void send(changed).then((ok) => {
+        if (ok) setDraft({});
+        setSaving(false);
+      });
+    },
+    discard: () => {
+      setDraft({});
+      setRefusal(undefined);
+    },
     /** The value to show and to step from. */
-    current: (name: 'ftp' | 'weight') => asked.current[name] ?? source?.data?.[name],
+    current: (name: 'ftp' | 'weight') => draft[name] ?? asked.current[name] ?? source?.data?.[name],
   };
 }
 
@@ -166,9 +209,15 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
   const language = useLanguage(ctx);
   const [state, change] = useMe(ctx);
   const connections = useRef<HTMLDivElement>(null);
-  useBack(ctx);
+  const save = useRef<HTMLButtonElement>(null);
   useEffect(() => (connections.current ? ctx.slot(CONNECTION_SLOT, connections.current) : undefined), [ctx]);
-  const { source, update, refusal, current } = useAthleteProfile(ctx);
+  const { source, update, refusal, remote, dirty, saving, save: saveDraft, discard, current } = useAthleteProfile(ctx);
+  // Back never throws an open draft away, and never sends it: it offers Save (ADR 0078).
+  useBack(ctx, () => {
+    if (!dirty) return false;
+    save.current?.focus();
+    return true;
+  });
   const ftp = current('ftp');
   const weight = current('weight');
   // Only a source known to be read only holds the buttons back: before it is known, they work.
@@ -206,6 +255,17 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
           value={`${localizeNumber(String(state.weeklyHours), language)} h`}
           onStep={(d) => change((s) => ({ ...s, weeklyHours: clamp(s.weeklyHours + 0.5 * d, 0.5, 30) }))}
         />
+        {remote && (source?.writable || dirty) ? (
+          <div className="pv-row" data-testid="profile-draft">
+            <button ref={save} type="button" className="pv-button" disabled={!dirty || saving} onClick={saveDraft}>
+              {text.save}
+            </button>
+            <button type="button" className="pv-button" disabled={!dirty || saving} onClick={discard}>
+              {text.discard}
+            </button>
+            {dirty ? <span className="pv-muted">{text.unsaved}</span> : null}
+          </div>
+        ) : null}
         {source ? (
           <p className="pv-muted">
             {wattsPerKg ? `${text.wattsPerKg(wattsPerKg)} ` : ''}

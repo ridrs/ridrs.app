@@ -93,6 +93,18 @@ function libraryOf(world: RidrsWorld, provider: string): HTMLElement | null {
 }
 
 Then(
+  'the library lists the workout {string} of {string}',
+  async function (this: RidrsWorld, name: string, provider: string) {
+    await waitFor(() => {
+      const block = libraryOf(this, provider);
+      assert.ok(block, `The library shows nothing of ${provider}`);
+      const names = [...block.querySelectorAll('article h4')].map((card) => card.textContent);
+      assert.ok(names.includes(name), `The library of ${provider} lists ${names.join(', ')}`);
+    });
+  },
+);
+
+Then(
   'the library lists these workouts of {string}:',
   async function (this: RidrsWorld, provider: string, table: DataTable) {
     await waitFor(() => {

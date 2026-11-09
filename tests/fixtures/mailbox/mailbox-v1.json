@@ -1,0 +1,13 @@
+{
+  "description": "ridrs mailbox v1: X25519 + HKDF-SHA256 (salt = eph_pub || enc_pub, info = 'ridrs-mailbox-v1') + AES-256-GCM (aad = device_id|type|timestamp). Binary values are base64url without padding; ciphertext = nonce || ct || tag.",
+  "device_id": "AAAAAAAAAAAAAAAAAAAAAA",
+  "type": "ACTIVITY_UPLOADED",
+  "timestamp": "2026-01-01T10:00:00",
+  "plaintext": "{\"athlete_id\":\"i42\",\"type\":\"ACTIVITY_UPLOADED\",\"timestamp\":\"2026-01-01T10:00:00\"}",
+  "device_enc_priv": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+  "eph_priv": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8",
+  "nonce": "oKGio6Slpqeoqaqr",
+  "device_enc_pub": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+  "eph_pub": "ST6C_HRGSlkmiBdiPSBTxeuOLMSpiLT-4XnsawENUx0",
+  "ciphertext": "oKGio6SlpqeoqaqrYC5BZHOuDcyWuc8NfoN6GWCCVzOSj8tIwM-K7F62FToT6UVx0tTXhp4KREkAcLgYG5B2_ExI2nCWOHBLAHVtNGHaxeGv_lyY5FVbGvn76LCtxhmY-rxoPjrU7yODtC1vXA"
+}

@@ -224,6 +224,7 @@ export {
   type Language,
   languageSchema,
 } from './language.ts';
+export { type AppLink, appLinkSchema, appLinkState, linkIdOf } from './links.ts';
 export {
   APP_CHANNEL_TYPES,
   capabilityIdSchema,
@@ -268,6 +269,10 @@ export {
   type HttpRequest,
   type HttpResponse,
   netHttpCapability,
+  netWebSocketCapability,
+  type WebSocketClient,
+  type WebSocketConnection,
+  type WebSocketListener,
 } from './net.ts';
 export {
   type BicycleCapability,
@@ -462,6 +467,7 @@ export {
   trainingDisconnectService,
   trainingHistoryState,
   trainingHistoryType,
+  trainingLibraryLoadService,
   trainingLibraryState,
   trainingLibraryType,
   trainingRefreshService,

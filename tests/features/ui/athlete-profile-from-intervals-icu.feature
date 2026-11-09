@@ -114,6 +114,7 @@ Feature: intervals.icu is a source of the athlete profile
   Scenario: Offline, the cached profile stands in and is marked
     Given the secret store holds a token for intervals.icu
     And the host has started
+    And the local time is "2026-11-04 09:30"
     And the host is restarted while intervals.icu is unreachable
     And the main screen is 1400 px wide
     And the ridrs UI is shown

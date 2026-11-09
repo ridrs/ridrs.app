@@ -29,7 +29,8 @@
       "publish": []
     },
     "state": [
-      "app.language"
+      "app.language",
+      "app.link"
     ]
   }
 }

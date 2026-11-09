@@ -56,7 +56,8 @@
     "calls": [
       "training.calendar.hand-over",
       "training.calendar.plan",
-      "training.calendar.move"
+      "training.calendar.move",
+      "training.library.load"
     ]
   }
 }

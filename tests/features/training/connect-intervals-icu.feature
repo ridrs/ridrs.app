@@ -113,3 +113,25 @@ Feature: Connecting intervals.icu
     When I open the next workout
     Then the page offers a "Refresh" button
     And the page offers no "Disconnect intervals.icu" button
+
+  Scenario: Where the system hands ridrs deep links to the app, the sign-in goes through the relay
+    Given the system hands ridrs deep links to the app
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    Then the browser was opened at "https://intervals.icu/oauth/authorize" with:
+      | redirect_uri | https://ridrs.app/intervals/oauth/callback |
+    When the athlete approves the sign-in
+    Then the sign-in came back as a deep link
+    And the code was exchanged with the verifier of the challenge and without a client secret
+    And the training tile shows "Connected as Alex Rider"
+
+  Scenario: A deep link with a different state is rejected like a loopback answer
+    Given the system hands ridrs deep links to the app
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the browser returns a code with a different state
+    Then no code was exchanged
+    And the training tile shows "Sign-in failed"
+    And the secret store holds no intervals.icu token

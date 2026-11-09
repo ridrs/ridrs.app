@@ -4,6 +4,7 @@ import {
   type CompletedWorkout,
   DEFAULT_PROVIDER,
   definePlugin,
+  linkIdOf,
   type PluginContext,
   recordingRideState,
   storageAppFilesCapability,
@@ -60,7 +61,7 @@ export default definePlugin({
         name: 'Ride',
         sport: 'virtual-ride',
         ...(footer ? { durationSeconds: Math.max(0, (footer.endedAt - header.startedAt) / 1000) } : {}),
-        externalId: header.sessionId,
+        externalId: linkIdOf(header.sessionId),
       });
     };
 

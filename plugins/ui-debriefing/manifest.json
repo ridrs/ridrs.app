@@ -24,6 +24,7 @@
     },
     "state": [
       "app.language",
+      "app.link",
       "export.fit",
       "recording.ride",
       "training.account",

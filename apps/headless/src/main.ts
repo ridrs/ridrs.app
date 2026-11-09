@@ -14,6 +14,7 @@ import {
   activityStateChangedEvent,
   appLanguageSetService,
   appLanguageState,
+  appLinkState,
   athleteProfileChangedEvent,
   athleteProfileState,
   athleteProfileUpdateService,
@@ -89,6 +90,7 @@ import {
   trainingConnectService,
   trainingDisconnectService,
   trainingHistoryState,
+  trainingLibraryLoadService,
   trainingLibraryState,
   trainingRefreshService,
   trainingUploadService,
@@ -166,6 +168,7 @@ const STATES: readonly StateDefinition[] = [
   trainingHistoryState,
   trainingLibraryState,
   trainingUploadState,
+  appLinkState,
 ];
 
 /** Every service the host knows (ADR 0068): provided and called beside the bus. */
@@ -188,6 +191,7 @@ const SERVICES: readonly ServiceDefinition[] = [
   trainingCalendarRemoveService,
   trainingConnectService,
   trainingDisconnectService,
+  trainingLibraryLoadService,
   trainingRefreshService,
   trainingUploadService,
 ];
