@@ -173,6 +173,9 @@ const TRACE_DOT = {
   boxShadow: '0 0 6px 2px var(--ridrs-accent, #b8f53b), 0 0 16px 5px rgb(184 245 59 / .55)',
   opacity: 0,
   pointerEvents: 'none',
+  // Keeps the dot on its own layer at all times. Otherwise the browser layers it (and the title
+  // over it) only while it rides, and redraws the title a pixel off once the ride ends.
+  willChange: 'opacity, left, top',
 } as const;
 
 /**
