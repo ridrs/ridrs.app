@@ -3,14 +3,19 @@
   "version": "1.0.0",
   "description": "ridrs.app Cloudflare Worker application",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "vitest run"
   },
   "keywords": [
     "cloudflare",
     "workers"
   ],
   "author": "Fridolin Jackstadt",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "vitest": "3.2.4"
+  }
 }
