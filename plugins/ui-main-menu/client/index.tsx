@@ -15,9 +15,11 @@ const TODAY = new URL('./assets/icons/sun.svg', import.meta.url).href;
  * labels leave the view on narrow screens but stay the buttons' names.
  */
 const CSS = `
-.mm-nav { display: flex; flex-direction: column; gap: 28px; height: 100%; padding: 28px 12px; }
+/* The brand's letters start level with the page title's (\`--ridrs-page-top\`, ui-main-screen). */
+.mm-nav { display: flex; flex-direction: column; gap: 28px; height: 100%;
+  padding: var(--ridrs-page-top, 28px) 12px 28px; }
 .mm-brand { margin: 0 12px; color: var(--ridrs-text, #f2f5fa); font: italic 900 26px system-ui, sans-serif;
-  letter-spacing: .04em; }
+  letter-spacing: .04em; text-box: trim-both cap alphabetic; }
 .mm-list { display: flex; flex-direction: column; gap: 6px; }
 .mm-list .mm-list, .mm-list [data-contribution] { display: contents; }
 .mm-nav [data-menu-item] { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px;
@@ -28,7 +30,7 @@ const CSS = `
 .mm-nav [data-menu-item]:focus-visible { outline: 3px solid var(--ridrs-focus, #fff); outline-offset: 2px; }
 .mm-nav [data-menu-icon] { flex: none; width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
-[data-breakpoint="medium"] .mm-nav { align-items: center; padding: 24px 10px; }
+[data-breakpoint="medium"] .mm-nav { align-items: center; padding: var(--ridrs-page-top, 24px) 10px 24px; }
 [data-breakpoint="medium"] .mm-brand { margin: 0; font-size: 18px; }
 [data-breakpoint="medium"] .mm-nav [data-menu-item] { justify-content: center; }
 [data-breakpoint="compact"] .mm-nav { flex-direction: row; padding: 6px 8px; }

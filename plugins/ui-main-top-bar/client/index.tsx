@@ -8,8 +8,9 @@ import { greetingAt, msUntilNextHour } from './greeting.ts';
 import { messages } from './i18n/index.ts';
 
 const CSS = `
-.tb-bar { display: flex; flex-direction: column; gap: 4px; }
-.tb-greeting { margin: 0; color: var(--ridrs-text, #f2f5fa); font: 800 40px/1.1 system-ui, sans-serif; }
+.tb-bar { display: flex; flex-direction: column; gap: 14px; }
+.tb-greeting { margin: 0; color: var(--ridrs-text, #f2f5fa); font: 800 40px/1.1 system-ui, sans-serif;
+  text-box: trim-both cap alphabetic; }
 .tb-sub { margin: 0; color: var(--ridrs-text-muted, #93a1b8); font-size: 20px; }
 `;
 

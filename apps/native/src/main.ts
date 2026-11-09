@@ -6,6 +6,7 @@ import { suppressBrowserChrome } from './browser-chrome.ts';
 import { bundledPlugins } from './bundled-plugins.ts';
 import { startRidrsApp } from './compose.ts';
 import { androidBackButton, createKeepAwake, ensureBluetoothPermission } from './platform.ts';
+import { enableOverlayTitleBar } from './title-bar.ts';
 
 /** Plugins that are bundled but not started in the app (the console output is for headless use). */
 const DISABLED_IN_APP = ['output-console'];
@@ -17,6 +18,7 @@ async function main(): Promise<void> {
     throw new Error('Missing #ridrs root element');
   }
   suppressBrowserChrome(document.documentElement, { allowInspect: import.meta.env.DEV });
+  enableOverlayTitleBar(document.documentElement);
 
   // Before any plugin scans: without the grant Android finds no trainer.
   const granted = await ensureBluetoothPermission().catch((error: unknown) => {
