@@ -41,6 +41,15 @@ keepawake = "0.6.1"
 # Window size and position survive a restart (desktop only).
 tauri-plugin-window-state = "2.5.0"
 
+# The debug bridge's screenshot (src/debug_snapshot.rs): the native snapshot of the WKWebView, in
+# debug builds on the Mac only. The versions are the ones Tauri already uses.
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
+objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSImage", "NSImageRep", "NSBitmapImageRep"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSData", "NSDictionary", "NSError", "NSValue", "block2"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
+
 [profile.release]
 codegen-units = 1
 lto = true

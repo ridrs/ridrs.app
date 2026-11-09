@@ -3685,7 +3685,12 @@ dependencies = [
 name = "ridrs-native"
 version = "0.1.0"
 dependencies = [
+ "block2",
  "keepawake",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-web-kit",
  "ridrs-ble",
  "ridrs-bridge",
  "ridrs-media",

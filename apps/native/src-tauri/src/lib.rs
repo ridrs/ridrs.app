@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod app_files;
+#[cfg(all(debug_assertions, target_os = "macos"))]
+mod debug_snapshot;
 mod keep_awake;
 
 use ridrs_ble::commands as ble;
@@ -76,6 +78,8 @@ pub fn run() {
             bridge::bridge_open,
             bridge::bridge_send_text,
             bridge::bridge_close,
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            debug_snapshot::debug_snapshot,
             keep_awake::keep_awake,
             app_files::app_file_replace,
             app_files::app_file_sync,

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { debugBridge } from './debug-bridge/plugin.ts';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const host = process.env.TAURI_DEV_HOST;
@@ -14,7 +15,8 @@ const ridrsVersion = (
 
 export default defineConfig({
   clearScreen: false,
-  plugins: [react()],
+  // The debug bridge is only in the dev server, and not when it is open to the network.
+  plugins: [react(), debugBridge({ repoRoot, enabled: !host })],
   resolve: {
     alias: {
       '@ridrs/ble-bridge': workspace('packages/ble-bridge/src/index.ts'),

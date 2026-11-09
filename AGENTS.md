@@ -42,6 +42,21 @@ Features are developed in parallel, each in its own Git worktree. The main check
    ```
 5. **Clean up after the merge.** Remove the worktree and the branch: `git worktree remove ../ridrs_app-worktrees/<name>` and `git branch -d feat/<name>`.
 
+## Debugging the Running Mac App
+
+`pnpm --filter @ridrs/native tauri dev` also serves a debug bridge (`apps/native/debug-bridge/`): the dev server runs JavaScript in the real WebKit web view and returns what the page logged, as a browser pane does in a browser. It is only in the dev server (no build has it), off when the dev server is open to the network (`TAURI_DEV_HOST`), and needs the token of the run (`node_modules/.cache/ridrs-debug.json`) and no `Origin`.
+
+```bash
+pnpm debug:app status                          # the page that is connected
+pnpm debug:app eval "return document.title"    # the code is an async function body; or pipe it on stdin
+pnpm debug:app logs [since]                    # console lines and uncaught errors, numbered
+pnpm debug:app layout [selector]               # geometry judged: cut-off text, overflow, overlap, zero size, targets under 24 px, contrast
+pnpm debug:app a11y [selector]                 # roles and names, as a screen reader finds them
+pnpm debug:app screenshot [out.png] [width]    # native snapshot of the web view, 800 pt wide by default
+```
+
+The screenshot is the `WKWebView`'s own snapshot (`debug_snapshot` in `apps/native/src-tauri/src/debug_snapshot.rs`, a command of debug builds on the Mac only): it needs no screen recording permission. A drag or a click made with `dispatchEvent` reaches the app's handlers but is not what the pointer does; native input is not part of the bridge. (`screencapture` is the fallback for a whole window, and needs the permission.)
+
 ## Building and Installing the Apps
 
 How to build the release companion and install and launch it on an Android phone over `adb`, including the local environment pitfalls (no `cargo` on the `PATH`, OpenJ9 JDK, signing): [README, "Release companion on an Android phone"](README.md#release-companion-on-an-android-phone).

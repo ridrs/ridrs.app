@@ -535,6 +535,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/recording
 
+  plugins/history-ridrs:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/recording':
+        specifier: workspace:*
+        version: link:../../packages/recording
+
   plugins/metric-cadence:
     dependencies:
       '@ridrs/contracts':

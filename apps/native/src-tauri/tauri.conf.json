@@ -22,7 +22,8 @@
         "theme": "Dark",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "zoomHotkeysEnabled": false
+        "zoomHotkeysEnabled": false,
+        "dragDropEnabled": false
       }
     ],
     "security": {

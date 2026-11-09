@@ -15,6 +15,7 @@
     "generate:licenses": "tsx scripts/generate-licenses.ts",
     "check:video-routes": "tsx scripts/check-video-routes.ts",
     "fetch:video-catalog": "tsx scripts/fetch-video-catalog.ts",
+    "debug:app": "node scripts/debug-app.mjs",
     "check:native-bundle": "pnpm --filter @ridrs/native build && node scripts/check-native-bundle.mjs"
   },
   "dependencies": {
