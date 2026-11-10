@@ -2,6 +2,10 @@ name = "ridrs-app"
 main = "src/index.js"
 compatibility_date = "2024-10-30"
 
+# Static files (landing page screenshots) are served from public/ before the Worker runs.
+[assets]
+directory = "./public"
+
 [[routes]]
 pattern = "ridrs.app"
 custom_domain = true
