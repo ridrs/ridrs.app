@@ -11,6 +11,9 @@ const TODAY = new URL('./assets/icons/sun.svg', import.meta.url).href;
 /** The ridrs wordmark: chrome letters and two slashes in the cyan-to-volt gradient. */
 const LOGO = new URL('./assets/logo.svg', import.meta.url).href;
 
+/** The two slashes alone, for the narrow menu. */
+const LOGO_MARK = new URL('./assets/logo-mark.svg', import.meta.url).href;
+
 /**
  * Entries of `menu/item` follow one contract (ADR 0058): a `button[data-menu-item]` holding an
  * icon `[data-menu-icon]` and a label `[data-menu-label]`; the menu styles them all alike. The
@@ -21,6 +24,7 @@ const CSS = `
 .mm-nav { display: flex; flex-direction: column; gap: 28px; height: 100%;
   padding: var(--ridrs-page-top, 28px) 12px 28px; }
 .mm-brand { display: block; width: 140px; height: auto; margin: 0 12px; }
+.mm-brand-mark { display: none; }
 .mm-list { display: flex; flex-direction: column; gap: 6px; }
 .mm-list .mm-list, .mm-list [data-contribution] { display: contents; }
 .mm-nav [data-menu-item] { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px;
@@ -32,10 +36,11 @@ const CSS = `
 .mm-nav [data-menu-icon] { flex: none; width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 [data-breakpoint="medium"] .mm-nav { align-items: center; padding: var(--ridrs-page-top, 24px) 10px 24px; }
-[data-breakpoint="medium"] .mm-brand { width: 60px; margin: 0; }
+[data-breakpoint="medium"] .mm-brand { display: none; }
+[data-breakpoint="medium"] .mm-brand-mark { display: block; width: 36px; height: auto; margin: 0; }
 [data-breakpoint="medium"] .mm-nav [data-menu-item] { justify-content: center; }
 [data-breakpoint="compact"] .mm-nav { flex-direction: row; padding: 6px 8px; }
-[data-breakpoint="compact"] .mm-brand { display: none; }
+[data-breakpoint="compact"] .mm-brand, [data-breakpoint="compact"] .mm-brand-mark { display: none; }
 [data-breakpoint="compact"] .mm-list { flex: 1; flex-direction: row; justify-content: space-around; }
 [data-breakpoint="compact"] .mm-nav [data-menu-item] { flex: 1; flex-direction: column; gap: 4px;
   width: auto; padding: 8px 12px; font-size: 12px; text-align: center; }
@@ -56,6 +61,7 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
     <nav className="mm-nav" aria-label={text.menu}>
       <style>{CSS}</style>
       <img className="mm-brand" src={LOGO} alt="" aria-hidden="true" />
+      <img className="mm-brand-mark" src={LOGO_MARK} alt="" aria-hidden="true" />
       <div className="mm-list">
         {/* Today is the main screen, where the menu lives; the areas mark their own entries. */}
         <button
