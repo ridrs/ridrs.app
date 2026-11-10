@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: core IPC (channels); app files below $APPDATA/recordings and $APPDATA/training, settings below $APPDATA/config, read only: replacing and flushing go through the app_file_* commands (storage-files-tauri, ADR 0054); HTTP to the intervals.icu API, its sign-in page in the system browser and the loopback redirect server (ADR 0049). The app-local ble_*, keep_awake, app_file_* and secret_* commands need no plugin permission.",
+  "description": "Main window: core IPC (channels); app files below $APPDATA/recordings and $APPDATA/training, settings below $APPDATA/config, read only: replacing and flushing go through the app_file_* commands (storage-files-tauri, ADR 0054); HTTP to the intervals.icu API, the relay (ADR 0079; the sign-in result at its exact URL), its sign-in page in the system browser and the loopback redirect server (ADR 0049). The app-local ble_*, keep_awake, app_file_* and secret_* commands need no plugin permission.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -124,6 +124,9 @@
       "allow": [
         {
           "url": "https://intervals.icu/api/*"
+        },
+        {
+          "url": "https://ridrs.app/intervals/oauth/result"
         },
         {
           "url": "https://ridrs.app/devices"

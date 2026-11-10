@@ -72,6 +72,10 @@ export class SimulatedMailbox {
   /** The token the registration sent, kept to assert it was sent once and only to /devices. */
   readonly tokensSeen: string[] = [];
   deleted = false;
+  /** What the app reported of its sign-in (`POST /intervals/oauth/result`), in order. */
+  readonly signInResults: Array<{ readonly state: string; readonly ok: boolean }> = [];
+  /** The status the report endpoint answers; anything but 204 is a failing endpoint. */
+  signInResultStatus = 204;
   /** The next signed requests answer 401 `stale_timestamp` (clock skew): the device stays known. */
   skewedRequests = 0;
   /** The relay no longer knows the device: signed requests answer 401 `unknown_device`. */
@@ -250,6 +254,17 @@ export class SimulatedMailbox {
     const body = typeof request.body === 'string' ? request.body : '';
     if (request.method === 'POST' && url.pathname === '/devices') {
       return this.register(body);
+    }
+    if (request.method === 'POST' && url.pathname === '/intervals/oauth/result') {
+      // Not signed: the secret is the state. The first report of a state wins.
+      const fields = JSON.parse(body) as { state?: string; ok?: boolean };
+      if (this.signInResultStatus === 204) {
+        if (!this.signInResults.some((result) => result.state === fields.state)) {
+          this.signInResults.push({ state: fields.state ?? '', ok: fields.ok === true });
+        }
+        return { status: 204, headers: {}, body: '' };
+      }
+      return json(this.signInResultStatus, { error: 'internal' });
     }
     const unauthorized = this.authenticate(request, path, body);
     if (unauthorized) {

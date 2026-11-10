@@ -1216,6 +1216,48 @@ Given('the system hands ridrs deep links to the app', function (this: RidrsWorld
   intervals(this).deepLinks = true;
 });
 
+Given('intervals.icu refuses the code', function (this: RidrsWorld) {
+  intervals(this).rejectCodes = true;
+});
+
+Given('the relay fails to take sign-in results', function (this: RidrsWorld) {
+  intervals(this).mailbox.signInResultStatus = 500;
+});
+
+/** The relay's page in the browser follows the state of the sign-in, so the report carries that state. */
+Then(
+  'the relay was told the sign-in {word}',
+  async function (this: RidrsWorld, outcome: 'succeeded' | 'failed') {
+    const simulation = intervals(this);
+    await this.waitForIo(
+      () => simulation.mailbox.signInResults.length > 0,
+      'the sign-in result at the relay',
+    );
+    assert.deepEqual(simulation.mailbox.signInResults, [
+      {
+        state: simulation.lastAuthorization?.searchParams.get('state'),
+        ok: outcome === 'succeeded',
+      },
+    ]);
+  },
+);
+
+Then('the relay was told nothing of the sign-in', async function (this: RidrsWorld) {
+  await this.settle();
+  const mailbox = intervals(this).mailbox;
+  assert.equal(mailbox.count('POST /intervals/oauth/result'), 0);
+  assert.deepEqual(mailbox.signInResults, []);
+});
+
+Then('the relay was asked for the sign-in result once', async function (this: RidrsWorld) {
+  const mailbox = intervals(this).mailbox;
+  await this.waitForIo(
+    () => mailbox.count('POST /intervals/oauth/result') > 0,
+    'the sign-in result request',
+  );
+  assert.equal(mailbox.count('POST /intervals/oauth/result'), 1);
+});
+
 Then('the sign-in came back as a deep link', function (this: RidrsWorld) {
   assert.match(intervals(this).lastCallbackUrl ?? '', /^ridrs:\/\/oauth\/intervals\?/);
 });

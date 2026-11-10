@@ -3,6 +3,7 @@
 // generic codes without internals.
 import { b64uDecode, encryptForDevice, randomId, sha256Hex, timingSafeEqualStr } from "./crypto.js";
 import { authenticate, readBody } from "./signing.js";
+import { OAUTH_RESULT_TTL_SECONDS } from "./relay.js";
 
 export const MAX_WEBHOOK_BODY = 256 * 1024;
 const MAX_REGISTER_BODY = 4096;
@@ -271,6 +272,7 @@ export async function purge(env, t = now()) {
     env.DB.prepare("DELETE FROM events WHERE device_id IN (SELECT device_id FROM devices WHERE last_seen < ?)").bind(t - DEVICE_IDLE_SECONDS),
     env.DB.prepare("DELETE FROM devices WHERE last_seen < ?").bind(t - DEVICE_IDLE_SECONDS),
     env.DB.prepare("DELETE FROM rate_limits WHERE window < ?").bind(Math.floor(t / 3600) - 2),
+    env.DB.prepare("DELETE FROM oauth_results WHERE created_at < ?").bind(t - OAUTH_RESULT_TTL_SECONDS),
   ]);
   await closeDevices(env, idle);
 }

@@ -299,11 +299,20 @@ export default definePlugin({
         const state = randomUnreserved(32);
         const challenge = await codeChallenge(verifier);
         let callback: URL;
+        /** The sign-in answered through the relay's page, which waits for the report below. */
+        let viaRelay = false;
+        const relayUri = `${mailboxConfig.baseUrl}${RELAY_CALLBACK_PATH}`;
+        /** Best effort and not awaited: the report never fails or delays the connect. */
+        const report = (ok: boolean) => {
+          if (viaRelay) {
+            void mailbox.reportSignIn(state, ok);
+          }
+        };
         try {
           const result = await signIn.signIn({
             callbackPath: CALLBACK_PATH,
             // With deep links the relay's page bounces the answer to the app; else the loopback (ADR 0079).
-            ...(signIn.deepLink ? { relayRedirectUri: `${mailboxConfig.baseUrl}${RELAY_CALLBACK_PATH}` } : {}),
+            ...(signIn.deepLink ? { relayRedirectUri: relayUri } : {}),
             authorizationUrl: (redirectUri) => {
               const url = new URL('/oauth/authorize', SITE);
               url.search = new URLSearchParams({
@@ -319,6 +328,7 @@ export default definePlugin({
             },
           });
           callback = new URL(result.callbackUrl);
+          viaRelay = result.redirectUri === relayUri;
         } catch (error) {
           const cancelled = error instanceof RidrsError && error.code === 'sign-in-cancelled';
           if (!cancelled) {
@@ -350,11 +360,13 @@ export default definePlugin({
             }).toString(),
           });
         } catch (error) {
+          report(false);
           account('failed', { reason: error instanceof RateLimited ? 'rate-limited' : 'unreachable' });
           return;
         }
         const token = response.status === 200 ? accessToken(response.body) : undefined;
         if (!token) {
+          report(false);
           ctx.logger.warn({ status: response.status }, 'intervals.icu: the code exchange failed');
           account('failed', { reason: 'sign-in-rejected' });
           return;
@@ -363,6 +375,8 @@ export default definePlugin({
         // The relay learns the athlete from the token, once, over TLS, and keeps the public keys.
         socket?.stop();
         await mailbox.register(token).catch(() => false);
+        // The token is exchanged and kept; whether the registration worked does not decide this.
+        report(true);
         // A new connection reads everything it shows again.
         held.cache = undefined;
         await loadResources(env, ['athlete', 'events'], now);

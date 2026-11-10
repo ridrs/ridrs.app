@@ -1,7 +1,7 @@
 // Routes the relay and mailbox endpoints; returns null for everything else so
 // the existing site handling in index.js stays untouched.
 import { verifySigned } from "./signing.js";
-import { handleActivity, handleOAuthCallback, methodNotAllowed } from "./relay.js";
+import { handleActivity, handleOAuthCallback, handleOAuthResult, handleOAuthStatus, methodNotAllowed } from "./relay.js";
 import {
   handleAck,
   handleDeleteDevice,
@@ -54,6 +54,8 @@ export async function route(request, rawEnv) {
   const { pathname } = new URL(request.url);
   try {
     if (pathname === "/intervals/oauth/callback") return await handleOAuthCallback(request);
+    if (pathname === "/intervals/oauth/result") return await handleOAuthResult(request, env);
+    if (pathname === "/intervals/oauth/status") return await handleOAuthStatus(request, env);
     if (pathname.startsWith("/activities/")) {
       let id = pathname.slice("/activities/".length);
       try {

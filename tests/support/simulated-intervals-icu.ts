@@ -349,11 +349,15 @@ export class SimulatedIntervalsIcu {
   /** The verifier of every token request, and whether a secret came along. */
   readonly exchanges: Array<{ readonly fields: URLSearchParams; readonly accepted: boolean }> = [];
 
+  /** The token endpoint refuses the code (a used or expired one). */
+  rejectCodes = false;
+
   private exchange(request: HttpRequest): HttpResponse {
     const fields = new URLSearchParams(typeof request.body === 'string' ? request.body : '');
     const challenge = this.lastAuthorization?.searchParams.get('code_challenge');
     const verifier = fields.get('code_verifier') ?? '';
     const accepted =
+      !this.rejectCodes &&
       fields.get('code') === ISSUED_CODE &&
       fields.get('client_id') === this.lastAuthorization?.searchParams.get('client_id') &&
       challenge !== undefined &&

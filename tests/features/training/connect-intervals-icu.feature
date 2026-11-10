@@ -135,3 +135,59 @@ Feature: Connecting intervals.icu
     Then no code was exchanged
     And the training tile shows "Sign-in failed"
     And the secret store holds no intervals.icu token
+
+  Scenario: The relay's page is told when the sign-in is complete
+    Given the system hands ridrs deep links to the app
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the athlete approves the sign-in
+    Then the training tile shows "Connected as Alex Rider"
+    And the relay was told the sign-in succeeded
+
+  Scenario: The relay's page is told when the code exchange fails
+    Given the system hands ridrs deep links to the app
+    And intervals.icu refuses the code
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the athlete approves the sign-in
+    Then the training tile shows "Sign-in failed"
+    And the relay was told the sign-in failed
+
+  Scenario: A registration that fails does not turn the sign-in into a failure
+    Given the system hands ridrs deep links to the app
+    And the relay cannot be reached
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the athlete approves the sign-in
+    Then the training tile shows "Connected as Alex Rider"
+
+  Scenario: A relay that cannot take the result does not fail the connect
+    Given the system hands ridrs deep links to the app
+    And the relay fails to take sign-in results
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the athlete approves the sign-in
+    Then the training tile shows "Connected as Alex Rider"
+    And the relay was asked for the sign-in result once
+    And the secret store holds the intervals.icu token
+
+  Scenario: The loopback sign-in tells the relay nothing
+    Given the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the athlete approves the sign-in
+    Then the training tile shows "Connected as Alex Rider"
+    And the relay was told nothing of the sign-in
+
+  Scenario: A state that does not match is not reported
+    Given the system hands ridrs deep links to the app
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Connect intervals.icu"
+    And the browser returns a code with a different state
+    Then the training tile shows "Sign-in failed"
+    And the relay was told nothing of the sign-in

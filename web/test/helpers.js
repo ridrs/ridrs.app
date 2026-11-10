@@ -6,7 +6,9 @@ import { b64uEncode, sha256Hex } from "../src/crypto.js";
 // Minimal D1 look-alike on node:sqlite (prepare/bind/run/first/all/batch).
 export function makeDb() {
   const db = new DatabaseSync(":memory:");
-  db.exec(readFileSync(new URL("../migrations/0001_mailbox.sql", import.meta.url), "utf8"));
+  for (const file of ["0001_mailbox.sql", "0002_oauth_results.sql"]) {
+    db.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), "utf8"));
+  }
   const stmt = (sql, args = []) => ({
     bind: (...a) => stmt(sql, a),
     run: async () => {

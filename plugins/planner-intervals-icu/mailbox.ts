@@ -110,7 +110,16 @@ export interface Mailbox {
   checkRegistration(): Promise<boolean>;
   /** Drops the keys and the state of this device. */
   forget(): Promise<void>;
+  /**
+   * Tells the relay how the sign-in ended, so that its page in the browser can say it
+   * (`POST /intervals/oauth/result`, unsigned: the secret is the state). Best effort with a short
+   * time-out: never throws and never takes long.
+   */
+  reportSignIn(state: string, ok: boolean): Promise<void>;
 }
+
+/** How long the report of a sign-in result may take (wall-clock time of I/O). */
+const REPORT_TIMEOUT_MS = 4000;
 
 const encoder = new TextEncoder();
 
@@ -237,6 +246,27 @@ export function createMailbox(deps: MailboxDeps): Mailbox {
   };
 
   return {
+    async reportSignIn(state, ok) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          http.request({
+            method: 'POST',
+            url: `${mailboxConfig.baseUrl}/intervals/oauth/result`,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ state, ok }),
+          }),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => reject(new Error('time-out')), REPORT_TIMEOUT_MS);
+          }),
+        ]);
+      } catch {
+        // The page in the browser then says nothing was heard; the connect is not affected.
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+
     async registered() {
       return (await loadKeys()) !== undefined;
     },
