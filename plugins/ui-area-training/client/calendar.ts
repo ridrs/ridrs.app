@@ -182,8 +182,6 @@ export interface PlannedItem {
   readonly detail?: string;
   /** Shown at once, not yet taken by the calendar's provider. */
   readonly pending?: true;
-  /** Not sent: a change of the draft that waits for Save (ADR 0078). */
-  readonly draft?: true;
 }
 
 /** A plan or a move the rider made, shown at once until the calendar's provider has it. */
@@ -195,8 +193,6 @@ export interface Pending {
   readonly moving?: string;
   /** The ids the provider's calendar held on the date when a plan was made: a new one is the plan's entry. */
   readonly before?: readonly string[];
-  /** A change of the draft, not sent yet. */
-  readonly draft?: true;
 }
 
 type Listed = { readonly id: string; readonly date: string; readonly name: string };
@@ -236,7 +232,6 @@ export function withPending(
           kind: 'workout',
           title: change.title,
           pending: true,
-          ...(change.draft ? { draft: true as const } : {}),
         }),
       ),
   ];

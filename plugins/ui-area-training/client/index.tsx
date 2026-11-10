@@ -89,11 +89,6 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
       setLarge(false);
       return true;
     }
-    // Open changes are never thrown away by Back, nor sent: it offers Save (ADR 0078).
-    if (week.draft.length > 0) {
-      week.saveButton.current?.focus();
-      return true;
-    }
     return false;
   });
 

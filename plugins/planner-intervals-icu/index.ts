@@ -1032,8 +1032,11 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
       const bodies = await libraryBodiesOf();
       held.libraryDocs = bodies ? libraryDocs(bodies[0]) : {};
       const { library: _old, libraryDocs: _docs, ...rest } = next;
+      // The library read takes a while: a change of the calendar written meanwhile is in the held plan, not in `next`.
+      const plan = held.cache ? { workouts: held.cache.workouts } : {};
       next = {
         ...rest,
+        ...plan,
         fetchedAt: now,
         fetched: stamp('library'),
         ...(bodies

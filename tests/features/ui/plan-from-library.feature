@@ -5,8 +5,8 @@ Feature: A library workout is planned on a day in the chosen calendar
   moved to another day or removed again. A write is refused, never queued: when intervals.icu
   cannot be reached nothing changes, and a token without the scope asks the rider to connect
   again. The workout is dragged from the library onto a day of this week's table in the Training
-  area, and a planned workout onto another day; a day that has passed takes none. The changes to
-  a calendar behind an external API wait in a draft until "Save" (ADR 0078). On the calendar
+  area, and a planned workout onto another day; a day that has passed takes none. A change of a
+  calendar behind an external API is sent at once, without a draft (ADR 0078). On the calendar
   of ridrs on this device the workout becomes an entry of the Training area on that weekday.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
@@ -36,7 +36,6 @@ Feature: A library workout is planned on a day in the chosen calendar
   Scenario: A library workout is planned on a day with its steps
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Thursday"
-    And I press "Save"
     Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
       | category         | WORKOUT             |
       | start_date_local | 2026-11-05T00:00:00 |
@@ -59,7 +58,6 @@ Feature: A library workout is planned on a day in the chosen calendar
     Given intervals.icu holds back its answers to writes
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Thursday"
-    And I press "Save"
     Then the calendar day "Thursday" lists "Sweet Spot 3x12"
     And the calendar day "Thursday" lists "Saving…"
     When intervals.icu answers its writes
@@ -69,7 +67,6 @@ Feature: A library workout is planned on a day in the chosen calendar
   Scenario: A workout of this device is planned in intervals.icu without steps
     When I press "Training"
     And I drag the workout "Recovery Spin" onto "Thursday"
-    And I press "Save"
     Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
       | category         | WORKOUT             |
       | start_date_local | 2026-11-05T00:00:00 |
@@ -97,7 +94,6 @@ Feature: A library workout is planned on a day in the chosen calendar
     And I press Back
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Thursday"
-    And I press "Save"
     Then the event created in intervals.icu has the workout document of the library workout "Sweet Spot 3x12"
 
   Scenario: A planned workout is moved to another day
@@ -128,22 +124,19 @@ Feature: A library workout is planned on a day in the chosen calendar
     Then intervals.icu received "DELETE" for the event "Threshold 20"
     And the training tile shows "No workout planned"
 
-  Scenario: When intervals.icu cannot be reached nothing is planned and the draft stays
+  Scenario: When intervals.icu cannot be reached nothing is planned
     Given intervals.icu cannot be reached for writes
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Wednesday"
-    And I press "Save"
     Then the page says "intervals.icu could not be reached: nothing was planned."
-    And the page says "1 change open"
-    When I press "Discard"
-    And I press Back
+    And the calendar day "Wednesday" lists no "Sweet Spot 3x12"
+    When I press Back
     Then the training tile shows "No workout planned"
 
   Scenario: A token without the scope asks the rider to connect again
     Given intervals.icu rejects writes with 403
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Wednesday"
-    And I press "Save"
     Then the page says "intervals.icu cannot be changed from the library."
     And the secret store holds no intervals.icu token
 
@@ -174,7 +167,6 @@ Feature: A library workout is planned on a day in the chosen calendar
     And I press Back
     When I press "Training"
     And I drag the planned workout "Threshold 20" onto "Saturday"
-    And I press "Save"
     Then intervals.icu received "PUT" for the event "Threshold 20" with the body:
       | start_date_local | 2026-11-07T00:00:00 |
 
@@ -189,7 +181,6 @@ Feature: A library workout is planned on a day in the chosen calendar
     And I press "Next week"
     Then the calendar day "Tuesday" lists "Threshold 20"
     When I drag the planned workout "Threshold 20" onto "Friday"
-    And I press "Save"
     Then intervals.icu received "PUT" for the event "Threshold 20" with the body:
       | start_date_local | 2026-11-13T00:00:00 |
 

@@ -1,10 +1,9 @@
-@ui @training @draft
-Feature: The Training area saves the changes of an external calendar once
-  Planning and moving workouts in a calendar behind an external API costs a request each
-  (ADR 0078). So they are collected in a list of open changes on the page ("3 changes open") with
-  one "Save" and a "Discard", and Save sends them one after another, at least 250 ms apart.
-  Back with open changes does not throw them away and sends nothing: it moves the focus to "Save".
-  The calendar of ridrs on this device keeps its changes at once.
+@ui @training
+Feature: The Training area sends a change of an external calendar at once
+  Planning and moving workouts in a calendar behind an external API is a request each. The rider
+  sees the result of a drop, so the change is sent when the workout is dropped: shown at once as
+  "Saving…" until the calendar has it, taken back with the reason when the calendar refuses it.
+  Unlike the athlete profile (ADR 0078), the calendar has no Save and no Discard.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
   2026.
@@ -31,59 +30,37 @@ Feature: The Training area saves the changes of an external calendar once
     And the ridrs UI is shown
     And the simulated intervals.icu forgets the requests so far
 
-  Scenario: Changes are collected and sent with one save
+  Scenario: Every drop is sent at once and the page offers no Save
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Friday"
     And I drag the workout "Sweet Spot 3x12" onto "Saturday"
     And I drag the planned workout "Threshold 20" onto "Sunday"
-    Then the page says "3 changes open"
-    And the calendar day "Friday" lists "Sweet Spot 3x12"
-    And the calendar day "Friday" lists "Not saved yet"
-    And intervals.icu received 0 requests "POST *"
-    And intervals.icu received 0 requests "PUT *"
-    When I press "Save"
     Then intervals.icu received 2 requests "POST /api/v1/athlete/0/events"
     And intervals.icu received 1 requests "PUT /api/v1/athlete/0/events/*"
-    And the page says "Sweet Spot 3x12"
+    And the calendar day "Friday" lists "Sweet Spot 3x12"
     And the page offers no "Save" button
+    And the page offers no "Discard" button
 
-  Scenario: The writes of a save are at least 250 ms apart
+  Scenario: The writes are at least 250 ms apart
     Given the requests to intervals.icu are paced as in the app
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Friday"
     And I drag the workout "Sweet Spot 3x12" onto "Saturday"
     And I drag the planned workout "Threshold 20" onto "Sunday"
-    And I press "Save"
     Then intervals.icu received 2 requests "POST *"
     And intervals.icu received 1 requests "PUT *"
     And the writes reached intervals.icu at least 250 ms apart
 
-  Scenario: Discard sends nothing and takes the changes back
+  Scenario: A moved workout can be moved again
     When I press "Training"
-    And I drag the workout "Sweet Spot 3x12" onto "Friday"
-    And I press "Discard"
-    Then the calendar day "Friday" lists no "Sweet Spot 3x12"
-    And the page offers no "Save" button
-    And intervals.icu received 0 requests "POST *"
+    And I drag the planned workout "Threshold 20" onto "Saturday"
+    And I drag the planned workout "Threshold 20" onto "Sunday"
+    Then intervals.icu received 2 requests "PUT /api/v1/athlete/0/events/*"
+    And the calendar day "Sunday" lists "Threshold 20"
 
-  Scenario: Back with open changes sends nothing and moves the focus to Save
-    When I press "Training"
-    And I drag the workout "Sweet Spot 3x12" onto "Friday"
-    And I press Back
-    Then the "training" screen is shown
-    And the focus is on "Save"
-    And the page says "1 change open"
-    And intervals.icu received 0 requests "POST *"
-
-  Scenario: A refused save keeps the changes and says why
+  Scenario: A refused change is taken back and says why
     Given intervals.icu cannot be reached for writes
     When I press "Training"
     And I drag the workout "Sweet Spot 3x12" onto "Friday"
-    And I press "Save"
     Then the page says "intervals.icu could not be reached: nothing was planned."
-    And the page says "1 change open"
-    When intervals.icu can be reached for writes
-    And the simulated intervals.icu forgets the requests so far
-    And I press "Save"
-    Then intervals.icu received 1 requests "POST /api/v1/athlete/0/events"
-    And the page offers no "Save" button
+    And the calendar day "Friday" lists no "Sweet Spot 3x12"

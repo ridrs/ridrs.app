@@ -15,7 +15,7 @@ ADR 0059 keeps what the rider changes in an area at once. For data that stays on
 1. **Which sources draft.** A provider whose data lives behind an external API says so in its source status: `DataSource.remote: true` (new optional field, absent means false). The provider `ridrs` (this device) is not remote: its pages change the value at once, unchanged. The flag is minimal and is the only contract change for the pages; `writable` keeps its meaning (read-only, or a token without the scope).
 2. **Me page.** The FTP and weight steppers of a remote source change a local draft only. A button "Save" (reachable with the arrows and Enter, with a visible focus) is enabled only when the draft differs from the loaded value. Back with an open draft discards nothing silently and sends nothing: it moves the focus to "Save" and offers "Save" and "Discard" (the pattern of `ui-debriefing`). One `athlete.profile.update` call carries both fields. 75 to 80 and back to 75 is no change: Save stays disabled. A refused save keeps the draft and says why.
 3. **Plugin guard.** `planner-intervals-icu` sends only the changed fields (at most two requests, the wellness weight and the sport settings FTP; none when the value equals the held one) and sends no move to the day a workout is on.
-4. **Training page.** Planning, moving and removing workouts of a remote calendar are collected in a draft list on the page ("3 changes open") with one "Save" and a "Discard". Back with open changes behaves as on the Me page. The save sends the changes one after another, with at least 250 ms between two writes. The calendar of ridrs on this device stays immediate. No bulk endpoint is used: their behaviour is not verified.
+4. **Training page.** Planning and moving workouts of a remote calendar are sent when the workout is dropped, one request each, through the gateway (item 6). The rider sees the result of a drop, so it has no draft, no "Save" and no "Discard" (amended on the maintainer's request after the first version collected them in a draft list; a drafted entry could not be moved again). The change is shown at once as "Saving…" and taken back, with the reason, when the calendar refuses it. The calendar of ridrs on this device stays immediate.
 5. **Reads have a validity per resource**, each with its own time (`fetched` in the cache file):
 
    | Resource | Requests | Valid for |
@@ -35,7 +35,7 @@ ADR 0059 keeps what the rider changes in an area at once. For data that stays on
 ## Consequences
 
 - New: `DataSource.remote`, the account reason `rate-limited`, the service `training.library.load`, the module `gateway.ts` of the plugin. Registered in `apps/native/src/compose.ts`, `apps/headless/src/main.ts` and the test World.
-- The Me and Training pages need an explicit Save for a remote source; a rider used to the immediate steppers now clicks once more. The local provider is unchanged.
+- The Me page needs an explicit Save for a remote source; a rider used to the immediate steppers now clicks once more. The local provider is unchanged.
 - The pacing is wall-clock pacing of I/O through `setTimeout`, not simulation time; it does not touch rides (ADR 0068, rule 13). The scenarios set the pacing to zero; a unit test covers the real values.
 - Planned workouts shown in watts are derived with the FTP of the time they were read; an FTP read an hour later does not recompute workouts that are valid for 15 minutes. Accepted.
 - Done rides appear after the next events read (at most 15 minutes, or at once after a saved ride or a refresh).
@@ -45,9 +45,9 @@ ADR 0059 keeps what the rider changes in an area at once. For data that stays on
 - **S1** `gateway.ts` (counter by purpose, logged per request), the simulated intervals.icu counts requests per method and path, no-op guards in `writeProfile` and `writeCalendar`.
 - **S2** `DataSource.remote`; the Me area's draft, Save, Discard and Back (`ui-area-me`).
 - **S3** per-resource reads with `fetched` in the cache, stale-while-revalidate, the service `training.library.load` (called by the Training area), the refresh cooldown (plugin and button), a saved ride reads the events resource only.
-- **S4** the draft list of the Training week (`ui-area-training`): plans and moves of a remote calendar. Removing has a service but no button, so it has no draft yet.
+- **S4** (replaced) the draft list of the Training week was dropped again: plans and moves go out at once (`ui-area-training`, `tests/features/ui/calendar-immediate.feature`).
 - **S5** the gateway: pacing 5 a second, writes 250 ms, one queue, `Retry-After`, the reason `rate-limited`.
 
-Scenarios: `tests/features/training/request-budget.feature`, `tests/features/ui/athlete-profile-draft.feature`, `tests/features/ui/calendar-draft.feature`; the scenarios of `athlete-profile-to-intervals-icu`, `plan-from-library`, `workout-library` and the offline ones were changed to press Save, to show the library when asked for, and to let the cache go stale before an offline start (their intent is the same). Vitest: `plugins/planner-intervals-icu/gateway.test.ts`.
+Scenarios: `tests/features/training/request-budget.feature`, `tests/features/ui/athlete-profile-draft.feature`, `tests/features/ui/calendar-immediate.feature`; the scenarios of `athlete-profile-to-intervals-icu`, `plan-from-library`, `workout-library` and the offline ones were changed to press Save, to show the library when asked for, and to let the cache go stale before an offline start (their intent is the same). Vitest: `plugins/planner-intervals-icu/gateway.test.ts`.
 
 The gateway paces with the wall clock (`Date.now()`) and `setTimeout`: the logical clock stands still inside a turn.

@@ -44,15 +44,6 @@ const CHECK = new URL('./assets/icons/check.svg', import.meta.url).href;
 /** What the rider changed in this area, kept at once (ADR 0059). */
 export const useTraining = userDocument(TRAINING_DOCUMENT, INITIAL_TRAINING);
 
-/** A change of a remote calendar that waits for Save: what is shown, and the call it becomes. */
-interface DraftChange {
-  readonly key: number;
-  readonly change: Omit<Pending, 'key' | 'draft'>;
-  readonly request:
-    | { readonly kind: 'plan'; readonly workoutId: string; readonly from: string }
-    | { readonly kind: 'move'; readonly id: string };
-}
-
 /** What is being dragged: an entry of the week, or a workout of a library. */
 export type Drag =
   | { readonly kind: 'entry'; readonly id: string }
@@ -92,10 +83,6 @@ export function useWeek(ctx: UiContext) {
   const [refusal, setRefusal] = useState<string>();
   // Plans and moves a provider has not answered: shown at once, with a sign that they are not kept yet.
   const [pending, setPending] = useState<readonly Pending[]>([]);
-  // Changes to a calendar behind an external API wait here for one Save (ADR 0078).
-  const [draft, setDraft] = useState<readonly DraftChange[]>([]);
-  const [saving, setSaving] = useState(false);
-  const saveButton = useRef<HTMLButtonElement>(null);
   const nextKey = useRef(1);
   const monday = addDays(weekDate('Monday', today), offset * 7);
   const dateOf = (day: Weekday) => addDays(monday, WEEKDAYS.indexOf(day));
@@ -119,7 +106,6 @@ export function useWeek(ctx: UiContext) {
   // answer to the write (and an answer can also come first), so the entry is neither gone nor
   // listed twice for a moment: the change is hidden at once when its entry is there.
   const shownPending = pending.filter((change) => !arrivedEntry(change, providerWorkouts));
-  const remote = !ownEntriesOnly && calendars.get(chosen)?.remote === true;
   // The entry a plan became takes over the key of its pending entry for good: one entry, updated.
   const claims = useRef(new Map<string, string>());
   for (const change of pending) {
@@ -146,7 +132,7 @@ export function useWeek(ctx: UiContext) {
     return withPending(
       entries,
       dateOf(day),
-      [...shownPending, ...draft.map((item): Pending => ({ ...item.change, key: item.key, draft: true }))],
+      shownPending,
       claims.current,
     );
   };
@@ -183,40 +169,6 @@ export function useWeek(ctx: UiContext) {
       },
     );
   };
-  /** Sends the open changes one after another; the first refusal stops and keeps the rest. */
-  const saveDraft = async () => {
-    if (saving || draft.length === 0) return;
-    setSaving(true);
-    setRefusal(undefined);
-    const label = calendars.get(chosen)?.label ?? chosen;
-    for (const item of draft) {
-      const answer = await ctx
-        .call(
-          item.request.kind === 'move' ? trainingCalendarMoveService : trainingCalendarPlanService,
-          item.request.kind === 'move'
-            ? { key: chosen, id: item.request.id, date: item.change.date }
-            : { key: chosen, date: item.change.date, workoutId: item.request.workoutId, from: item.request.from },
-        )
-        .catch((error: unknown): DataWriteResult => {
-          ctx.logger.warn(`Could not change the calendar: ${String(error)}`);
-          return { ok: false, reason: 'unreachable' };
-        });
-      if (!answer.ok) {
-        setRefusal(text.planRefused(label, answer.reason));
-        break;
-      }
-      // The provider's calendar shows it at once; until its entry is there the change stays listed as saving.
-      const key = nextKey.current++;
-      setPending((all) => [...all, { ...item.change, key }]);
-      setTimeout(() => setPending((all) => all.filter((entry) => entry.key !== key)), 4000);
-      setDraft((open) => open.filter((entry) => entry.key !== item.key));
-    }
-    setSaving(false);
-  };
-  const discardDraft = () => {
-    setDraft([]);
-    setRefusal(undefined);
-  };
   const drop = (day: Weekday) => {
     if (drag === undefined || !droppable(day)) return;
     const date = dateOf(day);
@@ -225,29 +177,11 @@ export function useWeek(ctx: UiContext) {
       if (ownEntriesOnly) calendar((c) => moveEntry(c, drag.id, day));
       else {
         const title = (calendars.get(chosen)?.data?.workouts ?? []).find((workout) => workout.id === drag.id)?.name ?? '';
-        if (remote) {
-          const before = providerWorkouts.filter((workout) => workout.date === date).map((workout) => workout.id);
-          setDraft((open) => [
-            ...open.filter((item) => !(item.request.kind === 'move' && item.request.id === drag.id)),
-            { key: nextKey.current++, change: { date, title, moving: drag.id, before }, request: { kind: 'move', id: drag.id } },
-          ]);
-        } else {
-          written({ date, title, moving: drag.id }, ctx.call(trainingCalendarMoveService, { key: chosen, id: drag.id, date }));
-        }
+        written({ date, title, moving: drag.id }, ctx.call(trainingCalendarMoveService, { key: chosen, id: drag.id, date }));
       }
     } else if (ownEntriesOnly) {
       // The calendar of ridrs is this area's own: the workout becomes one of its entries.
       calendar((c) => addEntry(c, { day, kind: 'workout', title: drag.name }));
-    } else if (remote) {
-      const before = providerWorkouts.filter((workout) => workout.date === date).map((workout) => workout.id);
-      setDraft((open) => [
-        ...open,
-        {
-          key: nextKey.current++,
-          change: { date, title: drag.name, before },
-          request: { kind: 'plan', workoutId: drag.workoutId, from: drag.provider },
-        },
-      ]);
     } else {
       written(
         { date, title: drag.name },
@@ -269,11 +203,6 @@ export function useWeek(ctx: UiContext) {
     drag,
     setDrag,
     refusal,
-    draft,
-    saving,
-    saveButton,
-    saveDraft,
-    discardDraft,
     ownEntriesOnly,
     favourites: state.favourites,
     change,
@@ -397,17 +326,6 @@ export function WeekCalendar({
           </button>
         ) : null}
       </div>
-      {week.draft.length > 0 ? (
-        <div className="pv-row" data-testid="calendar-draft">
-          <span role="status">{text.changesOpen(week.draft.length)}</span>
-          <button ref={week.saveButton} type="button" className="pv-button" disabled={week.saving} onClick={() => void week.saveDraft()}>
-            {text.save}
-          </button>
-          <button type="button" className="pv-button" disabled={week.saving} onClick={week.discardDraft}>
-            {text.discard}
-          </button>
-        </div>
-      ) : null}
       {week.refusal ? (
         <p className="tw-note" role="status">
           {week.refusal}
@@ -463,7 +381,7 @@ export function WeekCalendar({
                   >
                     <span className="tw-entry-name">{entry.kind === 'workout' ? entry.title : text.kinds[entry.kind]}</span>
                     {entry.pending ? (
-                      <span className="tw-entry-label">{entry.draft && !week.saving ? text.notSaved : text.saving}</span>
+                      <span className="tw-entry-label">{text.saving}</span>
                     ) : entry.detail ? (
                       <span className="tw-entry-label">{entry.detail}</span>
                     ) : null}
