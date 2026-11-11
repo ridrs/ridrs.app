@@ -48,10 +48,11 @@ Each host leaves out plugins its runtime cannot run: the app bundle excludes `tr
 
 A plugin declares its UI in the manifest (validated by `uiManifestSectionSchema`, strict):
 
-- `client`: browser module relative to the plugin folder (required with screens or contributions; may not leave the folder).
+- `client`: browser module relative to the plugin folder (required with screens, contributions or UI capabilities; may not leave the folder).
 - `screens[]`: `{ id, export, extensionPoints? }`. The `id` is the navigation path.
 - `contributions[]`: `{ id, extensionPoint, export, order?, extensionPoints? }`. Contributions may offer extension points of their own (nesting).
 - `events.subscribe` / `events.publish`: the event ids the client code may use. Their union over all started UI plugins is the bridge allow-list.
+- `provides` / `uses`: the UI capabilities the plugin provides (`{ capability, export }`) and the ones its client code draws with `ctx.render` ([ADR 0083](../decisions/0083-ui-capabilities-with-typed-input.md); see [UI capabilities](#ui-capabilities)).
 - `state` / `calls`: the app state topics the client code watches and the services it calls ([ADR 0068](../decisions/0068-app-state-and-services-beside-the-bus.md); only on `ui` plugins). Their unions are the registry's `state` and `calls`, the bridge's allow-lists for them.
 
 The core indexes the UI sections of the **started** plugins into a `UiRegistry` (`computeUiRegistry`, pure and deterministic), exposes it as `ctx.ui.registry()` and `host.getUiRegistry()`, and publishes `core.ui-registry.changed` (`{ revision }`) when it changes. It is recomputed once after `host.start()` and after every `stopPlugin` / `startPlugin`, so transient start order never shows up. Contributions are ordered by `order`, then plugin id, then contribution id. Rule violations are diagnostics; the affected entry is left out, the plugin keeps running:
@@ -62,16 +63,38 @@ The core indexes the UI sections of the **started** plugins into a `UiRegistry` 
 | `duplicate-screen` / `duplicate-extension-point` | Declared twice; the smaller plugin id wins. |
 | `client-entry-missing` | The plugin source cannot deliver `ui.client` (no file on disk, or not in the bundle). |
 | `client-load-failure` | A client module failed to load or a component threw on mount (reported by the shell). |
+| `ambiguous-provider` | Two plugins provide the same UI capability. Like the providers of a `single` capability, all of them are blocked at start, so none is drawn. |
 
 The core never knows what a screen or extension point means and never names one.
 
 ## Client contract, shell and bridge
 
-- **`@ridrs/ui-sdk`** (Apache-2.0, imports contracts only): `UiComponent = (container, ctx) => cleanup | void`, the `UiContext` (`events.subscribe/publish` limited to the plugin's own declared events, `slot(point, container, { contribution? })` (with `contribution`, only that one; ADR 0058), `settings` (the plugin's settings documents through the bridge; ADR 0059), `navigate(path)`, `hasScreen(path)` (ADR 0064), `onNavigated(handler)` and `outlet(container, { screens })` for screens shown inside another screen (ADR 0058), `frames.onFrame(handler)` since Phase 7, `onBack(handler)`, and since ADR 0068 `state.watch(topic, listener)` and `call(service, request)`, limited to the plugin's own `ui.state` / `ui.calls`), the `UiBridge` port (with `now()`, the host clock, since Phase 7), and the shared metric display rules (`describeMetricReading`: values rounded half up to their unit's precision - `W`, `rpm`, `bpm` whole numbers, `W/bpm` two decimals; reasons `no source`, `disconnected`, `no signal`, `warming up`).
+- **`@ridrs/ui-sdk`** (Apache-2.0, imports contracts only): `UiComponent = (container, ctx) => cleanup | void`, the `UiContext` (`events.subscribe/publish` limited to the plugin's own declared events, `slot(point, container, { contribution? })` (with `contribution`, only that one; ADR 0058), `settings` (the plugin's settings documents through the bridge; ADR 0059), `navigate(path)`, `hasScreen(path)` (ADR 0064), `onNavigated(handler)` and `outlet(container, { screens })` for screens shown inside another screen (ADR 0058), `frames.onFrame(handler)` since Phase 7, `onBack(handler)`, and since ADR 0068 `state.watch(topic, listener)` and `call(service, request)`, limited to the plugin's own `ui.state` / `ui.calls`, and since ADR 0083 `render(capability, container, input)`, limited to its `ui.uses`), the `UiBridge` port (with `now()`, the host clock, since Phase 7), and the shared metric display rules (`describeMetricReading`: values rounded half up to their unit's precision - `W`, `rpm`, `bpm` whole numbers, `W/bpm` two decimals; reasons `no source`, `disconnected`, `no signal`, `warming up`).
 - **`@ridrs/ui-shell`**: plain DOM, no framework. Renders one screen at a time (`main` first, else the alphabetically first); a screen that the screen in the root took over with `ctx.outlet` is shown in that outlet, with the screen in the root mounted around it; elsewhere, on its own. It mounts each contribution in a wrapper `data-contribution="<pluginId>/<contributionId>"`, keeps slots in sync with the registry without remounting unchanged contributions, and releases everything a component obtained through its context when it unmounts. A component that fails to load or throws is isolated: its wrapper stays empty and the shell reports `client-load-failure`. Navigation is deferred by a microtask, so components may navigate from their own handlers. Since Phase 7 the shell owns the app's one frame clock (`requestAnimationFrame`, or `ShellOptions.frameSource`), see [presentation.md](presentation.md).
 - **`@ridrs/ui-bridge`**: `createInProcessUiBridge(host, events)`. Enforces the allow-list (`event-not-allowed`), publishes on behalf of client code with the source `ui-bridge` (payloads validated by the bus: `invalid-event-payload`), and replays the **latest envelope per event** to every new subscriber, so a reloaded or second UI knows the current ride state and metric values. It is created before `host.start()`. App state and services pass it beside the events (ADR 0068): `watchState(topicId, listener)` sends a snapshot message, then the changed keys (`state-not-allowed` outside the registry's `state`), `call(serviceId, request)` calls with the caller `ui-bridge` and passes the answer or the `RidrsError` through (`call-not-allowed` outside the registry's `calls`); `dispose()` ends its watches. See [app-state-and-services.md](app-state-and-services.md).
 
 A remote bridge (the deferred `ui-gateway-web`, WebSocket) would implement the same `UiBridge` port; neither the shell nor any UI plugin would change.
+
+## UI capabilities
+
+A slot offers room and every contribution of its point decides what it shows there. A **UI capability** is the other way round ([ADR 0083](../decisions/0083-ui-capabilities-with-typed-input.md)): the host decides *what* is shown, and exactly one plugin knows *how*. The contracts define it with `defineUiCapability(id, { input, output })` (e.g. `workoutChartCapability`, `ui.workout-chart`); the provider names its export in `ui.provides`, a consumer the capability in `ui.uses`.
+
+```ts
+const chart = ctx.render(workoutChartCapability, element, { workout, variant: 'mini' });
+chart.onAvailability((available) => { if (!available) element.textContent = '65 min · TSS 72'; });
+chart.on('step-focused', ({ stepId }) => select(stepId));
+chart.update({ workout: draft, variant: 'edit' });
+```
+
+- **Registry:** the core indexes the `ui.provides` of started plugins whose client is available into `capabilities` (`{ pluginId, capability, export, client }`) and each plugin's `uses` into its entry of `plugins`. Two providers of one capability block each other at start (`ambiguous-provider`).
+- **Checks in the shell:** `ctx.render` throws `undeclared-capability` unless the capability is in the caller's `ui.uses`. The input is parsed with the capability's schema on `render` and on every `update`; invalid input throws `invalid-request` and the provider sees nothing. The provider's `emit(event, payload)` throws `undeclared-event` or `invalid-event-payload` unless the output schema accepts it, so the consumer's `on` handlers see checked data only. Input and output are plain data: no callbacks, no framework elements.
+- **Provider:** `UiCapabilityComponent<C> = (container, ctx, input, emit) => { update, release }`, with its own plugin's `ctx`. `update` gets new input without a new mount.
+- **Optional** ([ADR 0053](../decisions/0053-optional-capabilities.md)): while no provider is started, the handle's `available` is `false` and the container is the consumer's, for its own fallback. When the provider starts, the shell empties the container and mounts it with the last input; when it stops, the shell releases it, empties the container and the handle is unavailable again. `onAvailability(listener)` is called at once and on every change, so a consumer has one place for its fallback.
+- **Lifetime:** a handle belongs to the component that called `ctx.render` and is released with it, like a slot; `release()` ends it earlier.
+
+**Which mechanism when.** The host decides what is shown and one plugin knows how: a UI capability. The host offers room and any number of plugins decide what to show: a slot. A value that decides a ride (route, workout, targets, gear): the bus, recorded. App data (catalogue, profile, calendar, a draft): state and services. **Ride data is never render input:** a consumer reads it from the bus and at most passes it on, as the HUD passes the workout's progress to the chart. The landscape stays a slot; drawing it through `ctx.render` would lose its route on replay.
+
+`ui-capabilities.feature` covers the mechanism with the fixture capability `ui.test-badge`.
 
 ## Keyboard, remote and Back
 

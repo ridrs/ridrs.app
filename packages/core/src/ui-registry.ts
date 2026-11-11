@@ -20,6 +20,13 @@ export interface UiRegistryResult {
   readonly problems: readonly Diagnostic[];
 }
 
+type UiRegistryCapability = UiRegistry['capabilities'][number];
+
+interface InputWithProvided {
+  readonly plugin: UiRegistryInput;
+  readonly provided: UiManifestSection['provides'][number];
+}
+
 const byString = (a: string, b: string) => a.localeCompare(b);
 
 function sortedUnion(lists: Iterable<readonly string[]>): string[] {
@@ -37,12 +44,13 @@ export function computeUiRegistry(inputs: readonly UiRegistryInput[]): UiRegistr
 
   const withClient = plugins.filter((plugin) => {
     const { ui } = plugin;
-    const declaresUi = ui.screens.length > 0 || ui.contributions.length > 0;
+    const declaresUi =
+      ui.screens.length > 0 || ui.contributions.length > 0 || ui.provides.length > 0;
     if (declaresUi && !plugin.clientAvailable) {
       problems.push({
         code: 'client-entry-missing',
         pluginId: plugin.pluginId,
-        message: `Client module "${ui.client}" of plugin "${plugin.pluginId}" is not available; its screens and contributions are left out`,
+        message: `Client module "${ui.client}" of plugin "${plugin.pluginId}" is not available; its screens, contributions and UI capabilities are left out`,
         details: { client: ui.client },
       });
       return false;
@@ -168,10 +176,46 @@ export function computeUiRegistry(inputs: readonly UiRegistryInput[]): UiRegistr
         byString(a.id, b.id),
     );
 
+  // UI capabilities (ADR 0083): exactly one provider each. Start-up blocks rival providers like
+  // those of a `single` capability; should two still meet here, neither is drawn.
+  const providers = new Map<string, InputWithProvided[]>();
+  for (const plugin of withClient) {
+    for (const provided of plugin.ui.provides) {
+      providers.set(provided.capability, [
+        ...(providers.get(provided.capability) ?? []),
+        { plugin, provided },
+      ]);
+    }
+  }
+  const capabilities: UiRegistryCapability[] = [];
+  for (const [capability, entries] of providers) {
+    const [only] = entries;
+    if (entries.length === 1 && only) {
+      capabilities.push({
+        pluginId: only.plugin.pluginId,
+        capability,
+        export: only.provided.export,
+        client: only.plugin.ui.client ?? '',
+      });
+      continue;
+    }
+    const ids = entries.map((entry) => entry.plugin.pluginId);
+    for (const pluginId of ids) {
+      problems.push({
+        code: 'ambiguous-provider',
+        pluginId,
+        message: `UI capability "${capability}" has several providers (${ids.join(', ')}); none of them is drawn`,
+        details: { capability, plugins: ids },
+      });
+    }
+  }
+  capabilities.sort((a, b) => byString(a.capability, b.capability));
+
   return {
     registry: {
       screens,
       contributions,
+      capabilities,
       events: {
         subscribe: sortedUnion(plugins.map((p) => p.ui.events.subscribe)),
         publish: sortedUnion(plugins.map((p) => p.ui.events.publish)),
@@ -186,6 +230,7 @@ export function computeUiRegistry(inputs: readonly UiRegistryInput[]): UiRegistr
         },
         state: sortedUnion([p.ui.state]),
         calls: sortedUnion([p.ui.calls]),
+        uses: sortedUnion([p.ui.uses]),
       })),
     },
     problems,

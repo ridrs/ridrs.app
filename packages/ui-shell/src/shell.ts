@@ -7,6 +7,8 @@ import {
   type ServiceDefinition,
   type StateDefinition,
   type StateView,
+  type UiCapabilityDefinition,
+  type UiCapabilityInput,
   type UiRegistry,
   type UiRegistryContribution,
   type UiRegistryPlugin,
@@ -16,6 +18,8 @@ import { FrameClock, type FrameSource } from '@ridrs/presentation';
 import type {
   OutletOptions,
   UiBridge,
+  UiCapabilityComponent,
+  UiCapabilityHandle,
   UiComponent,
   UiContext,
   UiLogger,
@@ -44,9 +48,30 @@ function animationFrameSource(view: Window): FrameSource {
 }
 
 type Entry = UiRegistryScreen | UiRegistryContribution;
+type Provider = UiRegistry['capabilities'][number];
+/** What the shell mounts: a screen, a contribution or the provider of a UI capability. */
+type Mountable = Entry | Provider;
 
 interface Mounted {
   unmount(): void;
+}
+
+/** What a component's export is called with; returns its cleanup. */
+type Start = (component: unknown, ctx: UiContext) => Unsubscribe | undefined;
+
+/**
+ * One `ctx.render` of a consumer (ADR 0083): its capability, container and last input, and the
+ * provider mounted into the container while that one is started.
+ */
+interface Rendering {
+  readonly pluginId: string;
+  readonly capability: UiCapabilityDefinition;
+  readonly container: HTMLElement;
+  input: unknown;
+  readonly handlers: Map<string, Set<(payload: unknown) => void>>;
+  readonly listeners: Set<(available: boolean) => void>;
+  provider?: { readonly entry: Provider; readonly handle: Mounted };
+  instance?: { update(input: unknown): void; release(): void };
 }
 
 /** A slot keeps one extension point's contributions mounted in a container. */
@@ -73,6 +98,8 @@ interface Placed {
 }
 
 const keyOf = (entry: Entry) => `${entry.pluginId}/${entry.id}`;
+const labelOf = (entry: Mountable) =>
+  'id' in entry ? keyOf(entry) : `${entry.pluginId}/${entry.capability}`;
 
 /** The same screen of the same plugin, whichever registry revision it comes from. */
 const sameScreen = (a: UiRegistryScreen | undefined, b: UiRegistryScreen | undefined) =>
@@ -118,6 +145,7 @@ export function mountShell(
   });
   const modules = new Map<string, Promise<Record<string, unknown>>>();
   const slots = new Set<Slot>();
+  const renderings = new Set<Rendering>();
   // Back goes to the component that asked for it last: the innermost one still mounted.
   const backHandlers: (() => void)[] = [];
   const back = () => backHandlers.at(-1)?.();
@@ -153,11 +181,16 @@ export function mountShell(
       events: { subscribe: [], publish: [] },
       state: [],
       calls: [],
+      uses: [],
     };
   const eventsOf = (pluginId: string) => listsOf(pluginId).events;
 
   /** Mounts one component; everything it obtains through its context is released on unmount. */
-  const mountComponent = (entry: Entry, container: HTMLElement): Mounted => {
+  const mountComponent = (
+    entry: Mountable,
+    container: HTMLElement,
+    start: Start = (component, ctx) => (component as UiComponent)(container, ctx) ?? undefined,
+  ): Mounted => {
     const owned = new Set<Unsubscribe>();
     const own = (release: Unsubscribe): Unsubscribe => {
       const once = () => {
@@ -253,6 +286,18 @@ export function mountShell(
       },
       slot: (point, slotContainer, slotOptions) =>
         own(openSlot(point, slotContainer, slotOptions?.contribution)),
+      render: <C extends UiCapabilityDefinition>(
+        capability: C,
+        renderContainer: HTMLElement,
+        input: UiCapabilityInput<C>,
+      ) =>
+        openRendering(
+          entry.pluginId,
+          capability,
+          renderContainer,
+          input,
+          own,
+        ) as unknown as UiCapabilityHandle<C>,
       frames: {
         onFrame: (handler) => own(frames.onFrame(handler, entry.pluginId)),
       },
@@ -289,8 +334,8 @@ export function mountShell(
 
     const fail = (reason: unknown) => {
       const message = reason instanceof Error ? reason.message : String(reason);
-      logger.error(`UI component "${keyOf(entry)}" failed: ${message}`);
-      bridge.reportClientError(entry.pluginId, `${keyOf(entry)}: ${message}`);
+      logger.error(`UI component "${labelOf(entry)}" failed: ${message}`);
+      bridge.reportClientError(entry.pluginId, `${labelOf(entry)}: ${message}`);
     };
 
     loadModule(entry.pluginId).then(
@@ -304,7 +349,7 @@ export function mountShell(
           return;
         }
         try {
-          cleanup = (component as UiComponent)(container, ctx) ?? undefined;
+          cleanup = start(component, ctx);
         } catch (error) {
           for (const release of [...owned]) {
             release();
@@ -331,7 +376,7 @@ export function mountShell(
         try {
           cleanup?.();
         } catch (error) {
-          logger.error(`UI component "${keyOf(entry)}" failed to clean up: ${String(error)}`);
+          logger.error(`UI component "${labelOf(entry)}" failed to clean up: ${String(error)}`);
         }
         container.replaceChildren();
       },
@@ -382,6 +427,179 @@ export function mountShell(
     };
   };
 
+  /** Mounts the capability's provider into the rendering's container, which it empties first. */
+  const mountProvider = (rendering: Rendering, entry: Provider) => {
+    rendering.container.replaceChildren();
+    const handle = mountComponent(entry, rendering.container, (component, ctx) => {
+      let live = true;
+      const emit = (event: string, payload: unknown) => {
+        if (live) {
+          deliver(rendering, entry.pluginId, event, payload);
+        }
+      };
+      const instance = (component as UiCapabilityComponent<UiCapabilityDefinition>)(
+        rendering.container,
+        ctx,
+        rendering.input,
+        emit as Parameters<UiCapabilityComponent<UiCapabilityDefinition>>[3],
+      );
+      rendering.instance = instance;
+      return () => {
+        live = false;
+        rendering.instance = undefined;
+        instance.release();
+      };
+    });
+    rendering.provider = { entry, handle };
+  };
+
+  /** Checks an output event of the provider and hands it to the consumer's handlers. */
+  const deliver = (rendering: Rendering, providerId: string, event: string, payload: unknown) => {
+    const schema = (rendering.capability.output as Record<string, UiCapabilityDefinition['input']>)[
+      event
+    ];
+    if (!schema) {
+      throw new RidrsError(
+        'undeclared-event',
+        `UI capability "${rendering.capability.id}" has no output event "${event}"`,
+        { pluginId: providerId },
+      );
+    }
+    const parsed = schema.safeParse(payload);
+    if (!parsed.success) {
+      throw new RidrsError(
+        'invalid-event-payload',
+        `Invalid "${event}" output of "${rendering.capability.id}": ${parsed.error.message}`,
+        { pluginId: providerId },
+      );
+    }
+    for (const handler of [...(rendering.handlers.get(event) ?? [])]) {
+      try {
+        handler(parsed.data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(`A "${event}" handler of "${rendering.pluginId}" failed: ${message}`);
+        bridge.reportClientError(rendering.pluginId, `"${event}" handler: ${message}`);
+      }
+    }
+  };
+
+  /** Mounts, swaps or releases the provider as the registry says; tells the consumer of changes. */
+  const syncRendering = (rendering: Rendering) => {
+    const entry = registry.capabilities.find((c) => c.capability === rendering.capability.id);
+    const current = rendering.provider?.entry;
+    if (
+      current &&
+      entry &&
+      current.pluginId === entry.pluginId &&
+      current.export === entry.export
+    ) {
+      return;
+    }
+    const was = rendering.provider !== undefined;
+    rendering.provider?.handle.unmount();
+    rendering.provider = undefined;
+    if (entry) {
+      mountProvider(rendering, entry);
+    }
+    if (was !== (entry !== undefined)) {
+      for (const listener of [...rendering.listeners]) {
+        listener(entry !== undefined);
+      }
+    }
+  };
+
+  const openRendering = (
+    pluginId: string,
+    capability: UiCapabilityDefinition,
+    container: HTMLElement,
+    input: unknown,
+    own: (release: Unsubscribe) => Unsubscribe,
+  ): UiCapabilityHandle<UiCapabilityDefinition> => {
+    if (!listsOf(pluginId).uses.includes(capability.id)) {
+      throw new RidrsError(
+        'undeclared-capability',
+        `Plugin "${pluginId}" did not declare "${capability.id}" in ui.uses`,
+        { pluginId },
+      );
+    }
+    const parse = (value: unknown) => {
+      const parsed = capability.input.safeParse(value);
+      if (!parsed.success) {
+        throw new RidrsError(
+          'invalid-request',
+          `Invalid input of "${capability.id}" from "${pluginId}": ${parsed.error.message}`,
+          { pluginId },
+        );
+      }
+      return parsed.data;
+    };
+    const rendering: Rendering = {
+      pluginId,
+      capability,
+      container,
+      input: parse(input),
+      handlers: new Map(),
+      listeners: new Set(),
+    };
+    renderings.add(rendering);
+    syncRendering(rendering);
+    const release = own(() => {
+      renderings.delete(rendering);
+      rendering.listeners.clear();
+      rendering.handlers.clear();
+      rendering.provider?.handle.unmount();
+      rendering.provider = undefined;
+    });
+    return {
+      get available() {
+        return rendering.provider !== undefined;
+      },
+      onAvailability(listener) {
+        rendering.listeners.add(listener);
+        listener(rendering.provider !== undefined);
+        return () => {
+          rendering.listeners.delete(listener);
+        };
+      },
+      update(next) {
+        const parsed = parse(next);
+        if (!renderings.has(rendering)) {
+          return;
+        }
+        rendering.input = parsed;
+        try {
+          rendering.instance?.update(parsed);
+        } catch (error) {
+          const providerId = rendering.provider?.entry.pluginId ?? pluginId;
+          const message = error instanceof Error ? error.message : String(error);
+          logger.error(`UI capability "${capability.id}" failed to update: ${message}`);
+          bridge.reportClientError(providerId, `${capability.id}: update: ${message}`);
+        }
+      },
+      on(event, handler) {
+        if (!Object.hasOwn(capability.output, event)) {
+          throw new RidrsError(
+            'undeclared-event',
+            `UI capability "${capability.id}" has no output event "${event}"`,
+            { pluginId },
+          );
+        }
+        let handlers = rendering.handlers.get(event);
+        if (!handlers) {
+          handlers = new Set();
+          rendering.handlers.set(event, handlers);
+        }
+        const entryHandler = (payload: unknown) => handler(payload as never);
+        handlers.add(entryHandler);
+        return () => {
+          handlers.delete(entryHandler);
+        };
+      },
+      release,
+    };
+  };
+
   /** Keeps `screen` mounted in `place`; unmounts what is there when either is gone or changed. */
   const placeScreen = (
     placed: Placed | undefined,
@@ -414,12 +632,12 @@ export function mountShell(
   };
 
   const openOutlet = (
-    entry: Entry,
+    entry: Mountable,
     container: HTMLElement,
     { screens, dialog }: OutletOptions,
   ): Unsubscribe => {
     if (entry !== active?.screen) {
-      logger.warn(`"${keyOf(entry)}" is not the screen in the root; its outlet stays empty`);
+      logger.warn(`"${labelOf(entry)}" is not the screen in the root; its outlet stays empty`);
       return () => {};
     }
     const opened = {
@@ -518,7 +736,9 @@ export function mountShell(
 
   const onRegistry = (next: UiRegistry) => {
     registry = next;
-    const present = new Set([...next.screens, ...next.contributions].map((e) => e.pluginId));
+    const present = new Set(
+      [...next.screens, ...next.contributions, ...next.capabilities].map((e) => e.pluginId),
+    );
     for (const pluginId of [...modules.keys()]) {
       if (!present.has(pluginId)) {
         // A restarted plugin's module is imported again on its next appearance.
@@ -551,6 +771,11 @@ export function mountShell(
     for (const slot of [...slots]) {
       if (slots.has(slot)) {
         syncSlot(slot);
+      }
+    }
+    for (const rendering of [...renderings]) {
+      if (renderings.has(rendering)) {
+        syncRendering(rendering);
       }
     }
   };

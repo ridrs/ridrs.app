@@ -91,6 +91,36 @@ function resolveAppChannels(
   }
 }
 
+/**
+ * A UI capability has exactly one provider (ADR 0083): rival providers are all blocked, like the
+ * providers of a `single` capability. A consumer without a provider is not blocked: the
+ * capability is optional to it (ADR 0053).
+ */
+function resolveUiCapabilities(
+  plugins: readonly DiscoveredPlugin[],
+  diagnostics: DiagnosticCollector,
+  blocked: Set<string>,
+): void {
+  const providers = new Map<string, string[]>();
+  for (const { manifest } of plugins) {
+    for (const { capability } of manifest.ui?.provides ?? []) {
+      providers.set(capability, [...(providers.get(capability) ?? []), manifest.id]);
+    }
+  }
+  for (const [capability, ids] of providers) {
+    if (ids.length > 1) {
+      diagnostics.report({
+        code: 'ambiguous-provider',
+        message: `UI capability "${capability}" has several providers (${ids.join(', ')}) but may have only one`,
+        details: { capability, plugins: ids },
+      });
+      for (const id of ids) {
+        blocked.add(id);
+      }
+    }
+  }
+}
+
 export function resolveCapabilities(
   plugins: readonly DiscoveredPlugin[],
   contracts: ReadonlyMap<string, CapabilityContract>,
@@ -100,6 +130,7 @@ export function resolveCapabilities(
   const sortedPlugins = [...plugins].sort((a, b) => a.manifest.id.localeCompare(b.manifest.id));
   const blocked = new Set<string>();
   resolveAppChannels(sortedPlugins, channels, diagnostics, blocked);
+  resolveUiCapabilities(sortedPlugins, diagnostics, blocked);
 
   // 1. Validate that all referenced capabilities have registered contracts.
   for (const plugin of sortedPlugins) {

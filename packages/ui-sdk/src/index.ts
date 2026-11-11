@@ -5,6 +5,8 @@ export type {
   SlotOptions,
   StateUpdate,
   UiBridge,
+  UiCapabilityComponent,
+  UiCapabilityHandle,
   UiComponent,
   UiContext,
   UiFrame,

@@ -1,0 +1,13 @@
+{
+  "id": "fixture-ui-badge-twin",
+  "name": "Second Badge Provider (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "provides": [{ "capability": "ui.test-badge", "export": "Badge" }]
+  }
+}

@@ -7,6 +7,9 @@ import type {
   ServiceDefinition,
   StateDefinition,
   StateView,
+  UiCapabilityDefinition,
+  UiCapabilityInput,
+  UiCapabilityOutput,
   UiRegistry,
 } from '@ridrs/contracts';
 
@@ -36,6 +39,52 @@ export interface SlotOptions {
   /** The one contribution to mount, as `<pluginId>/<contributionId>`; all of them without it. */
   readonly contribution?: string;
 }
+
+/**
+ * What `ctx.render` returns (ADR 0083): the consumer's hold on one drawing of a UI capability.
+ * It belongs to the calling component and is released with it.
+ */
+export interface UiCapabilityHandle<C> {
+  /**
+   * Whether the capability's provider is started now. Without it `container` stays the caller's,
+   * which shows its own fallback there; the shell empties the container before the provider
+   * draws into it and again once the provider is gone.
+   */
+  readonly available: boolean;
+  /**
+   * Called with `available` at once and whenever it changes: the provider starts (it is mounted)
+   * or stops (it is released).
+   */
+  onAvailability(listener: (available: boolean) => void): Unsubscribe;
+  /**
+   * New input for the same drawing, without mounting it again. Throws `invalid-request` when
+   * the input fails the capability's schema; the provider then sees nothing.
+   */
+  update(input: UiCapabilityInput<C>): void;
+  /** Calls `handler` with every output event of that name, after its schema has checked it. */
+  on<K extends keyof UiCapabilityOutput<C> & string>(
+    event: K,
+    handler: (payload: UiCapabilityOutput<C>[K]) => void,
+  ): Unsubscribe;
+  /** Releases the provider's drawing and empties `container`; later calls do nothing. */
+  release(): void;
+}
+
+/**
+ * The export a plugin names in `ui.provides` (ADR 0083). It draws `input`, already checked by the
+ * capability's schema, into `container` and keeps it current through `update`. `emit` reports
+ * an output event; it throws `undeclared-event` for a name the capability does not define and
+ * `invalid-event-payload` for a payload its schema refuses. `ctx` is the provider plugin's own.
+ */
+export type UiCapabilityComponent<C> = (
+  container: HTMLElement,
+  ctx: UiContext,
+  input: UiCapabilityInput<C>,
+  emit: <K extends keyof UiCapabilityOutput<C> & string>(
+    event: K,
+    payload: UiCapabilityOutput<C>[K],
+  ) => void,
+) => { update(input: UiCapabilityInput<C>): void; release(): void };
 
 /**
  * What the shell hands to every screen and contribution. Mirrors the plugin context of the core:
@@ -73,6 +122,16 @@ export interface UiContext {
    * `contribution` (`<pluginId>/<contributionId>`), only that one, once it targets the point.
    */
   slot(extensionPoint: string, container: HTMLElement, options?: SlotOptions): Unsubscribe;
+  /**
+   * Draws a UI capability with `input` into `container` (ADR 0083), through its one provider,
+   * whenever that one is started. Throws `undeclared-capability` unless the capability is in the
+   * plugin's own `ui.uses`, and `invalid-request` when the input fails its schema.
+   */
+  render<C extends UiCapabilityDefinition>(
+    capability: C,
+    container: HTMLElement,
+    input: UiCapabilityInput<C>,
+  ): UiCapabilityHandle<C>;
   /**
    * Handles Back (Escape, Backspace, the platform's back button) while the component is mounted.
    * The handler registered last wins; without one, Back does nothing.

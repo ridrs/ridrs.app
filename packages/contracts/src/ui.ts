@@ -132,6 +132,14 @@ export interface UiRegistryContribution {
   readonly client: string;
 }
 
+/** The one provider of a UI capability (ADR 0083). */
+export interface UiRegistryCapability {
+  readonly pluginId: string;
+  readonly capability: string;
+  readonly export: string;
+  readonly client: string;
+}
+
 export interface UiRegistryEvents {
   readonly subscribe: readonly string[];
   readonly publish: readonly string[];
@@ -142,6 +150,8 @@ export interface UiRegistryPlugin {
   readonly events: UiRegistryEvents;
   readonly state: readonly string[];
   readonly calls: readonly string[];
+  /** The UI capabilities its client code may draw with `ctx.render` (ADR 0083). */
+  readonly uses: readonly string[];
 }
 
 /**
@@ -152,6 +162,8 @@ export interface UiRegistry {
   readonly revision: number;
   readonly screens: readonly UiRegistryScreen[];
   readonly contributions: readonly UiRegistryContribution[];
+  /** The provider of each UI capability, by capability id; one per capability. */
+  readonly capabilities: readonly UiRegistryCapability[];
   /** Union over all started UI plugins: the bridge allow-list. */
   readonly events: UiRegistryEvents;
   /** Union of `ui.state` over all started UI plugins: the topics the bridge lets clients watch. */

@@ -121,6 +121,7 @@ const EMPTY_UI_REGISTRY: UiRegistry = Object.freeze({
   revision: 0,
   screens: [],
   contributions: [],
+  capabilities: [],
   events: { subscribe: [], publish: [] },
   state: [],
   calls: [],

@@ -483,6 +483,7 @@ export {
 export {
   type UiManifestSection,
   type UiRegistry,
+  type UiRegistryCapability,
   type UiRegistryContribution,
   type UiRegistryEvents,
   type UiRegistryPlugin,
