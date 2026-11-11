@@ -12,10 +12,11 @@ import {
   trainingCalendarState,
   trainingHistoryState,
   type Workout,
+  type WorkoutDetailsSubject,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { type DragEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import { type DragEvent, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { INITIAL_TRAINING, TRAINING_DOCUMENT } from '../document.ts';
 import {
   addDays,
@@ -37,6 +38,7 @@ import {
   weekDate,
   withPending,
 } from './calendar.ts';
+import { focusKeyProps, OpenDetails } from './details.tsx';
 import { messages } from './i18n/index.ts';
 import { chartWorkout, useChartAthlete, WorkoutChartSlot } from './workout-chart.tsx';
 
@@ -204,9 +206,16 @@ export function useWeek(ctx: UiContext) {
     }
   };
 
+  /** The details an entry of the calendar opens: a workout the provider has, not one still being saved or the area's samples. */
+  const detailsOf = (entry: PlannedItem): WorkoutDetailsSubject | undefined =>
+    entry.kind !== 'workout' || entry.pending || (ownEntriesOnly && FIRST_WEEK.entries.some((sample) => sample.id === entry.id))
+      ? undefined
+      : { kind: 'planned', from: chosen, id: entry.id };
+
   return {
     today,
     monday,
+    detailsOf,
     offset,
     setOffset,
     dateOf,
@@ -256,6 +265,8 @@ export const WEEK_CSS = `
 .tw-entry { transition: background .25s, box-shadow .25s; position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 8px 14px;
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
 .tw-entry-name { overflow-wrap: anywhere; font-size: 14px; line-height: 1.15; }
+.tw-entry-open { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tw-entry-open:focus-visible { outline: 3px solid var(--ridrs-focus, #00f0ff); outline-offset: 3px; }
 .tw-entry-label { font-size: 11px; letter-spacing: .06em; opacity: .75; }
 /* Planned: a cut-corner outline with a cyan edge, like a slot waiting to be ridden. */
 .tw-entry[data-state="planned"] { background: rgb(0 240 255 / .1); color: var(--ridrs-text, #f1f5f9); }
@@ -352,6 +363,7 @@ function Day({
   const past = date < today;
   const { open, done } = week.day(date);
   const athlete = useChartAthlete(ctx);
+  const openDetails = useContext(OpenDetails);
   return (
     <div
       className={className}
@@ -377,7 +389,10 @@ function Day({
     >
       {head}
       <ul className="tw-list">
-        {open.map((entry) => (
+        {open.map((entry) => {
+          const subject = week.detailsOf(entry);
+          const label = entry.kind === 'workout' ? entry.title : text.kinds[entry.kind];
+          return (
           <li
             key={entry.key}
             className="tw-entry tr-entry"
@@ -388,7 +403,18 @@ function Day({
             onDragStart={startDrag({ kind: 'entry', id: entry.id }, setDrag)}
             onDragEnd={() => setDrag(undefined)}
           >
-            <span className="tw-entry-name">{entry.kind === 'workout' ? entry.title : text.kinds[entry.kind]}</span>
+            {subject ? (
+              <button
+                type="button"
+                className="tw-entry-name tw-entry-open"
+                {...focusKeyProps(`entry:${entry.id}`)}
+                onClick={() => openDetails({ subject, focusKey: `entry:${entry.id}` })}
+              >
+                {label}
+              </button>
+            ) : (
+              <span className="tw-entry-name">{label}</span>
+            )}
             {entry.chart ? <WorkoutChartSlot ctx={ctx} workout={entry.chart} athlete={athlete} variant="micro" /> : null}
             {entry.pending ? (
               <span className="tw-entry-label">{text.saving}</span>
@@ -396,7 +422,8 @@ function Day({
               <span className="tw-entry-label">{entry.detail}</span>
             ) : null}
           </li>
-        ))}
+          );
+        })}
         {done.map(({ ride, plan }) => (
           <li
             key={ride.id}

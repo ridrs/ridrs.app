@@ -9,7 +9,7 @@ import {
   WORKOUT_FOCUSES,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import {
   type CatalogueFilter,
@@ -19,6 +19,7 @@ import {
   focusesIn,
   passes,
 } from './catalogue.ts';
+import { type DetailsRequest, focusBack, focusKeyProps, OpenDetails, WorkoutDetailsView } from './details.tsx';
 import { messages } from './i18n/index.ts';
 import { catalogueMessages } from './i18n/catalogue.ts';
 import { MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
@@ -30,9 +31,6 @@ const BACK = new URL('./assets/icons/chevron-left.svg', import.meta.url).href;
 const STAR = new URL('./assets/icons/star.svg', import.meta.url).href;
 /** By Munbaik Cycling Clothing on Unsplash (Unsplash License, see the folder's README). */
 const PICTURE = new URL('./assets/pictures/hero.jpg', import.meta.url).href;
-
-/** The screen that shows one workout in full (another plugin's): Enter on a card opens it where it is there. */
-const WORKOUT_DETAILS = 'workout-details';
 
 type Provider = { readonly provider: string; readonly label: string; readonly workouts: readonly LibraryWorkout[] };
 
@@ -54,6 +52,7 @@ function LibraryCard({
   readonly favourable?: boolean;
 }) {
   const text = useMessages(ctx, messages);
+  const open = useContext(OpenDetails);
   const { setDrag } = week;
   const [charted, setCharted] = useState(false);
   const chart = chartWorkout(workout);
@@ -77,14 +76,18 @@ function LibraryCard({
       onDragStart={startDrag({ kind: 'library', provider, workoutId: workout.id, name: workout.name }, setDrag)}
       onDragEnd={() => setDrag(undefined)}
     >
-      {/* The card is one focus target: Enter opens the details, where that screen is there. */}
+      {/* The card is one focus target: Enter opens the details (nothing opens without their plugin). */}
       <button
         type="button"
         className="pv-open tr-library-open"
         aria-label={workout.name}
-        onClick={() => {
-          if (ctx.hasScreen(WORKOUT_DETAILS)) ctx.navigate(WORKOUT_DETAILS);
-        }}
+        {...focusKeyProps(`library:${provider}:${workout.id}`)}
+        onClick={() =>
+          open({
+            subject: { kind: 'library', from: provider, workoutId: workout.id },
+            focusKey: `library:${provider}:${workout.id}`,
+          })
+        }
       >
         <h4>{workout.name}</h4>
         {facts ? <span className="pv-muted">{facts}</span> : null}
@@ -234,9 +237,29 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
       const { [field]: _, ...rest } = was;
       return value === undefined ? rest : { ...rest, [field]: value };
     });
+  // The details of a workout are an inner view of the area, in place of its content; closing them
+  // gives the focus back to the card or entry that opened them.
+  const [opened, setOpened] = useState<DetailsRequest>();
+  const returnTo = useRef<string | undefined>(undefined);
+  const open = useCallback((request: DetailsRequest) => setOpened(request), []);
+  const current = useRef<DetailsRequest | undefined>(undefined);
+  current.current = opened;
+  const close = useCallback(() => {
+    if (current.current) returnTo.current = current.current.focusKey;
+    setOpened(undefined);
+  }, []);
+  useEffect(() => {
+    if (opened !== undefined || returnTo.current === undefined) return;
+    focusBack(returnTo.current);
+    returnTo.current = undefined;
+  }, [opened]);
   // The large calendar is a subpage of the area: Back leaves it for the area first.
   const [large, setLarge] = useState(false);
   useBack(ctx, () => {
+    if (opened) {
+      close();
+      return true;
+    }
     if (large) {
       setLarge(false);
       return true;
@@ -248,6 +271,10 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
     }
     return false;
   });
+
+  if (opened) {
+    return <WorkoutDetailsView ctx={ctx} subject={opened.subject} onClose={close} />;
+  }
 
   if (large) {
     return (
@@ -262,12 +289,15 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
           </button>
           <h1>{text.calendar}</h1>
         </header>
-        <MonthCalendar ctx={ctx} week={week} />
+        <OpenDetails.Provider value={open}>
+          <MonthCalendar ctx={ctx} week={week} />
+        </OpenDetails.Provider>
       </div>
     );
   }
 
   return (
+    <OpenDetails.Provider value={open}>
     <AreaPage title={text.title} intro={text.intro} picture={{ image: PICTURE, credits: text.pictureCredits }}>
       <style>{WEEK_CSS}</style>
       <style>{CHART_SLOT_CSS}</style>
@@ -340,6 +370,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         </article>
       </section>
     </AreaPage>
+    </OpenDetails.Provider>
   );
 }
 

@@ -60,7 +60,8 @@
       "training.library.load"
     ],
     "uses": [
-      "ui.workout-chart"
+      "ui.workout-chart",
+      "ui.workout-details"
     ]
   }
 }

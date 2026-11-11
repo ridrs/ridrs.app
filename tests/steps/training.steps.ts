@@ -707,20 +707,6 @@ Then('the next workout card shows:', async function (this: RidrsWorld, table: Da
   }
 });
 
-Then(
-  'the next workout card shows a power profile of {int} bars',
-  async function (this: RidrsWorld, bars: number) {
-    const profile = await within(await card(this)).findByTestId('next-workout-profile');
-    assert.equal(profile.querySelectorAll('[data-bar]').length, bars);
-  },
-);
-
-Then('the next workout card shows no power profile', async function (this: RidrsWorld) {
-  const found = await card(this);
-  await this.settle();
-  assert.equal(within(found).queryByTestId('next-workout-profile'), null);
-});
-
 Then('the focus is on the next workout card', async function (this: RidrsWorld) {
   const found = await card(this);
   assert.equal(document.activeElement, found);
