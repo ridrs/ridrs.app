@@ -12,6 +12,7 @@ import {
   workoutChartCapability,
   workoutDetailsCapability,
   workoutEditorCapability,
+  workoutExportCapability,
 } from '@ridrs/contracts';
 import type { UiCapabilityComponent, UiCapabilityHandle, UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
@@ -129,7 +130,8 @@ function EditorPlace({
     ];
     return () => {
       for (const stop of stops) stop();
-      editor.release();
+      // After this commit: the provider's React root cannot be unmounted while this one commits.
+      queueMicrotask(() => editor.release());
     };
   }, [ctx, subject]);
   return (
@@ -138,6 +140,51 @@ function EditorPlace({
       {available ? null : (
         <p className="wd-fallback">
           {text.editorMissing}{' '}
+          <button type="button" className="wd-back" onClick={onClosed}>
+            {text.back}
+          </button>
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * The export through `ui.workout-export` (ADR 0083), in place of the details, like the editor.
+ * Without a provider there is nothing to show but a way back.
+ */
+function ExportPlace({
+  ctx,
+  subject,
+  onClosed,
+  text,
+}: {
+  readonly ctx: UiContext;
+  readonly subject: { readonly from: string; readonly workoutId: string };
+  readonly onClosed: () => void;
+  readonly text: Messages;
+}) {
+  const place = useRef<HTMLDivElement>(null);
+  const latest = useRef(onClosed);
+  latest.current = onClosed;
+  const [available, setAvailable] = useState(true);
+  useEffect(() => {
+    const element = place.current;
+    if (!element) return undefined;
+    const exporter = ctx.render(workoutExportCapability, element, subject);
+    const stops = [exporter.onAvailability(setAvailable), exporter.on('closed', () => latest.current())];
+    return () => {
+      for (const stop of stops) stop();
+      // After this commit: the provider's React root cannot be unmounted while this one commits.
+      queueMicrotask(() => exporter.release());
+    };
+  }, [ctx, subject]);
+  return (
+    <>
+      <div ref={place} data-testid="workout-details-export" />
+      {available ? null : (
+        <p className="wd-fallback">
+          {text.exportMissing}{' '}
           <button type="button" className="wd-back" onClick={onClosed}>
             {text.back}
           </button>
@@ -329,6 +376,8 @@ function DetailsView({
   const choices = useStateEntries(ctx, dataSourceState);
   // "Edit" opens the editor in place of the details; once it has saved, the details show the saved workout.
   const [editing, setEditing] = useState<EditorSubject>();
+  // "Export" opens the export in place of the details, for a workout of a library.
+  const [exporting, setExporting] = useState<{ readonly from: string; readonly workoutId: string }>();
   const [saved, setSaved] = useState<{ readonly of: string; readonly subject: WorkoutDetailsSubject }>();
   const subjectKey = JSON.stringify(subject);
   const current = saved?.of === subjectKey ? saved.subject : subject;
@@ -350,6 +399,22 @@ function DetailsView({
     setEditing({ kind: from.own ? 'edit' : 'copy', from: from.from, workoutId: from.workoutId });
 
   const name = shown.state === 'shown' ? shown.workout.name : '';
+  if (exporting) {
+    return (
+      <article className="wd-page" data-testid="workout-details-exporting" aria-label={text.details(name)}>
+        <DetailsStyles />
+        <ExportPlace
+          ctx={ctx}
+          subject={exporting}
+          text={text}
+          onClosed={() => {
+            setExporting(undefined);
+            queueMicrotask(() => back.current?.focus());
+          }}
+        />
+      </article>
+    );
+  }
   if (editing) {
     return (
       <article className="wd-page" data-testid="workout-details-editing" aria-label={text.details(name)}>
@@ -382,14 +447,24 @@ function DetailsView({
           text={text}
           edit={
             ref ? (
-              <button
-                type="button"
-                className="wd-back"
-                data-testid="workout-details-edit"
-                onClick={() => startEdit(ref)}
-              >
-                {ref.own ? text.edit : text.editAsCopy}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="wd-back"
+                  data-testid="workout-details-edit"
+                  onClick={() => startEdit(ref)}
+                >
+                  {ref.own ? text.edit : text.editAsCopy}
+                </button>
+                <button
+                  type="button"
+                  className="wd-back"
+                  data-testid="workout-details-export-open"
+                  onClick={() => setExporting({ from: ref.from, workoutId: ref.workoutId })}
+                >
+                  {text.export}
+                </button>
+              </>
             ) : undefined
           }
         />

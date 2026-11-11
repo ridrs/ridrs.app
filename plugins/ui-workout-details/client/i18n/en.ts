@@ -7,6 +7,8 @@ export const en = {
   locale: 'en-GB',
   back: 'Back',
   edit: 'Edit',
+  export: 'Export',
+  exportMissing: 'The export of workouts is not installed.',
   editorMissing: 'The editor is not available.',
   editAsCopy: 'Edit as a copy',
   details: (name: string) => `Details of ${name}`,

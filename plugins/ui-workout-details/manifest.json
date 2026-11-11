@@ -18,7 +18,8 @@
     ],
     "uses": [
       "ui.workout-chart",
-      "ui.workout-editor"
+      "ui.workout-editor",
+      "ui.workout-export"
     ],
     "state": [
       "app.language",

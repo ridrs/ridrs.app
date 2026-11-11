@@ -7,6 +7,8 @@ export const de: Messages = {
   locale: 'de-DE',
   back: 'Zurück',
   edit: 'Bearbeiten',
+  export: 'Exportieren',
+  exportMissing: 'Der Export von Workouts ist nicht installiert.',
   editorMissing: 'Der Editor ist nicht verfügbar.',
   editAsCopy: 'Als Kopie bearbeiten',
   details: (name: string) => `Details zu ${name}`,
