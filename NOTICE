@@ -39,6 +39,7 @@ This project incorporates third-party open-source dependencies under the followi
 | `@noble/curves` / `@noble/hashes` / `@noble/ciphers` | 2.2.0 | MIT | Ed25519, X25519, HKDF-SHA256 and AES-256-GCM of the relay's mailbox, the same pure JS on every platform (`planner-intervals-icu`, ADR 0079) |
 | `@tauri-apps/plugin-deep-link` | 2.6.3 | MIT OR Apache-2.0 | `ridrs://` links: the relay's sign-in redirect and links to rides (`auth-sign-in-tauri`, ADR 0079) |
 | `@tauri-apps/plugin-websocket` | 2.5.0 | MIT OR Apache-2.0 | The mailbox's socket, run in Rust (`net-websocket-tauri`, ADR 0079) |
+| `@tauri-apps/plugin-dialog` | 2.8.4 | MIT OR Apache-2.0 | The system save dialog for exported workouts (`files-save-tauri`, ADR 0085) |
 | `@zip.js/zip.js` | 2.24.0 | BSD-3-Clause | ZIP entries by HTTP range for the video catalog tool (`scripts/fetch-video-catalog.ts`); unpacking downloaded video packages (`data-archive-node`) (ADR 0065) |
 | `fast-xml-parser` | 5.11.2 | MIT | Reading Incyclist control files (`video-import-incyclist`, ADR 0066); its dependencies `strnum`, `@nodable/entities`, `path-expression-matcher`, `fast-xml-builder`, `is-unsafe`, `xml-naming` are MIT |
 | `entities` | 8.1.0 | BSD-2-Clause | HTML's named entities in Incyclist control files (`video-import-incyclist`, ADR 0066) |
@@ -56,6 +57,7 @@ Rust dependencies of `apps/native` (selection; the full tree is in `apps/native/
 | `tauri-plugin-http` / `tauri-plugin-opener` | 2.8.3 / 2.7.2 | Apache-2.0 OR MIT | HTTP to intervals.icu; opening its sign-in page (ADR 0049) |
 | `tauri-plugin-oauth` | 2.1.0 | MIT OR Apache-2.0 | One-shot loopback server for the OAuth redirect (ADR 0049) |
 | `tauri-plugin-deep-link` / `tauri-plugin-websocket` | 2.4 | Apache-2.0 OR MIT | `ridrs://` deep links; the mailbox's socket in Rust (ADR 0079) |
+| `tauri-plugin-dialog` | 2.8.4 | Apache-2.0 OR MIT | The system save dialog for exported workouts (`files-save-tauri`, ADR 0085) |
 | `keyring-core` / `android-native-keyring-store` | 1.0.1 / 1.0.0 | MIT OR Apache-2.0 | Secrets in the Keystore-backed store on Android (ADR 0050, ADR 0053) |
 | `aes-gcm` / `hkdf` / `sha2` | 0.10.3 / 0.12.4 / 0.10.9 | Apache-2.0 OR MIT | The encrypted secrets file on the desktop (ADR 0053) |
 | `machine-uid` | 0.6.0 | MIT | The machine id the secrets file's key is derived from (ADR 0053) |

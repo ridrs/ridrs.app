@@ -1,0 +1,30 @@
+{
+  "id": "ui-workout-export",
+  "name": "Workout Export",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "provides": [
+      {
+        "capability": "ui.workout-export",
+        "export": "WorkoutExport"
+      }
+    ],
+    "uses": [],
+    "state": [
+      "app.language",
+      "athlete.profile",
+      "data.source",
+      "training.library"
+    ],
+    "calls": [
+      "files.save"
+    ]
+  }
+}

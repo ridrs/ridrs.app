@@ -12,8 +12,8 @@ import {
   type MessageDefinition,
 } from './profile.ts';
 
-const HEADER_SIZE = 14;
-const DEFINITION_FLAG = 0x40;
+export const HEADER_SIZE = 14;
+export const DEFINITION_FLAG = 0x40;
 
 type FieldValues = Readonly<Record<string, number | undefined>>;
 
@@ -32,7 +32,7 @@ function softwareVersion(version: string): number | undefined {
 }
 
 /** Little-endian bytes, growing as needed. */
-class Output {
+export class Output {
   private bytes = new Uint8Array(1024);
   length = 0;
 
@@ -61,6 +61,12 @@ class Output {
 
   s32(value: number): void {
     this.reserve(4).setInt32(0, value, true);
+  }
+
+  append(data: Uint8Array): void {
+    for (const byte of data) {
+      this.u8(byte);
+    }
   }
 
   result(): Uint8Array {
@@ -240,12 +246,20 @@ export function encodeActivity(model: ActivityModel): Uint8Array {
     localTimestamp: end + model.timeZoneOffsetMinutes * 60,
   });
 
+  return sealFile(out, FIT_PROTOCOL_VERSION);
+}
+
+/**
+ * Closes a file whose first `HEADER_SIZE` bytes are placeholders: writes the 14-byte header with
+ * its CRC over them and the file CRC at the end.
+ */
+export function sealFile(out: Output, protocolVersion: number): Uint8Array {
   const dataSize = out.length - HEADER_SIZE;
   out.u16(0); // file CRC, written below
   const bytes = out.result();
   const view = new DataView(bytes.buffer);
   view.setUint8(0, HEADER_SIZE);
-  view.setUint8(1, FIT_PROTOCOL_VERSION);
+  view.setUint8(1, protocolVersion);
   view.setUint16(2, FIT_PROFILE_VERSION.major * 1000 + FIT_PROFILE_VERSION.minor, true);
   view.setUint32(4, dataSize, true);
   bytes.set([0x2e, 0x46, 0x49, 0x54], 8); // ".FIT"

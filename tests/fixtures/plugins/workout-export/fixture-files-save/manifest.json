@@ -1,0 +1,10 @@
+{
+  "id": "fixture-files-save",
+  "name": "Save Files (fixture)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "services": { "provides": ["files.save"] }
+}

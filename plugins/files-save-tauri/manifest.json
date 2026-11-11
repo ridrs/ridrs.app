@@ -1,0 +1,12 @@
+{
+  "id": "files-save-tauri",
+  "name": "Save Files (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "services": {
+    "provides": ["files.save"]
+  }
+}

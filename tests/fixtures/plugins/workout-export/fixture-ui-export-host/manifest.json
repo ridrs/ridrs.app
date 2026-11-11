@@ -1,0 +1,15 @@
+{
+  "id": "fixture-ui-export-host",
+  "name": "Export Host (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "screens": [{ "id": "main", "export": "ExportHost" }],
+    "state": ["training.library"],
+    "uses": ["ui.workout-export"]
+  }
+}

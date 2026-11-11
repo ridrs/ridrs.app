@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import type { Messages } from './en.ts';
+
+/** The texts of the workout export in German (ADR 0072). */
+export const de: Messages = {
+  locale: 'de-DE',
+  back: 'Zurück',
+  title: (name: string) => `${name} exportieren`,
+  loading: 'Das Workout wird geladen…',
+  missing: 'Dieses Workout gibt es nicht mehr.',
+  formatLabel: 'Format',
+  formats: {
+    zwo: 'ZWO (Zwift)',
+    fit: 'FIT (Garmin)',
+    erg: 'ERG',
+    mrc: 'MRC',
+    tcx: 'TCX (Garmin)',
+    intervals: 'intervals.icu-Text',
+  },
+  warningsHeading: 'Was sich in diesem Format ändert',
+  noWarnings: 'In diesem Format wird nichts umgerechnet und nichts geht verloren.',
+  at: (place: string) => `(${place})`,
+  refusedHeading: (format: string) => `Export nach ${format} nicht möglich`,
+  refusedFtp:
+    'Dieses Format kann die Einheit des Workouts nicht abbilden, und das Umrechnen braucht deine FTP. Trage deine FTP im Profil ein oder wähle ein Format, das sie abbilden kann.',
+  refusedOther: 'Das Workout lässt sich in diesem Format nicht schreiben.',
+  fileName: 'Dateiname',
+  save: 'Speichern …',
+  saving: 'Wird gespeichert …',
+  saved: (fileName: string) => `${fileName} gespeichert.`,
+  notSaved: 'Nicht gespeichert.',
+  failed: 'Die Datei konnte nicht gespeichert werden.',
+  warnings: {
+    'watts-to-percent': 'Watt werden mit deiner FTP in % FTP umgerechnet.',
+    'percent-to-watts': '% FTP wird mit deiner FTP in Watt umgerechnet.',
+    'zone-converted': 'Zonen werden als Leistungsbereich der Zone geschrieben.',
+    'zone-range': 'Dieses Format kennt eine Zone; bei einem Bereich wird die niedrigste geschrieben.',
+    'range-to-middle': 'Ein Bereich wird als seine Mitte geschrieben; dieses Format kennt einen Wert.',
+    'repeat-unrolled': 'Eine Wiederholung wird Schritt für Schritt ausgeschrieben.',
+    'repeats-unrolled': 'Wiederholungen werden Runde für Runde ausgeschrieben.',
+    'repeat-until-once': 'Eine Wiederholung, die nicht nach einer Anzahl endet, wird einmal geschrieben.',
+    'target-to-free-ride': 'Ein Ziel, das dieses Format nicht kennt, wird zur freien Fahrt.',
+    'target-held': 'Ein Schritt ohne Leistungsziel hält die letzte Leistung.',
+    'target-dropped': 'Ein Ziel, das dieses Format nicht kennt, wird nicht geschrieben.',
+    'duration-estimated':
+      'Ein Schritt, der nicht nach Zeit endet, wird zu einem Zeitschritt mit geschätzter Länge.',
+    'cadence-dropped': 'Trittfrequenzziele werden nicht geschrieben.',
+    'secondary-dropped': 'Ein zweites Ziel eines Schritts wird nicht geschrieben.',
+    'step-names-dropped': 'Namen und Notizen der Schritte werden nicht geschrieben.',
+    'metadata-dropped': 'Einige Angaben zum Workout haben in diesem Format keinen Platz.',
+    'ramp-stepped': 'Eine Rampe wird als Folge kleiner Schritte geschrieben.',
+    'ramp-as-range': 'Eine Rampe mit offener Länge wird als Bereich geschrieben.',
+    'cues-dropped': 'Texte während eines Schritts werden nicht geschrieben.',
+    'intensity-approximated': 'Dieses Format hat weniger Intensitäten; manche werden als die nächste geschrieben.',
+    'max-effort-open': 'Ein Schritt „alles geben“ wird zu einem Schritt ohne Ziel.',
+    'flat-road-dropped': '„Flache Straße“ einer freien Fahrt wird nicht geschrieben.',
+    'value-rounded': 'Werte werden auf ganze Zahlen gerundet.',
+    'no-power': 'Das Workout hat keinen Schritt mit Leistungsziel.',
+  },
+  warningFallback: 'In diesem Format wird etwas geändert.',
+};

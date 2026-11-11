@@ -324,6 +324,15 @@ export const licenseData: LicenseData = {
       ]
     },
     {
+      "name": "@tauri-apps/plugin-dialog",
+      "version": "2.8.4",
+      "license": "MIT OR Apache-2.0",
+      "purpose": "The system save dialog for exported workouts (files-save-tauri, ADR 0085)",
+      "texts": [
+        "eb8a6c846304"
+      ]
+    },
+    {
       "name": "@zip.js/zip.js",
       "version": "2.24.0",
       "license": "BSD-3-Clause",
@@ -439,6 +448,17 @@ export const licenseData: LicenseData = {
       "texts": [
         "a8d80f63116d",
         "79b827e4df3a"
+      ]
+    },
+    {
+      "name": "tauri-plugin-dialog",
+      "version": "2.8.4",
+      "license": "Apache-2.0 OR MIT",
+      "purpose": "The system save dialog for exported workouts (files-save-tauri, ADR 0085)",
+      "texts": [
+        "eb8a6c846304",
+        "0cec06e0e55f",
+        "89ff9689dcf9"
       ]
     },
     {

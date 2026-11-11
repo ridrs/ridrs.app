@@ -41,6 +41,7 @@ import {
   type EventDefinition,
   equipmentBicycleChangedEvent,
   exportFitState,
+  filesSaveService,
   measurementCadenceEvent,
   measurementHeartRateEvent,
   measurementPowerEvent,
@@ -121,6 +122,8 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   // The bridge transport needs a connector; this host has none (the companion bridge is native-only).
   'transport-ble-bridge',
   'storage-files-tauri',
+  // The system's save dialog; the headless app has none.
+  'files-save-tauri',
   // intervals.icu needs HTTP, the browser sign-in and the secret store: native-only providers.
   'planner-intervals-icu',
   // Media, downloads and archives in Rust (crates/ridrs-media); headless has the Node providers.
@@ -184,6 +187,7 @@ const SERVICES: readonly ServiceDefinition[] = [
   deviceConnectService,
   deviceForgetService,
   deviceDiscoverService,
+  filesSaveService,
   recordingContinueService,
   recordingFinishService,
   recordingDeleteService,

@@ -24,6 +24,10 @@ tauri-plugin-blec = "0.18.0"
 # Recordings and FIT exports in the app container (plugins/storage-files-tauri); the JS side
 # is @tauri-apps/plugin-fs of the same version.
 tauri-plugin-fs = "2.7.1"
+# The save dialog for exported workouts (plugins/files-save-tauri, ADR 0085); the JS side is
+# @tauri-apps/plugin-dialog of the same version. The dialog adds the file the rider chose to the
+# fs plugin's scope.
+tauri-plugin-dialog = "2.8.4"
 # intervals.icu (ADR 0049): HTTP from Rust, the system browser and the loopback redirect.
 tauri-plugin-http = "2.8.3"
 tauri-plugin-opener = "2.7.2"

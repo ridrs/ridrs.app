@@ -330,11 +330,11 @@ module.exports = {
     {
       name: 'tauri-only-in-transport-native-and-testing',
       comment:
-        '@tauri-apps/* and the Tauri oauth plugin may only be imported by the Tauri BLE package, the Tauri plugins (transport, bridge connector, app files, secrets, HTTP, WebSocket, browser sign-in, media, downloads, archives), the Tauri apps and the simulated bridge in packages/testing.',
+        '@tauri-apps/* and the Tauri oauth plugin may only be imported by the Tauri BLE package, the Tauri plugins (transport, bridge connector, app files, file saving, secrets, HTTP, WebSocket, browser sign-in, media, downloads, archives), the Tauri apps and the simulated bridge in packages/testing.',
       severity: 'error',
       from: {
         pathNot:
-          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri|storage-files-tauri|storage-secrets-tauri|net-http-tauri|net-websocket-tauri|auth-sign-in-tauri|storage-media-tauri|data-fetch-tauri|data-archive-tauri)/|apps/(native|companion)/|packages/testing/)',
+          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri|storage-files-tauri|files-save-tauri|storage-secrets-tauri|net-http-tauri|net-websocket-tauri|auth-sign-in-tauri|storage-media-tauri|data-fetch-tauri|data-archive-tauri)/|apps/(native|companion)/|packages/testing/)',
       },
       to: { path: '(@tauri-apps|@fabianlars/tauri-plugin-oauth)' },
     },

@@ -27,6 +27,8 @@ pub fn run() {
         .plugin(tauri_plugin_blec::init())
         // Scoped to $APPDATA/recordings/** by capabilities/default.json.
         .plugin(tauri_plugin_fs::init())
+        // The save dialog of `files.save` (ADR 0085); `dialog:allow-save` only, see capabilities/default.json.
+        .plugin(tauri_plugin_dialog::init())
         // intervals.icu (ADR 0049): HTTP from Rust, scoped to its API by capabilities/default.json;
         // the system browser for the sign-in, and the one-shot loopback server for its redirect.
         .plugin(tauri_plugin_http::init())

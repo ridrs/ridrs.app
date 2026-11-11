@@ -37,3 +37,9 @@ export {
   type MessageDefinition,
   type MessageName,
 } from './profile.ts';
+export {
+  encodeFitMessages,
+  type FitWriteDeveloperField,
+  type FitWriteMessage,
+  type FitWriteValue,
+} from './workout.ts';
