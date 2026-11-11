@@ -4,9 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   addEntry,
+  addMonths,
   arrivedEntry,
   FIRST_WEEK,
+  matchDone,
   mergeCompleted,
+  monthDays,
   withPending,
   moveEntry,
   plannedWorkouts,
@@ -165,5 +168,68 @@ describe('a change that arrived', () => {
     const plan = { key: 2, date: '2026-11-07', title: 'Threshold 20', before: ['e1'] };
     expect(arrivedEntry(plan, workouts)).toBeUndefined();
     expect(arrivedEntry(plan, [...workouts, { id: 'e2', date: '2026-11-07', name: 'Threshold 20' }])?.id).toBe('e2');
+  });
+});
+
+describe('the month', () => {
+  it('pages across years', () => {
+    expect(addMonths('2026-11', 1)).toBe('2026-12');
+    expect(addMonths('2026-12', 1)).toBe('2027-01');
+    expect(addMonths('2026-01', -1)).toBe('2025-12');
+  });
+
+  it('shows whole weeks from Monday, from the week of its first day to the week of its last', () => {
+    const days = monthDays('2026-11');
+    expect(days[0]).toBe('2026-10-26');
+    expect(days.at(-1)).toBe('2026-12-06');
+    expect(days.length % 7).toBe(0);
+    expect(days).toContain('2026-11-30');
+  });
+});
+
+describe('a plan that was ridden', () => {
+  const ride = (id: string, name: string, minutes: number, load: number) => ({
+    id,
+    date: '2026-11-04',
+    name,
+    sport: 'ride' as const,
+    durationSeconds: minutes * 60,
+    trainingLoad: load,
+  });
+  const plan = (key: string, title: string, minutes?: number, load?: number) => ({
+    key,
+    title,
+    ...(minutes === undefined ? {} : { durationSeconds: minutes * 60 }),
+    ...(load === undefined ? {} : { trainingLoad: load }),
+  });
+
+  it('is listed once, as its ride, when the names match', () => {
+    const { open, done } = matchDone([plan('p1', 'Sweet Spot 3×12')], [ride('r1', 'sweet spot 3x12', 30, 10)]);
+    expect(open).toEqual([]);
+    expect(done[0]?.plan?.key).toBe('p1');
+  });
+
+  it('matches by duration and load where the names differ', () => {
+    const { open, done } = matchDone([plan('p1', 'Threshold 20', 60, 80)], [ride('r1', 'Morning Ride', 58, 78)]);
+    expect(open).toEqual([]);
+    expect(done[0]?.plan?.key).toBe('p1');
+  });
+
+  it('stays listed when the ride is something else, or the plan has nothing to compare', () => {
+    expect(matchDone([plan('p1', 'Threshold 20', 60, 80)], [ride('r1', 'Recovery', 30, 20)]).open).toHaveLength(1);
+    expect(matchDone([plan('p1', 'Threshold 20')], [ride('r1', 'Morning Ride', 60, 80)]).open).toHaveLength(1);
+  });
+
+  it('pairs each plan and each ride once, a name before a duration', () => {
+    const { open, done } = matchDone(
+      [plan('p1', 'Endurance', 60, 50), plan('p2', 'Tempo', 60, 50)],
+      [ride('r1', 'Ride', 60, 50), ride('r2', 'Tempo', 60, 50)],
+    );
+    expect(open).toEqual([]);
+    expect(done.map((d) => d.plan?.key)).toEqual(['p1', 'p2']);
+  });
+
+  it('never pairs a plan its provider has not kept yet', () => {
+    expect(matchDone([{ ...plan('p1', 'Tempo'), pending: true as const }], [ride('r1', 'Tempo', 60, 50)]).open).toHaveLength(1);
   });
 });

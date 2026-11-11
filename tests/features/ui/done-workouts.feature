@@ -4,6 +4,8 @@ Feature: The Training area shows the workouts that were done
   provider says so: every provider of the data type `training.history` adds to the column, no
   source is chosen. The rides saved on this device and the activities of intervals.icu are listed
   together, and a ride that both know, a ride of ridrs uploaded to intervals.icu, is listed once.
+  A planned workout that was ridden on its day is listed once too, as done and as planned: the done
+  ride matches the plan by its name, or by its duration and load.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
   2026.
@@ -55,3 +57,50 @@ Feature: The Training area shows the workouts that were done
     And I press "Training"
     Then the calendar day "Wednesday" shows 1 done ride
     And the calendar day "Wednesday" shows "Evening spin" as done
+
+  Scenario: A planned workout that was ridden on its day is listed once, as done as planned
+    Given intervals.icu plans:
+      | date       | type | name         | duration | load |
+      | 2026-11-04 | Ride | Threshold 20 | 1h       | 80   |
+      | 2026-11-06 | Ride | Endurance 90 | 1h30m    | 65   |
+    And intervals.icu has done:
+      | date       | type | name         | duration | load |
+      | 2026-11-04 | Ride | Threshold 20 | 1h2m     | 82   |
+    And the secret store holds a token for intervals.icu
+    And the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Training"
+    Then the calendar day "Wednesday" shows "Threshold 20" as done as planned
+    And the calendar day "Wednesday" lists 0 planned workouts
+    And the calendar day "Friday" lists 1 planned workout
+
+  Scenario: A ride of another name matches the plan of its day by its duration and load
+    Given intervals.icu plans:
+      | date       | type | name         | duration | load |
+      | 2026-11-04 | Ride | Threshold 20 | 1h       | 80   |
+    And intervals.icu has done:
+      | date       | type | name          | duration | load |
+      | 2026-11-04 | Ride | Morning Ride  | 58m      | 78   |
+    And the secret store holds a token for intervals.icu
+    And the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Training"
+    Then the calendar day "Wednesday" shows "Morning Ride" as done as planned
+    And the calendar day "Wednesday" lists 0 planned workouts
+
+  Scenario: A ride that does not match the plan of its day leaves the plan listed
+    Given intervals.icu plans:
+      | date       | type | name         | duration | load |
+      | 2026-11-04 | Ride | Threshold 20 | 1h       | 80   |
+    And intervals.icu has done:
+      | date       | type | name          | duration | load |
+      | 2026-11-04 | Ride | Recovery Spin | 30m      | 20   |
+    And the secret store holds a token for intervals.icu
+    And the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Training"
+    Then the calendar day "Wednesday" shows 1 done ride
+    And the calendar day "Wednesday" lists 1 planned workout

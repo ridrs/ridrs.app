@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { WORKOUTS } from './calendar.ts';
 import { messages } from './i18n/index.ts';
-import { startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
+import { MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
 const DUMBBELL = new URL('./assets/icons/dumbbell.svg', import.meta.url).href;
@@ -104,7 +104,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
           </button>
           <h1>{text.calendar}</h1>
         </header>
-        <WeekCalendar ctx={ctx} week={week} large />
+        <MonthCalendar ctx={ctx} week={week} />
       </div>
     );
   }

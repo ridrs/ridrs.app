@@ -164,6 +164,73 @@ Then(
   },
 );
 
+Then(
+  'the calendar day {string} shows {string} as done as planned',
+  async function (this: RidrsWorld, day: string, name: string) {
+    await waitFor(() =>
+      assert.ok(
+        [...calendarDay(this, day).querySelectorAll('li[data-done][data-as-planned]')].some((li) =>
+          li.textContent?.includes(name),
+        ),
+        `No ride "${name}" done as planned on ${day}`,
+      ),
+    );
+  },
+);
+
+Then(
+  'the calendar day {string} lists {int} planned workout(s)',
+  async function (this: RidrsWorld, day: string, count: number) {
+    await waitFor(() =>
+      assert.equal(
+        calendarDay(this, day).querySelectorAll('li[data-state="planned"]').length,
+        count,
+      ),
+    );
+  },
+);
+
+Then(
+  "the calendar's heading {string} links {string}",
+  async function (this: RidrsWorld, title: string, link: string) {
+    await waitFor(() => {
+      const heading = within(shownScreen(this)).getByRole('heading', { name: new RegExp(title) });
+      within(heading).getByRole('button', { name: link });
+    });
+    assert.equal(within(shownScreen(this)).getAllByRole('button', { name: link }).length, 1);
+  },
+);
+
+/** A day of the large calendar, by its date. */
+function calendarDate(world: RidrsWorld, date: string): HTMLElement {
+  const element = shownScreen(world).querySelector<HTMLElement>(`[data-calendar-date="${date}"]`);
+  assert.ok(element, `No calendar date ${date}`);
+  return element;
+}
+
+Then(
+  'the calendar date {string} lists {string}',
+  async function (this: RidrsWorld, date: string, entry: string) {
+    await waitFor(() => assert.ok(calendarDate(this, date).textContent?.includes(entry)));
+  },
+);
+
+Then('the calendar date {string} is shown', async function (this: RidrsWorld, date: string) {
+  await waitFor(() => calendarDate(this, date));
+});
+
+Then(
+  'the large calendar shows the month {string}',
+  async function (this: RidrsWorld, month: string) {
+    await waitFor(() =>
+      assert.equal(
+        shownScreen(this).querySelector('[data-month]')?.getAttribute('data-month'),
+        month,
+      ),
+    );
+  },
+);
+
 /** Drags `source` onto the calendar day `day`, as the pointer does: start, over, drop, end. */
 async function dragOnto(world: RidrsWorld, source: HTMLElement, day: string): Promise<void> {
   const target = calendarDay(world, day);

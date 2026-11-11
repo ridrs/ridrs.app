@@ -81,6 +81,16 @@ Feature: Changes in the app's areas take effect at once and are kept
     And I press "Previous week"
     Then the calendar shows the week starting "2026-10-26"
 
+  Scenario: "This week" leads back from another week, as the one way back
+    When I press "Training"
+    Then the Training area has no button "This week"
+    When I press "Next week"
+    And I press "Next week"
+    Then the calendar's heading "Nov – " links "This week"
+    When I press "This week"
+    Then the calendar shows the week starting "2026-11-02"
+    And the Training area has no button "This week"
+
   Scenario: The calendar of ridrs takes workouts in this week only
     When I press "Training"
     And I press "Next week"
@@ -91,10 +101,27 @@ Feature: Changes in the app's areas take effect at once and are kept
     When I press "Training"
     And I press "Open large calendar"
     Then the large calendar is shown
-    And the calendar day "Thursday" lists "VO2 Max 5×4"
+    And the large calendar shows the month "2026-11"
+    And the calendar date "2026-11-05" lists "VO2 Max 5×4"
     And the Training area has no button "Open large calendar"
     When I press Back
     Then the Training area has the button "Open large calendar"
+
+  Scenario: The large calendar pages through the months
+    When I press "Training"
+    And I press "Open large calendar"
+    Then the large calendar shows the month "2026-11"
+    And the Training area has no button "This month"
+    When I press "Next month"
+    Then the large calendar shows the month "2026-12"
+    And the calendar's heading "December 2026" links "This month"
+    And the calendar date "2026-12-31" is shown
+    When I press "Previous month"
+    And I press "Previous month"
+    Then the large calendar shows the month "2026-10"
+    When I press "This month"
+    Then the large calendar shows the month "2026-11"
+    And the Training area has no button "This month"
 
   Scenario: The FTP is changed in steps and kept
     When I press "Profile"

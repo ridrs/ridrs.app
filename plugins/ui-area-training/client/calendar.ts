@@ -180,6 +180,9 @@ export interface PlannedItem {
   readonly kind: EntryKind;
   readonly title: string;
   readonly detail?: string;
+  /** What the matching of a day with its rides compares, where the provider has it. */
+  readonly durationSeconds?: number;
+  readonly trainingLoad?: number;
   /** Shown at once, not yet taken by the calendar's provider. */
   readonly pending?: true;
 }
@@ -235,4 +238,90 @@ export function withPending(
         }),
       ),
   ];
+}
+
+/** The month `months` after (or before) a month, both `YYYY-MM`. */
+export function addMonths(month: string, months: number): string {
+  const [year = 0, m = 1] = month.split('-').map(Number);
+  return new Date(Date.UTC(year, m - 1 + months, 1)).toISOString().slice(0, 7);
+}
+
+/**
+ * The days the large calendar shows for a month (`YYYY-MM`): whole weeks, Monday first, from the
+ * week that holds its first day to the week that holds its last.
+ */
+export function monthDays(month: string): string[] {
+  const first = `${month}-01`;
+  const last = addDays(`${addMonths(month, 1)}-01`, -1);
+  const days: string[] = [];
+  for (let date = weekDate('Monday', first); date <= weekDate('Sunday', last); date = addDays(date, 1)) {
+    days.push(date);
+  }
+  return days;
+}
+
+/** A planned workout as the matching of a day sees it. */
+export interface PlannedOfDay {
+  readonly key: string;
+  readonly title: string;
+  readonly durationSeconds?: number;
+  readonly trainingLoad?: number;
+  readonly pending?: true;
+}
+
+/** "Sweet Spot 3x12" for "sweet spot 3×12 ": names compared by what they say. */
+const normalName = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/×/g, 'x')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/** How far apart two values may be, relatively, and still be the same workout. */
+const DURATION_TOLERANCE = 0.1;
+const LOAD_TOLERANCE = 0.15;
+
+const near = (a: number | undefined, b: number | undefined, tolerance: number) =>
+  a !== undefined && b !== undefined && a > 0 && b > 0 && Math.abs(a - b) <= tolerance * Math.max(a, b);
+
+/** A ride done as a plan of its day: by its name, or by its duration and load where both are known. */
+const ridden = (plan: PlannedOfDay, ride: CompletedWorkout): boolean =>
+  (normalName(plan.title) !== '' && normalName(plan.title) === normalName(ride.name)) ||
+  (near(plan.durationSeconds, ride.durationSeconds, DURATION_TOLERANCE) &&
+    near(plan.trainingLoad, ride.trainingLoad, LOAD_TOLERANCE));
+
+/**
+ * The rides of a day paired with the plans of the same day they did: a plan that was ridden is
+ * listed once, as a done ride (ADR 0076). A ride matches by its name first, then by its duration
+ * and load; each plan and each ride is paired at most once, and a plan not yet kept by its
+ * provider is never paired.
+ */
+export function matchDone<P extends PlannedOfDay>(
+  plans: readonly P[],
+  rides: readonly CompletedWorkout[],
+): { readonly open: P[]; readonly done: { readonly ride: CompletedWorkout; readonly plan?: P }[] } {
+  const taken = new Set<string>();
+  const pairs = new Map<string, P>();
+  for (const byName of [true, false]) {
+    for (const ride of rides) {
+      if (pairs.has(ride.id)) continue;
+      const plan = plans.find(
+        (candidate) =>
+          !candidate.pending &&
+          !taken.has(candidate.key) &&
+          (byName ? normalName(candidate.title) === normalName(ride.name) && normalName(ride.name) !== '' : ridden(candidate, ride)),
+      );
+      if (plan) {
+        taken.add(plan.key);
+        pairs.set(ride.id, plan);
+      }
+    }
+  }
+  return {
+    open: plans.filter((plan) => !taken.has(plan.key)),
+    done: rides.map((ride) => {
+      const plan = pairs.get(ride.id);
+      return plan ? { ride, plan } : { ride };
+    }),
+  };
 }
