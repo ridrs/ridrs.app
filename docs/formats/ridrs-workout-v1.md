@@ -14,7 +14,7 @@ A ridrs workout is one structured cycling workout in the canonical format every 
 |---|---|---|
 | 1. Typed model | Durations, targets, ramps and ranges, repeats, cues, metadata | Showing, riding, editing, export to any format |
 | 2. `extensions.<format>` | Per workout and per step: what the source holds and layer 1 has no field for | An export to the **same** format restores it |
-| 3. Original file | The imported bytes, kept as an app file and referenced by `source.originalHash` | Provenance; importing again with a better parser |
+| 3. Original file | The imported bytes, kept as an app file and referenced by `source.originalHash`: the lower-case hex SHA-256 of the bytes | Provenance; importing again with a better parser |
 
 After an edit, layers 1 and 2 hold; the original file stays as provenance only.
 

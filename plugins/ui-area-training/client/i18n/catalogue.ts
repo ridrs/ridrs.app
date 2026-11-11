@@ -11,6 +11,7 @@ const en = {
   duration: 'Duration',
   provider: 'Source',
   noMatch: 'No workout matches these filters.',
+  importWorkouts: 'Import workouts',
   focuses: {
     recovery: 'Recovery',
     endurance: 'Endurance',
@@ -44,6 +45,7 @@ const de: CatalogueMessages = {
   duration: 'Dauer',
   provider: 'Quelle',
   noMatch: 'Kein Workout passt zu diesen Filtern.',
+  importWorkouts: 'Workouts importieren',
   focuses: {
     recovery: 'Erholung',
     endurance: 'Grundlage',

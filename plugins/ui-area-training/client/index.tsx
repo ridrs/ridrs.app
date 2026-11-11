@@ -175,6 +175,11 @@ function Library({
   return (
     <section className="pv-section" data-testid="library">
       <h2>{text.library}</h2>
+      {ctx.hasScreen(WORKOUT_IMPORT) ? (
+        <button type="button" className="pv-button" data-testid="import-workouts" onClick={() => ctx.navigate(WORKOUT_IMPORT)}>
+          {browse.importWorkouts}
+        </button>
+      ) : null}
       {providers.length === 0 ? <p className="pv-muted">{text.libraryEmpty}</p> : null}
       {providers.length > 0 && shown.length === 0 ? <p className="pv-muted">{browse.noMatch}</p> : null}
       {shown.map((source) => (
@@ -190,6 +195,9 @@ function Library({
     </section>
   );
 }
+
+/** The import of workout files (ui-workout-import), a dialog over the page when that plugin is there. */
+const WORKOUT_IMPORT = 'workout-import';
 
 function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);

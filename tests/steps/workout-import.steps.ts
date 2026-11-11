@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { After, Before, type DataTable, Given, Then, When } from '@cucumber/cucumber';
+import { After, type DataTable, Given, Then, When } from '@cucumber/cucumber';
 import {
   type LibraryWorkout,
   trainingLibraryRemoveService,
@@ -46,12 +46,6 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 
 /** What the last save or removal of a scenario answered. */
 const answers = new WeakMap<object, { result?: unknown; error?: unknown }>();
-
-// The test world registers the services it knows; these two belong to this feature.
-Before(function (this: RidrsWorld) {
-  this.serviceDefinitions.set(trainingLibrarySaveService.id, trainingLibrarySaveService);
-  this.serviceDefinitions.set(trainingLibraryRemoveService.id, trainingLibraryRemoveService);
-});
 
 After(function (this: RidrsWorld) {
   answers.delete(this);
