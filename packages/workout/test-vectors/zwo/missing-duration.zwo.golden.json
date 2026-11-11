@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "missing-attribute",
+      "at": "workout/Warmup[1]"
+    }
+  ]
+}

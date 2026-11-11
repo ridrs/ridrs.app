@@ -1,0 +1,190 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "over-unders",
+      "name": "over-unders",
+      "description": "Over-unders",
+      "sport": "ride",
+      "referenceFtp": 200,
+      "source": {
+        "kind": "imported",
+        "format": "mrc",
+        "fileName": "over-unders.mrc",
+        "originalHash": "48cc2948f8035c5c4ab76741919b3cee49076b8d8a5f41b2307ace76d60d0de8",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 45,
+                "high": 45
+              },
+              "end": {
+                "low": 75,
+                "high": 75
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "durationSeconds": 15,
+              "text": "Warm up"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 120
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 95,
+                "high": 95
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "durationSeconds": 10,
+              "text": "Under: sit in the saddle"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "duration": {
+            "kind": "time",
+            "seconds": 120
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 105,
+                "high": 105
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "durationSeconds": 10,
+              "text": "Over: stand if you like"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "time",
+            "seconds": 210
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "duration": {
+            "kind": "time",
+            "seconds": 120
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 95,
+                "high": 95
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "6",
+          "duration": {
+            "kind": "time",
+            "seconds": 120
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 105,
+                "high": 105
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "7",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 40,
+                "high": 40
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "mrc": {
+          "columns": "MINUTES PERCENT",
+          "header": [
+            {
+              "key": "VERSION",
+              "value": "2"
+            },
+            {
+              "key": "UNITS",
+              "value": "ENGLISH"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

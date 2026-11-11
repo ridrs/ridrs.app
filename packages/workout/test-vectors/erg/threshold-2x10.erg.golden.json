@@ -1,0 +1,161 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "threshold-2x10",
+      "name": "Threshold 2x10",
+      "description": "Threshold blocks in watts",
+      "sport": "ride",
+      "referenceFtp": 250,
+      "source": {
+        "kind": "imported",
+        "format": "erg",
+        "fileName": "threshold-2x10.erg",
+        "originalHash": "b0ad0c4d156754daa7e4f161a282cc58ecbf4af2d24f2576512640ed0c51d815",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 125,
+                "high": 125
+              },
+              "end": {
+                "low": 175,
+                "high": 175
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "durationSeconds": 10,
+              "text": "Easy start"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 240,
+                "high": 240
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "durationSeconds": 15,
+              "text": "First block: hold 240 W"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 120,
+                "high": 120
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 240,
+                "high": 240
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "durationSeconds": 10,
+              "text": "Second block"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "duration": {
+            "kind": "time",
+            "seconds": 330
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 100,
+                "high": 100
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 330,
+              "durationSeconds": 20,
+              "text": "All done, spin out"
+            }
+          ]
+        }
+      ],
+      "extensions": {
+        "erg": {
+          "columns": "MINUTES WATTS",
+          "header": [
+            {
+              "key": "VERSION",
+              "value": "2"
+            },
+            {
+              "key": "UNITS",
+              "value": "ENGLISH"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

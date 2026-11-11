@@ -1,0 +1,146 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "steps-ramp-test",
+      "name": "ramp-test",
+      "description": "Ramp from 50 to 100 percent in 5 minute sections",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "mrc",
+        "fileName": "steps-ramp-test.mrc",
+        "originalHash": "f1ec89262d42d78488dc870a371a15f59eb9f2f6a7107bd5d18dc79f08b227e0",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 70,
+                "high": 70
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 80,
+                "high": 80
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 90,
+                "high": 90
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "6",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 100,
+                "high": 100
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "mrc": {
+          "columns": "MINUTES PERCENT",
+          "header": [
+            {
+              "key": "VERSION",
+              "value": "2"
+            },
+            {
+              "key": "UNITS",
+              "value": "ENGLISH"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

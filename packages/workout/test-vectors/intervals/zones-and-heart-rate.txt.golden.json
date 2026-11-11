@@ -1,0 +1,250 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "zones-and-heart-rate",
+      "name": "zones-and-heart-rate",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "intervals",
+        "fileName": "zones-and-heart-rate.txt",
+        "originalHash": "0fa6ddba0775b7cb7a5ac7746530226f2bf3d4bb0377c759f9dd9dff004b2229",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "name": "Easy spin",
+          "duration": {
+            "kind": "time",
+            "seconds": 1200
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "power-zone",
+              "start": {
+                "low": 2,
+                "high": 2
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "hr-zone",
+              "start": {
+                "low": 3,
+                "high": 3
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-lthr",
+              "start": {
+                "low": 80,
+                "high": 80
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-max-hr",
+              "start": {
+                "low": 70,
+                "high": 70
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "bpm",
+              "start": {
+                "low": 140,
+                "high": 140
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "6",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "bpm",
+              "start": {
+                "low": 130,
+                "high": 150
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "7",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 95,
+                "high": 105
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "8",
+          "duration": {
+            "kind": "time",
+            "seconds": 3600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "9",
+          "intensity": "active",
+          "duration": {
+            "kind": "time",
+            "seconds": 90
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 120,
+                "high": 120
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "10",
+          "notes": "Hold it steady",
+          "duration": {
+            "kind": "time",
+            "seconds": 330
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 200,
+                "high": 220
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 100,
+                  "high": 100
+                }
+              }
+            ]
+          },
+          "extensions": {
+            "intervals": {
+              "line": "5m30s 200-220w 100rpm Hold it steady"
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "11",
+          "duration": {
+            "kind": "time",
+            "seconds": 30
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "rpe",
+              "start": {
+                "low": 9,
+                "high": 9
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "intervals": {
+          "lines": [
+            {
+              "text": "Endurance and heart rate, as pasted from a description.",
+              "before": "1"
+            },
+            {
+              "text": "Notes: drink a lot."
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

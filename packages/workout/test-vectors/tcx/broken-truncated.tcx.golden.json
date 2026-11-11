@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "invalid-xml",
+      "at": "line 1"
+    }
+  ]
+}

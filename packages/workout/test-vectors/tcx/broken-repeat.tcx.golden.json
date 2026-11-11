@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "bad-repetitions",
+      "at": "Workouts/Workout[1]/Step[1]"
+    }
+  ]
+}

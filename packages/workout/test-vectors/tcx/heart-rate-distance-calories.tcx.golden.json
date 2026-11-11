@@ -1,0 +1,226 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "heart-rate-distance-calories",
+      "name": "HR and distance",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "tcx",
+        "fileName": "heart-rate-distance-calories.tcx",
+        "originalHash": "6db5452ee9111c495e9cf3798269a7016d272f87ecd3c59ed7aeb54f949dfa12",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "intensity": "active",
+          "duration": {
+            "kind": "distance",
+            "meters": 5000
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "hr-zone",
+              "start": {
+                "low": 3,
+                "high": 3
+              }
+            }
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "1",
+              "duration": {
+                "type": "Distance_t"
+              },
+              "target": {
+                "type": "HeartRate_t",
+                "zone": {
+                  "type": "PredefinedHeartRateZone_t"
+                }
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "intensity": "active",
+          "duration": {
+            "kind": "until",
+            "unit": "bpm",
+            "comparison": "above",
+            "value": 150
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "bpm",
+              "start": {
+                "low": 120,
+                "high": 140
+              }
+            }
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "2",
+              "duration": {
+                "type": "HeartRateAbove_t",
+                "heartRateType": "HeartRateInBeatsPerMinute_t"
+              },
+              "target": {
+                "type": "HeartRate_t",
+                "zone": {
+                  "type": "CustomHeartRateZone_t",
+                  "lowType": "HeartRateInBeatsPerMinute_t",
+                  "highType": "HeartRateInBeatsPerMinute_t"
+                }
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "intensity": "rest",
+          "duration": {
+            "kind": "until",
+            "unit": "percent-max-hr",
+            "comparison": "below",
+            "value": 65
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-max-hr",
+              "start": {
+                "low": 50,
+                "high": 60
+              }
+            }
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "3",
+              "duration": {
+                "type": "HeartRateBelow_t",
+                "heartRateType": "HeartRateInPercentOfMax_t"
+              },
+              "target": {
+                "type": "HeartRate_t",
+                "zone": {
+                  "type": "CustomHeartRateZone_t",
+                  "lowType": "HeartRateInPercentOfMax_t",
+                  "highType": "HeartRateInPercentOfMax_t"
+                }
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "intensity": "active",
+          "duration": {
+            "kind": "energy",
+            "kilocalories": 100
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "meters-per-second",
+              "start": {
+                "low": 6.5,
+                "high": 7.5
+              }
+            }
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "4",
+              "duration": {
+                "type": "CaloriesBurned_t"
+              },
+              "target": {
+                "type": "Speed_t",
+                "zone": {
+                  "type": "CustomSpeedZone_t",
+                  "children": [
+                    {
+                      "index": 0,
+                      "node": {
+                        "name": "ViewAs",
+                        "children": [
+                          {
+                            "text": "Speed"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "intensity": "warm-up",
+          "duration": {
+            "kind": "open"
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 65
+              }
+            }
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "5",
+              "duration": {
+                "type": "LapButton_t"
+              },
+              "target": {
+                "type": "Power_t",
+                "zone": {
+                  "type": "CustomPowerZone_t",
+                  "lowType": "PowerInPercentOfFTP_t",
+                  "highType": "PowerInPercentOfFTP_t"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "tcx": {
+          "document": {
+            "attributes": {
+              "xmlns": "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2",
+              "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,106 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "irregular",
+      "name": "irregular",
+      "description": "Irregular course file",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "erg",
+        "fileName": "irregular.erg",
+        "originalHash": "db7ddd4be49be6c4205cb98b849ecd4921fc13d9d83097911b09b256b7960d65",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 150
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 100,
+                "high": 100
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 110,
+              "text": "plain spaces text"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 135
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "watts",
+              "start": {
+                "low": 180,
+                "high": 180
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "erg": {
+          "columns": "MINUTES WATTS",
+          "header": [
+            {
+              "key": "VERSION",
+              "value": "2"
+            },
+            {
+              "key": "UNITS",
+              "value": "METRIC"
+            },
+            {
+              "key": "PRIVATE",
+              "value": "keep me"
+            },
+            {
+              "raw": "just a loose header line"
+            }
+          ],
+          "sections": [
+            {
+              "name": "VENDOR EXTRA",
+              "lines": ["some=thing"]
+            }
+          ],
+          "outside": ["leading line outside any section", "trailing line"],
+          "unplacedCourseText": [
+            {
+              "line": "0 before the first point"
+            }
+          ],
+          "points": [[1.5, 100], [1.5, 100], [4, 100], [4, 180], [6.25, 180], [6.25, 90]]
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "cue-before-start",
+      "at": "line 23"
+    }
+  ]
+}

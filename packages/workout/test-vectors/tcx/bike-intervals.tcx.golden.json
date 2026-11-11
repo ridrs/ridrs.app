@@ -1,0 +1,290 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "bike-intervals",
+      "name": "Bike intervals",
+      "description": "Hand-written for ridrs.",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "tcx",
+        "fileName": "bike-intervals.tcx",
+        "originalHash": "b15f2f9f23e8f7ec44d4161f7d887ac99e0abf854030769006c39f8c99c2b34a",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "name": "Warm up",
+          "intensity": "active",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "power-zone",
+              "start": {
+                "low": 2,
+                "high": 2
+              }
+            }
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "1",
+              "duration": {
+                "type": "Time_t"
+              },
+              "target": {
+                "type": "Power_t",
+                "zone": {
+                  "type": "PredefinedPowerZone_t"
+                }
+              }
+            }
+          }
+        },
+        {
+          "kind": "repeat",
+          "id": "2",
+          "until": {
+            "kind": "count",
+            "reps": 4
+          },
+          "steps": [
+            {
+              "kind": "interval",
+              "id": "2.1",
+              "name": "Hard",
+              "intensity": "active",
+              "duration": {
+                "kind": "time",
+                "seconds": 240
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "watts",
+                  "start": {
+                    "low": 250,
+                    "high": 270
+                  }
+                }
+              },
+              "extensions": {
+                "tcx": {
+                  "type": "Step_t",
+                  "stepId": "3",
+                  "duration": {
+                    "type": "Time_t"
+                  },
+                  "target": {
+                    "type": "Power_t",
+                    "zone": {
+                      "type": "CustomPowerZone_t",
+                      "lowType": "PowerInWatts_t",
+                      "highType": "PowerInWatts_t"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "interval",
+              "id": "2.2",
+              "name": "Easy",
+              "intensity": "rest",
+              "duration": {
+                "kind": "time",
+                "seconds": 120
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "rpm",
+                  "start": {
+                    "low": 85,
+                    "high": 95
+                  }
+                }
+              },
+              "extensions": {
+                "tcx": {
+                  "type": "Step_t",
+                  "stepId": "4",
+                  "duration": {
+                    "type": "Time_t"
+                  },
+                  "target": {
+                    "type": "Cadence_t"
+                  }
+                }
+              }
+            }
+          ],
+          "extensions": {
+            "tcx": {
+              "type": "Repeat_t",
+              "stepId": "2"
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "name": "Cool down",
+          "intensity": "rest",
+          "duration": {
+            "kind": "open"
+          },
+          "effort": {
+            "kind": "free"
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "5",
+              "duration": {
+                "type": "UserInput_t"
+              },
+              "target": {
+                "type": "None_t"
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "tcx": {
+          "children": [
+            {
+              "index": 4,
+              "node": {
+                "name": "ScheduledOn",
+                "children": [
+                  {
+                    "text": "2026-11-12"
+                  }
+                ]
+              }
+            },
+            {
+              "index": 6,
+              "node": {
+                "name": "Creator",
+                "attributes": {
+                  "xsi:type": "Device_t"
+                },
+                "children": [
+                  {
+                    "name": "Name",
+                    "children": [
+                      {
+                        "text": "Test device"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "UnitId",
+                    "children": [
+                      {
+                        "text": "0"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "ProductID",
+                    "children": [
+                      {
+                        "text": "0"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "index": 7,
+              "node": {
+                "name": "Extensions",
+                "children": [
+                  {
+                    "name": "Vendor",
+                    "attributes": {
+                      "xmlns": "urn:example:vendor"
+                    },
+                    "children": [
+                      {
+                        "name": "Hint",
+                        "children": [
+                          {
+                            "text": "keep"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "document": {
+            "attributes": {
+              "xmlns": "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2",
+              "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+              "xsi:schemaLocation": "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd"
+            },
+            "children": [
+              {
+                "index": 0,
+                "node": {
+                  "name": "Folders",
+                  "children": [
+                    {
+                      "name": "Workouts",
+                      "children": [
+                        {
+                          "name": "Running",
+                          "attributes": {
+                            "Name": "Running"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 2,
+                "node": {
+                  "name": "Author",
+                  "attributes": {
+                    "xsi:type": "Application_t"
+                  },
+                  "children": [
+                    {
+                      "name": "Name",
+                      "children": [
+                        {
+                          "text": "ridrs test vectors"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

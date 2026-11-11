@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "bad-repetitions",
+      "at": "line 1"
+    }
+  ]
+}

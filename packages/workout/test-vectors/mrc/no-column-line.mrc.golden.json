@@ -1,0 +1,94 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "no-column-line",
+      "name": "no column line",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "mrc",
+        "fileName": "no-column-line.mrc",
+        "originalHash": "a7b1d04cb0a40a20c5cdac22e8cd1c911da3030ac35477940c80598a0d6915ee",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 900,
+              "durationSeconds": 10,
+              "text": "after the end"
+            }
+          ]
+        }
+      ],
+      "extensions": {
+        "mrc": {
+          "header": [
+            {
+              "key": "VERSION",
+              "value": "2"
+            },
+            {
+              "key": "FTP",
+              "value": "abc"
+            }
+          ],
+          "unplacedCourseText": [
+            {
+              "line": "-5\tbefore the start\t10"
+            },
+            {
+              "line": "not a text line"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "no-column-header",
+      "at": "COURSE HEADER"
+    },
+    {
+      "severity": "warning",
+      "code": "bad-ftp"
+    },
+    {
+      "severity": "warning",
+      "code": "bad-course-text",
+      "at": "line 11"
+    },
+    {
+      "severity": "warning",
+      "code": "cue-after-end",
+      "at": "line 12"
+    },
+    {
+      "severity": "warning",
+      "code": "bad-course-text",
+      "at": "line 13"
+    }
+  ]
+}

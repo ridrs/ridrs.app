@@ -1,0 +1,80 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "percent-column",
+      "name": "percent-in-erg",
+      "description": "A percent column in an ERG file",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "erg",
+        "fileName": "percent-column.erg",
+        "originalHash": "d16b6fc312d193d694f8193f09abf2754ae82042eeb4e52da3898d7cb1bec88b",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 180
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 100,
+                "high": 100
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "erg": {
+          "columns": "MINUTES PERCENT",
+          "header": [
+            {
+              "key": "VERSION",
+              "value": "2"
+            },
+            {
+              "key": "UNITS",
+              "value": "ENGLISH"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "unit-mismatch",
+      "at": "COURSE HEADER"
+    }
+  ]
+}

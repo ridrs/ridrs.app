@@ -1,0 +1,26 @@
+[COURSE HEADER]
+VERSION = 2
+UNITS = METRIC
+DESCRIPTION = Irregular course file
+FILE NAME = irregular
+MINUTES WATTS
+PRIVATE = keep me
+just a loose header line
+[END COURSE HEADER]
+leading line outside any section
+[COURSE DATA]
+1.5   100
+1.5   100
+4.0   100
+4.0   180
+6.25  180
+6.25  90
+[END COURSE DATA]
+[VENDOR EXTRA]
+some=thing
+[END VENDOR EXTRA]
+[COURSE TEXT]
+0 before the first point
+200 plain spaces text
+[END COURSE TEXT]
+trailing line

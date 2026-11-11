@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Workouts>
+    <Workout Sport="Biking" Version="3">
+      <Name>Unusual</Name>
+      <Step xsi:type="Step_t" Colour="red">
+        <StepId>1</StepId>
+        <Duration xsi:type="Time_t"><Seconds>300</Seconds></Duration>
+        <Intensity>Sprint</Intensity>
+        <Target xsi:type="Speed_t">
+          <SpeedZone xsi:type="PredefinedSpeedZone_t"><Number>4</Number></SpeedZone>
+        </Target>
+        <Notes>A note on a step.</Notes>
+      </Step>
+      <Step xsi:type="Step_t">
+        <StepId>2</StepId>
+        <Duration xsi:type="Time_t"><Seconds>300</Seconds><Hint>x</Hint></Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="Mystery_t"><Number>1</Number></Target>
+      </Step>
+      <Step xsi:type="Repeat_t">
+        <StepId>3</StepId>
+        <Repetitions>2</Repetitions>
+        <Child xsi:type="Repeat_t">
+          <StepId>4</StepId>
+          <Repetitions>3</Repetitions>
+          <Child xsi:type="Step_t">
+            <StepId>5</StepId>
+            <Duration xsi:type="Time_t"><Seconds>30</Seconds></Duration>
+            <Intensity>Active</Intensity>
+            <Target xsi:type="None_t"/>
+          </Child>
+        </Child>
+      </Step>
+    </Workout>
+  </Workouts>
+</TrainingCenterDatabase>

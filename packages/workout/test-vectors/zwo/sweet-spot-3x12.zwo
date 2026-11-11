@@ -1,0 +1,24 @@
+<workout_file>
+    <author>ridrs test vectors</author>
+    <name>Sweet Spot 3x12</name>
+    <description>Three blocks at sweet spot with short recoveries. Hand-written for ridrs.</description>
+    <sportType>bike</sportType>
+    <category>Sweet Spot</category>
+    <subcategory>Blocks</subcategory>
+    <tags>
+        <tag name="sweet-spot"/>
+        <tag name="indoor"/>
+    </tags>
+    <workout>
+        <Warmup Duration="600" PowerLow="0.5" PowerHigh="0.75" Cadence="90">
+            <textevent timeoffset="0" message="Spin up easily"/>
+            <textevent timeoffset="540" message="Last minute: get ready" duration="20"/>
+        </Warmup>
+        <SteadyState Duration="720" Power="0.9"/>
+        <SteadyState Duration="240" Power="0.55"/>
+        <SteadyState Duration="720" Power="0.9"/>
+        <SteadyState Duration="240" Power="0.55"/>
+        <SteadyState Duration="720" Power="0.9" Cadence="85"/>
+        <Cooldown Duration="480" PowerLow="0.6" PowerHigh="0.35"/>
+    </workout>
+</workout_file>

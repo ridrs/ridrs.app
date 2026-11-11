@@ -1,0 +1,248 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "intervals-free-max",
+      "name": "Intervals, free ride and max effort",
+      "description": "IntervalsT with cadence, a free ride on a flat road, a ramp and a sprint.",
+      "sport": "ride",
+      "author": "ridrs test vectors",
+      "source": {
+        "kind": "imported",
+        "format": "zwo",
+        "fileName": "intervals-free-max.zwo",
+        "originalHash": "69d2b35197d4b10ee6764f5e1a74b49c736f52c9a40c936649e68ce0e1f8cdef",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power"]
+            }
+          }
+        },
+        {
+          "kind": "repeat",
+          "id": "2",
+          "until": {
+            "kind": "count",
+            "reps": 5
+          },
+          "steps": [
+            {
+              "kind": "interval",
+              "id": "2.1",
+              "intensity": "interval",
+              "duration": {
+                "kind": "time",
+                "seconds": 45
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 120,
+                    "high": 120
+                  }
+                },
+                "secondary": [
+                  {
+                    "unit": "rpm",
+                    "start": {
+                      "low": 100,
+                      "high": 100
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "interval",
+              "id": "2.2",
+              "intensity": "recovery",
+              "duration": {
+                "kind": "time",
+                "seconds": 75
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 50,
+                    "high": 50
+                  }
+                },
+                "secondary": [
+                  {
+                    "unit": "rpm",
+                    "start": {
+                      "low": 80,
+                      "high": 80
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "extensions": {
+            "zwo": {
+              "element": "IntervalsT",
+              "attributeOrder": [
+                "Repeat",
+                "OnDuration",
+                "OffDuration",
+                "OnPower",
+                "OffPower",
+                "Cadence",
+                "CadenceResting"
+              ]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "free",
+            "flatRoad": true
+          },
+          "extensions": {
+            "zwo": {
+              "element": "FreeRide",
+              "attributeOrder": ["Duration", "FlatRoad"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "time",
+            "seconds": 180
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              },
+              "end": {
+                "low": 110,
+                "high": 110
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 85,
+                  "high": 95
+                }
+              }
+            ]
+          },
+          "extensions": {
+            "zwo": {
+              "element": "Ramp",
+              "attributeOrder": ["Duration", "PowerLow", "PowerHigh", "CadenceLow", "CadenceHigh"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "duration": {
+            "kind": "time",
+            "seconds": 20
+          },
+          "effort": {
+            "kind": "max-effort"
+          },
+          "extensions": {
+            "zwo": {
+              "element": "MaxEffort",
+              "attributeOrder": ["Duration"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "6",
+          "duration": {
+            "kind": "time",
+            "seconds": 120
+          },
+          "effort": {
+            "kind": "free",
+            "flatRoad": false
+          },
+          "extensions": {
+            "zwo": {
+              "element": "FreeRide",
+              "attributeOrder": ["Duration", "FlatRoad"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "7",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 7,
+                "high": 7
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power"]
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "elementOrder": ["author", "name", "description", "sportType", "workout"],
+          "sportType": "bike"
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

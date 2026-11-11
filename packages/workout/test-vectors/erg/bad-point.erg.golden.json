@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "bad-point",
+      "at": "line 6"
+    }
+  ]
+}

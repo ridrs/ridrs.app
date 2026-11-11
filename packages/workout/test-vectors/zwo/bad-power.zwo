@@ -1,0 +1,6 @@
+<workout_file>
+    <name>Bad power</name>
+    <workout>
+        <SteadyState Duration="600" Power="high"/>
+    </workout>
+</workout_file>

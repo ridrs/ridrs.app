@@ -1,0 +1,15 @@
+Power: 1s
+
+- 20m freeride
+- 10m free 150-200w
+- 30s maxeffort
+- 5km 70%
+- 8.5mi 65%
+- 500mtr 100%
+- Spin up 30^Now harder 60^Easy <!> 2m 60%
+- Press lap 50%
+- 10m 70% Z2 60% MMP 5m
+- 5m ramp 80%
+- - -
+---
+- A bullet without a duration

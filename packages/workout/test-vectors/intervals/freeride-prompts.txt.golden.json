@@ -1,0 +1,264 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "freeride-prompts",
+      "name": "freeride-prompts",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "intervals",
+        "fileName": "freeride-prompts.txt",
+        "originalHash": "510516b69bb3e32320ecf8275c489cdd986b2e9ddb3ceb359e830b7872f8fa5f",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 1200
+          },
+          "effort": {
+            "kind": "free"
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "free",
+            "secondary": [
+              {
+                "unit": "watts",
+                "start": {
+                  "low": 150,
+                  "high": 200
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "duration": {
+            "kind": "time",
+            "seconds": 30
+          },
+          "effort": {
+            "kind": "max-effort"
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "distance",
+            "meters": 5000
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 70,
+                "high": 70
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "duration": {
+            "kind": "distance",
+            "meters": 13679.424
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 65,
+                "high": 65
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "6",
+          "duration": {
+            "kind": "distance",
+            "meters": 500
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 100,
+                "high": 100
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "7",
+          "duration": {
+            "kind": "time",
+            "seconds": 120
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "text": "Spin up"
+            },
+            {
+              "offsetSeconds": 30,
+              "text": "Now harder"
+            },
+            {
+              "offsetSeconds": 60,
+              "text": "Easy"
+            }
+          ]
+        },
+        {
+          "kind": "interval",
+          "id": "8",
+          "notes": "Press lap",
+          "duration": {
+            "kind": "open"
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          },
+          "extensions": {
+            "intervals": {
+              "line": "Press lap 50%"
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "9",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 70,
+                "high": 70
+              }
+            },
+            "secondary": [
+              {
+                "unit": "power-zone",
+                "start": {
+                  "low": 2,
+                  "high": 2
+                }
+              }
+            ]
+          },
+          "extensions": {
+            "intervals": {
+              "line": "10m 70% Z2 60% MMP 5m",
+              "unmapped": ["60% MMP 5m"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "10",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 80,
+                "high": 80
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "intervals": {
+          "lines": [
+            {
+              "text": "Power: 1s",
+              "before": "1"
+            },
+            {
+              "text": "- - -"
+            },
+            {
+              "text": "---"
+            },
+            {
+              "text": "- A bullet without a duration"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "unsupported-target",
+      "at": "line 11"
+    },
+    {
+      "severity": "warning",
+      "code": "ramp-without-range",
+      "at": "line 12"
+    },
+    {
+      "severity": "warning",
+      "code": "text-line",
+      "at": "line 13"
+    },
+    {
+      "severity": "warning",
+      "code": "text-line",
+      "at": "line 15"
+    }
+  ]
+}

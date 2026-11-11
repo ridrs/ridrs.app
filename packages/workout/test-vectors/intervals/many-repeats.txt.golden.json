@@ -1,0 +1,134 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "many-repeats",
+      "name": "many-repeats",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "intervals",
+        "fileName": "many-repeats.txt",
+        "originalHash": "b1c134f95393d83e5407abc7575f1fcfc706f65662c575b47d4309f6a9b3034a",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "repeat",
+          "id": "1",
+          "until": {
+            "kind": "count",
+            "reps": 5
+          },
+          "steps": [
+            {
+              "kind": "interval",
+              "id": "1.1",
+              "duration": {
+                "kind": "time",
+                "seconds": 30
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 120,
+                    "high": 120
+                  }
+                }
+              }
+            },
+            {
+              "kind": "interval",
+              "id": "1.2",
+              "duration": {
+                "kind": "time",
+                "seconds": 30
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 50,
+                    "high": 50
+                  }
+                }
+              }
+            }
+          ],
+          "extensions": {
+            "intervals": {
+              "header": "5x"
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              }
+            }
+          }
+        },
+        {
+          "kind": "repeat",
+          "id": "3",
+          "until": {
+            "kind": "count",
+            "reps": 2
+          },
+          "steps": [
+            {
+              "kind": "interval",
+              "id": "3.1",
+              "duration": {
+                "kind": "time",
+                "seconds": 60
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 100,
+                    "high": 100
+                  }
+                }
+              }
+            }
+          ],
+          "extensions": {
+            "intervals": {
+              "header": "2x"
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "intervals": {
+          "lines": [
+            {
+              "text": "Some plain line closes the block",
+              "before": "2"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

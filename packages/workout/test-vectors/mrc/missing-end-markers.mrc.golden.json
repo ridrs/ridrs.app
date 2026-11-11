@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "missing-end-markers",
+      "name": "missing-end-markers",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "mrc",
+        "fileName": "missing-end-markers.mrc",
+        "originalHash": "8a1458a499652528b7b8a7ff8d02b687105df39f669554c5eff89059babfb7f5",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 180
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "mrc": {
+          "columns": "MINUTES PERCENT"
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

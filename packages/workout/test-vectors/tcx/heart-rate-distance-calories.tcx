@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Workouts>
+    <Workout Sport="Biking">
+      <Name>HR and distance</Name>
+      <Step xsi:type="Step_t">
+        <StepId>1</StepId>
+        <Duration xsi:type="Distance_t"><Meters>5000</Meters></Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="HeartRate_t">
+          <HeartRateZone xsi:type="PredefinedHeartRateZone_t"><Number>3</Number></HeartRateZone>
+        </Target>
+      </Step>
+      <Step xsi:type="Step_t">
+        <StepId>2</StepId>
+        <Duration xsi:type="HeartRateAbove_t">
+          <HeartRate xsi:type="HeartRateInBeatsPerMinute_t"><Value>150</Value></HeartRate>
+        </Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="HeartRate_t">
+          <HeartRateZone xsi:type="CustomHeartRateZone_t">
+            <Low xsi:type="HeartRateInBeatsPerMinute_t"><Value>120</Value></Low>
+            <High xsi:type="HeartRateInBeatsPerMinute_t"><Value>140</Value></High>
+          </HeartRateZone>
+        </Target>
+      </Step>
+      <Step xsi:type="Step_t">
+        <StepId>3</StepId>
+        <Duration xsi:type="HeartRateBelow_t">
+          <HeartRate xsi:type="HeartRateInPercentOfMax_t"><Value>65</Value></HeartRate>
+        </Duration>
+        <Intensity>Resting</Intensity>
+        <Target xsi:type="HeartRate_t">
+          <HeartRateZone xsi:type="CustomHeartRateZone_t">
+            <Low xsi:type="HeartRateInPercentOfMax_t"><Value>50</Value></Low>
+            <High xsi:type="HeartRateInPercentOfMax_t"><Value>60</Value></High>
+          </HeartRateZone>
+        </Target>
+      </Step>
+      <Step xsi:type="Step_t">
+        <StepId>4</StepId>
+        <Duration xsi:type="CaloriesBurned_t"><Calories>100</Calories></Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="Speed_t">
+          <SpeedZone xsi:type="CustomSpeedZone_t">
+            <ViewAs>Speed</ViewAs>
+            <LowInMetersPerSecond>6.5</LowInMetersPerSecond>
+            <HighInMetersPerSecond>7.5</HighInMetersPerSecond>
+          </SpeedZone>
+        </Target>
+      </Step>
+      <Step xsi:type="Step_t">
+        <StepId>5</StepId>
+        <Duration xsi:type="LapButton_t"/>
+        <Intensity>Warmup</Intensity>
+        <Target xsi:type="Power_t">
+          <PowerZone xsi:type="CustomPowerZone_t">
+            <Low xsi:type="PowerInPercentOfFTP_t"><Value>55</Value></Low>
+            <High xsi:type="PowerInPercentOfFTP_t"><Value>65</Value></High>
+          </PowerZone>
+        </Target>
+      </Step>
+    </Workout>
+  </Workouts>
+</TrainingCenterDatabase>

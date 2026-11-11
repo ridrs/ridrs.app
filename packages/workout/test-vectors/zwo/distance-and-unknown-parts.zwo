@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workout_file schemaVersion="2">
+    <author>ridrs test vectors</author>
+    <name lang="en">Distance based, with parts ridrs does not know</name>
+    <description><![CDATA[Contains <angle> brackets & an ampersand in CDATA.]]></description>
+    <sportType>bike</sportType>
+    <durationType>distance</durationType>
+    <tags>
+        <tag name="odd" colour="red"/>
+    </tags>
+    <thumbnail url="thumb.png"/>
+    <workout theme="dark">
+        <SteadyState Duration="5000" Power="0.65" pace="0" show_avg="1" tint="blue">
+            <textevent timeoffset="30" message="Settle in" duration="10" size="40"/>
+            <vendorHint source="test">kept as it is</vendorHint>
+        </SteadyState>
+        <Banner text="not a step"/>
+        <SteadyState Duration="2500" Power="0.8"/>
+        <IntervalsT Repeat="2" OnDuration="500" OffDuration="500" OnPower="0.95" OffPower="0.5" Flat="1">
+            <textevent timeoffset="0" message="Start of the repeats"/>
+        </IntervalsT>
+    </workout>
+    <footer>made by hand</footer>
+</workout_file>

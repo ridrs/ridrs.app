@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "no-course-data"
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "sweet-spot",
+      "name": "sweet-spot",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "intervals",
+        "fileName": "sweet-spot.txt",
+        "originalHash": "229869dab8445b9b4d6cf1403c8b5fcf8737259f737eef76dfd5da34fb7830f5",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              },
+              "end": {
+                "low": 75,
+                "high": 75
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 90,
+                  "high": 90
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 180
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 90,
+                  "high": 90
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "repeat",
+          "id": "3",
+          "until": {
+            "kind": "count",
+            "reps": 3
+          },
+          "steps": [
+            {
+              "kind": "interval",
+              "id": "3.1",
+              "duration": {
+                "kind": "time",
+                "seconds": 720
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 88,
+                    "high": 92
+                  }
+                },
+                "secondary": [
+                  {
+                    "unit": "rpm",
+                    "start": {
+                      "low": 85,
+                      "high": 95
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "interval",
+              "id": "3.2",
+              "name": "Recover",
+              "duration": {
+                "kind": "time",
+                "seconds": 240
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 55,
+                    "high": 55
+                  }
+                }
+              }
+            }
+          ],
+          "extensions": {
+            "intervals": {
+              "header": "Main Set 3x",
+              "name": "Main Set"
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "time",
+            "seconds": 480
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              },
+              "end": {
+                "low": 40,
+                "high": 40
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "intervals": {
+          "lines": [
+            {
+              "text": "Warmup",
+              "before": "1"
+            },
+            {
+              "text": "Cooldown",
+              "before": "4"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

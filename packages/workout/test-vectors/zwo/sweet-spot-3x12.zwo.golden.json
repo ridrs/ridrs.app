@@ -1,0 +1,249 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "sweet-spot-3x12",
+      "name": "Sweet Spot 3x12",
+      "description": "Three blocks at sweet spot with short recoveries. Hand-written for ridrs.",
+      "sport": "ride",
+      "author": "ridrs test vectors",
+      "category": "Sweet Spot",
+      "subcategory": "Blocks",
+      "tags": ["sweet-spot", "indoor"],
+      "source": {
+        "kind": "imported",
+        "format": "zwo",
+        "fileName": "sweet-spot-3x12.zwo",
+        "originalHash": "d3c22b63dbab7b5684c6b1233e5f040b163894758c774bf6d4f6eae72fcb6d1f",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "intensity": "warm-up",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              },
+              "end": {
+                "low": 75,
+                "high": 75
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 90,
+                  "high": 90
+                }
+              }
+            ]
+          },
+          "cues": [
+            {
+              "offsetSeconds": 0,
+              "text": "Spin up easily"
+            },
+            {
+              "offsetSeconds": 540,
+              "durationSeconds": 20,
+              "text": "Last minute: get ready"
+            }
+          ],
+          "extensions": {
+            "zwo": {
+              "element": "Warmup",
+              "attributeOrder": ["Duration", "PowerLow", "PowerHigh", "Cadence"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "time",
+            "seconds": 720
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 90,
+                "high": 90
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "4",
+          "duration": {
+            "kind": "time",
+            "seconds": 720
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 90,
+                "high": 90
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "6",
+          "duration": {
+            "kind": "time",
+            "seconds": 720
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 90,
+                "high": 90
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 85,
+                  "high": 85
+                }
+              }
+            ]
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power", "Cadence"]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "7",
+          "intensity": "cool-down",
+          "duration": {
+            "kind": "time",
+            "seconds": 480
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              },
+              "end": {
+                "low": 35,
+                "high": 35
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "Cooldown",
+              "attributeOrder": ["Duration", "PowerLow", "PowerHigh"]
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "elementOrder": [
+            "author",
+            "name",
+            "description",
+            "sportType",
+            "category",
+            "subcategory",
+            "tags",
+            "workout"
+          ],
+          "sportType": "bike"
+        }
+      }
+    }
+  ],
+  "diagnostics": []
+}

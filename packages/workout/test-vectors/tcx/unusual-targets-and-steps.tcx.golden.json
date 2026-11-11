@@ -1,0 +1,212 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "unusual-targets-and-steps",
+      "name": "Unusual",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "tcx",
+        "fileName": "unusual-targets-and-steps.tcx",
+        "originalHash": "fa5e10b962a800977caa66c51f89e38c6e52e53f50cb751978cfdd4ea5bd0e6b",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "notes": "A note on a step.",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "free"
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "1",
+              "intensity": "Sprint",
+              "duration": {
+                "type": "Time_t"
+              },
+              "target": {
+                "type": "Speed_t",
+                "raw": {
+                  "name": "Target",
+                  "attributes": {
+                    "xsi:type": "Speed_t"
+                  },
+                  "children": [
+                    {
+                      "name": "SpeedZone",
+                      "attributes": {
+                        "xsi:type": "PredefinedSpeedZone_t"
+                      },
+                      "children": [
+                        {
+                          "name": "Number",
+                          "children": [
+                            {
+                              "text": "4"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              "attributes": {
+                "Colour": "red"
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "intensity": "active",
+          "duration": {
+            "kind": "time",
+            "seconds": 300
+          },
+          "effort": {
+            "kind": "free"
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "2",
+              "duration": {
+                "type": "Time_t",
+                "children": [
+                  {
+                    "index": 1,
+                    "node": {
+                      "name": "Hint",
+                      "children": [
+                        {
+                          "text": "x"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "target": {
+                "type": "Mystery_t",
+                "raw": {
+                  "name": "Target",
+                  "attributes": {
+                    "xsi:type": "Mystery_t"
+                  },
+                  "children": [
+                    {
+                      "name": "Number",
+                      "children": [
+                        {
+                          "text": "1"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "kind": "repeat",
+          "id": "3",
+          "until": {
+            "kind": "count",
+            "reps": 2
+          },
+          "steps": [
+            {
+              "kind": "repeat",
+              "id": "3.1",
+              "until": {
+                "kind": "count",
+                "reps": 3
+              },
+              "steps": [
+                {
+                  "kind": "interval",
+                  "id": "3.1.1",
+                  "intensity": "active",
+                  "duration": {
+                    "kind": "time",
+                    "seconds": 30
+                  },
+                  "effort": {
+                    "kind": "free"
+                  },
+                  "extensions": {
+                    "tcx": {
+                      "type": "Step_t",
+                      "stepId": "5",
+                      "duration": {
+                        "type": "Time_t"
+                      },
+                      "target": {
+                        "type": "None_t"
+                      }
+                    }
+                  }
+                }
+              ],
+              "extensions": {
+                "tcx": {
+                  "type": "Repeat_t",
+                  "stepId": "4"
+                }
+              }
+            }
+          ],
+          "extensions": {
+            "tcx": {
+              "type": "Repeat_t",
+              "stepId": "3"
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "tcx": {
+          "attributes": {
+            "Version": "3"
+          },
+          "document": {
+            "attributes": {
+              "xmlns": "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2",
+              "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "unknown-intensity",
+      "at": "Workouts/Workout[1]/Step[1]"
+    },
+    {
+      "severity": "warning",
+      "code": "unmapped-target",
+      "at": "Workouts/Workout[1]/Step[1]"
+    },
+    {
+      "severity": "warning",
+      "code": "unmapped-target",
+      "at": "Workouts/Workout[1]/Step[2]"
+    }
+  ]
+}

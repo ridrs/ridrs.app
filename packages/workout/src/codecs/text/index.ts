@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Filled in phase 1 (structured-workouts.md, section 13).
-export {};
+/** The text formats' importers (structured-workouts.md, section 8): pure, headless, no loss. */
+export { importErg, importMrc } from './course.ts';
+export { importIntervalsText } from './intervals.ts';
+export { importTcx } from './tcx.ts';
+export { importZwo } from './zwo.ts';

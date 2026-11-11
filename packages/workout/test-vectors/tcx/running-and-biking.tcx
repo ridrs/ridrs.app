@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Workouts>
+    <Workout Sport="Running">
+      <Name>Easy run</Name>
+      <Step xsi:type="Step_t">
+        <StepId>1</StepId>
+        <Duration xsi:type="Time_t"><Seconds>1800</Seconds></Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="None_t"/>
+      </Step>
+    </Workout>
+    <Workout Sport="Biking">
+      <Name>Easy ride</Name>
+      <Step xsi:type="Step_t">
+        <StepId>1</StepId>
+        <Duration xsi:type="Time_t"><Seconds>3600</Seconds></Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="None_t"/>
+      </Step>
+    </Workout>
+    <Workout Sport="Biking">
+      <Name>Second ride</Name>
+      <Step xsi:type="Step_t">
+        <StepId>1</StepId>
+        <Duration xsi:type="Time_t"><Seconds>600</Seconds></Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="None_t"/>
+      </Step>
+    </Workout>
+  </Workouts>
+</TrainingCenterDatabase>

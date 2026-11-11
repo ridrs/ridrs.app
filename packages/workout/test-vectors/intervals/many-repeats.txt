@@ -1,0 +1,8 @@
+5x
+- 30s 120%
+- 30s 50%
+Some plain line closes the block
+- 5m 60%
+
+2x
+- 1m 100%

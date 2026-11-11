@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd">
+  <Folders>
+    <Workouts>
+      <Running Name="Running"/>
+    </Workouts>
+  </Folders>
+  <Workouts>
+    <Workout Sport="Biking">
+      <Name>Bike intervals</Name>
+      <Step xsi:type="Step_t">
+        <StepId>1</StepId>
+        <Name>Warm up</Name>
+        <Duration xsi:type="Time_t">
+          <Seconds>600</Seconds>
+        </Duration>
+        <Intensity>Active</Intensity>
+        <Target xsi:type="Power_t">
+          <PowerZone xsi:type="PredefinedPowerZone_t">
+            <Number>2</Number>
+          </PowerZone>
+        </Target>
+      </Step>
+      <Step xsi:type="Repeat_t">
+        <StepId>2</StepId>
+        <Repetitions>4</Repetitions>
+        <Child xsi:type="Step_t">
+          <StepId>3</StepId>
+          <Name>Hard</Name>
+          <Duration xsi:type="Time_t">
+            <Seconds>240</Seconds>
+          </Duration>
+          <Intensity>Active</Intensity>
+          <Target xsi:type="Power_t">
+            <PowerZone xsi:type="CustomPowerZone_t">
+              <Low xsi:type="PowerInWatts_t">
+                <Value>250</Value>
+              </Low>
+              <High xsi:type="PowerInWatts_t">
+                <Value>270</Value>
+              </High>
+            </PowerZone>
+          </Target>
+        </Child>
+        <Child xsi:type="Step_t">
+          <StepId>4</StepId>
+          <Name>Easy</Name>
+          <Duration xsi:type="Time_t">
+            <Seconds>120</Seconds>
+          </Duration>
+          <Intensity>Resting</Intensity>
+          <Target xsi:type="Cadence_t">
+            <Low>85</Low>
+            <High>95</High>
+          </Target>
+        </Child>
+      </Step>
+      <Step xsi:type="Step_t">
+        <StepId>5</StepId>
+        <Name>Cool down</Name>
+        <Duration xsi:type="UserInput_t"/>
+        <Intensity>Resting</Intensity>
+        <Target xsi:type="None_t"/>
+      </Step>
+      <ScheduledOn>2026-11-12</ScheduledOn>
+      <Notes>Hand-written for ridrs.</Notes>
+      <Creator xsi:type="Device_t">
+        <Name>Test device</Name>
+        <UnitId>0</UnitId>
+        <ProductID>0</ProductID>
+      </Creator>
+      <Extensions>
+        <Vendor xmlns="urn:example:vendor">
+          <Hint>keep</Hint>
+        </Vendor>
+      </Extensions>
+    </Workout>
+  </Workouts>
+  <Author xsi:type="Application_t">
+    <Name>ridrs test vectors</Name>
+  </Author>
+</TrainingCenterDatabase>

@@ -1,0 +1,269 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "distance-and-unknown-parts",
+      "name": "Distance based, with parts ridrs does not know",
+      "description": "Contains <angle> brackets & an ampersand in CDATA.",
+      "sport": "ride",
+      "author": "ridrs test vectors",
+      "tags": ["odd"],
+      "source": {
+        "kind": "imported",
+        "format": "zwo",
+        "fileName": "distance-and-unknown-parts.zwo",
+        "originalHash": "694582b5bf4423c507e27be444d673e3df93b3468ce12ee8389031f7547afa21",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "duration": {
+            "kind": "distance",
+            "meters": 5000
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 65,
+                "high": 65
+              }
+            }
+          },
+          "cues": [
+            {
+              "offsetSeconds": 30,
+              "durationSeconds": 10,
+              "text": "Settle in"
+            }
+          ],
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power", "pace", "show_avg", "tint"],
+              "attributes": {
+                "pace": "0",
+                "show_avg": "1",
+                "tint": "blue"
+              },
+              "children": [
+                {
+                  "index": 1,
+                  "node": {
+                    "name": "vendorHint",
+                    "attributes": {
+                      "source": "test"
+                    },
+                    "children": [
+                      {
+                        "text": "kept as it is"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "textevents": [
+                {
+                  "index": 0,
+                  "attributes": {
+                    "size": "40"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2",
+          "duration": {
+            "kind": "distance",
+            "meters": 2500
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 80,
+                "high": 80
+              }
+            }
+          },
+          "extensions": {
+            "zwo": {
+              "element": "SteadyState",
+              "attributeOrder": ["Duration", "Power"]
+            }
+          }
+        },
+        {
+          "kind": "repeat",
+          "id": "3",
+          "until": {
+            "kind": "count",
+            "reps": 2
+          },
+          "steps": [
+            {
+              "kind": "interval",
+              "id": "3.1",
+              "intensity": "interval",
+              "duration": {
+                "kind": "distance",
+                "meters": 500
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 95,
+                    "high": 95
+                  }
+                }
+              }
+            },
+            {
+              "kind": "interval",
+              "id": "3.2",
+              "intensity": "recovery",
+              "duration": {
+                "kind": "distance",
+                "meters": 500
+              },
+              "effort": {
+                "kind": "target",
+                "primary": {
+                  "unit": "percent-ftp",
+                  "start": {
+                    "low": 50,
+                    "high": 50
+                  }
+                }
+              }
+            }
+          ],
+          "extensions": {
+            "zwo": {
+              "element": "IntervalsT",
+              "attributeOrder": [
+                "Repeat",
+                "OnDuration",
+                "OffDuration",
+                "OnPower",
+                "OffPower",
+                "Flat"
+              ],
+              "attributes": {
+                "Flat": "1"
+              },
+              "textevents": [
+                {
+                  "index": 0,
+                  "attributes": {
+                    "timeoffset": "0",
+                    "message": "Start of the repeats"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "elementOrder": [
+            "author",
+            "name",
+            "description",
+            "sportType",
+            "durationType",
+            "tags",
+            "thumbnail",
+            "workout",
+            "footer"
+          ],
+          "attributeOrder": ["schemaVersion"],
+          "attributes": {
+            "schemaVersion": "2"
+          },
+          "sportType": "bike",
+          "durationType": "distance",
+          "fields": {
+            "name": {
+              "attributes": {
+                "lang": "en"
+              }
+            }
+          },
+          "tags": {
+            "tags": [
+              {
+                "index": 0,
+                "attributes": {
+                  "colour": "red"
+                }
+              }
+            ]
+          },
+          "workout": {
+            "attributes": {
+              "theme": "dark"
+            },
+            "children": [
+              {
+                "index": 1,
+                "node": {
+                  "name": "Banner",
+                  "attributes": {
+                    "text": "not a step"
+                  }
+                }
+              }
+            ]
+          },
+          "children": [
+            {
+              "index": 6,
+              "node": {
+                "name": "thumbnail",
+                "attributes": {
+                  "url": "thumb.png"
+                }
+              }
+            },
+            {
+              "index": 8,
+              "node": {
+                "name": "footer",
+                "children": [
+                  {
+                    "text": "made by hand"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "unknown-element",
+      "at": "workout/Banner[2]"
+    },
+    {
+      "severity": "info",
+      "code": "cues-kept-in-extensions",
+      "at": "workout/IntervalsT[4]"
+    }
+  ]
+}

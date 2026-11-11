@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "bad-number",
+      "at": "workout/SteadyState[1]"
+    }
+  ]
+}

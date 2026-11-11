@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "not-cycling",
+      "at": "line 2"
+    }
+  ]
+}

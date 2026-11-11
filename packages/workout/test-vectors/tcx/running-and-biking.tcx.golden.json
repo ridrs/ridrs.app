@@ -1,0 +1,114 @@
+{
+  "ok": true,
+  "workouts": [
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "running-and-biking-2",
+      "name": "Easy ride",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "tcx",
+        "fileName": "running-and-biking.tcx",
+        "originalHash": "e92ed9c055767396420c558833ffff8911c59199c35f039b6b04358f46a6c603",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "intensity": "active",
+          "duration": {
+            "kind": "time",
+            "seconds": 3600
+          },
+          "effort": {
+            "kind": "free"
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "1",
+              "duration": {
+                "type": "Time_t"
+              },
+              "target": {
+                "type": "None_t"
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "tcx": {
+          "document": {
+            "attributes": {
+              "xmlns": "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2",
+              "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+            }
+          },
+          "workoutIndex": 1
+        }
+      }
+    },
+    {
+      "format": "ridrs-workout",
+      "version": 1,
+      "id": "running-and-biking-3",
+      "name": "Second ride",
+      "sport": "ride",
+      "source": {
+        "kind": "imported",
+        "format": "tcx",
+        "fileName": "running-and-biking.tcx",
+        "originalHash": "e92ed9c055767396420c558833ffff8911c59199c35f039b6b04358f46a6c603",
+        "importedAt": "2026-11-11T12:00:00.000Z"
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "1",
+          "intensity": "active",
+          "duration": {
+            "kind": "time",
+            "seconds": 600
+          },
+          "effort": {
+            "kind": "free"
+          },
+          "extensions": {
+            "tcx": {
+              "type": "Step_t",
+              "stepId": "1",
+              "duration": {
+                "type": "Time_t"
+              },
+              "target": {
+                "type": "None_t"
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "tcx": {
+          "document": {
+            "attributes": {
+              "xmlns": "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2",
+              "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+            }
+          },
+          "workoutIndex": 2
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "not-cycling",
+      "at": "Workouts/Workout[1]"
+    }
+  ]
+}
