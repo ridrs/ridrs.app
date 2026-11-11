@@ -13,7 +13,7 @@ Feature: A library workout is planned on a day in the chosen calendar
   2026.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-settings, ui-area-training, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-settings, ui-area-training, library-ridrs, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
     And a test device plugin "test-device"
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And intervals.icu has the library:
@@ -66,17 +66,17 @@ Feature: A library workout is planned on a day in the chosen calendar
 
   Scenario: A workout of this device is planned in intervals.icu without steps
     When I press "Training"
-    And I drag the workout "Recovery Spin" onto "Thursday"
+    And I drag the workout "Sweet Spot 3×12" onto "Thursday"
     Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
       | category         | WORKOUT             |
       | start_date_local | 2026-11-05T00:00:00 |
       | type             | VirtualRide         |
-      | name             | Recovery Spin       |
-      | moving_time      | 2400                |
+      | name             | Sweet Spot 3×12       |
+      | moving_time      | 3780                |
     When I press Back
     Then the next workout card shows:
       | day  | Tomorrow      |
-      | name | Recovery Spin |
+      | name | Sweet Spot 3×12 |
 
   Scenario: The workout is planned with the steps exactly as the library has them
     Given the library workout "Sweet Spot 3x12" of intervals.icu has the workout document:

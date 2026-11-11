@@ -1,0 +1,157 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "sweet-spot-3x12",
+  "name": "Sweet Spot 3×12",
+  "description": "Three blocks of 12 minutes at 90 % FTP with 4 minutes easy between them.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Sweet spot",
+  "focus": "sweet-spot",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "sweet-spot-3x12.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 75,
+            "high": 75
+          }
+        }
+      },
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "2",
+      "until": {
+        "kind": "count",
+        "reps": 3
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "2.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 720
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 90,
+                "high": 90
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 65,
+            "high": 65
+          },
+          "end": {
+            "low": 45,
+            "high": 45
+          }
+        }
+      },
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

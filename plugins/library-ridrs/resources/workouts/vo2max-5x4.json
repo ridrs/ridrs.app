@@ -1,0 +1,168 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "vo2max-5x4",
+  "name": "VO2max 5×4",
+  "description": "Five 4-minute efforts at 115 % FTP with 95-105 rpm, each followed by 4 minutes easy.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "VO2max",
+  "focus": "vo2max",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "vo2max-5x4.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 75,
+            "high": 75
+          }
+        }
+      },
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "2",
+      "until": {
+        "kind": "count",
+        "reps": 5
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "2.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 115,
+                "high": 115
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 95,
+                  "high": 105
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 60,
+            "high": 60
+          },
+          "end": {
+            "low": 40,
+            "high": 40
+          }
+        }
+      },
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

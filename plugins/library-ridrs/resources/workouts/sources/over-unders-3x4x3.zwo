@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Over-Unders 3×(4×3′)</name>
+  <description>Three sets of four over-under cycles (2 minutes at 95 % FTP, 1 minute at 108 %), with 5 minutes easy after each set. ZWO has no nested repeats: the outer repeat is written out, the inner one is an IntervalsT.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="600" PowerLow="0.50" PowerHigh="0.75"/>
+    <IntervalsT Repeat="4" OnDuration="120" OffDuration="60" OnPower="0.95" OffPower="1.08"/>
+    <SteadyState Duration="300" Power="0.50"/>
+    <IntervalsT Repeat="4" OnDuration="120" OffDuration="60" OnPower="0.95" OffPower="1.08"/>
+    <SteadyState Duration="300" Power="0.50"/>
+    <IntervalsT Repeat="4" OnDuration="120" OffDuration="60" OnPower="0.95" OffPower="1.08"/>
+    <SteadyState Duration="300" Power="0.50"/>
+    <Cooldown Duration="300" PowerLow="0.60" PowerHigh="0.40"/>
+  </workout>
+</workout_file>

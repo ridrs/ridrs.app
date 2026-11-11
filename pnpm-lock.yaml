@@ -559,6 +559,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/recording
 
+  plugins/library-ridrs:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/workout':
+        specifier: workspace:*
+        version: link:../../packages/workout
+
   plugins/metric-cadence:
     dependencies:
       '@ridrs/contracts':

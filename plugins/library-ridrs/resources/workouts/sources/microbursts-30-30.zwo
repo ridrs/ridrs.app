@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Microbursts 30/30</name>
+  <description>Three 10-second max efforts in the warm-up, then two sets of ten 30-second bursts at 130 % FTP with 30 seconds easy. The two sets are written out, since ZWO has no nested repeats.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="480" PowerLow="0.50" PowerHigh="0.75"/>
+    <MaxEffort Duration="10"/>
+    <SteadyState Duration="50" Power="0.50"/>
+    <MaxEffort Duration="10"/>
+    <SteadyState Duration="50" Power="0.50"/>
+    <MaxEffort Duration="10"/>
+    <SteadyState Duration="290" Power="0.50"/>
+    <IntervalsT Repeat="10" OnDuration="30" OffDuration="30" OnPower="1.30" OffPower="0.50"/>
+    <SteadyState Duration="300" Power="0.50"/>
+    <IntervalsT Repeat="10" OnDuration="30" OffDuration="30" OnPower="1.30" OffPower="0.50"/>
+    <SteadyState Duration="300" Power="0.50"/>
+  </workout>
+</workout_file>
