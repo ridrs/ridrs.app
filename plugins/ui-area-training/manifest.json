@@ -13,8 +13,7 @@
   ],
   "state": {
     "owns": [
-      "training.calendar",
-      "training.library"
+      "training.calendar"
     ]
   },
   "services": {

@@ -13,11 +13,7 @@ Feature: A library workout is planned on a day in the chosen calendar
   2026.
 
   Background:
-<<<<<<< HEAD
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-settings, ui-area-training, library-ridrs, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
-=======
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-settings, ui-area-training, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan, ui-workout-chart" together with the simulated intervals.icu
->>>>>>> c79f2a5 (Draw workouts with the UI capability ui.workout-chart on Today, the cards and the calendar)
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-settings, ui-area-training, library-ridrs, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan, ui-workout-chart" together with the simulated intervals.icu
     And a test device plugin "test-device"
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And intervals.icu has the library:
@@ -68,15 +64,27 @@ Feature: A library workout is planned on a day in the chosen calendar
     Then the calendar day "Thursday" lists no "Saving…"
     And the calendar day "Thursday" lists "Sweet Spot 3x12"
 
-  Scenario: A workout of this device is planned in intervals.icu without steps
+  Scenario: A workout of this device is planned in intervals.icu with its content
     When I press "Training"
     And I drag the workout "Sweet Spot 3×12" onto "Thursday"
     Then intervals.icu received "POST /api/v1/athlete/0/events" with the body:
       | category         | WORKOUT             |
       | start_date_local | 2026-11-05T00:00:00 |
       | type             | VirtualRide         |
-      | name             | Sweet Spot 3×12       |
+      | name             | Sweet Spot 3×12     |
       | moving_time      | 3780                |
+    And the event created in intervals.icu has the description:
+      """
+      Three blocks of 12 minutes at 90 % FTP with 4 minutes easy between them.
+
+      - 10m ramp 50-75% intensity=warmup
+
+      3x
+      - 12m 90% intensity=interval
+      - 4m 55% intensity=recovery
+
+      - 5m ramp 65-45% intensity=cooldown
+      """
     When I press Back
     Then the next workout card shows:
       | day  | Tomorrow      |

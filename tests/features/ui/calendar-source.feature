@@ -42,11 +42,11 @@ Feature: The rider chooses where the planned workouts come from
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Training"
-    And I drag the workout "Recovery Spin" onto "Thursday"
+    And I drag the workout "Microbursts 30/30" onto "Thursday"
     And I press Back
     Then the next workout card shows:
       | day  | Tomorrow      |
-      | name | Recovery Spin |
+      | name | Microbursts 30/30 |
 
   Scenario: Connecting the service later makes it the source until the rider chooses
     Given the host has started
@@ -105,9 +105,9 @@ Feature: The rider chooses where the planned workouts come from
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Training"
-    And I drag the workout "Recovery Spin" onto "Thursday"
+    And I drag the workout "Microbursts 30/30" onto "Thursday"
     And I drag the workout "Sweet Spot 3×12" onto "Saturday"
-    And I drag the planned workout "Recovery Spin" onto "Sunday"
+    And I drag the planned workout "Microbursts 30/30" onto "Sunday"
     And I press Back
     Then the next workout card shows:
       | day  | Sat 7 Nov       |

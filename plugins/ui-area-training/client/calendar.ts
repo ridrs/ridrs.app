@@ -33,21 +33,6 @@ export interface Calendar {
 /** How many changes Undo can take back. */
 export const UNDO_DEPTH = 10;
 
-export interface Workout {
-  readonly id: string;
-  readonly name: string;
-  readonly minutes: number;
-  readonly tss: number;
-  readonly zone: string;
-}
-
-export const WORKOUTS: readonly Workout[] = [
-  { id: 'sweet-spot', name: 'Sweet Spot 3×12', minutes: 60, tss: 75, zone: 'Sweet spot' },
-  { id: 'vo2-max', name: 'VO2 Max 5×4', minutes: 55, tss: 70, zone: 'VO2 max' },
-  { id: 'endurance', name: 'Endurance 90', minutes: 90, tss: 65, zone: 'Endurance' },
-  { id: 'recovery', name: 'Recovery Spin', minutes: 40, tss: 20, zone: 'Recovery' },
-];
-
 export const FIRST_WEEK: Calendar = {
   entries: [
     { id: 'seed-1', day: 'Tuesday', kind: 'workout', title: 'Sweet Spot 3×12' },

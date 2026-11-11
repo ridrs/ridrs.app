@@ -47,12 +47,12 @@ Feature: Changes in the app's areas take effect at once and are kept
 
   Scenario: A workout dragged onto a day is kept
     When I press "Training"
-    And I drag the workout "Recovery Spin" onto "Friday"
-    Then the calendar day "Friday" lists "Recovery Spin"
+    And I drag the workout "Microbursts 30/30" onto "Friday"
+    Then the calendar day "Friday" lists "Microbursts 30/30"
     When ridrs restarted
     And I reload the UI
     And I press "Training"
-    Then the calendar day "Friday" lists "Recovery Spin"
+    Then the calendar day "Friday" lists "Microbursts 30/30"
 
   Scenario: A planned workout is moved to another day by dragging
     When I press "Training"
@@ -62,8 +62,8 @@ Feature: Changes in the app's areas take effect at once and are kept
 
   Scenario: A day that has passed takes no workout and its workouts stay
     When I press "Training"
-    And I drag the workout "Recovery Spin" onto "Monday"
-    Then the calendar day "Monday" lists no "Recovery Spin"
+    And I drag the workout "Microbursts 30/30" onto "Monday"
+    Then the calendar day "Monday" lists no "Microbursts 30/30"
     And the planned workout "Sweet Spot 3×12" cannot be dragged
 
   Scenario: The calendar shows the days side by side with nothing to select
@@ -94,8 +94,8 @@ Feature: Changes in the app's areas take effect at once and are kept
   Scenario: The calendar of ridrs takes workouts in this week only
     When I press "Training"
     And I press "Next week"
-    And I drag the workout "Recovery Spin" onto "Friday"
-    Then the calendar day "Friday" lists no "Recovery Spin"
+    And I drag the workout "Microbursts 30/30" onto "Friday"
+    Then the calendar day "Friday" lists no "Microbursts 30/30"
 
   Scenario: The large calendar is a page of its own
     When I press "Training"
