@@ -36,6 +36,9 @@ function intervals(world: RidrsWorld): SimulatedIntervalsIcu {
   return simulation;
 }
 
+/** The simulated intervals.icu of a scenario, for the steps of the workout sync (intervals-sync.steps.ts). */
+export const simulatedIntervalsIcu = intervals;
+
 function splitCsv(value: string): string[] {
   return value
     .split(',')

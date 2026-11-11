@@ -20,3 +20,7 @@ ridrs imports FIT workout files (`file_id.type = workout`) and exports workouts 
 
 - dependency-cruiser's `fit-sdk-only-in-tests` rule and `check-native-bundle.mjs` keep enforcing that the SDK is not shipped.
 - `@ridrs/fit` stays AGPL-3.0-or-later (ADR 0034).
+
+## Known Gap
+
+FIT steps whose duration or repeat is based on training load (`training_peaks_tss`, `repeat_until_tss`) and `reps` repeats are refused on import (`unsupported-duration`, `unsupported-repeat`), as are custom targets in mixed units. The maintainer decided on 2026-11-11 to keep refusing them for now; the mapping is improved later (backlog, not the export phase).

@@ -1,8 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { athleteProfileSchema, completedWorkoutSchema, libraryWorkoutSchema, plannedWorkoutSchema } from '@ridrs/contracts';
+import {
+  athleteProfileSchema,
+  completedWorkoutSchema,
+  libraryWorkoutSchema,
+  plannedWorkoutSchema,
+  workoutSchema,
+} from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { ftpField, libraryDocs, localDate, toActivities, toAthlete, toLibrary, toSteps, toWorkouts } from './intervals.ts';
+import { exportIntervalsDoc } from '@ridrs/workout';
+import {
+  ftpField,
+  heartRateTop,
+  libraryDocs,
+  localDate,
+  toActivities,
+  toAthlete,
+  toLibrary,
+  toSteps,
+  toWorkouts,
+  zoneSettings,
+} from './intervals.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
 
 describe('toAthlete', () => {
@@ -152,7 +170,7 @@ describe('toSteps', () => {
     ]);
   });
 
-  it('keeps zone targets as zones, rides unknown units free, and drops steps without a duration', () => {
+  it('keeps zone targets as zones, rides unknown units free (kept in the extensions), and drops steps without a duration', () => {
     expect(
       toSteps([
         { duration: 60, power: { units: 'power_zone', value: 2 } },
@@ -166,8 +184,140 @@ describe('toSteps', () => {
         duration: { kind: 'time', seconds: 60 },
         effort: { kind: 'target', primary: { unit: 'power-zone', start: { low: 2, high: 2 } } },
       },
-      { kind: 'interval', id: '2', duration: { kind: 'time', seconds: 60 }, effort: { kind: 'free' } },
+      {
+        kind: 'interval',
+        id: '2',
+        duration: { kind: 'time', seconds: 60 },
+        effort: { kind: 'free' },
+        extensions: { intervals: { doc: { power: { units: '%mmp', value: 80 } }, implicitFree: true } },
+      },
     ]);
+  });
+
+  it('reads heart rate, distance, lap button, free ride, max effort and the intensity words', () => {
+    expect(
+      toSteps([
+        { distance: 2000, duration: 300, hr: { units: 'bpm', start: 140, end: 150 }, intensity: 'warmup' },
+        { until_lap_press: true, hr: { units: '%hr', value: 75 }, cadence: { units: 'rpm', value: 90 } },
+        { duration: 300, freeride: true, cadence: { units: 'rpm', value: 85 } },
+        { duration: 10, maxeffort: true, power: { units: '%ftp', value: 200 } },
+        { duration: 60, power: { units: '%ftp', value: 60 }, hr: { units: 'hr_zone', value: 2 }, intensity: 'recovery' },
+      ]),
+    ).toEqual([
+      {
+        kind: 'interval',
+        id: '1',
+        intensity: 'warm-up',
+        duration: { kind: 'distance', meters: 2000 },
+        effort: { kind: 'target', primary: { unit: 'bpm', start: { low: 140, high: 150 } } },
+        extensions: { intervals: { doc: { duration: 300 }, intensityAs: 'text' } },
+      },
+      {
+        kind: 'interval',
+        id: '2',
+        duration: { kind: 'open' },
+        effort: {
+          kind: 'target',
+          primary: { unit: 'percent-max-hr', start: { low: 75, high: 75 } },
+          secondary: [{ unit: 'rpm', start: { low: 90, high: 90 } }],
+        },
+      },
+      {
+        kind: 'interval',
+        id: '3',
+        duration: { kind: 'time', seconds: 300 },
+        effort: { kind: 'free', secondary: [{ unit: 'rpm', start: { low: 85, high: 85 } }] },
+      },
+      {
+        kind: 'interval',
+        id: '4',
+        duration: { kind: 'time', seconds: 10 },
+        effort: { kind: 'max-effort' },
+        extensions: { intervals: { doc: { power: { units: '%ftp', value: 200 } } } },
+      },
+      {
+        kind: 'interval',
+        id: '5',
+        intensity: 'recovery',
+        duration: { kind: 'time', seconds: 60 },
+        effort: {
+          kind: 'target',
+          primary: { unit: 'percent-ftp', start: { low: 60, high: 60 } },
+          secondary: [{ unit: 'hr-zone', start: { low: 2, high: 2 } }],
+        },
+      },
+    ]);
+  });
+
+  it('gives back the same document through exportIntervalsDoc', () => {
+    const doc = {
+      steps: [
+        { text: 'Warm up', duration: 600, warmup: true, ramp: true, power: { units: '%ftp', start: 50, end: 75 }, _power: { start: 125, end: 188 } },
+        { reps: 3, text: 'Main set 3x', steps: [
+          { duration: 300, power: { units: 'w', value: 280, target: 'POWER' }, cadence: { units: 'rpm', start: 95, end: 105 } },
+          { duration: 180, power: { units: 'power_zone', value: 2 }, intensity: 'rest' },
+        ] },
+        { duration: 60, power: { units: '%mmp', value: 80, mmp_duration: 300 }, hidepower: true },
+        { duration: 300, freeride: true },
+        { duration: 10, maxeffort: true },
+        { distance: 5000, duration: 540, hr: { units: 'hr_zone', value: 2 } },
+        { until_lap_press: true, hr: { units: '%lthr', start: 80, end: 85 }, intensity: 'cooldown' },
+      ],
+    };
+    const workout = {
+      format: 'ridrs-workout' as const,
+      version: 1 as const,
+      id: 'w',
+      name: 'W',
+      sport: 'ride' as const,
+      source: { kind: 'provider' as const },
+      steps: toSteps(doc.steps),
+    };
+    expect(workoutSchema.parse(workout)).toEqual(workout);
+    const exported = exportIntervalsDoc(workout);
+    expect(exported.doc).toEqual(doc);
+    expect(exported.diagnostics).toEqual([]);
+  });
+});
+
+describe('zones', () => {
+  const athlete = {
+    sportSettings: [
+      {
+        types: ['Ride'],
+        ftp: 250,
+        power_zones: [55, 75, 90, 105, 120, 150, 999],
+        power_zone_names: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'],
+        hr_zones: [138, 154, 190],
+        hr_zone_names: ['Easy', '', 'Hard'],
+      },
+    ],
+  };
+
+  it('reads the Ride zones with the last one open', () => {
+    const profile = toAthlete(athlete);
+    expect(profile.powerZones?.at(-1)).toEqual({ name: 'Z7' });
+    expect(profile.powerZones?.[0]).toEqual({ name: 'Z1', upTo: 55 });
+    expect(profile.heartRateZones).toEqual([{ name: 'Easy', upTo: 138 }, { upTo: 154 }, { name: 'Hard' }]);
+    expect(heartRateTop(athlete)).toBe(190);
+    expect(athleteProfileSchema.parse(profile)).toEqual(profile);
+  });
+
+  it('gives no zones that the profile would refuse', () => {
+    expect(toAthlete({ sportSettings: [{ types: ['Ride'], power_zones: [90, 55, 999] }] }).powerZones).toBeUndefined();
+    expect(toAthlete({ sportSettings: [{ types: ['Ride'], hr_zones: 'x' }] }).heartRateZones).toBeUndefined();
+  });
+
+  it('writes the bounds with the open zone closed as intervals.icu keeps it, and a name for every zone', () => {
+    expect(
+      zoneSettings({ powerZones: [{ name: 'Easy', upTo: 60 }, {}], heartRateZones: [{ upTo: 140 }, { name: 'High' }] }, 190),
+    ).toEqual({
+      power_zones: [60, 999],
+      power_zone_names: ['Easy', 'Z2'],
+      hr_zones: [140, 190],
+      hr_zone_names: ['Z1', 'High'],
+    });
+    expect(zoneSettings({}, 190)).toEqual({});
   });
 });
 

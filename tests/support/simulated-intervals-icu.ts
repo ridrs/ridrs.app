@@ -63,6 +63,8 @@ export class SimulatedIntervalsIcu {
   athlete = { id: 'i4711', name: 'Athlete', ftp: 200, weight: 70 };
   /** The indoor FTP of the Ride settings, when the athlete set one. */
   indoorFtp: number | undefined;
+  /** The zones of the Ride settings (`power_zones`, `power_zone_names`, `hr_zones`, `hr_zone_names`), as `PUT sport-settings/Ride` keeps them. */
+  rideZones: Record<string, unknown> = {};
   /** Wellness weights by date (`GET …/wellness/{date}`); a day without one answers 404. */
   readonly wellnessWeights = new Map<string, number>();
   events: PlannedEvent[] = [];
@@ -177,6 +179,7 @@ export class SimulatedIntervalsIcu {
               ...(this.indoorFtp === undefined ? {} : { indoor_ftp: this.indoorFtp }),
               lthr: 165,
               max_hr: 185,
+              ...this.rideZones,
             },
             { types: ['Run', 'VirtualRun'], ftp: null, lthr: 170, max_hr: 190 },
           ],
@@ -275,6 +278,13 @@ export class SimulatedIntervalsIcu {
     }
     if (settings && typeof body.indoor_ftp === 'number') {
       this.indoorFtp = body.indoor_ftp;
+    }
+    if (settings) {
+      for (const field of ['power_zones', 'power_zone_names', 'hr_zones', 'hr_zone_names']) {
+        if (field in body) {
+          this.rideZones[field] = (body as Record<string, unknown>)[field];
+        }
+      }
     }
     return json(200, { ...body });
   }

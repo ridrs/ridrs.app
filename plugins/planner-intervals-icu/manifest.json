@@ -26,7 +26,8 @@
       "training.upload"
     ],
     "watches": [
-      "recording.ride"
+      "recording.ride",
+      "training.library"
     ]
   },
   "services": {

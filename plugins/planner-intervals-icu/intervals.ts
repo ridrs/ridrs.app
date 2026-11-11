@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {
+  type AthleteProfile,
+  type HeartRateZones,
+  type PowerZones,
+  powerZonesSchema,
+} from '@ridrs/contracts';
 import type {
-  AthleteProfile,
   CompletedWorkout,
   LibraryWorkout,
   PlannedWorkout,
+  WorkoutDuration,
+  WorkoutEffort,
+  WorkoutIntensity,
   WorkoutInterval,
   WorkoutRange,
   WorkoutStep,
@@ -66,12 +74,71 @@ export function toAthlete(body: unknown, wellnessWeight?: number): AthleteProfil
   const lthr = positive(ride?.lthr);
   const maxHeartRate = positive(ride?.max_hr);
   const name = text(athlete.name);
+  const powerZones = toZones(ride?.power_zones, ride?.power_zone_names);
+  const heartRateZones = toZones(ride?.hr_zones, ride?.hr_zone_names);
   return {
     ...(name !== undefined ? { name } : {}),
+    ...(powerZones !== undefined ? { powerZones } : {}),
+    ...(heartRateZones !== undefined ? { heartRateZones } : {}),
     ...(ftp !== undefined ? { ftp: Math.round(ftp) } : {}),
     ...(weight !== undefined ? { weight } : {}),
     ...(lthr !== undefined ? { lthr } : {}),
     ...(maxHeartRate !== undefined ? { maxHeartRate } : {}),
+  };
+}
+
+/**
+ * Zones of the Ride settings (ADR 0082): `power_zones` in % FTP and `hr_zones` in bpm are upper
+ * bounds, lowest first, with their names beside them. The last zone is open in ridrs; intervals.icu
+ * gives it a bound all the same (999 for power, the maximum heart rate for heart rate), which a
+ * write puts back. Anything the profile's schema refuses gives no zones.
+ */
+function toZones(bounds: unknown, names: unknown): PowerZones | undefined {
+  if (!Array.isArray(bounds) || bounds.length === 0) {
+    return undefined;
+  }
+  const labels = Array.isArray(names) ? names : [];
+  const zones = bounds.map((bound, index) => {
+    const name = text(labels[index]);
+    const upTo = index < bounds.length - 1 ? positive(bound) : undefined;
+    return { ...(name !== undefined ? { name } : {}), ...(upTo !== undefined ? { upTo } : {}) };
+  });
+  const parsed = powerZonesSchema.safeParse(zones);
+  return parsed.success ? parsed.data : undefined;
+}
+
+/** The bound intervals.icu keeps for the last, open heart rate zone. */
+export function heartRateTop(body: unknown): number | undefined {
+  const ride = rideSettings(isObject(body) ? body : {});
+  return Array.isArray(ride?.hr_zones) ? positive(ride.hr_zones.at(-1)) : undefined;
+}
+
+/** The last, open power zone as intervals.icu writes it. */
+const OPEN_POWER_ZONE = 999;
+
+/**
+ * The fields of `PUT sport-settings/Ride` for changed zones. Every zone gets a name (intervals.icu
+ * keeps the names beside the bounds), `Z1`, `Z2`, … where ridrs has none.
+ */
+export function zoneSettings(
+  change: { readonly powerZones?: PowerZones; readonly heartRateZones?: HeartRateZones },
+  heartRateTopBound: number,
+): Json {
+  const names = (zones: PowerZones) => zones.map((zone, index) => zone.name ?? `Z${index + 1}`);
+  const bounds = (zones: PowerZones, top: number) => zones.map((zone) => zone.upTo ?? top);
+  return {
+    ...(change.powerZones
+      ? {
+          power_zones: bounds(change.powerZones, OPEN_POWER_ZONE),
+          power_zone_names: names(change.powerZones),
+        }
+      : {}),
+    ...(change.heartRateZones
+      ? {
+          hr_zones: bounds(change.heartRateZones, heartRateTopBound),
+          hr_zone_names: names(change.heartRateZones),
+        }
+      : {}),
   };
 }
 
@@ -190,8 +257,16 @@ export function libraryDocs(body: unknown): Record<string, unknown> {
 
 /**
  * The steps of a `workout_doc`, repeats nested, in the canonical model (ADR 0081): targets keep
- * their unit, nothing is converted. Step ids are their path, `1`, `2`, `2.1`; the whole document
- * is read in the catalogue phase (structured-workouts.md, section 8).
+ * their unit, nothing is converted, a range is not a ramp. Step ids are their path, `1`, `2`,
+ * `2.1`. The shape follows the classes the developer of intervals.icu posted in "Downloading
+ * planned workouts from the API" (https://forum.intervals.icu/t/downloading-planned-workouts-from-the-api/93737):
+ * `text`, `duration`, `distance`, `until_lap_press`, `reps` and `steps`, `warmup`, `cooldown`,
+ * `intensity`, `ramp`, `freeride`, `maxeffort`, and the values `power`, `hr`, `cadence`, each
+ * `{ value }` or `{ start, end }` with `units`. What the model has no field for (`_power` and the
+ * other resolved values, `hidepower`, `text_locale`, `pace`, a `%mmp` target, a value's `target`
+ * or `mmp_duration`, the estimated `duration` of a distance step) stays in
+ * `extensions.intervals.doc`, which `exportIntervalsDoc` restores. A step without any duration
+ * is left out.
  */
 export function toSteps(steps: unknown, prefix = ''): WorkoutStep[] {
   if (!Array.isArray(steps)) {
@@ -202,31 +277,146 @@ export function toSteps(steps: unknown, prefix = ''): WorkoutStep[] {
     const reps = positive(step.reps);
     if (reps !== undefined && Array.isArray(step.steps)) {
       const inner = toSteps(step.steps, `${id}.`);
+      const { reps: _reps, steps: _steps, ...rest } = step;
       return inner.length > 0
-        ? [{ kind: 'repeat', id, until: { kind: 'count', reps: Math.round(reps) }, steps: inner }]
+        ? [
+            {
+              kind: 'repeat',
+              id,
+              until: { kind: 'count', reps: Math.round(reps) },
+              steps: inner,
+              ...withDoc(rest, {}),
+            },
+          ]
         : [];
     }
-    const seconds = nonNegative(step.duration);
-    if (seconds === undefined) {
-      return [];
+    return toInterval(step, id);
+  });
+}
+
+/** `extensions.intervals` of a step: what is `left` of it, and the marks of the reader. */
+function withDoc(left: Json, marks: Json): { extensions?: { intervals: Json } } {
+  const intervals = { ...(Object.keys(left).length > 0 ? { doc: left } : {}), ...marks };
+  return Object.keys(intervals).length > 0 ? { extensions: { intervals } } : {};
+}
+
+const INTENSITIES: Readonly<Record<string, WorkoutIntensity>> = {
+  warmup: 'warm-up',
+  active: 'active',
+  interval: 'interval',
+  rest: 'rest',
+  recovery: 'recovery',
+  cooldown: 'cool-down',
+  other: 'other',
+};
+
+function toInterval(step: Json, id: string): WorkoutInterval[] {
+  const left: Json = { ...step };
+  const take = <T>(key: string, found: T | undefined): T | undefined => {
+    if (found !== undefined) {
+      delete left[key];
     }
-    const ramp = step.ramp === true;
-    const power = toTarget(step.power, POWER_UNITS, ramp);
-    const cadence = toTarget(step.cadence, { rpm: 'rpm' }, ramp, 'rpm');
-    const name = text(step.text);
-    const interval: WorkoutInterval = {
+    return found;
+  };
+
+  let duration: WorkoutDuration | undefined;
+  if (step.until_lap_press === true) {
+    duration = take('until_lap_press', { kind: 'open' });
+  } else if (nonNegative(step.distance) !== undefined) {
+    duration = take('distance', { kind: 'distance', meters: step.distance as number });
+  } else if (nonNegative(step.duration) !== undefined) {
+    duration = take('duration', { kind: 'time', seconds: step.duration as number });
+  }
+  if (duration === undefined) {
+    return [];
+  }
+
+  const name = take('text', text(step.text));
+  const marks: Json = {};
+  let intensity = take(
+    'intensity',
+    typeof step.intensity === 'string' ? INTENSITIES[step.intensity] : undefined,
+  );
+  if (intensity === 'warm-up' || intensity === 'cool-down') {
+    marks.intensityAs = 'text';
+  }
+  if (intensity === undefined) {
+    intensity =
+      take('warmup', step.warmup === true ? ('warm-up' as const) : undefined) ??
+      take('cooldown', step.cooldown === true ? ('cool-down' as const) : undefined);
+  }
+
+  const ramp = step.ramp === true;
+  let ramped = false;
+  /** A value in its unit, its other fields left in the document. */
+  const target = (key: 'power' | 'hr' | 'cadence', units: Readonly<Record<string, WorkoutTargetUnit>>, fallback?: WorkoutTargetUnit) => {
+    const found = toTarget(step[key], units, ramp, fallback);
+    if (found === undefined) {
+      return undefined;
+    }
+    const raw = step[key] as Json;
+    const other: Json = { ...raw };
+    delete other.units;
+    if (nonNegative(raw.start) !== undefined && nonNegative(raw.end) !== undefined) {
+      delete other.start;
+      delete other.end;
+    } else {
+      delete other.value;
+    }
+    if (Object.keys(other).length > 0) {
+      left[key] = other;
+    } else {
+      delete left[key];
+    }
+    ramped ||= found.end !== undefined;
+    return found;
+  };
+  const power = target('power', POWER_UNITS);
+  const hr = target('hr', HR_UNITS);
+  const cadence = target('cadence', { rpm: 'rpm' }, 'rpm');
+  if (ramped) {
+    delete left.ramp;
+  }
+
+  let effort: WorkoutEffort;
+  const secondary = (targets: Array<WorkoutTarget | undefined>) => {
+    const present = targets.filter((entry): entry is WorkoutTarget => entry !== undefined);
+    return present.length > 0 ? { secondary: present } : {};
+  };
+  if (step.maxeffort === true) {
+    delete left.maxeffort;
+    effort = { kind: 'max-effort' };
+    // Targets beside an all-out effort stay as they were written.
+    for (const key of ['power', 'hr', 'cadence'] as const) {
+      if (step[key] !== undefined) {
+        left[key] = step[key];
+      }
+    }
+  } else if (step.freeride === true) {
+    delete left.freeride;
+    effort = { kind: 'free', ...secondary([power, hr, cadence]) };
+  } else if (power ?? hr) {
+    effort = {
+      kind: 'target',
+      primary: (power ?? hr) as WorkoutTarget,
+      ...secondary(power ? [hr, cadence] : [cadence]),
+    };
+  } else {
+    marks.implicitFree = true;
+    effort = { kind: 'free', ...secondary([cadence]) };
+  }
+
+  return [
+    {
       kind: 'interval',
       id,
       ...(name !== undefined ? { name } : {}),
-      ...(step.warmup === true ? { intensity: 'warm-up' as const } : {}),
-      ...(step.cooldown === true ? { intensity: 'cool-down' as const } : {}),
-      duration: { kind: 'time', seconds },
-      effort: power
-        ? { kind: 'target', primary: power, ...(cadence ? { secondary: [cadence] } : {}) }
-        : { kind: 'free', ...(cadence ? { secondary: [cadence] } : {}) },
-    };
-    return [interval];
-  });
+      ...(intensity !== undefined ? { intensity } : {}),
+      duration,
+      effort,
+      ...withDoc(left, marks),
+    },
+  ];
 }
 
 /** The power units of a `workout_doc`, as the canonical model names them. */
@@ -236,22 +426,28 @@ const POWER_UNITS: Readonly<Record<string, WorkoutTargetUnit>> = {
   power_zone: 'power-zone',
 };
 
-/** `{ value }` or `{ start, end }`; `undefined` for anything else. */
+/** The heart rate units of a `workout_doc`. */
+const HR_UNITS: Readonly<Record<string, WorkoutTargetUnit>> = {
+  '%lthr': 'percent-lthr',
+  '%hr': 'percent-max-hr',
+  bpm: 'bpm',
+  hr_zone: 'hr-zone',
+};
+
+/** `{ start, end }` or `{ value }`; `undefined` for anything else. */
 function toRange(target: Json): { start: WorkoutRange; end?: WorkoutRange } | undefined {
-  const value = nonNegative(target.value);
-  if (value !== undefined) {
-    return { start: { low: value, high: value } };
-  }
   const start = nonNegative(target.start);
   const end = nonNegative(target.end);
-  return start !== undefined && end !== undefined
-    ? { start: { low: start, high: start }, end: { low: end, high: end } }
-    : undefined;
+  if (start !== undefined && end !== undefined) {
+    return { start: { low: start, high: start }, end: { low: end, high: end } };
+  }
+  const value = nonNegative(target.value);
+  return value !== undefined ? { start: { low: value, high: value } } : undefined;
 }
 
 /**
  * A target in its own unit. `start` and `end` are a ramp when the step says `ramp`, else a range
- * ("stay between"). Units ridrs does not know yet (% of MMP and the like) give none.
+ * ("stay between"). Units ridrs has no unit for (% of MMP and the like) give none.
  */
 function toTarget(
   target: unknown,

@@ -43,7 +43,18 @@ import {
   trainingUploadState,
 } from '@ridrs/contracts';
 import { createGateway, type Gateway, type Purpose, RateLimited } from './gateway.ts';
-import { ftpField, libraryDocs, localDate, toActivities, toAthlete, toLibrary, toWorkouts } from './intervals.ts';
+import {
+  ftpField,
+  heartRateTop,
+  libraryDocs,
+  localDate,
+  toActivities,
+  toAthlete,
+  toLibrary,
+  toWorkouts,
+  zoneSettings,
+} from './intervals.ts';
+import { contentSync, eventContent, eventHash, type Link, sourceHash, workoutOf } from './sync.ts';
 import { createMailbox, mailboxConfig } from './mailbox.ts';
 import { createMailboxSocket } from './mailbox-socket.ts';
 import { type Applied, interpret, newApplied } from './mailbox-events.ts';
@@ -110,12 +121,18 @@ interface Cache {
   readonly library?: LibraryWorkout[];
   /** The `workout_doc` of each library workout by its id, as intervals.icu has it. */
   readonly libraryDocs?: Record<string, unknown>;
+  /** The entries planned from another library, by event id (sync.ts). */
+  readonly links?: Record<string, Link>;
+  /** The bound intervals.icu keeps for the last, open heart rate zone. */
+  readonly heartRateTop?: number;
 }
 
 /** What the plugin holds between two requests. */
 interface Held {
   ftpField: Cache['ftpField'];
   libraryDocs: Record<string, unknown>;
+  links: Record<string, Link>;
+  heartRateTop?: number;
   /** What is shown, and kept: none before the first load. */
   cache?: Cache;
 }
@@ -159,7 +176,7 @@ export default definePlugin({
     // Pacing and the rest `Retry-After` asks for are wall-clock time of I/O, not simulation time: the
     // logical clock stands still inside a turn, and no ride depends on this.
     const gateway = createGateway({ http, now: () => Date.now(), logger: ctx.logger });
-    const held: Held = { ftpField: 'ftp', libraryDocs: {} };
+    const held: Held = { ftpField: 'ftp', libraryDocs: {}, links: {} };
     const env: Env = { ctx, gateway, secrets, files, held };
     const signIn = ctx.capabilities.get(authBrowserSignInCapability);
     const mailbox = createMailbox({
@@ -194,8 +211,27 @@ export default definePlugin({
           busy = false;
           if (pending.size > 0) {
             drain();
+          } else if (followWanted) {
+            runFollow();
           }
         });
+    };
+
+    /**
+     * A library workout changed: its future entries follow (structured-workouts.md, section 10).
+     * After the work that runs, once, however often it was asked for meanwhile.
+     */
+    let followWanted = false;
+    const runFollow = () =>
+      run(async () => {
+        followWanted = false;
+        await followLibraries(env, ctx.clock.now());
+      });
+    const follow = () => {
+      followWanted = true;
+      if (!busy) {
+        runFollow();
+      }
     };
 
     /** Reads what was asked for while other work ran, once, together. */
@@ -407,6 +443,7 @@ export default definePlugin({
         await files.remove(CACHE_FILE).catch(() => undefined);
         held.cache = undefined;
         held.libraryDocs = {};
+        held.links = {};
         pending.clear();
         account('disconnected');
         setSources(ctx, 'unavailable');
@@ -451,6 +488,12 @@ export default definePlugin({
     ctx.services.provide(trainingLibraryLoadService, () => {
       want(['library']);
       return {};
+    });
+    // The libraries of other providers: a changed workout updates its entries planned here.
+    ctx.state.watch(trainingLibraryState, ({ changed }) => {
+      if (changed.some((key) => key !== SERVICE)) {
+        follow();
+      }
     });
     // A saved ride may complete a planned workout: read the plan again once one is saved. The
     // first delivery is every ride of the run so far; the plan loads at start anyway.
@@ -497,6 +540,10 @@ async function startUp(
     held.cache = cached;
     held.ftpField = cached.ftpField;
     held.libraryDocs = cached.libraryDocs ?? {};
+    held.links = cached.links ?? {};
+    if (cached.heartRateTop !== undefined) {
+      held.heartRateTop = cached.heartRateTop;
+    }
     ctx.state.set(trainingAccountState, SERVICE, {
       service: SERVICE,
       state: 'connected',
@@ -526,7 +573,7 @@ async function applyMailbox(
     let next = cache;
     const { events: changed, deleted } = effects.calendar;
     if (changed.length > 0 || deleted.length > 0) {
-      const incoming = toWorkouts(changed);
+      const incoming = linkedWorkouts(env, changed, false);
       // An event that is no longer a planned ride (another category or sport) leaves the calendar too.
       const replaced = new Set([...deleted, ...changed.map((entry) => String(entry.id))]);
       const first = localDate(env.ctx.clock.now());
@@ -663,7 +710,9 @@ function accessToken(body: string): string | undefined {
 }
 
 /** Shows what an accepted change made of the data, and keeps it for a start without network. */
-async function keep(env: Env, loaded: Cache, status: DataSourceStatus = 'ready'): Promise<void> {
+async function keep(env: Env, kept: Cache, status: DataSourceStatus = 'ready'): Promise<void> {
+  const { links, heartRateTop: top } = env.held;
+  const loaded: Cache = { ...kept, links, ...(top !== undefined ? { heartRateTop: top } : {}) };
   env.held.cache = loaded;
   setSources(env.ctx, status, loaded);
   await env.files
@@ -730,19 +779,30 @@ async function send(
 }
 
 /**
- * Writes a change of the profile: the weight to today's wellness record, the FTP to the Ride
- * settings, into the field it was read from. `icu_weight` is never written. A value the profile
- * already has is not sent (ADR 0078): at most two requests, none for no change.
+ * Writes a change of the profile: the weight to today's wellness record, the FTP and the zones to
+ * the Ride settings (the FTP into the field it was read from; ADR 0082). `icu_weight` is never
+ * written. A value the profile already has is not sent (ADR 0078): at most two requests, none for
+ * no change.
  */
 async function writeProfile(
   env: Env,
-  asked: { readonly ftp?: number; readonly weight?: number },
+  asked: Omit<AthleteProfile, 'name'>,
 ): Promise<DataWriteResult> {
   const { ctx, held } = env;
   const current = held.cache?.athlete;
+  const differs = (a: unknown, b: unknown) => JSON.stringify(a ?? null) !== JSON.stringify(b ?? null);
+  const zones = {
+    ...(asked.powerZones !== undefined && differs(asked.powerZones, current?.powerZones)
+      ? { powerZones: asked.powerZones }
+      : {}),
+    ...(asked.heartRateZones !== undefined && differs(asked.heartRateZones, current?.heartRateZones)
+      ? { heartRateZones: asked.heartRateZones }
+      : {}),
+  };
   const change = {
     ...(asked.weight !== undefined && asked.weight !== current?.weight ? { weight: asked.weight } : {}),
     ...(asked.ftp !== undefined && asked.ftp !== current?.ftp ? { ftp: asked.ftp } : {}),
+    ...zones,
   };
   if (change.weight !== undefined) {
     const sent = await send(env, 'profile-write', 'PUT', `/api/v1/athlete/0/wellness/${localDate(ctx.clock.now())}`, {
@@ -752,9 +812,13 @@ async function writeProfile(
       return sent;
     }
   }
-  if (change.ftp !== undefined) {
+  if (change.ftp !== undefined || Object.keys(zones).length > 0) {
+    // The open last heart rate zone goes back with the bound intervals.icu had for it, else the
+    // maximum heart rate; 220 bpm only when neither is known.
+    const top = held.heartRateTop ?? current?.maxHeartRate ?? 220;
     const sent = await send(env, 'profile-write', 'PUT', '/api/v1/athlete/0/sport-settings/Ride', {
-      [held.ftpField]: change.ftp,
+      ...(change.ftp !== undefined ? { [held.ftpField]: change.ftp } : {}),
+      ...zoneSettings(zones, top),
     });
     if (!sent.ok) {
       return sent;
@@ -785,31 +849,51 @@ async function writeCalendar(env: Env, change: CalendarChange): Promise<DataWrit
   let workouts = loaded?.workouts ?? [];
   if ('plan' in change) {
     const { date, workoutId, from } = change.plan;
-    // The steps go as intervals.icu has them: ridrs reads only part of a workout document (no
-    // zones, no difference between a range and a ramp), so its steps would change the workout.
     const workout = ctx.state
       .entries(trainingLibraryState)
       .get(from)
       ?.data?.workouts.find((candidate) => candidate.id === workoutId);
-    // A workout of another library (the built-in workouts of ridrs) has no document: it is planned by its name and length.
+    // A workout of the library of intervals.icu goes with its document as intervals.icu has it:
+    // nothing is rewritten.
     const doc = from === SERVICE ? held.libraryDocs[workoutId] : undefined;
     if (!workout || (from === SERVICE && doc === undefined)) {
       throw new Error(`The library of "${SERVICE}" has no workout "${workoutId}" of "${from}"`);
     }
+    // A workout of another library goes with its whole content (structured-workouts.md, section 10).
+    const mode = contentSync.send;
+    const content =
+      from === SERVICE
+        ? {
+            type: workout.sport === 'virtual-ride' ? 'VirtualRide' : 'Ride',
+            name: workout.name,
+            ...(workout.description !== undefined ? { description: workout.description } : {}),
+            ...(workout.durationSeconds !== undefined ? { moving_time: workout.durationSeconds } : {}),
+            workout_doc: doc,
+          }
+        : eventContent(workout, mode, (diagnostics) => logExport(env, workoutId, diagnostics));
     const sent = await send(env, 'calendar-write', 'POST', '/api/v1/athlete/0/events', {
       category: 'WORKOUT',
       start_date_local: `${date}T00:00:00`,
-      type: workout.sport === 'virtual-ride' ? 'VirtualRide' : 'Ride',
-      name: workout.name,
-      ...(workout.description !== undefined ? { description: workout.description } : {}),
-      ...(workout.durationSeconds !== undefined ? { moving_time: workout.durationSeconds } : {}),
-      ...(doc !== undefined ? { workout_doc: doc } : {}),
+      ...content,
     });
     if (!sent.ok) {
       return sent;
     }
-    const created = toWorkouts([sent.body]);
-    workouts = [...workouts, ...created];
+    const created = isRecord(sent.body) ? sent.body : undefined;
+    if (from !== SERVICE && created?.id !== undefined) {
+      held.links = {
+        ...held.links,
+        [String(created.id)]: {
+          from,
+          workoutId,
+          date,
+          mode,
+          content: eventHash(created, mode),
+          source: sourceHash(workout),
+        },
+      };
+    }
+    workouts = [...workouts, ...linkedWorkouts(env, [sent.body], false)];
   } else if ('move' in change) {
     const { id, date } = change.move;
     if (workouts.find((workout) => workout.id === id)?.date === date) {
@@ -822,6 +906,10 @@ async function writeCalendar(env: Env, change: CalendarChange): Promise<DataWrit
       return sent;
     }
     workouts = workouts.map((workout) => (workout.id === id ? { ...workout, date } : workout));
+    const link = held.links[id];
+    if (link) {
+      held.links = { ...held.links, [id]: { ...link, date } };
+    }
   } else {
     const { id } = change.remove;
     const sent = await send(env, 'calendar-write', 'DELETE', `/api/v1/athlete/0/events/${encodeURIComponent(id)}`);
@@ -829,6 +917,8 @@ async function writeCalendar(env: Env, change: CalendarChange): Promise<DataWrit
       return sent;
     }
     workouts = workouts.filter((workout) => workout.id !== id);
+    const { [id]: _gone, ...links } = held.links;
+    held.links = links;
   }
   if (loaded) {
     const first = localDate(now);
@@ -998,6 +1088,7 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
       const athleteBody = await get('athlete', '/api/v1/athlete/0');
       const athlete = toAthlete(athleteBody, held.cache.athlete.weight);
       held.ftpField = ftpField(athleteBody);
+      held.heartRateTop = heartRateTop(athleteBody);
       next = { ...next, athlete, ftpField: held.ftpField };
       await keep(env, next);
     }
@@ -1006,6 +1097,7 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
       const weight = await wellnessWeight();
       const athlete = toAthlete(athleteBody, weight);
       held.ftpField = ftpField(athleteBody);
+      held.heartRateTop = heartRateTop(athleteBody);
       next = { ...next, fetchedAt: now, fetched: stamp('athlete'), athlete, ftpField: held.ftpField };
       account('connected', { athleteName: athlete.name });
       await keep(env, next);
@@ -1022,7 +1114,7 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
         ...next,
         fetchedAt: now,
         fetched: stamp('events'),
-        workouts: toWorkouts(eventsBody),
+        workouts: linkedWorkouts(env, eventsBody, true),
         ...(history ? { history } : {}),
       };
       account('connected', { athleteName: next.athlete.name });
@@ -1066,6 +1158,7 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
       held.cache = cached;
       held.ftpField = cached.ftpField;
       held.libraryDocs = cached.libraryDocs ?? {};
+      held.links = cached.links ?? {};
       account('connected', { athleteName: cached.athlete.name });
       setSources(ctx, 'offline', cached);
     } else {
@@ -1092,6 +1185,8 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
       history?: unknown;
       library?: unknown;
       libraryDocs?: unknown;
+      links?: unknown;
+      heartRateTop?: unknown;
     };
     const { name, ...rest } = parsed.athlete ?? {};
     const athlete = athleteProfileSchema.safeParse({ ...rest, ...(name ? { name } : {}) });
@@ -1116,6 +1211,8 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
           ...(history.success ? { history: history.data } : {}),
           ...(library.success ? { library: library.data.workouts } : {}),
           ...(isRecord(parsed.libraryDocs) ? { libraryDocs: parsed.libraryDocs } : {}),
+          links: linksOf(parsed.links),
+          ...(typeof parsed.heartRateTop === 'number' ? { heartRateTop: parsed.heartRateTop } : {}),
         }
       : undefined;
   } catch {
@@ -1125,3 +1222,130 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The links of a cache file; a link that is not whole is left out. */
+function linksOf(value: unknown): Record<string, Link> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([id, link]): Array<[string, Link]> => {
+      if (!isRecord(link)) {
+        return [];
+      }
+      const { from, workoutId, date, mode, content, source } = link;
+      return typeof from === 'string' &&
+        typeof workoutId === 'string' &&
+        typeof date === 'string' &&
+        (mode === 'description' || mode === 'workout_doc') &&
+        typeof content === 'string' &&
+        typeof source === 'string'
+        ? [[id, { from, workoutId, date, mode, content, source }]]
+        : [];
+    }),
+  );
+}
+
+/** Notes of the exporter: what intervals.icu cannot hold of a workout, for the log. */
+function logExport(env: Env, workoutId: string, diagnostics: readonly { code: string; message: string }[]): void {
+  if (diagnostics.length > 0) {
+    env.ctx.logger.info({ workoutId, diagnostics }, 'intervals.icu: the workout was sent as near as it goes');
+  }
+}
+
+/**
+ * The planned workouts of an answer of `…/events`, with the links of ridrs checked (sync.ts). An
+ * entry intervals.icu still has as ridrs wrote it keeps its link and shows the steps of its
+ * library workout; one that changed there keeps what intervals.icu has and loses its link, so
+ * that ridrs never overwrites it. `full` is a read of the whole plan: then the links of entries
+ * that are gone (removed in intervals.icu, or past) go as well.
+ */
+function linkedWorkouts(env: Env, body: unknown, full: boolean): PlannedWorkout[] {
+  const { ctx, held } = env;
+  const events = new Map(
+    (Array.isArray(body) ? body.filter(isRecord) : []).map((event) => [String(event.id), event] as const),
+  );
+  const libraries = ctx.state.entries(trainingLibraryState);
+  const links = { ...held.links };
+  const workouts = toWorkouts(body).map((workout): PlannedWorkout => {
+    const link = links[workout.id];
+    if (!link) {
+      return workout;
+    }
+    if (eventHash(events.get(workout.id), link.mode) !== link.content) {
+      delete links[workout.id];
+      ctx.logger.info({ id: workout.id }, 'intervals.icu: the entry was changed there and no longer follows its library workout');
+      return workout;
+    }
+    links[workout.id] = { ...link, date: workout.date };
+    const entry = libraries.get(link.from)?.data?.workouts.find((candidate) => candidate.id === link.workoutId);
+    // The library's own steps, as long as they are what was sent; intervals.icu's reading of them otherwise.
+    const steps = entry && sourceHash(entry) === link.source ? workoutOf(entry).steps : workout.steps;
+    return { ...workout, steps: [...steps], library: { from: link.from, workoutId: link.workoutId } };
+  });
+  if (full) {
+    const first = localDate(ctx.clock.now());
+    const last = localDate(ctx.clock.now(), PLAN_DAYS - 1);
+    for (const [id, link] of Object.entries(links)) {
+      if (link.date < first || (link.date <= last && !events.has(id))) {
+        delete links[id];
+      }
+    }
+  }
+  held.links = links;
+  return workouts;
+}
+
+/**
+ * Brings the future entries of changed library workouts up to date (structured-workouts.md,
+ * section 10; A6): by `PUT` with the new content, without a question. Ridden and past entries stay.
+ * The plan is read once first (two requests, ADR 0078), so that an entry changed in intervals.icu
+ * since the last read loses its link instead of being overwritten. Nothing is sent when no linked
+ * library workout changed. A refused write leaves the entry as it was; the next change or start
+ * tries again.
+ */
+async function followLibraries(env: Env, now: number): Promise<void> {
+  const { ctx, held } = env;
+  if (!held.cache) {
+    return;
+  }
+  const today = localDate(now);
+  const libraries = ctx.state.entries(trainingLibraryState);
+  const entryOf = (link: Link) =>
+    libraries.get(link.from)?.data?.workouts.find((candidate) => candidate.id === link.workoutId);
+  const due = () =>
+    Object.entries(held.links).filter(([, link]) => {
+      const entry = entryOf(link);
+      return link.date >= today && entry !== undefined && sourceHash(entry) !== link.source;
+    });
+  if (due().length === 0) {
+    return;
+  }
+  await loadResources(env, ['events'], now);
+  const ridden = new Set((held.cache?.history ?? []).map((ride) => ride.date));
+  for (const [id, link] of due()) {
+    const entry = entryOf(link);
+    if (!entry || (link.date === today && ridden.has(today))) {
+      continue;
+    }
+    const sent = await send(
+      env,
+      'calendar-write',
+      'PUT',
+      `/api/v1/athlete/0/events/${encodeURIComponent(id)}`,
+      eventContent(entry, link.mode, (diagnostics) => logExport(env, link.workoutId, diagnostics)),
+    );
+    if (!sent.ok) {
+      continue;
+    }
+    held.links = {
+      ...held.links,
+      [id]: { ...link, content: eventHash(sent.body, link.mode), source: sourceHash(entry) },
+    };
+    const [updated] = linkedWorkouts(env, [sent.body], false);
+    const cache = held.cache;
+    if (updated && cache) {
+      await keep(env, { ...cache, workouts: cache.workouts.map((workout) => (workout.id === id ? updated : workout)) });
+    }
+  }
+}
