@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type AthleteProfile,
   athleteProfileState,
   athleteProfileUpdateService,
   DEFAULT_PROVIDER,
@@ -20,12 +21,14 @@ import { localizeNumber, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import { defaultHeartRateZones, defaultPowerZones } from '@ridrs/workout';
 import { messages } from './i18n/index.ts';
+import { ZONES_CSS, ZonesEditor, zonesProblem } from './zones.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as a mask in the text colour. */
 const USER = new URL('./assets/icons/user.svg', import.meta.url).href;
 
-const CSS = `
+const CSS = `${ZONES_CSS}
 .me-stepper { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 10px;
   max-width: 420px; }
 .me-stepper output { min-width: 80px; font-size: 20px; font-weight: 700; text-align: center; }
@@ -60,6 +63,17 @@ const useMe = userDocument(
   { weeklyHours: 5, showOnToday: true },
 );
 
+type Zones = NonNullable<AthleteProfile['powerZones']>;
+type ZoneField = 'powerZones' | 'heartRateZones';
+const ZONE_FIELDS: readonly ZoneField[] = ['powerZones', 'heartRateZones'];
+interface Draft {
+  ftp?: number;
+  weight?: number;
+  powerZones?: Zones;
+  heartRateZones?: Zones;
+}
+const sameZones = (a: Zones | undefined, b: Zones | undefined) => JSON.stringify(a) === JSON.stringify(b);
+
 /** Where the first step of an unset FTP or weight starts. */
 const FIRST_FTP = 200;
 const FIRST_WEIGHT = 75;
@@ -80,10 +94,10 @@ function useAthleteProfile(ctx: UiContext) {
    * draft only. The values of the draft are the ones that differ from the source's.
    */
   const remote = source?.remote === true;
-  const [draft, setDraft] = useState<{ ftp?: number; weight?: number }>({});
+  const [draft, setDraft] = useState<Draft>({});
   const [saving, setSaving] = useState(false);
   const [refusal, setRefusal] = useState<DataWriteResult & { ok: false }>();
-  const asked = useRef<{ ftp?: number; weight?: number }>({});
+  const asked = useRef<Draft>({});
   // The source shows what was asked for: the value is its own again.
   useEffect(() => {
     for (const name of ['ftp', 'weight'] as const) {
@@ -92,7 +106,7 @@ function useAthleteProfile(ctx: UiContext) {
       }
     }
   }, [source]);
-  const send = (change: { ftp?: number; weight?: number }): Promise<boolean> => {
+  const send = (change: Draft): Promise<boolean> => {
     asked.current = { ...asked.current, ...change };
     return ctx.call(athleteProfileUpdateService, { key: provider, ...change }).then(
       (answer) => {
@@ -120,21 +134,33 @@ function useAthleteProfile(ctx: UiContext) {
       return next;
     });
   };
-  const changed = {
+  const changed: Draft = {
     ...(draft.ftp !== undefined && draft.ftp !== source?.data?.ftp ? { ftp: draft.ftp } : {}),
     ...(draft.weight !== undefined && draft.weight !== source?.data?.weight ? { weight: draft.weight } : {}),
+    ...Object.fromEntries(
+      ZONE_FIELDS.filter((name) => draft[name] !== undefined && !sameZones(draft[name], source?.data?.[name])).map(
+        (name) => [name, draft[name]],
+      ),
+    ),
   };
-  const dirty = remote && Object.keys(changed).length > 0;
+  /** Zones are always a draft, as the values of a source behind an API are (ADR 0078). */
+  const dirty = Object.keys(changed).length > 0;
+  const zonesProblems = ZONE_FIELDS.some((name) => draft[name] !== undefined && zonesProblem(draft[name]) !== undefined);
   return {
     source,
     update,
     refusal,
     remote,
     dirty,
+    /** A draft of zones the contract refuses cannot be saved. */
+    invalid: zonesProblems,
+    /** Zones to show: the draft, else the source's. */
+    zones: (name: ZoneField) => draft[name] ?? source?.data?.[name],
+    setZones: (name: ZoneField, zones: Zones) => setDraft((open) => ({ ...open, [name]: zones })),
     saving,
     /** One call with every value of the draft; a refusal keeps the draft. */
     save: () => {
-      if (!dirty || saving) return;
+      if (!dirty || saving || zonesProblems) return;
       setSaving(true);
       void send(changed).then((ok) => {
         if (ok) setDraft({});
@@ -211,7 +237,20 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
   const connections = useRef<HTMLDivElement>(null);
   const save = useRef<HTMLButtonElement>(null);
   useEffect(() => (connections.current ? ctx.slot(CONNECTION_SLOT, connections.current) : undefined), [ctx]);
-  const { source, update, refusal, remote, dirty, saving, save: saveDraft, discard, current } = useAthleteProfile(ctx);
+  const {
+    source,
+    update,
+    refusal,
+    remote,
+    dirty,
+    invalid,
+    saving,
+    save: saveDraft,
+    discard,
+    current,
+    zones,
+    setZones,
+  } = useAthleteProfile(ctx);
   // Back never throws an open draft away, and never sends it: it offers Save (ADR 0078).
   useBack(ctx, () => {
     if (!dirty) return false;
@@ -255,9 +294,9 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
           value={`${localizeNumber(String(state.weeklyHours), language)} h`}
           onStep={(d) => change((s) => ({ ...s, weeklyHours: clamp(s.weeklyHours + 0.5 * d, 0.5, 30) }))}
         />
-        {remote && (source?.writable || dirty) ? (
+        {(remote && source?.writable) || dirty ? (
           <div className="pv-row" data-testid="profile-draft">
-            <button ref={save} type="button" className="pv-button" disabled={!dirty || saving} onClick={saveDraft}>
+            <button ref={save} type="button" className="pv-button" disabled={!dirty || saving || invalid} onClick={saveDraft}>
               {text.save}
             </button>
             <button type="button" className="pv-button" disabled={!dirty || saving} onClick={discard}>
@@ -279,6 +318,45 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
           </p>
         ) : null}
         <p className="pv-muted">{text.rideUses}</p>
+      </section>
+      <section className="pv-section">
+        <h2>{text.zones}</h2>
+        {zones('powerZones') ? (
+          <>
+            <h3>{text.powerZones}</h3>
+            <ZonesEditor
+              ctx={ctx}
+              kind="power"
+              zones={zones('powerZones') as Zones}
+              ftp={ftp}
+              readOnly={readOnly}
+              defaults={defaultPowerZones()}
+              onChange={(next) => setZones('powerZones', next)}
+            />
+            {ftp === undefined ? (
+              <p className="pv-muted" data-testid="zones-need-ftp">
+                {text.zonesNeedFtp}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+        {zones('heartRateZones') ? (
+          <>
+            <h3>{text.heartRateZones}</h3>
+            <ZonesEditor
+              ctx={ctx}
+              kind="heartRate"
+              zones={zones('heartRateZones') as Zones}
+              readOnly={readOnly}
+              defaults={source?.data?.lthr ? defaultHeartRateZones(source.data.lthr) : undefined}
+              onChange={(next) => setZones('heartRateZones', next)}
+            />
+          </>
+        ) : (
+          <p className="pv-muted" data-testid="zones-need-lthr">
+            {text.zonesNeedLthr}
+          </p>
+        )}
       </section>
       <section className="pv-section">
         <h2>{text.activities}</h2>

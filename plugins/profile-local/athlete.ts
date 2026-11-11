@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { SettingsDocument } from '@ridrs/contracts';
+import { heartRateZonesSchema, powerZonesSchema, type SettingsDocument } from '@ridrs/contracts';
 import { z } from 'zod';
 
 /**
@@ -13,6 +13,9 @@ export const athleteDocumentSchema = z
     weight: z.number().positive().optional(),
     lthr: z.number().positive().optional(),
     maxHeartRate: z.number().positive().optional(),
+    /** Only the zones the rider set themselves; the defaults are derived on read (ADR 0082). */
+    powerZones: powerZonesSchema.optional(),
+    heartRateZones: heartRateZonesSchema.optional(),
     changedAt: z.number().nonnegative(),
   })
   .strict();

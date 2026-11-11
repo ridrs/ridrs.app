@@ -7,11 +7,34 @@ import {
   DEFAULT_PROVIDER,
   definePlugin,
 } from '@ridrs/contracts';
+import { defaultHeartRateZones, defaultPowerZones } from '@ridrs/workout';
 import { ATHLETE_DOCUMENT, type AthleteDocument } from './athlete.ts';
 
-/** The values of the document without the time of the change. */
+/**
+ * The profile of the document: the rider's own zones, else the defaults, derived on read so that
+ * a change of the LTHR moves the heart rate zones the rider did not set (ADR 0082).
+ */
 function profileOf({ changedAt: _changedAt, ...values }: AthleteDocument): AthleteProfile {
-  return values;
+  const heartRateZones = values.heartRateZones ?? (values.lthr ? defaultHeartRateZones(values.lthr) : undefined);
+  return {
+    ...values,
+    powerZones: values.powerZones ?? defaultPowerZones(),
+    ...(heartRateZones ? { heartRateZones } : {}),
+  };
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Zones equal to the defaults are not kept: they stay derived ("reset to defaults"). */
+function withoutDefaultZones(document: AthleteDocument): AthleteDocument {
+  const { powerZones, heartRateZones, ...rest } = document;
+  return {
+    ...rest,
+    ...(powerZones && !same(powerZones, defaultPowerZones()) ? { powerZones } : {}),
+    ...(heartRateZones && !(rest.lthr && same(heartRateZones, defaultHeartRateZones(rest.lthr)))
+      ? { heartRateZones }
+      : {}),
+  };
 }
 
 /**
@@ -31,12 +54,12 @@ export default definePlugin({
         label: 'ridrs (this device)',
         status: 'ready',
         writable: true,
-        data: document ? profileOf(document) : {},
+        data: profileOf(document ?? { changedAt: 0 }),
       });
     publish();
 
     ctx.services.provide(athleteProfileUpdateService, async ({ key: _key, ...change }) => {
-      document = { ...document, ...change, changedAt: ctx.clock.now() };
+      document = withoutDefaultZones({ ...document, ...change, changedAt: ctx.clock.now() });
       publish();
       const changed = document;
       await kept

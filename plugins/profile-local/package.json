@@ -6,6 +6,7 @@
   "type": "module",
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
+    "@ridrs/workout": "workspace:*",
     "zod": "4.6.7"
   }
 }
