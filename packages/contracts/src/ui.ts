@@ -46,6 +46,14 @@ export const uiContributionSchema = z
   })
   .strict();
 
+/** A UI capability the plugin provides (ADR 0083): its id and the export of the client module. */
+export const uiProvidedCapabilitySchema = z
+  .object({
+    capability: eventIdSchema.refine((id) => id.startsWith('ui.'), 'Must start with "ui."'),
+    export: exportNameSchema,
+  })
+  .strict();
+
 export const uiEventsSchema = z
   .object({
     subscribe: z.array(eventIdSchema).default([]),
@@ -63,14 +71,21 @@ export const uiManifestSectionSchema = z
     state: z.array(eventIdSchema).default([]),
     /** Services the client code calls (ADR 0068). */
     calls: z.array(eventIdSchema).default([]),
+    /** UI capabilities the plugin provides (ADR 0083); each has exactly one provider. */
+    provides: z.array(uiProvidedCapabilitySchema).default([]),
+    /** UI capabilities the client code draws with `ctx.render` (ADR 0083). */
+    uses: z.array(eventIdSchema).default([]),
   })
   .strict()
   .superRefine((ui, issues) => {
-    if ((ui.screens.length > 0 || ui.contributions.length > 0) && ui.client === undefined) {
+    if (
+      (ui.screens.length > 0 || ui.contributions.length > 0 || ui.provides.length > 0) &&
+      ui.client === undefined
+    ) {
       issues.addIssue({
         code: 'custom',
         path: ['client'],
-        message: 'Required when the plugin declares screens or contributions',
+        message: 'Required when the plugin declares screens, contributions or UI capabilities',
       });
     }
     const seen = new Set<string>();
@@ -83,6 +98,17 @@ export const uiManifestSectionSchema = z
         });
       }
       seen.add(contribution.id);
+    });
+    const provided = new Set<string>();
+    ui.provides.forEach((entry, index) => {
+      if (provided.has(entry.capability)) {
+        issues.addIssue({
+          code: 'custom',
+          path: ['provides', index, 'capability'],
+          message: `Duplicate UI capability "${entry.capability}"`,
+        });
+      }
+      provided.add(entry.capability);
     });
   });
 

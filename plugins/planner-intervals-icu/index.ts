@@ -526,7 +526,7 @@ async function applyMailbox(
     let next = cache;
     const { events: changed, deleted } = effects.calendar;
     if (changed.length > 0 || deleted.length > 0) {
-      const incoming = toWorkouts(changed, cache.athlete.ftp);
+      const incoming = toWorkouts(changed);
       // An event that is no longer a planned ride (another category or sport) leaves the calendar too.
       const replaced = new Set([...deleted, ...changed.map((entry) => String(entry.id))]);
       const first = localDate(env.ctx.clock.now());
@@ -808,7 +808,7 @@ async function writeCalendar(env: Env, change: CalendarChange): Promise<DataWrit
     if (!sent.ok) {
       return sent;
     }
-    const created = toWorkouts([sent.body], loaded?.athlete.ftp);
+    const created = toWorkouts([sent.body]);
     workouts = [...workouts, ...created];
   } else if ('move' in change) {
     const { id, date } = change.move;
@@ -1022,7 +1022,7 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
         ...next,
         fetchedAt: now,
         fetched: stamp('events'),
-        workouts: toWorkouts(eventsBody, next.athlete.ftp),
+        workouts: toWorkouts(eventsBody),
         ...(history ? { history } : {}),
       };
       account('connected', { athleteName: next.athlete.name });
@@ -1040,7 +1040,7 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
         fetchedAt: now,
         fetched: stamp('library'),
         ...(bodies
-          ? { library: toLibrary(bodies[0], bodies[1], next.athlete.ftp), libraryDocs: held.libraryDocs }
+          ? { library: toLibrary(bodies[0], bodies[1]), libraryDocs: held.libraryDocs }
           : {}),
       };
       await keep(env, next);

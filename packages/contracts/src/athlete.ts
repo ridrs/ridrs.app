@@ -4,6 +4,54 @@ import { z } from 'zod';
 import { defineDataType, providerIdSchema } from './data-sources.ts';
 import { defineEvent } from './events.ts';
 
+/**
+ * Training zones by their upper bounds, lowest first (ADR 0082): every zone but the last has
+ * `upTo`, rising; the last one is open. A zone target (`Z2`) is the zone with this 1-based number.
+ */
+function zonesSchema() {
+  return z
+    .array(
+      z
+        .object({
+          /** As the source names it, e.g. "Sweet Spot"; else the UI numbers the zone. */
+          name: z.string().min(1).optional(),
+          /** The upper bound (% FTP or bpm); absent only on the last, open zone. */
+          upTo: z.number().positive().optional(),
+        })
+        .strict(),
+    )
+    .min(1)
+    .max(10)
+    .superRefine((zones, issues) => {
+      zones.forEach((zone, index) => {
+        const last = index === zones.length - 1;
+        if (!last && zone.upTo === undefined) {
+          issues.addIssue({
+            code: 'custom',
+            path: [index, 'upTo'],
+            message: 'Only the last zone is open',
+          });
+        }
+        const previous = zones[index - 1]?.upTo;
+        if (zone.upTo !== undefined && previous !== undefined && zone.upTo <= previous) {
+          issues.addIssue({
+            code: 'custom',
+            path: [index, 'upTo'],
+            message: 'Upper bounds must rise',
+          });
+        }
+      });
+    });
+}
+
+/** Power zones; `upTo` in % FTP. */
+export const powerZonesSchema = zonesSchema();
+export type PowerZones = z.infer<typeof powerZonesSchema>;
+
+/** Heart rate zones; `upTo` in bpm. */
+export const heartRateZonesSchema = zonesSchema();
+export type HeartRateZones = z.infer<typeof heartRateZonesSchema>;
+
 /** The athlete profile of a source (ADR 0075): what ridrs needs, nothing more. */
 export const athleteProfileSchema = z
   .object({
@@ -17,6 +65,9 @@ export const athleteProfileSchema = z
     lthr: z.number().positive().optional(),
     /** bpm */
     maxHeartRate: z.number().positive().optional(),
+    /** From the same source as the FTP (ADR 0082). */
+    powerZones: powerZonesSchema.optional(),
+    heartRateZones: heartRateZonesSchema.optional(),
   })
   .strict();
 

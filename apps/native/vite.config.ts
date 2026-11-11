@@ -24,6 +24,7 @@ export default defineConfig({
       '@ridrs/contracts': workspace('packages/contracts/src/index.ts'),
       '@ridrs/core': workspace('packages/core/src/index.ts'),
       '@ridrs/fit': workspace('packages/fit/src/index.ts'),
+      '@ridrs/workout': workspace('packages/workout/src/index.ts'),
       '@ridrs/presentation': workspace('packages/presentation/src/index.ts'),
       '@ridrs/recording': workspace('packages/recording/src/index.ts'),
       '@ridrs/ui-bridge': workspace('packages/ui-bridge/src/index.ts'),

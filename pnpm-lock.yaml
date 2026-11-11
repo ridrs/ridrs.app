@@ -421,6 +421,18 @@ importers:
         specifier: 6.5.0
         version: 6.5.0
 
+  packages/workout:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ridrs/fit':
+        specifier: workspace:*
+        version: link:../fit
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
+
   plugins/activity-session:
     dependencies:
       '@ridrs/contracts':

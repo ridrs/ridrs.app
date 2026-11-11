@@ -32,7 +32,7 @@ module.exports = {
         'packages/core and packages/contracts run in Node and in a WebView: no node:* builtins and no Node-only libraries. Only packages/core/src/node/ (the Node-only entry) may use them.',
       severity: 'error',
       from: {
-        path: '^packages/(core|contracts|ble-bridge|ble-simulator|temporal|spatial|metric-source|ble-peripheral|recording|fit)/',
+        path: '^packages/(core|contracts|ble-bridge|ble-simulator|temporal|spatial|metric-source|ble-peripheral|recording|fit|workout)/',
         pathNot: '(^packages/core/src/node/|\\.test\\.ts$)',
       },
       to: {

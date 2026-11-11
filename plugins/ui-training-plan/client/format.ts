@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { TrainingAccount, WorkoutInterval, WorkoutPower, WorkoutStep } from '@ridrs/contracts';
+import type {
+  TrainingAccount,
+  WorkoutInterval,
+  WorkoutRange,
+  WorkoutStep,
+  WorkoutTarget,
+} from '@ridrs/contracts';
 import type { Messages } from './i18n/index.ts';
 
 const DAY_MS = 86_400_000;
@@ -46,30 +52,80 @@ export function durationLabel(seconds: number): string {
 const range = (low: number, high: number, unit: string) =>
   low === high ? `${low} ${unit}` : `${low}–${high} ${unit}`;
 
-/** "90 % FTP · 225 W", "50–75 % FTP · 125–188 W"; watts only with an FTP. */
-export function powerLabel(power: WorkoutPower): string {
-  const percent = range(Math.round(power.low), Math.round(power.high), '% FTP');
-  if (power.lowWatts === undefined || power.highWatts === undefined) {
-    return percent;
+const mid = (range: WorkoutRange) => (range.low + range.high) / 2;
+
+/** A ramp from start to end, else the range of the start. */
+const span = (target: WorkoutTarget): [number, number] =>
+  target.end ? [mid(target.start), mid(target.end)] : [target.start.low, target.start.high];
+
+/**
+ * "90 % FTP · 225 W", "50–75 % FTP · 125–188 W", "200–220 W", "Z2": the target in its own unit,
+ * watts beside % only with an FTP. Units the tile does not show yet give "".
+ */
+export function targetLabel(target: WorkoutTarget, ftp: number | undefined): string {
+  const [from, to] = span(target);
+  switch (target.unit) {
+    case 'percent-ftp': {
+      const percent = range(Math.round(from), Math.round(to), '% FTP');
+      if (ftp === undefined) {
+        return percent;
+      }
+      const watts = (value: number) => Math.round((value * ftp) / 100);
+      return `${percent} · ${range(watts(from), watts(to), 'W')}`;
+    }
+    case 'watts':
+      return range(Math.round(from), Math.round(to), 'W');
+    case 'power-zone':
+      return from === to ? `Z${from}` : `Z${from}–Z${to}`;
+    default:
+      return '';
   }
-  return `${percent} · ${range(power.lowWatts, power.highWatts, 'W')}`;
+}
+
+/** The power target of an interval, if it has one. */
+export function powerTarget(step: WorkoutInterval): WorkoutTarget | undefined {
+  const primary = step.effort.kind === 'target' ? step.effort.primary : undefined;
+  return primary && ['percent-ftp', 'watts', 'power-zone'].includes(primary.unit) ? primary : undefined;
+}
+
+/** The mean power of an interval in % FTP, for the bars; 0 without one ridrs can place. */
+export function meanPercent(step: WorkoutInterval, ftp: number | undefined): number {
+  const target = powerTarget(step);
+  if (!target) {
+    return 0;
+  }
+  const [from, to] = span(target);
+  const mean = (from + to) / 2;
+  if (target.unit === 'percent-ftp') {
+    return mean;
+  }
+  return target.unit === 'watts' && ftp !== undefined ? (mean / ftp) * 100 : 0;
+}
+
+/** The seconds of a step with a time; 0 for distance, lap button and the like. */
+export function stepSeconds(step: WorkoutInterval): number {
+  return step.duration.kind === 'time' ? step.duration.seconds : 0;
 }
 
 export function stepName(step: WorkoutInterval, text: Messages): string {
-  if (step.phase === 'warm-up') {
+  if (step.intensity === 'warm-up') {
     return text.warmUp;
   }
-  if (step.phase === 'cool-down') {
+  if (step.intensity === 'cool-down') {
     return text.coolDown;
   }
-  return step.text ?? '';
+  return step.name ?? '';
 }
+
+/** The number of times a repeat runs: its count, else once. */
+export const repeatCount = (step: Extract<WorkoutStep, { kind: 'repeat' }>): number =>
+  step.until.kind === 'count' ? step.until.reps : 1;
 
 /** The intervals in riding order, repeats unrolled: one bar each in the power profile. */
 export function unrolled(steps: readonly WorkoutStep[]): WorkoutInterval[] {
   return steps.flatMap((step) =>
     step.kind === 'repeat'
-      ? Array.from({ length: step.reps }, () => unrolled(step.steps)).flat()
+      ? Array.from({ length: repeatCount(step) }, () => unrolled(step.steps)).flat()
       : [step],
   );
 }

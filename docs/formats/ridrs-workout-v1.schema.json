@@ -1,0 +1,782 @@
+{
+  "title": "ridrs workout v1",
+  "description": "A cycling workout in the canonical ridrs format. See ridrs-workout-v1.md.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "ridrs-workout"
+    },
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "sport": {
+      "type": "string",
+      "enum": [
+        "ride",
+        "virtual-ride"
+      ]
+    },
+    "subSport": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "subcategory": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "focus": {
+      "type": "string",
+      "enum": [
+        "recovery",
+        "endurance",
+        "tempo",
+        "sweet-spot",
+        "threshold",
+        "vo2max",
+        "anaerobic",
+        "sprint",
+        "test"
+      ]
+    },
+    "referenceFtp": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "declared": {
+      "type": "object",
+      "properties": {
+        "durationSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "trainingLoad": {
+          "type": "number",
+          "minimum": 0
+        },
+        "intensityFactor": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "builtin",
+            "user",
+            "imported",
+            "provider"
+          ]
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "zwo",
+            "fit",
+            "erg",
+            "mrc",
+            "tcx",
+            "intervals"
+          ]
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "originalHash": {
+          "type": "string"
+        },
+        "importedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema0"
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "zwo",
+          "fit",
+          "erg",
+          "mrc",
+          "tcx",
+          "intervals"
+        ]
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "id",
+    "name",
+    "sport",
+    "source",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "interval"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "intensity": {
+              "type": "string",
+              "enum": [
+                "warm-up",
+                "active",
+                "interval",
+                "rest",
+                "recovery",
+                "cool-down",
+                "other"
+              ]
+            },
+            "duration": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "time"
+                    },
+                    "seconds": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "seconds"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "distance"
+                    },
+                    "meters": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "meters"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "energy"
+                    },
+                    "kilocalories": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "kilocalories"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "open"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "until"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "enum": [
+                        "percent-ftp",
+                        "watts",
+                        "power-zone",
+                        "percent-lthr",
+                        "percent-max-hr",
+                        "bpm",
+                        "hr-zone",
+                        "rpm",
+                        "meters-per-second",
+                        "percent-threshold-speed",
+                        "rpe"
+                      ]
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below"
+                      ]
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "unit",
+                    "comparison",
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "effort": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "target"
+                    },
+                    "primary": {
+                      "type": "object",
+                      "properties": {
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "percent-ftp",
+                            "watts",
+                            "power-zone",
+                            "percent-lthr",
+                            "percent-max-hr",
+                            "bpm",
+                            "hr-zone",
+                            "rpm",
+                            "meters-per-second",
+                            "percent-threshold-speed",
+                            "rpe"
+                          ]
+                        },
+                        "start": {
+                          "type": "object",
+                          "properties": {
+                            "low": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "high": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "low",
+                            "high"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "end": {
+                          "type": "object",
+                          "properties": {
+                            "low": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "high": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "low",
+                            "high"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "averaging": {
+                          "type": "string",
+                          "enum": [
+                            "3s",
+                            "10s",
+                            "30s",
+                            "lap"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "unit",
+                        "start"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "secondary": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "percent-ftp",
+                              "watts",
+                              "power-zone",
+                              "percent-lthr",
+                              "percent-max-hr",
+                              "bpm",
+                              "hr-zone",
+                              "rpm",
+                              "meters-per-second",
+                              "percent-threshold-speed",
+                              "rpe"
+                            ]
+                          },
+                          "start": {
+                            "type": "object",
+                            "properties": {
+                              "low": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "high": {
+                                "type": "number",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "low",
+                              "high"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "end": {
+                            "type": "object",
+                            "properties": {
+                              "low": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "high": {
+                                "type": "number",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "low",
+                              "high"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "averaging": {
+                            "type": "string",
+                            "enum": [
+                              "3s",
+                              "10s",
+                              "30s",
+                              "lap"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "start"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "primary"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "free"
+                    },
+                    "flatRoad": {
+                      "type": "boolean"
+                    },
+                    "secondary": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "percent-ftp",
+                              "watts",
+                              "power-zone",
+                              "percent-lthr",
+                              "percent-max-hr",
+                              "bpm",
+                              "hr-zone",
+                              "rpm",
+                              "meters-per-second",
+                              "percent-threshold-speed",
+                              "rpe"
+                            ]
+                          },
+                          "start": {
+                            "type": "object",
+                            "properties": {
+                              "low": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "high": {
+                                "type": "number",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "low",
+                              "high"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "end": {
+                            "type": "object",
+                            "properties": {
+                              "low": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "high": {
+                                "type": "number",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "low",
+                              "high"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "averaging": {
+                            "type": "string",
+                            "enum": [
+                              "3s",
+                              "10s",
+                              "30s",
+                              "lap"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "start"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "max-effort"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "cues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offsetSeconds": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "durationSeconds": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "offsetSeconds",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "extensions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "zwo",
+                  "fit",
+                  "erg",
+                  "mrc",
+                  "tcx",
+                  "intervals"
+                ]
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "duration",
+            "effort"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "repeat"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "until": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "count"
+                    },
+                    "reps": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "reps"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "time"
+                    },
+                    "seconds": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "seconds"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "distance"
+                    },
+                    "meters": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "meters"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "energy"
+                    },
+                    "kilocalories": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "kilocalories"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "condition"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "enum": [
+                        "percent-ftp",
+                        "watts",
+                        "power-zone",
+                        "percent-lthr",
+                        "percent-max-hr",
+                        "bpm",
+                        "hr-zone",
+                        "rpm",
+                        "meters-per-second",
+                        "percent-threshold-speed",
+                        "rpe"
+                      ]
+                    },
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below"
+                      ]
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "unit",
+                    "comparison",
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            "extensions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "zwo",
+                  "fit",
+                  "erg",
+                  "mrc",
+                  "tcx",
+                  "intervals"
+                ]
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "until",
+            "steps"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

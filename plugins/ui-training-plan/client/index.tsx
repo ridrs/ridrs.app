@@ -7,6 +7,7 @@ import {
   type DataSource,
   dataSourceState,
   type PlannedWorkout,
+  type WorkoutInterval,
   type ServiceDefinition,
   type TrainingAccount,
   type TrainingCalendar,
@@ -24,8 +25,12 @@ import {
   accountMessage,
   dayLabel,
   durationLabel,
-  powerLabel,
+  meanPercent,
+  powerTarget,
+  repeatCount,
   stepName,
+  stepSeconds,
+  targetLabel,
   unrolled,
 } from './format.ts';
 import { type Messages, messages } from './i18n/index.ts';
@@ -98,23 +103,23 @@ function callAccount(ctx: UiContext, service: ServiceDefinition<{ readonly key: 
 const nextWorkout = (plan: Plan | undefined): PlannedWorkout | undefined =>
   plan?.workouts[0];
 
-function PowerProfile({ workout }: { readonly workout: PlannedWorkout }) {
+function PowerProfile({ workout, ftp }: { readonly workout: PlannedWorkout; readonly ftp?: number }) {
   const intervals = unrolled(workout.steps);
   if (intervals.length === 0) {
     return null;
   }
-  const top = Math.max(120, ...intervals.map((step) => Math.max(step.power?.high ?? 0, step.power?.low ?? 0)));
+  const top = Math.max(120, ...intervals.map((step) => meanPercent(step, ftp)));
   return (
     <div className="rt-profile" data-testid="next-workout-profile" aria-hidden="true">
       {intervals.map((step, index) => {
-        const percent = step.power ? (step.power.low + step.power.high) / 2 : 0;
+        const percent = meanPercent(step, ftp);
         return (
           <i
             // biome-ignore lint/suspicious/noArrayIndexKey: the bars are positional and never reorder.
             key={index}
             data-bar
             style={{
-              flexGrow: Math.max(step.durationSeconds, 1),
+              flexGrow: Math.max(stepSeconds(step), 1),
               height: `${Math.max(8, (percent / top) * 100)}%`,
               background: percent >= 105 ? COLORS.red : percent >= 88 ? COLORS.amber : COLORS.cyan,
             }}
@@ -276,7 +281,7 @@ function NextWorkoutCard({
                 <span data-testid="next-workout-load">{text.load(Math.round(workout.trainingLoad))}</span>
               ) : null}
             </span>
-            <PowerProfile workout={workout} />
+            <PowerProfile workout={workout} {...(plan?.athlete?.ftp !== undefined ? { ftp: plan.athlete.ftp } : {})} />
           </>
         ) : (
           <span className="rt-name rt-muted">{plan ? text.nonePlanned : text.loadingDots}</span>
@@ -288,24 +293,35 @@ function NextWorkoutCard({
   );
 }
 
-function StepRows({ workout, text }: { readonly workout: PlannedWorkout; readonly text: Messages }) {
+function StepRows({
+  workout,
+  ftp,
+  text,
+}: {
+  readonly workout: PlannedWorkout;
+  readonly ftp: number | undefined;
+  readonly text: Messages;
+}) {
+  const target = (step: WorkoutInterval) => {
+    const power = powerTarget(step);
+    return power ? targetLabel(power, ftp) : '';
+  };
+  const duration = (step: WorkoutInterval) => {
+    const seconds = stepSeconds(step);
+    return seconds > 0 ? durationLabel(seconds) : '';
+  };
   const rows: Array<{ step: string; duration: string; target: string; inner: boolean }> = [];
   for (const step of workout.steps) {
     if (step.kind === 'repeat') {
-      rows.push({ step: `${step.reps}×`, duration: '', target: '', inner: false });
+      rows.push({ step: `${repeatCount(step)}×`, duration: '', target: '', inner: false });
       for (const inner of unrolled(step.steps)) {
-        rows.push({
-          step: stepName(inner, text),
-          duration: durationLabel(inner.durationSeconds),
-          target: inner.power ? powerLabel(inner.power) : '',
-          inner: true,
-        });
+        rows.push({ step: stepName(inner, text), duration: duration(inner), target: target(inner), inner: true });
       }
     } else {
       rows.push({
         step: stepName(step, text),
-        duration: durationLabel(step.durationSeconds),
-        target: step.power ? powerLabel(step.power) : '',
+        duration: duration(step),
+        target: target(step),
         inner: false,
       });
     }
@@ -373,7 +389,7 @@ function WorkoutDetailsView({ ctx }: { readonly ctx: UiContext }) {
         </dl>
       ) : null}
       {workout?.description ? <p className="rt-description">{workout.description}</p> : null}
-      {workout && workout.steps.length > 0 ? <StepRows workout={workout} text={text} /> : null}
+      {workout && workout.steps.length > 0 ? <StepRows workout={workout} ftp={athlete?.ftp} text={text} /> : null}
       <footer>
         <RefreshButton ctx={ctx} text={text} />
       </footer>

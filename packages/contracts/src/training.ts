@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { defineState } from './app-state.ts';
 import { defineDataType, providerIdSchema } from './data-sources.ts';
 import { defineService } from './services.ts';
+import { workoutStepSchema } from './workout.ts';
 
 /**
  * The rider's planning services (ADR 0048): their account, their uploads and the planned workouts
@@ -69,60 +70,6 @@ export type TrainingAccount = z.infer<typeof trainingAccountSchema>;
 /** The rider's account of each planning service, by the service (`intervals.icu`; ADR 0068). */
 export const trainingAccountState = defineState('training.account', trainingAccountSchema);
 
-/** A power target in % FTP; a fixed target has `low = high`, a ramp goes from `low` to `high`. */
-export const workoutPowerSchema = z
-  .object({
-    low: z.number().nonnegative(),
-    high: z.number().nonnegative(),
-    /** Only when the athlete has an FTP. */
-    lowWatts: z.number().int().nonnegative().optional(),
-    highWatts: z.number().int().nonnegative().optional(),
-  })
-  .strict();
-export type WorkoutPower = z.infer<typeof workoutPowerSchema>;
-
-export interface WorkoutInterval {
-  readonly kind: 'interval';
-  readonly durationSeconds: number;
-  readonly phase?: 'warm-up' | 'cool-down';
-  readonly text?: string;
-  readonly power?: WorkoutPower;
-  /** rpm, a range when `low ≠ high`. */
-  readonly cadence?: { readonly low: number; readonly high: number };
-}
-
-export interface WorkoutRepeat {
-  readonly kind: 'repeat';
-  readonly reps: number;
-  readonly steps: readonly WorkoutStep[];
-}
-
-export type WorkoutStep = WorkoutInterval | WorkoutRepeat;
-
-const workoutIntervalSchema = z
-  .object({
-    kind: z.literal('interval'),
-    durationSeconds: z.number().nonnegative(),
-    phase: z.enum(['warm-up', 'cool-down']).optional(),
-    text: z.string().optional(),
-    power: workoutPowerSchema.optional(),
-    cadence: z.object({ low: z.number(), high: z.number() }).strict().optional(),
-  })
-  .strict();
-
-export const workoutStepSchema: z.ZodType<WorkoutStep> = z.lazy(() =>
-  z.union([
-    workoutIntervalSchema,
-    z
-      .object({
-        kind: z.literal('repeat'),
-        reps: z.number().int().positive(),
-        steps: z.array(workoutStepSchema),
-      })
-      .strict(),
-  ]),
-);
-
 export const plannedWorkoutSchema = z
   .object({
     id: z.string().min(1),
@@ -133,7 +80,7 @@ export const plannedWorkoutSchema = z
     description: z.string().optional(),
     durationSeconds: z.number().nonnegative().optional(),
     trainingLoad: z.number().nonnegative().optional(),
-    /** Empty when the service has no structure for the workout. */
+    /** The structure in the canonical model (ADR 0081); empty when the source has none. */
     steps: z.array(workoutStepSchema),
   })
   .strict();

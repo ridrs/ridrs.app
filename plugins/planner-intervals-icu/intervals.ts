@@ -6,8 +6,10 @@ import type {
   LibraryWorkout,
   PlannedWorkout,
   WorkoutInterval,
-  WorkoutPower,
+  WorkoutRange,
   WorkoutStep,
+  WorkoutTarget,
+  WorkoutTargetUnit,
 } from '@ridrs/contracts';
 
 /**
@@ -74,7 +76,7 @@ export function toAthlete(body: unknown, wellnessWeight?: number): AthleteProfil
 }
 
 /** `GET /api/v1/athlete/0/events`: the planned cycling workouts, in date order. */
-export function toWorkouts(body: unknown, ftp: number | undefined): PlannedWorkout[] {
+export function toWorkouts(body: unknown): PlannedWorkout[] {
   const events = Array.isArray(body) ? body.filter(isObject) : [];
   return events
     .filter((event) => event.category === 'WORKOUT' && typeof event.type === 'string')
@@ -99,7 +101,7 @@ export function toWorkouts(body: unknown, ftp: number | undefined): PlannedWorko
           ...(description !== undefined ? { description } : {}),
           ...(durationSeconds !== undefined ? { durationSeconds } : {}),
           ...(trainingLoad !== undefined ? { trainingLoad } : {}),
-          steps: toSteps(doc?.steps, ftp),
+          steps: toSteps(doc?.steps),
         },
       ];
     })
@@ -141,7 +143,7 @@ export function toActivities(body: unknown): CompletedWorkout[] {
  * `GET /api/v1/athlete/0/workouts` with `GET …/folders`: the cycling workouts of the library,
  * each with the name of its folder or plan, ordered by folder and name.
  */
-export function toLibrary(body: unknown, folders: unknown, ftp: number | undefined): LibraryWorkout[] {
+export function toLibrary(body: unknown, folders: unknown): LibraryWorkout[] {
   const names = new Map(
     (Array.isArray(folders) ? folders.filter(isObject) : []).flatMap((folder) => {
       const name = text(folder.name);
@@ -168,7 +170,7 @@ export function toLibrary(body: unknown, folders: unknown, ftp: number | undefin
           ...(description !== undefined ? { description } : {}),
           ...(durationSeconds !== undefined ? { durationSeconds } : {}),
           ...(trainingLoad !== undefined ? { trainingLoad } : {}),
-          steps: toSteps(doc?.steps, ftp),
+          steps: toSteps(doc?.steps),
         },
       ];
     })
@@ -186,77 +188,91 @@ export function libraryDocs(body: unknown): Record<string, unknown> {
   );
 }
 
-/** The steps of a `workout_doc`, repeats nested. */
-export function toSteps(steps: unknown, ftp: number | undefined): WorkoutStep[] {
+/**
+ * The steps of a `workout_doc`, repeats nested, in the canonical model (ADR 0081): targets keep
+ * their unit, nothing is converted. Step ids are their path, `1`, `2`, `2.1`; the whole document
+ * is read in the catalogue phase (structured-workouts.md, section 8).
+ */
+export function toSteps(steps: unknown, prefix = ''): WorkoutStep[] {
   if (!Array.isArray(steps)) {
     return [];
   }
-  return steps.filter(isObject).flatMap((step): WorkoutStep[] => {
+  return steps.filter(isObject).flatMap((step, index): WorkoutStep[] => {
+    const id = `${prefix}${index + 1}`;
     const reps = positive(step.reps);
     if (reps !== undefined && Array.isArray(step.steps)) {
-      const inner = toSteps(step.steps, ftp);
-      return inner.length > 0 ? [{ kind: 'repeat', reps: Math.round(reps), steps: inner }] : [];
+      const inner = toSteps(step.steps, `${id}.`);
+      return inner.length > 0
+        ? [{ kind: 'repeat', id, until: { kind: 'count', reps: Math.round(reps) }, steps: inner }]
+        : [];
     }
-    const durationSeconds = nonNegative(step.duration);
-    if (durationSeconds === undefined) {
+    const seconds = nonNegative(step.duration);
+    if (seconds === undefined) {
       return [];
     }
-    const power = toPower(step.power, ftp);
-    const cadence = toRange(step.cadence);
-    const label = text(step.text);
+    const ramp = step.ramp === true;
+    const power = toTarget(step.power, POWER_UNITS, ramp);
+    const cadence = toTarget(step.cadence, { rpm: 'rpm' }, ramp, 'rpm');
+    const name = text(step.text);
     const interval: WorkoutInterval = {
       kind: 'interval',
-      durationSeconds,
-      ...(step.warmup === true ? { phase: 'warm-up' as const } : {}),
-      ...(step.cooldown === true ? { phase: 'cool-down' as const } : {}),
-      ...(label !== undefined ? { text: label } : {}),
-      ...(power ? { power } : {}),
-      ...(cadence ? { cadence } : {}),
+      id,
+      ...(name !== undefined ? { name } : {}),
+      ...(step.warmup === true ? { intensity: 'warm-up' as const } : {}),
+      ...(step.cooldown === true ? { intensity: 'cool-down' as const } : {}),
+      duration: { kind: 'time', seconds },
+      effort: power
+        ? { kind: 'target', primary: power, ...(cadence ? { secondary: [cadence] } : {}) }
+        : { kind: 'free', ...(cadence ? { secondary: [cadence] } : {}) },
     };
     return [interval];
   });
 }
 
-/** `{ value }` or `{ start, end }` (a ramp); `undefined` for anything else. */
-function toRange(target: unknown): { low: number; high: number } | undefined {
-  if (!isObject(target)) {
-    return undefined;
-  }
+/** The power units of a `workout_doc`, as the canonical model names them. */
+const POWER_UNITS: Readonly<Record<string, WorkoutTargetUnit>> = {
+  '%ftp': 'percent-ftp',
+  w: 'watts',
+  power_zone: 'power-zone',
+};
+
+/** `{ value }` or `{ start, end }`; `undefined` for anything else. */
+function toRange(target: Json): { start: WorkoutRange; end?: WorkoutRange } | undefined {
   const value = nonNegative(target.value);
   if (value !== undefined) {
-    return { low: value, high: value };
+    return { start: { low: value, high: value } };
   }
   const start = nonNegative(target.start);
   const end = nonNegative(target.end);
-  return start !== undefined && end !== undefined ? { low: start, high: end } : undefined;
+  return start !== undefined && end !== undefined
+    ? { start: { low: start, high: start }, end: { low: end, high: end } }
+    : undefined;
 }
 
-/** In % FTP, and in watts when the FTP is known. Targets in watts need the FTP to convert. */
-function toPower(target: unknown, ftp: number | undefined): WorkoutPower | undefined {
+/**
+ * A target in its own unit. `start` and `end` are a ramp when the step says `ramp`, else a range
+ * ("stay between"). Units ridrs does not know yet (% of MMP and the like) give none.
+ */
+function toTarget(
+  target: unknown,
+  units: Readonly<Record<string, WorkoutTargetUnit>>,
+  ramp: boolean,
+  fallbackUnit?: WorkoutTargetUnit,
+): WorkoutTarget | undefined {
+  if (!isObject(target)) {
+    return undefined;
+  }
+  const unit = typeof target.units === 'string' ? units[target.units] : fallbackUnit;
   const range = toRange(target);
-  const units = isObject(target) ? target.units : undefined;
-  if (!range) {
+  if (unit === undefined || range === undefined) {
     return undefined;
   }
-  let percent: { low: number; high: number };
-  if (units === '%ftp') {
-    percent = range;
-  } else if (units === 'w' && ftp !== undefined) {
-    percent = { low: (range.low / ftp) * 100, high: (range.high / ftp) * 100 };
-  } else {
-    // Zones, % of MMP and the like need data ridrs does not load.
-    return undefined;
+  if (range.end === undefined) {
+    return { unit, start: range.start };
   }
-  return {
-    low: percent.low,
-    high: percent.high,
-    ...(ftp !== undefined
-      ? {
-          lowWatts: Math.round((percent.low * ftp) / 100),
-          highWatts: Math.round((percent.high * ftp) / 100),
-        }
-      : {}),
-  };
+  return ramp
+    ? { unit, start: range.start, end: range.end }
+    : { unit, start: { low: range.start.low, high: range.end.low } };
 }
 
 /** The rider's local date of an instant, `YYYY-MM-DD`. */

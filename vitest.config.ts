@@ -14,6 +14,7 @@ export default defineConfig({
       '@ridrs/core/node': resolve(import.meta.dirname, 'packages/core/src/node/index.ts'),
       '@ridrs/core': resolve(import.meta.dirname, 'packages/core/src/index.ts'),
       '@ridrs/fit': resolve(import.meta.dirname, 'packages/fit/src/index.ts'),
+      '@ridrs/workout': resolve(import.meta.dirname, 'packages/workout/src/index.ts'),
       '@ridrs/metric-source': resolve(import.meta.dirname, 'packages/metric-source/src/index.ts'),
       '@ridrs/presentation': resolve(import.meta.dirname, 'packages/presentation/src/index.ts'),
       '@ridrs/recording': resolve(import.meta.dirname, 'packages/recording/src/index.ts'),

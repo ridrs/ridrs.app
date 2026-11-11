@@ -64,7 +64,6 @@ describe('toWorkouts', () => {
         event({ id: 4, category: 'NOTE' }),
         event({ id: 1, name: 'A', moving_time: 3600, icu_training_load: 60, description: 'Go' }),
       ],
-      250,
     );
     expect(workouts).toEqual([
       {
@@ -86,70 +85,88 @@ describe('toWorkouts', () => {
 });
 
 describe('toSteps', () => {
-  it('maps targets in % FTP to watts, ramps, phases and repeats', () => {
-    const steps = toSteps(
-      [
-        { duration: 600, warmup: true, ramp: true, power: { units: '%ftp', start: 50, end: 75 } },
-        {
-          reps: 3,
-          steps: [
-            { duration: 720, power: { units: '%ftp', value: 90 }, cadence: { value: 95 } },
-            { duration: 240, power: { units: '%ftp', value: 55 }, text: 'Easy' },
-          ],
-        },
-        { duration: 300, cooldown: true, power: { units: 'w', start: 150, end: 100 } },
-      ],
-      250,
-    );
+  it('keeps targets in their unit, tells ramps from ranges, and nests repeats', () => {
+    const steps = toSteps([
+      { duration: 600, warmup: true, ramp: true, power: { units: '%ftp', start: 50, end: 75 } },
+      {
+        reps: 3,
+        steps: [
+          { duration: 720, power: { units: '%ftp', value: 90 }, cadence: { value: 95 } },
+          { duration: 240, power: { units: '%ftp', value: 55 }, text: 'Easy' },
+        ],
+      },
+      { duration: 300, cooldown: true, ramp: true, power: { units: 'w', start: 150, end: 100 } },
+      { duration: 120, power: { units: 'w', start: 200, end: 220 } },
+    ]);
     expect(steps).toEqual([
       {
         kind: 'interval',
-        durationSeconds: 600,
-        phase: 'warm-up',
-        power: { low: 50, high: 75, lowWatts: 125, highWatts: 188 },
+        id: '1',
+        intensity: 'warm-up',
+        duration: { kind: 'time', seconds: 600 },
+        effort: {
+          kind: 'target',
+          primary: { unit: 'percent-ftp', start: { low: 50, high: 50 }, end: { low: 75, high: 75 } },
+        },
       },
       {
         kind: 'repeat',
-        reps: 3,
+        id: '2',
+        until: { kind: 'count', reps: 3 },
         steps: [
           {
             kind: 'interval',
-            durationSeconds: 720,
-            power: { low: 90, high: 90, lowWatts: 225, highWatts: 225 },
-            cadence: { low: 95, high: 95 },
+            id: '2.1',
+            duration: { kind: 'time', seconds: 720 },
+            effort: {
+              kind: 'target',
+              primary: { unit: 'percent-ftp', start: { low: 90, high: 90 } },
+              secondary: [{ unit: 'rpm', start: { low: 95, high: 95 } }],
+            },
           },
           {
             kind: 'interval',
-            durationSeconds: 240,
-            text: 'Easy',
-            power: { low: 55, high: 55, lowWatts: 138, highWatts: 138 },
+            id: '2.2',
+            name: 'Easy',
+            duration: { kind: 'time', seconds: 240 },
+            effort: { kind: 'target', primary: { unit: 'percent-ftp', start: { low: 55, high: 55 } } },
           },
         ],
       },
       {
         kind: 'interval',
-        durationSeconds: 300,
-        phase: 'cool-down',
-        power: { low: 60, high: 40, lowWatts: 150, highWatts: 100 },
+        id: '3',
+        intensity: 'cool-down',
+        duration: { kind: 'time', seconds: 300 },
+        effort: {
+          kind: 'target',
+          primary: { unit: 'watts', start: { low: 150, high: 150 }, end: { low: 100, high: 100 } },
+        },
+      },
+      {
+        kind: 'interval',
+        id: '4',
+        duration: { kind: 'time', seconds: 120 },
+        effort: { kind: 'target', primary: { unit: 'watts', start: { low: 200, high: 220 } } },
       },
     ]);
   });
 
-  it('keeps % FTP without watts when the FTP is unknown, and drops targets it cannot convert', () => {
+  it('keeps zone targets as zones, rides unknown units free, and drops steps without a duration', () => {
     expect(
-      toSteps(
-        [
-          { duration: 60, power: { units: '%ftp', value: 100 } },
-          { duration: 60, power: { units: 'w', value: 200 } },
-          { duration: 60, power: { units: 'power_zone', value: 2 } },
-          { power: { units: '%ftp', value: 100 } },
-        ],
-        undefined,
-      ),
+      toSteps([
+        { duration: 60, power: { units: 'power_zone', value: 2 } },
+        { duration: 60, power: { units: '%mmp', value: 80 } },
+        { power: { units: '%ftp', value: 100 } },
+      ]),
     ).toEqual([
-      { kind: 'interval', durationSeconds: 60, power: { low: 100, high: 100 } },
-      { kind: 'interval', durationSeconds: 60 },
-      { kind: 'interval', durationSeconds: 60 },
+      {
+        kind: 'interval',
+        id: '1',
+        duration: { kind: 'time', seconds: 60 },
+        effort: { kind: 'target', primary: { unit: 'power-zone', start: { low: 2, high: 2 } } },
+      },
+      { kind: 'interval', id: '2', duration: { kind: 'time', seconds: 60 }, effort: { kind: 'free' } },
     ]);
   });
 });
@@ -180,7 +197,6 @@ describe('toLibrary', () => {
         { id: 3, name: 'Base', type: 'FOLDER' },
         { id: 4, name: 'Base', type: 'PLAN' },
       ],
-      250,
     );
     expect(library.map((w) => [w.folder, w.name])).toEqual([
       [undefined, 'Loose'],
@@ -198,8 +214,9 @@ describe('toLibrary', () => {
       steps: [
         {
           kind: 'interval',
-          durationSeconds: 600,
-          power: { low: 90, high: 90, lowWatts: 225, highWatts: 225 },
+          id: '1',
+          duration: { kind: 'time', seconds: 600 },
+          effort: { kind: 'target', primary: { unit: 'percent-ftp', start: { low: 90, high: 90 } } },
         },
       ],
     });
@@ -209,7 +226,7 @@ describe('toLibrary', () => {
   });
 
   it('is empty for an answer that is no list', () => {
-    expect(toLibrary(null, null, undefined)).toEqual([]);
+    expect(toLibrary(null, null)).toEqual([]);
   });
 });
 
