@@ -303,6 +303,27 @@ export const workoutChartCapability = defineUiCapability('ui.workout-chart', {
   output: {
     /** A step got the focus (`full`) or was selected (`edit`). */
     'step-focused': z.object({ stepId: z.string() }).strict(),
+    /**
+     * A handle of the `edit` chart was dragged (structured-workouts.md, section 12): the new
+     * length of the step in seconds (snapped to 15 s) and/or the new power of its start and/or end
+     * in the unit of the step's own target (snapped to 1 %, or 1 W). `done` is false while the
+     * pointer moves and true once with the final value when it is released, so a consumer can
+     * make one undo step of a drag. The chart never changes the workout itself.
+     */
+    'step-changed': z
+      .object({
+        stepId: z.string(),
+        durationSeconds: z.number().positive().optional(),
+        power: z
+          .object({
+            start: z.number().nonnegative().optional(),
+            end: z.number().nonnegative().optional(),
+          })
+          .strict()
+          .optional(),
+        done: z.boolean(),
+      })
+      .strict(),
   },
 });
 

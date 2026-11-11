@@ -102,3 +102,30 @@ export function chosenAthlete(
     ...(heartRateZones === undefined ? {} : { heartRateZones }),
   };
 }
+
+/** What the details offer to change: the library workout behind the subject, and whether it is the rider's own. */
+export interface EditRef {
+  readonly from: string;
+  readonly workoutId: string;
+  /** Own workouts of the `ridrs` library are edited; every other one is edited as a copy. */
+  readonly own: boolean;
+}
+
+/**
+ * The library workout the subject stands for: the entry itself, or the library workout a planned
+ * entry was planned from. Without one (an entry of the calendar's own service) there is nothing to edit.
+ */
+export function editRef(
+  subject: WorkoutDetailsSubject,
+  libraries: ReadonlyMap<string, Library>,
+  calendars: ReadonlyMap<string, DataSource<TrainingCalendar>>,
+): EditRef | undefined {
+  const ref =
+    subject.kind === 'library'
+      ? { from: subject.from, workoutId: subject.workoutId }
+      : calendars.get(subject.from)?.data?.workouts.find((entry) => entry.id === subject.id)?.library;
+  if (!ref) return undefined;
+  const entry = libraries.get(ref.from)?.data?.workouts.find((each) => each.id === ref.workoutId);
+  if (!entry) return undefined;
+  return { ...ref, own: ref.from === 'ridrs' && entry.workout?.source.kind !== 'builtin' };
+}

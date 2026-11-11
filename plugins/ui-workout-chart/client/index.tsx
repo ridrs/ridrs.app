@@ -4,23 +4,25 @@ import type { workoutChartCapability } from '@ridrs/contracts';
 import type { UiCapabilityComponent, UiContext } from '@ridrs/ui-sdk';
 import { useMessages } from '@ridrs/ui-sdk/react';
 import { createRoot } from 'react-dom/client';
-import { CHART_CSS, Chart, type ChartInput } from './chart.tsx';
+import { CHART_CSS, Chart, type ChartInput, type StepChange } from './chart.tsx';
 import { messages } from './i18n/index.ts';
 
 function ChartView({
   ctx,
   input,
   onStepFocused,
+  onStepChanged,
 }: {
   readonly ctx: UiContext;
   readonly input: ChartInput;
   readonly onStepFocused: (stepId: string) => void;
+  readonly onStepChanged: (change: StepChange) => void;
 }) {
   const text = useMessages(ctx, messages);
   return (
     <>
       <style>{CHART_CSS}</style>
-      <Chart input={input} text={text} onStepFocused={onStepFocused} />
+      <Chart input={input} text={text} onStepFocused={onStepFocused} onStepChanged={onStepChanged} />
     </>
   );
 }
@@ -40,7 +42,14 @@ export const WorkoutChart: UiCapabilityComponent<typeof workoutChartCapability> 
   const root = createRoot(host);
   let shown = JSON.stringify(input);
   const draw = (next: ChartInput) =>
-    root.render(<ChartView ctx={ctx} input={next} onStepFocused={(stepId) => emit('step-focused', { stepId })} />);
+    root.render(
+      <ChartView
+        ctx={ctx}
+        input={next}
+        onStepFocused={(stepId) => emit('step-focused', { stepId })}
+        onStepChanged={(change) => emit('step-changed', change)}
+      />,
+    );
   draw(input);
   return {
     update(next) {

@@ -9,7 +9,7 @@ import type {
   Workout,
 } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { chosenAthlete, type Library, shownWorkout } from './subject.ts';
+import { chosenAthlete, editRef, type Library, shownWorkout } from './subject.ts';
 
 const steps: Workout['steps'] = [
   {
@@ -123,5 +123,47 @@ describe('chosenAthlete', () => {
       ftp: 280,
       lthr: 170,
     });
+  });
+});
+
+describe('editRef', () => {
+  const entry = (id: string, kind: 'builtin' | 'user'): LibraryWorkout => ({
+    id,
+    name: id,
+    sport: 'ride',
+    steps,
+    workout: { ...canonical, id, source: { kind } },
+  });
+  const libraries = new Map<string, Library>([
+    ['ridrs', { provider: 'ridrs', label: 'r', status: 'ready', writable: true, data: { workouts: [entry('mine', 'user'), entry('built', 'builtin')] } }],
+    ['other', { provider: 'other', label: 'o', status: 'ready', writable: false, data: { workouts: [entry('mine', 'user')] } }],
+  ]);
+  const calendars = new Map<string, DataSource<TrainingCalendar>>([
+    [
+      'ridrs',
+      {
+        provider: 'ridrs',
+        label: 'r',
+        status: 'ready',
+        writable: true,
+        data: {
+          workouts: [
+            { id: 'p1', date: '2099-01-01', name: 'x', sport: 'ride', steps, library: { from: 'ridrs', workoutId: 'mine' } },
+            { id: 'p2', date: '2099-01-02', name: 'y', sport: 'ride', steps },
+          ],
+        },
+      },
+    ],
+  ]);
+
+  it('edits an own workout of the ridrs library and copies every other one', () => {
+    expect(editRef({ kind: 'library', from: 'ridrs', workoutId: 'mine' }, libraries, calendars)).toMatchObject({ own: true });
+    expect(editRef({ kind: 'library', from: 'ridrs', workoutId: 'built' }, libraries, calendars)).toMatchObject({ own: false });
+    expect(editRef({ kind: 'library', from: 'other', workoutId: 'mine' }, libraries, calendars)).toMatchObject({ own: false });
+  });
+
+  it('follows a planned entry to the library workout it came from, if it has one', () => {
+    expect(editRef({ kind: 'planned', from: 'ridrs', id: 'p1' }, libraries, calendars)).toEqual({ from: 'ridrs', workoutId: 'mine', own: true });
+    expect(editRef({ kind: 'planned', from: 'ridrs', id: 'p2' }, libraries, calendars)).toBeUndefined();
   });
 });

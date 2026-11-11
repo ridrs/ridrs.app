@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { UiCapabilityInput, workoutChartCapability } from '@ridrs/contracts';
+import type { UiCapabilityInput, WorkoutInterval, workoutChartCapability } from '@ridrs/contracts';
 import {
   type ChartPoint,
   type ChartShape,
@@ -8,9 +8,19 @@ import {
   layoutWorkout,
   type WorkoutLayout,
 } from '@ridrs/workout';
-import { type KeyboardEvent, type ReactNode, useId, useMemo, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { describeSummary, durationText } from './describe.ts';
 import type { Messages } from './i18n/index.ts';
+import { draggedPower, draggedSeconds, findInterval, type HandleKind, handlesOf, powerOf } from './handles.ts';
 import { PALETTE_CSS, zoneColour } from './palette.ts';
 import { type StepInfo, stepInfos } from './steps.ts';
 
@@ -21,6 +31,7 @@ const SIZES = {
   micro: { width: 72, height: 18 },
   mini: { width: 240, height: 56 },
   full: { width: 720, height: 180 },
+  edit: { width: 720, height: 220 },
 } as const;
 const DEFAULT_ZONE_COUNT = 7;
 /** Room around the full chart: left for the axis, right edge, a row per bracket depth, the time axis and the zone bar. */
@@ -43,7 +54,7 @@ const layouts = new Map<string, WorkoutLayout>();
  */
 export function cachedLayout(
   input: Pick<ChartInput, 'workout' | 'athlete'>,
-  variant: 'micro' | 'mini' | 'full',
+  variant: 'micro' | 'mini' | 'full' | 'edit',
 ): WorkoutLayout {
   const { width, height } = SIZES[variant];
   const key = JSON.stringify([input.workout, input.athlete, variant]);
@@ -63,9 +74,9 @@ export function cachedLayout(
 const path = (points: readonly ChartPoint[]) =>
   `${points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ')} Z`;
 
-/** The variant drawn: `edit` and `hud` come with their phases and draw as `full` until then. */
-export const variantOf = (variant: ChartInput['variant']): 'micro' | 'mini' | 'full' =>
-  variant === 'micro' || variant === 'mini' ? variant : 'full';
+/** The variant drawn: `hud` comes with its phase and draws as `full` until then. */
+export const variantOf = (variant: ChartInput['variant']): 'micro' | 'mini' | 'full' | 'edit' =>
+  variant === 'micro' || variant === 'mini' || variant === 'edit' ? variant : 'full';
 
 export const CHART_CSS = `${PALETTE_CSS}
 .wc { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--wc-text);
@@ -83,6 +94,11 @@ export const CHART_CSS = `${PALETTE_CSS}
 .wc-bracket-line { stroke: var(--wc-muted); stroke-width: 1.25; fill: none; }
 .wc-facts { color: var(--wc-muted); font-size: 12px; }
 .wc-hint { color: var(--wc-muted); font-size: 11px; font-style: italic; }
+.wc-handle { fill: var(--wc-text); stroke: var(--wc-surface); stroke-width: 1.5; touch-action: none; }
+.wc-handle[data-handle="duration"] { cursor: ew-resize; }
+.wc-handle:not([data-handle="duration"]) { cursor: ns-resize; }
+.wc-handle-hit { fill: transparent; touch-action: none; }
+.wc[data-variant="edit"] [data-step] { cursor: pointer; }
 .wc-tooltip { position: absolute; top: 0; z-index: 2; min-width: 9em; padding: 6px 10px; border: 1px solid var(--wc-line);
   border-radius: 8px; background: var(--wc-surface); color: var(--wc-text); font-size: 12px; line-height: 1.35;
   pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; }
@@ -94,10 +110,20 @@ interface Props {
   readonly input: ChartInput;
   readonly text: Messages;
   readonly onStepFocused: (stepId: string) => void;
+  readonly onStepChanged?: (change: StepChange) => void;
+}
+
+/** What a drag of a handle reports (`step-changed`). */
+export interface StepChange {
+  readonly stepId: string;
+  readonly durationSeconds?: number;
+  readonly power?: { readonly start?: number; readonly end?: number };
+  /** The drag is over. */
+  readonly done: boolean;
 }
 
 /** The chart: an SVG drawn from `layoutWorkout`; all maths is in `@ridrs/workout`. */
-export function Chart({ input, text, onStepFocused }: Props): ReactNode {
+export function Chart({ input, text, onStepFocused, onStepChanged }: Props): ReactNode {
   const variant = variantOf(input.variant);
   const layout = cachedLayout(input, variant);
   const patternId = `wc-hatch-${useId().replace(/\W/g, '')}`;
@@ -106,9 +132,10 @@ export function Chart({ input, text, onStepFocused }: Props): ReactNode {
   const description = describeSummary(layout.summary, layout.axis.unit, text);
   const hint = layout.zoned ? undefined : text.neutralHint;
 
-  if (variant === 'full') {
+  if (variant === 'full' || variant === 'edit') {
     return (
       <FullChart
+        variant={variant}
         input={input}
         layout={layout}
         text={text}
@@ -117,6 +144,7 @@ export function Chart({ input, text, onStepFocused }: Props): ReactNode {
         zoneCount={zoneCount}
         hint={hint}
         onStepFocused={onStepFocused}
+        {...(onStepChanged ? { onStepChanged } : {})}
       />
     );
   }
@@ -198,18 +226,26 @@ function FullChart({
   zoneCount,
   hint,
   onStepFocused,
+  onStepChanged,
+  variant,
 }: Props & {
+  readonly variant: 'full' | 'edit';
   readonly layout: WorkoutLayout;
   readonly description: string;
   readonly patternId: string;
   readonly zoneCount: number;
   readonly hint: string | undefined;
 }) {
-  const { width, height } = SIZES.full;
+  const { width, height } = SIZES[variant];
+  const editing = variant === 'edit';
   const athlete = input.athlete;
   const zones = athlete?.powerZones ?? defaultPowerZones();
   const [focused, setFocused] = useState<number>();
   const [hovered, setHovered] = useState<number>();
+  const svg = useRef<SVGSVGElement>(null);
+  const dragging = useRef<() => void>(undefined);
+  // A drag in progress ends with the chart.
+  useEffect(() => () => dragging.current?.(), []);
   const infos = useMemo<StepInfo[]>(
     () => stepInfos(input.workout, athlete ?? {}, layout.shapes, zones.map((zone) => zone.name), text),
     [input.workout, athlete, layout.shapes, zones, text],
@@ -229,6 +265,67 @@ function FullChart({
     steps[Math.min(Math.max(at + direction, 0), steps.length - 1)]?.focus();
   };
 
+  /**
+   * Drags a handle: the pointer's movement in SVG units gives the new duration or power, snapped,
+   * reported as it changes (`done: false`) and once more when the pointer is released.
+   */
+  const beginDrag = (
+    event: ReactPointerEvent<SVGElement>,
+    handle: HandleKind,
+    shape: ChartShape,
+    step: WorkoutInterval,
+  ) => {
+    if (!onStepChanged || !svg.current || (event.button ?? 0) !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragging.current?.();
+    const rect = svg.current.getBoundingClientRect();
+    const scale = rect.width > 0 ? total / rect.width : 1;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const seconds = step.duration.kind === 'time' ? step.duration.seconds : 0;
+    const power = powerOf(step, handle) ?? 0;
+    const target = step.effort.kind === 'target' ? step.effort.primary.unit : undefined;
+    let last: StepChange | undefined;
+    const report = (at: { clientX: number; clientY: number }, done: boolean) => {
+      let change: StepChange;
+      if (handle === 'duration') {
+        const delta = ((at.clientX - startX) * scale * layout.durationSeconds) / width;
+        change = { stepId: shape.stepId, durationSeconds: draggedSeconds(seconds, delta), done };
+      } else {
+        if (target !== 'percent-ftp' && target !== 'watts') return;
+        const delta = (-(at.clientY - startY) * scale * layout.axis.max) / height;
+        const value = draggedPower(power, delta, {
+          axis: layout.axis.unit,
+          target,
+          ...(athlete?.ftp ? { ftp: athlete.ftp } : {}),
+        });
+        change = { stepId: shape.stepId, power: { [handle === 'power-end' ? 'end' : 'start']: value }, done };
+      }
+      const same = last && JSON.stringify({ ...last, done: 0 }) === JSON.stringify({ ...change, done: 0 });
+      if (!done && same) return;
+      if (done && !last && !hasChanged(change, seconds, power)) return;
+      last = change;
+      onStepChanged(change);
+    };
+    const move = (e: PointerEvent) => report(e, false);
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      dragging.current = undefined;
+    };
+    const up = (e: PointerEvent) => {
+      stop();
+      if (last) onStepChanged({ ...last, done: true });
+      else report(e, true);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    dragging.current = stop;
+  };
+
   const zoneTime = new Map<number, number>();
   for (const shape of layout.shapes) {
     if (shape.zone !== undefined) zoneTime.set(shape.zone, (zoneTime.get(shape.zone) ?? 0) + shape.x1 - shape.x0);
@@ -236,8 +333,9 @@ function FullChart({
   let barX = 0;
 
   return (
-    <div className="wc" data-testid="workout-chart" data-variant="full" data-zoned={layout.zoned}>
+    <div className="wc" data-testid="workout-chart" data-variant={variant} data-zoned={layout.zoned}>
       <svg
+        ref={svg}
         role="group"
         aria-label={description}
         viewBox={`0 0 ${total} ${totalHeight}`}
@@ -277,6 +375,7 @@ function FullChart({
               role="img"
               aria-label={infos[index] ? `${infos[index].title}, ${infos[index].duration}, ${infos[index].target}` : undefined}
               tabIndex={focused === index || (focused === undefined && index === 0) ? 0 : -1}
+              onClick={editing ? () => onStepFocused(shape.stepId) : undefined}
               onFocus={() => {
                 setFocused(index);
                 onStepFocused(shape.stepId);
@@ -300,6 +399,22 @@ function FullChart({
               ) : null}
             </g>
           ))}
+          {editing && onStepChanged
+            ? layout.shapes.map((shape) => {
+                if (shape.stepId !== input.selectedStep) return null;
+                const step = findInterval(input.workout.steps, shape.stepId);
+                if (!step) return null;
+                return handlesOf(step).map((handle) => (
+                  <Handle
+                    key={`${shape.segmentIndex}-${handle}`}
+                    handle={handle}
+                    shape={shape}
+                    height={height}
+                    onPointerDown={(event) => beginDrag(event, handle, shape, step)}
+                  />
+                ));
+              })
+            : null}
           {layout.ftpLine ? (
             <>
               <line className="wc-ftp" data-testid="workout-chart-ftp-line" x1={0} x2={width} y1={layout.ftpLine.y} y2={layout.ftpLine.y} />
@@ -364,5 +479,54 @@ function FullChart({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Whether a reported change differs from what the step had: a click on a handle changes nothing. */
+function hasChanged(change: StepChange, seconds: number, power: number): boolean {
+  if (change.durationSeconds !== undefined) return change.durationSeconds !== seconds;
+  const value = change.power?.start ?? change.power?.end;
+  return value !== undefined && value !== power;
+}
+
+/** One handle on a selected step: a grip on its right edge, or on the top of a steady step or either end of a ramp. */
+function Handle({
+  handle,
+  shape,
+  height,
+  onPointerDown,
+}: {
+  readonly handle: HandleKind;
+  readonly shape: ChartShape;
+  readonly height: number;
+  readonly onPointerDown: (event: ReactPointerEvent<SVGElement>) => void;
+}) {
+  const left = shape.polygon[1] ?? [shape.x0, height];
+  const right = shape.polygon[2] ?? [shape.x1, height];
+  const common = {
+    'data-testid': 'workout-chart-handle',
+    'data-handle': handle,
+    'data-step-id': shape.stepId,
+    onPointerDown,
+  } as const;
+  if (handle === 'duration') {
+    return (
+      <g {...common}>
+        <rect className="wc-handle-hit" x={shape.x1 - 9} y={height * 0.15} width={18} height={height * 0.7} />
+        <rect className="wc-handle" x={shape.x1 - 3} y={height * 0.3} width={6} height={height * 0.4} rx={3} />
+      </g>
+    );
+  }
+  const at = handle === 'power-start' ? left : handle === 'power-end' ? right : [(shape.x0 + shape.x1) / 2, left[1]];
+  const [x, y] = at as [number, number];
+  return (
+    <g {...common}>
+      <circle className="wc-handle-hit" cx={x} cy={y} r={14} />
+      {handle === 'power' ? (
+        <rect className="wc-handle" x={x - 14} y={y - 3} width={28} height={6} rx={3} />
+      ) : (
+        <circle className="wc-handle" cx={x} cy={y} r={6} />
+      )}
+    </g>
   );
 }

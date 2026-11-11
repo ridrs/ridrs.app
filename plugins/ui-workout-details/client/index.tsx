@@ -11,11 +11,12 @@ import {
   type WorkoutStep,
   workoutChartCapability,
   workoutDetailsCapability,
+  workoutEditorCapability,
 } from '@ridrs/contracts';
 import type { UiCapabilityComponent, UiCapabilityHandle, UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { defaultPowerZones, type WorkoutAthlete, workoutMetrics } from '@ridrs/workout';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   chartFallbackText,
@@ -29,7 +30,7 @@ import {
   zoneRowsOf,
 } from './format.ts';
 import { type Messages, messages } from './i18n/index.ts';
-import { type Library, shownWorkout, chosenAthlete } from './subject.ts';
+import { chosenAthlete, type EditRef, editRef, type Library, shownWorkout } from './subject.ts';
 import { DetailsStyles } from './theme.tsx';
 
 type ChartInput = UiCapabilityInput<typeof workoutChartCapability>;
@@ -90,6 +91,59 @@ function Chart({
         </p>
       )}
     </section>
+  );
+}
+
+type EditorSubject = UiCapabilityInput<typeof workoutEditorCapability>;
+
+/**
+ * The editor through `ui.workout-editor` (ADR 0083), in place of the details. Its container
+ * belongs to the shell while the provider draws; without a provider there is nothing to show but a
+ * way back.
+ */
+function EditorPlace({
+  ctx,
+  subject,
+  onSaved,
+  onClosed,
+  text,
+}: {
+  readonly ctx: UiContext;
+  readonly subject: EditorSubject;
+  readonly onSaved: (workoutId: string) => void;
+  readonly onClosed: () => void;
+  readonly text: Messages;
+}) {
+  const place = useRef<HTMLDivElement>(null);
+  const latest = useRef({ onSaved, onClosed });
+  latest.current = { onSaved, onClosed };
+  const [available, setAvailable] = useState(true);
+  useEffect(() => {
+    const element = place.current;
+    if (!element) return undefined;
+    const editor = ctx.render(workoutEditorCapability, element, subject);
+    const stops = [
+      editor.onAvailability(setAvailable),
+      editor.on('saved', ({ workoutId }) => latest.current.onSaved(workoutId)),
+      editor.on('closed', () => latest.current.onClosed()),
+    ];
+    return () => {
+      for (const stop of stops) stop();
+      editor.release();
+    };
+  }, [ctx, subject]);
+  return (
+    <>
+      <div ref={place} data-testid="workout-details-editor" />
+      {available ? null : (
+        <p className="wd-fallback">
+          {text.editorMissing}{' '}
+          <button type="button" className="wd-back" onClick={onClosed}>
+            {text.back}
+          </button>
+        </p>
+      )}
+    </>
   );
 }
 
@@ -187,7 +241,9 @@ function Details({
   plannedFor,
   athlete,
   text,
+  edit,
 }: {
+  readonly edit?: ReactNode;
   readonly ctx: UiContext;
   readonly workout: Workout;
   readonly plannedFor: string | undefined;
@@ -223,6 +279,7 @@ function Details({
         {plannedFor ? <span className="wd-eyebrow">{text.plannedFor(dayText(plannedFor, text))}</span> : null}
         <h1 className="wd-title">{workout.name}</h1>
         {byline ? <span className="wd-byline">{byline}</span> : null}
+        {edit}
       </header>
       {workout.description ? <p className="wd-description">{workout.description}</p> : null}
       <section aria-label={text.numbers}>
@@ -270,7 +327,13 @@ function DetailsView({
   const calendars = useStateEntries(ctx, trainingCalendarState);
   const profiles = useStateEntries(ctx, athleteProfileState);
   const choices = useStateEntries(ctx, dataSourceState);
-  const shown = useMemo(() => shownWorkout(subject, libraries, calendars), [subject, libraries, calendars]);
+  // "Edit" opens the editor in place of the details; once it has saved, the details show the saved workout.
+  const [editing, setEditing] = useState<EditorSubject>();
+  const [saved, setSaved] = useState<{ readonly of: string; readonly subject: WorkoutDetailsSubject }>();
+  const subjectKey = JSON.stringify(subject);
+  const current = saved?.of === subjectKey ? saved.subject : subject;
+  const shown = useMemo(() => shownWorkout(current, libraries, calendars), [current, libraries, calendars]);
+  const ref = useMemo(() => editRef(current, libraries, calendars), [current, libraries, calendars]);
   const athlete = useMemo(() => chosenAthlete(profiles, choices), [profiles, choices]);
   const back = useRef<HTMLButtonElement>(null);
   const latestBack = useRef(onBack);
@@ -279,7 +342,31 @@ function DetailsView({
   useEffect(() => ctx.onBack(() => latestBack.current()), [ctx]);
   useEffect(() => back.current?.focus(), []);
 
+  const closeEditor = () => {
+    setEditing(undefined);
+    queueMicrotask(() => back.current?.focus());
+  };
+  const startEdit = (from: EditRef) =>
+    setEditing({ kind: from.own ? 'edit' : 'copy', from: from.from, workoutId: from.workoutId });
+
   const name = shown.state === 'shown' ? shown.workout.name : '';
+  if (editing) {
+    return (
+      <article className="wd-page" data-testid="workout-details-editing" aria-label={text.details(name)}>
+        <DetailsStyles />
+        <EditorPlace
+          ctx={ctx}
+          subject={editing}
+          text={text}
+          onClosed={closeEditor}
+          onSaved={(workoutId) => {
+            setSaved({ of: subjectKey, subject: { kind: 'library', from: 'ridrs', workoutId } });
+            closeEditor();
+          }}
+        />
+      </article>
+    );
+  }
   return (
     <article className="wd-page" data-testid="workout-details" aria-label={text.details(name)}>
       <DetailsStyles />
@@ -293,6 +380,18 @@ function DetailsView({
           plannedFor={shown.plannedFor}
           athlete={athlete}
           text={text}
+          edit={
+            ref ? (
+              <button
+                type="button"
+                className="wd-back"
+                data-testid="workout-details-edit"
+                onClick={() => startEdit(ref)}
+              >
+                {ref.own ? text.edit : text.editAsCopy}
+              </button>
+            ) : undefined
+          }
         />
       ) : (
         <p className="wd-hint">{shown.state === 'loading' ? text.loading : text.missing}</p>

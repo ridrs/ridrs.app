@@ -1,0 +1,33 @@
+{
+  "id": "ui-workout-editor",
+  "name": "Workout Editor",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "provides": [
+      {
+        "capability": "ui.workout-editor",
+        "export": "WorkoutEditor"
+      }
+    ],
+    "uses": [
+      "ui.workout-chart"
+    ],
+    "state": [
+      "app.language",
+      "athlete.profile",
+      "data.source",
+      "training.library",
+      "training.calendar"
+    ],
+    "calls": [
+      "training.library.save"
+    ]
+  }
+}

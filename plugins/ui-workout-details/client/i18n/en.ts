@@ -6,6 +6,9 @@ import type { WorkoutIntensity } from '@ridrs/contracts';
 export const en = {
   locale: 'en-GB',
   back: 'Back',
+  edit: 'Edit',
+  editorMissing: 'The editor is not available.',
+  editAsCopy: 'Edit as a copy',
   details: (name: string) => `Details of ${name}`,
   by: (author: string) => `by ${author}`,
   plannedFor: (day: string) => `Planned for ${day}`,

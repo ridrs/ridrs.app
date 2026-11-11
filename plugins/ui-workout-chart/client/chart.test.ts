@@ -119,6 +119,47 @@ describe('the full chart', () => {
   });
 });
 
+describe('the edit chart', () => {
+  const editable = (selectedStep?: string, changes = true) =>
+    renderToStaticMarkup(
+      createElement(Chart, {
+        input: {
+          workout: sweetSpot,
+          athlete: { ftp: 250 },
+          variant: 'edit',
+          ...(selectedStep ? { selectedStep } : {}),
+        },
+        text: messages.en,
+        onStepFocused: () => {},
+        ...(changes ? { onStepChanged: () => {} } : {}),
+      }),
+    );
+
+  it('is drawn as its own variant, like the full chart with axes and brackets', () => {
+    const markup = editable();
+    expect(markup).toContain('data-variant="edit"');
+    expect(markup).toContain('workout-chart-bracket');
+    expect(markup).toContain('workout-chart-zone-bar');
+  });
+
+  it('shows handles on the selected step only', () => {
+    expect(editable()).not.toContain('workout-chart-handle');
+    const markup = editable('warm');
+    // A ramp: its end by time and the top at both ends.
+    expect(markup.match(/data-handle="duration"/g)).toHaveLength(1);
+    expect(markup).toContain('data-handle="power-start"');
+    expect(markup).toContain('data-handle="power-end"');
+  });
+
+  it('shows a handle for each round of a repeated step', () => {
+    expect(editable('on').match(/data-handle="duration"/g)).toHaveLength(3);
+  });
+
+  it('shows none when nobody listens for changes', () => {
+    expect(editable('warm', false)).not.toContain('workout-chart-handle');
+  });
+});
+
 describe('the layout cache', () => {
   it('answers equal content with one layout, whichever object carries it', () => {
     const copy = JSON.parse(JSON.stringify(sweetSpot)) as Workout;

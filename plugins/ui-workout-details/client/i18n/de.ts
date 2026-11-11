@@ -6,6 +6,9 @@ import type { Messages } from './en.ts';
 export const de: Messages = {
   locale: 'de-DE',
   back: 'Zurück',
+  edit: 'Bearbeiten',
+  editorMissing: 'Der Editor ist nicht verfügbar.',
+  editAsCopy: 'Als Kopie bearbeiten',
   details: (name: string) => `Details zu ${name}`,
   by: (author: string) => `von ${author}`,
   plannedFor: (day: string) => `Geplant für ${day}`,

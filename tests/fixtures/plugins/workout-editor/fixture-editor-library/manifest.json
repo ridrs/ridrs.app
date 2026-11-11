@@ -1,0 +1,18 @@
+{
+  "id": "fixture-editor-library",
+  "name": "Writable ridrs Library (fixture)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "state": { "owns": ["training.library", "training.calendar"] },
+  "services": {
+    "provides": [
+      "training.library.save",
+      "training.calendar.plan",
+      "training.calendar.move",
+      "training.calendar.remove"
+    ]
+  }
+}
