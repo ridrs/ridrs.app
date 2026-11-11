@@ -977,7 +977,7 @@ Then('intervals.icu received {int} requests', async function (this: RidrsWorld, 
   assert.equal(
     await requestsSettled(this, (s) => s.requests.length, expected),
     expected,
-    `Requests: ${intervals(this).requestLines().join(', ')}`,
+    `Requests: ${intervals(this).requestUrls().join(', ')}`,
   );
 });
 
@@ -988,6 +988,21 @@ Then(
       await requestsSettled(this, (s) => s.countRequests(call), expected),
       expected,
       `Requests: ${intervals(this).requestLines().join(', ')}`,
+    );
+  },
+);
+
+Then(
+  'intervals.icu was asked for the {word} from {string} to {string}',
+  async function (this: RidrsWorld, resource: string, oldest: string, newest: string) {
+    await this.settle();
+    const asked = intervals(this)
+      .requests.map((request) => new URL(request.url))
+      .filter((url) => url.pathname === `/api/v1/athlete/0/${resource}`)
+      .map((url) => `${url.searchParams.get('oldest')} – ${url.searchParams.get('newest')}`);
+    assert.ok(
+      asked.includes(`${oldest} – ${newest}`),
+      `Asked for the ${resource} of: ${asked.join(', ')}`,
     );
   },
 );

@@ -40,6 +40,7 @@ import {
 } from './calendar.ts';
 import { focusKeyProps, OpenDetails } from './details.tsx';
 import { messages } from './i18n/index.ts';
+import { useShownDays } from './shown-days.ts';
 import { chartWorkout, useChartAthlete, WorkoutChartSlot } from './workout-chart.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
@@ -570,6 +571,9 @@ export function MonthCalendar({ ctx, week }: { readonly ctx: UiContext; readonly
   const text = useMessages(ctx, messages);
   const [offset, setOffset] = useState(0);
   const month = addMonths(week.today.slice(0, 7), offset);
+  const days = monthDays(month);
+  // The providers read the weeks of the month shown when it is paged to (ADR 0088).
+  useShownDays(ctx, days[0], days.at(-1));
   const title = new Intl.DateTimeFormat(text.dateLocale, { month: 'long', year: 'numeric' }).format(at(`${month}-01`));
   return (
     <div className="tw tm" data-month={month}>
@@ -596,7 +600,7 @@ export function MonthCalendar({ ctx, week }: { readonly ctx: UiContext; readonly
             {text.short(text.weekdays[day])}
           </span>
         ))}
-        {monthDays(month).map((date) => (
+        {days.map((date) => (
           <Day
             key={date}
             ctx={ctx}

@@ -92,6 +92,7 @@ import {
   trainingHistoryState,
   trainingLibraryLoadService,
   trainingLibraryState,
+  trainingRangeLoadService,
   trainingRefreshService,
   trainingUploadService,
   trainingUploadState,
@@ -192,6 +193,7 @@ const SERVICES: readonly ServiceDefinition[] = [
   trainingConnectService,
   trainingDisconnectService,
   trainingLibraryLoadService,
+  trainingRangeLoadService,
   trainingRefreshService,
   trainingUploadService,
 ];

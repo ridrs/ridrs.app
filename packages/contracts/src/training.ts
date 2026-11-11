@@ -140,7 +140,10 @@ export const trainingLibraryState = trainingLibraryType.topic;
  */
 export const trainingCalendarSchema = z
   .object({
-    /** Planned cycling workouts in date order. */
+    /**
+     * Planned cycling workouts in date order. They can begin before today: a provider holds the
+     * days it read, the next two weeks and the months the rider paged to (ADR 0088).
+     */
     workouts: z.array(plannedWorkoutSchema),
   })
   .strict();
@@ -252,6 +255,25 @@ export const trainingRefreshService = defineService('training.refresh', {
  */
 export const trainingLibraryLoadService = defineService('training.library.load', {
   request: accountRequest,
+  response: done,
+  keyedBy: trainingAccountState,
+});
+
+/** The longest span `training.range.load` reads at once: the six weeks a month can show. */
+export const TRAINING_RANGE_MAX_DAYS = 42;
+
+/**
+ * Loads the planned workouts and the rides done of the days `oldest` to `newest` (the rider's
+ * local dates, at most `TRAINING_RANGE_MAX_DAYS` days) into the service's `training.calendar` and
+ * `training.history` (ADR 0088): the large calendar asks for the weeks of the month it shows. A
+ * span read in the last 15 minutes costs no request (ADR 0078). Answers once the work started;
+ * the data follows in the states.
+ */
+export const trainingRangeLoadService = defineService('training.range.load', {
+  request: accountRequest
+    .extend({ oldest: localDateSchema, newest: localDateSchema })
+    .strict()
+    .refine((range) => range.oldest <= range.newest, { message: '`oldest` is after `newest`' }),
   response: done,
   keyedBy: trainingAccountState,
 });

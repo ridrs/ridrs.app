@@ -126,6 +126,7 @@ import {
   trainingHistoryState,
   trainingLibraryLoadService,
   trainingLibraryState,
+  trainingRangeLoadService,
   trainingRefreshService,
   trainingUploadService,
   trainingUploadState,
@@ -289,6 +290,7 @@ const TEST_SERVICES: readonly ServiceDefinition[] = [
   trainingConnectService,
   trainingDisconnectService,
   trainingLibraryLoadService,
+  trainingRangeLoadService,
   trainingRefreshService,
   trainingUploadService,
   defineService('test.fetch', {

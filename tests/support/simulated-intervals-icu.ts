@@ -117,6 +117,10 @@ export class SimulatedIntervalsIcu {
   requestLines(): string[] {
     return this.requests.map((request) => `${request.method} ${new URL(request.url).pathname}`);
   }
+  /** The requests so far as `METHOD url`, with the query: what a failed count shows. */
+  requestUrls(): string[] {
+    return this.requests.map((request) => `${request.method} ${request.url}`);
+  }
 
   /** How many requests matched `METHOD /path`; `*` at the end of the path matches any rest. */
   countRequests(call: string): number {

@@ -39,6 +39,7 @@
       "training.connect",
       "training.disconnect",
       "training.library.load",
+      "training.range.load",
       "training.refresh",
       "training.upload"
     ]

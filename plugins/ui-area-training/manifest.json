@@ -57,7 +57,8 @@
       "training.calendar.hand-over",
       "training.calendar.plan",
       "training.calendar.move",
-      "training.library.load"
+      "training.library.load",
+      "training.range.load"
     ],
     "uses": [
       "ui.workout-chart",

@@ -37,6 +37,8 @@ import {
   trainingHistoryState,
   trainingLibraryLoadService,
   trainingLibraryState,
+  TRAINING_RANGE_MAX_DAYS,
+  trainingRangeLoadService,
   trainingRefreshService,
   type TrainingUpload,
   trainingUploadService,
@@ -59,6 +61,7 @@ import { createMailbox, mailboxConfig } from './mailbox.ts';
 import { createMailboxSocket } from './mailbox-socket.ts';
 import { type Applied, interpret, newApplied } from './mailbox-events.ts';
 import { codeChallenge, randomUnreserved } from './pkce.ts';
+import { holds, isSpanFresh, mergeDays, type ReadSpan, spanDays, withSpan } from './range.ts';
 
 /** The public OAuth client "Ridrs.APP" (ADR 0048): configuration, not a secret. */
 const CLIENT_ID = '1697';
@@ -84,6 +87,11 @@ const LABEL = 'intervals.icu';
 
 /** How many days of done rides are read. */
 const HISTORY_DAYS = 14;
+
+/** The planned workouts a start reads: today and the next 13 days. */
+const planWindow = (now: number) => ({ oldest: localDate(now), newest: localDate(now, PLAN_DAYS - 1) });
+/** The rides a start reads: the last 13 days and today. */
+const historyWindow = (now: number) => ({ oldest: localDate(now, -(HISTORY_DAYS - 1)), newest: localDate(now) });
 
 /**
  * How long what was read stays valid (ADR 0078). `events` are the planned workouts with the rides
@@ -125,6 +133,8 @@ interface Cache {
   readonly links?: Record<string, Link>;
   /** The bound intervals.icu keeps for the last, open heart rate zone. */
   readonly heartRateTop?: number;
+  /** The spans the large calendar asked for, with when each was read (ADR 0088); none from before. */
+  readonly spans?: readonly ReadSpan[];
 }
 
 /** What the plugin holds between two requests. */
@@ -192,6 +202,10 @@ export default definePlugin({
     let busy = false;
     /** What is asked for and not yet read: one piece of work reads all of it. */
     const pending = new Set<Resource>();
+    /** The spans of days asked for and not yet read, by `oldest|newest`; read in the same piece of work. */
+    const pendingSpans = new Map<string, { oldest: string; newest: string }>();
+    /** The spans being read now: asked for again meanwhile, they are not read twice. */
+    const readingSpans = new Set<string>();
     let lastRefreshAt: number | undefined;
 
     // The sources are there from the start, so the rider can choose them while they load.
@@ -209,7 +223,7 @@ export default definePlugin({
         .catch((error: unknown) => ctx.logger.error({ error }, 'intervals.icu: unexpected failure'))
         .finally(() => {
           busy = false;
-          if (pending.size > 0) {
+          if (pending.size > 0 || pendingSpans.size > 0) {
             drain();
           } else if (followWanted) {
             runFollow();
@@ -239,7 +253,18 @@ export default definePlugin({
       run(async () => {
         const resources = [...pending];
         pending.clear();
-        await loadResources(env, resources, ctx.clock.now());
+        const spans = [...pendingSpans.entries()];
+        pendingSpans.clear();
+        for (const [key] of spans) {
+          readingSpans.add(key);
+        }
+        try {
+          await loadResources(env, resources, ctx.clock.now(), spans.map(([, span]) => span));
+        } finally {
+          for (const [key] of spans) {
+            readingSpans.delete(key);
+          }
+        }
       });
 
     /** Reads the stale ones of `resources`; a fresh one costs nothing. `force` reads them all. */
@@ -495,6 +520,20 @@ export default definePlugin({
         follow();
       }
     });
+    // The large calendar asks for the weeks of the month it shows (ADR 0088): read unless a span
+    // read in the last 15 minutes holds them, or the same span is already on its way.
+    ctx.services.provide(trainingRangeLoadService, ({ oldest, newest }) => {
+      if (spanDays(oldest, newest) > TRAINING_RANGE_MAX_DAYS) {
+        throw new Error(`At most ${TRAINING_RANGE_MAX_DAYS} days are read at once, not ${oldest} to ${newest}`);
+      }
+      const key = `${oldest}|${newest}`;
+      const fresh = isSpanFresh(held.cache?.spans ?? [], oldest, newest, ctx.clock.now(), VALIDITY_MS.events);
+      if (!fresh && !readingSpans.has(key)) {
+        pendingSpans.set(key, { oldest, newest });
+        drain();
+      }
+      return {};
+    });
     // A saved ride may complete a planned workout: read the plan again once one is saved. The
     // first delivery is every ride of the run so far; the plan loads at start anyway.
     let first = true;
@@ -576,12 +615,11 @@ async function applyMailbox(
       const incoming = linkedWorkouts(env, changed, false);
       // An event that is no longer a planned ride (another category or sport) leaves the calendar too.
       const replaced = new Set([...deleted, ...changed.map((entry) => String(entry.id))]);
-      const first = localDate(env.ctx.clock.now());
-      const last = localDate(env.ctx.clock.now(), PLAN_DAYS - 1);
+      const kept = holds(planWindow(env.ctx.clock.now()), cache.spans ?? []);
       next = {
         ...next,
         workouts: [...cache.workouts.filter((workout) => !replaced.has(workout.id)), ...incoming]
-          .filter((workout) => workout.date >= first && workout.date <= last)
+          .filter((workout) => kept(workout.date))
           .sort((a, b) => a.date.localeCompare(b.date)),
       };
     }
@@ -921,13 +959,11 @@ async function writeCalendar(env: Env, change: CalendarChange): Promise<DataWrit
     held.links = links;
   }
   if (loaded) {
-    const first = localDate(now);
-    const last = localDate(now, PLAN_DAYS - 1);
+    // The days held: the next two weeks and the months the rider paged to (ADR 0088).
+    const kept = holds(planWindow(now), loaded.spans ?? []);
     await keep(env, {
       ...loaded,
-      workouts: workouts
-        .filter((workout) => workout.date >= first && workout.date <= last)
-        .sort((a, b) => a.date.localeCompare(b.date)),
+      workouts: workouts.filter((workout) => kept(workout.date)).sort((a, b) => a.date.localeCompare(b.date)),
     });
   }
   return { ok: true };
@@ -986,7 +1022,12 @@ function setSources(
  * the rider is disconnected. Offline, what is held stands in, marked `offline`; rate limited, the
  * same, and the account says so.
  */
-async function loadResources(env: Env, resources: readonly Resource[], now: number): Promise<void> {
+async function loadResources(
+  env: Env,
+  resources: readonly Resource[],
+  now: number,
+  spans: readonly { readonly oldest: string; readonly newest: string }[] = [],
+): Promise<void> {
   const { ctx, gateway, secrets, files, held } = env;
   const account = (state: TrainingAccount['state'], extra: Partial<TrainingAccount> = {}) =>
     ctx.state.set(trainingAccountState, SERVICE, { service: SERVICE, state, ...extra });
@@ -1049,12 +1090,11 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
     return [JSON.parse(workouts.body), JSON.parse(folders.body)];
   };
 
-  /** The rides of the last days; none where the token lacks the scope. */
-  const historyOf = async (): Promise<CompletedWorkout[] | undefined> => {
-    const query = new URLSearchParams({
-      oldest: localDate(now, -(HISTORY_DAYS - 1)),
-      newest: localDate(now),
-    });
+  /** The rides of the days `span`, the last days by default; none where the token lacks the scope. */
+  const historyOf = async (
+    span: { readonly oldest: string; readonly newest: string } = historyWindow(now),
+  ): Promise<CompletedWorkout[] | undefined> => {
+    const query = new URLSearchParams({ oldest: span.oldest, newest: span.newest });
     const response = await request('history', `/api/v1/athlete/0/activities?${query}`);
     if (response.status === 401) {
       throw new TokenRejected();
@@ -1102,21 +1142,44 @@ async function loadResources(env: Env, resources: readonly Resource[], now: numb
       account('connected', { athleteName: athlete.name });
       await keep(env, next);
     }
+    /** The planned workouts of the days `span`. */
+    /** `full` is the read of the whole plan, which also drops the links of entries gone (sync.ts). */
+    const eventsOf = async (span: { readonly oldest: string; readonly newest: string }, full: boolean) => {
+      const query = new URLSearchParams({ oldest: span.oldest, newest: span.newest, category: 'WORKOUT' });
+      return linkedWorkouts(env, await get('events', `/api/v1/athlete/0/events?${query}`), full);
+    };
+    /**
+     * `next` with the days of `plans` and `rides` replaced by what was read. The rest stays where
+     * the default window or a span held holds it (ADR 0088).
+     */
+    const merged = (
+      plans: { readonly oldest: string; readonly newest: string },
+      workouts: PlannedWorkout[],
+      rides: { readonly oldest: string; readonly newest: string },
+      history: CompletedWorkout[] | undefined,
+      held: readonly ReadSpan[],
+    ): Pick<Cache, 'workouts' | 'history' | 'spans'> => ({
+      workouts: mergeDays(next.workouts, plans, workouts, holds(planWindow(now), held)),
+      ...(history ? { history: mergeDays(next.history ?? [], rides, history, holds(historyWindow(now), held)) } : {}),
+      ...(held.length > 0 ? { spans: held } : {}),
+    });
     if (wanted.has('events')) {
-      const query = new URLSearchParams({
-        oldest: localDate(now),
-        newest: localDate(now, PLAN_DAYS - 1),
-        category: 'WORKOUT',
-      });
-      const eventsBody = await get('events', `/api/v1/athlete/0/events?${query}`);
+      const workouts = await eventsOf(planWindow(now), true);
       const history = await historyOf();
       next = {
         ...next,
         fetchedAt: now,
         fetched: stamp('events'),
-        workouts: linkedWorkouts(env, eventsBody, true),
-        ...(history ? { history } : {}),
+        ...merged(planWindow(now), workouts, historyWindow(now), history, next.spans ?? []),
       };
+      account('connected', { athleteName: next.athlete.name });
+      await keep(env, next);
+    }
+    for (const span of spans) {
+      const workouts = await eventsOf(span, false);
+      const history = await historyOf(span);
+      const kept = withSpan(next.spans ?? [], { ...span, at: now });
+      next = { ...next, fetchedAt: now, ...merged(span, workouts, span, history, kept) };
       account('connected', { athleteName: next.athlete.name });
       await keep(env, next);
     }
@@ -1187,6 +1250,7 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
       libraryDocs?: unknown;
       links?: unknown;
       heartRateTop?: unknown;
+      spans?: unknown;
     };
     const { name, ...rest } = parsed.athlete ?? {};
     const athlete = athleteProfileSchema.safeParse({ ...rest, ...(name ? { name } : {}) });
@@ -1213,6 +1277,7 @@ async function readCache(files: AppFiles): Promise<Cache | undefined> {
           ...(isRecord(parsed.libraryDocs) ? { libraryDocs: parsed.libraryDocs } : {}),
           links: linksOf(parsed.links),
           ...(typeof parsed.heartRateTop === 'number' ? { heartRateTop: parsed.heartRateTop } : {}),
+          ...(spansOf(parsed.spans).length > 0 ? { spans: spansOf(parsed.spans) } : {}),
         }
       : undefined;
   } catch {
@@ -1349,3 +1414,19 @@ async function followLibraries(env: Env, now: number): Promise<void> {
     }
   }
 }
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The spans of a cache file that are well formed; none from before (ADR 0088). */
+const spansOf = (value: unknown): ReadSpan[] =>
+  Array.isArray(value)
+    ? value.flatMap((span: unknown) =>
+        isRecord(span) &&
+        typeof span.oldest === 'string' &&
+        DATE.test(span.oldest) &&
+        typeof span.newest === 'string' &&
+        DATE.test(span.newest) &&
+        typeof span.at === 'number'
+          ? [{ oldest: span.oldest, newest: span.newest, at: span.at }]
+          : [],
+      )
+    : [];

@@ -215,6 +215,20 @@ Then(
   },
 );
 
+Then(
+  'the calendar date {string} shows {string} as done',
+  async function (this: RidrsWorld, date: string, ride: string) {
+    await waitFor(() =>
+      assert.ok(
+        [...calendarDate(this, date).querySelectorAll('li[data-done]')].some((li) =>
+          li.textContent?.includes(ride),
+        ),
+        `No ride "${ride}" done on ${date}`,
+      ),
+    );
+  },
+);
+
 Then('the calendar date {string} is shown', async function (this: RidrsWorld, date: string) {
   await waitFor(() => calendarDate(this, date));
 });

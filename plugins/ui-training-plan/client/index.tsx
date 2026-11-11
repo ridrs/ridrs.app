@@ -100,9 +100,22 @@ function callAccount(ctx: UiContext, service: ServiceDefinition<{ readonly key: 
   );
 }
 
-/** "Today" is the rider's calendar day; the UI reads the wall clock, never drives anything with it. */
-const nextWorkout = (plan: Plan | undefined): PlannedWorkout | undefined =>
-  plan?.workouts[0];
+/** The rider's local date of `now`, `YYYY-MM-DD`. */
+const localDate = (now: number): string => {
+  const at = new Date(now);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+};
+
+/**
+ * The first workout from today on: a calendar also holds the past days of the months the rider
+ * paged to (ADR 0088). "Today" is the rider's calendar day; the UI reads the wall clock, never
+ * drives anything with it.
+ */
+const nextWorkout = (plan: Plan | undefined): PlannedWorkout | undefined => {
+  const today = localDate(Date.now());
+  return plan?.workouts.find((workout) => workout.date >= today);
+};
 
 /** The workout's chart (`mini`); the facts beside it are the tile's own text while it is not drawn. */
 function Profile({
