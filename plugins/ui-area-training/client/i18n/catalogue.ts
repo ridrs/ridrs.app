@@ -12,6 +12,7 @@ const en = {
   provider: 'Source',
   noMatch: 'No workout matches these filters.',
   importWorkouts: 'Import workouts',
+  newWorkout: 'New workout',
   focuses: {
     recovery: 'Recovery',
     endurance: 'Endurance',
@@ -46,6 +47,7 @@ const de: CatalogueMessages = {
   provider: 'Quelle',
   noMatch: 'Kein Workout passt zu diesen Filtern.',
   importWorkouts: 'Workouts importieren',
+  newWorkout: 'Neues Workout',
   focuses: {
     recovery: 'Erholung',
     endurance: 'Grundlage',

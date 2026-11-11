@@ -9,7 +9,7 @@ import {
   WORKOUT_FOCUSES,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import {
   type CatalogueFilter,
@@ -20,6 +20,7 @@ import {
   passes,
 } from './catalogue.ts';
 import { type DetailsRequest, focusBack, focusKeyProps, OpenDetails, WorkoutDetailsView } from './details.tsx';
+import { WorkoutEditorView } from './editor.tsx';
 import { messages } from './i18n/index.ts';
 import { catalogueMessages } from './i18n/catalogue.ts';
 import { MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
@@ -166,6 +167,7 @@ function Library({
 }) {
   const text = useMessages(ctx, messages);
   const browse = useMessages(ctx, catalogueMessages);
+  const create = useContext(CreateWorkout);
   const shown = providers
     .map((source) => ({
       ...source,
@@ -175,6 +177,15 @@ function Library({
   return (
     <section className="pv-section" data-testid="library">
       <h2>{text.library}</h2>
+      <button
+        type="button"
+        className="pv-button"
+        data-testid="new-workout"
+        {...focusKeyProps(NEW_WORKOUT)}
+        onClick={create}
+      >
+        {browse.newWorkout}
+      </button>
       {ctx.hasScreen(WORKOUT_IMPORT) ? (
         <button type="button" className="pv-button" data-testid="import-workouts" onClick={() => ctx.navigate(WORKOUT_IMPORT)}>
           {browse.importWorkouts}
@@ -198,6 +209,12 @@ function Library({
 
 /** The import of workout files (ui-workout-import), a dialog over the page when that plugin is there. */
 const WORKOUT_IMPORT = 'workout-import';
+
+/** The focus key of "New workout": the focus goes back there when the editor closes. */
+const NEW_WORKOUT = 'new-workout';
+
+/** How the library asks the area to open the editor for a new workout. */
+const CreateWorkout = createContext<() => void>(() => undefined);
 
 function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
@@ -248,6 +265,9 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   // The details of a workout are an inner view of the area, in place of its content; closing them
   // gives the focus back to the card or entry that opened them.
   const [opened, setOpened] = useState<DetailsRequest>();
+  // A new workout in the editor (ui.workout-editor); once saved, its details are shown.
+  const [creating, setCreating] = useState(false);
+  const createWorkout = useCallback(() => setCreating(true), []);
   const returnTo = useRef<string | undefined>(undefined);
   const open = useCallback((request: DetailsRequest) => setOpened(request), []);
   const current = useRef<DetailsRequest | undefined>(undefined);
@@ -257,13 +277,18 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
     setOpened(undefined);
   }, []);
   useEffect(() => {
-    if (opened !== undefined || returnTo.current === undefined) return;
+    if (opened !== undefined || creating || returnTo.current === undefined) return;
     focusBack(returnTo.current);
     returnTo.current = undefined;
-  }, [opened]);
+  }, [opened, creating]);
   // The large calendar is a subpage of the area: Back leaves it for the area first.
   const [large, setLarge] = useState(false);
   useBack(ctx, () => {
+    if (creating) {
+      setCreating(false);
+      returnTo.current = NEW_WORKOUT;
+      return true;
+    }
     if (opened) {
       close();
       return true;
@@ -279,6 +304,23 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
     }
     return false;
   });
+
+  if (creating) {
+    return (
+      <WorkoutEditorView
+        ctx={ctx}
+        subject={{ kind: 'new' }}
+        onClose={() => {
+          returnTo.current = NEW_WORKOUT;
+          setCreating(false);
+        }}
+        onSaved={(workoutId) => {
+          setCreating(false);
+          setOpened({ subject: { kind: 'library', from: DEFAULT_PROVIDER, workoutId }, focusKey: NEW_WORKOUT });
+        }}
+      />
+    );
+  }
 
   if (opened) {
     return <WorkoutDetailsView ctx={ctx} subject={opened.subject} onClose={close} />;
@@ -297,15 +339,18 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
           </button>
           <h1>{text.calendar}</h1>
         </header>
-        <OpenDetails.Provider value={open}>
+        <CreateWorkout.Provider value={createWorkout}>
+<OpenDetails.Provider value={open}>
           <MonthCalendar ctx={ctx} week={week} />
         </OpenDetails.Provider>
+</CreateWorkout.Provider>
       </div>
     );
   }
 
   return (
-    <OpenDetails.Provider value={open}>
+    <CreateWorkout.Provider value={createWorkout}>
+<OpenDetails.Provider value={open}>
     <AreaPage title={text.title} intro={text.intro} picture={{ image: PICTURE, credits: text.pictureCredits }}>
       <style>{WEEK_CSS}</style>
       <style>{CHART_SLOT_CSS}</style>
@@ -379,6 +424,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
       </section>
     </AreaPage>
     </OpenDetails.Provider>
+</CreateWorkout.Provider>
   );
 }
 
