@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { defineState } from './app-state.ts';
 import { defineDataType, providerIdSchema } from './data-sources.ts';
 import { defineService } from './services.ts';
-import { workoutStepSchema } from './workout.ts';
+import { workoutSchema, workoutStepSchema } from './workout.ts';
 
 /**
  * The rider's planning services (ADR 0048): their account, their uploads and the planned workouts
@@ -82,14 +82,28 @@ export const plannedWorkoutSchema = z
     trainingLoad: z.number().nonnegative().optional(),
     /** The structure in the canonical model (ADR 0081); empty when the source has none. */
     steps: z.array(workoutStepSchema),
+    /**
+     * The library workout the entry was planned from (structured-workouts.md, section 10): its
+     * future, unridden entries follow when that workout changes. Absent for an entry made or
+     * changed in the calendar's own service, which ridrs never silently overwrites.
+     */
+    library: z
+      .object({ from: providerIdSchema, workoutId: z.string().min(1) })
+      .strict()
+      .optional(),
   })
   .strict();
 export type PlannedWorkout = z.infer<typeof plannedWorkoutSchema>;
 
-/** A workout of a library (ADR 0075): what a planned workout has, without a date. */
+/**
+ * A workout of a library (ADR 0075): what a planned workout has, without a date. `workout` is the
+ * whole canonical workout (ADR 0081) where the provider has it (the ridrs library, imported
+ * workouts): its metadata, extensions and source, for the details and every export. Then `steps`
+ * are its steps.
+ */
 export const libraryWorkoutSchema = plannedWorkoutSchema
-  .omit({ date: true })
-  .extend({ folder: z.string().optional() })
+  .omit({ date: true, library: true })
+  .extend({ folder: z.string().optional(), workout: workoutSchema.optional() })
   .strict();
 export type LibraryWorkout = z.infer<typeof libraryWorkoutSchema>;
 
