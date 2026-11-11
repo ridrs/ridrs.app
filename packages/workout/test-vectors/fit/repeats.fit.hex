@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol and profile 21.218:
+# a repeat nested in a repeat, and every repeat_until_* type. A repeat step's duration_value is
+# the message index it jumps back to, its target_value the count or the bound.
+
+0e 20 u16:21218 {size} 2e 46 49 54 {hcrc}
+
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+41 00 00 u16:26 03   04 01 00   06 02 84   08 10 07
+01 02 u16:20 str16"Repeats"
+
+# workout_step: message_index, wkt_step_name[12], duration_type, duration_value, target_type,
+# target_value, intensity
+42 00 00 u16:27 07   fe 02 84   00 0c 07   01 01 00   02 04 86   03 01 00   04 04 86   07 01 00
+02 u16:0  str12"Spin"    00 u32:300000   02 ff ff ff ff   02
+# 2 × (3 × (sprint, float), rest)
+02 u16:1  str12"Sprint"  00 u32:10000    02 ff ff ff ff   05
+02 u16:2  str12"Float"   00 u32:50000    02 ff ff ff ff   04
+02 u16:3  str12""        06 u32:1        ff u32:3         ff   # repeat_until_steps_cmplt, back to 1, 3 times
+02 u16:4  str12"Rest"    00 u32:120000   02 ff ff ff ff   01
+02 u16:5  str12""        06 u32:1        ff u32:2         ff   # back to 1 again: the repeat above and the rest, 2 times
+02 u16:6  str12"Tempo"   00 u32:60000    02 ff ff ff ff   00
+02 u16:7  str12""        07 u32:6        ff u32:600000    ff   # repeat_until_time: 600 s in ms
+02 u16:8  str12"Hill"    01 u32:100000   02 ff ff ff ff   00
+02 u16:9  str12""        08 u32:8        ff u32:1000000   ff   # repeat_until_distance: 10 km in cm
+02 u16:10 str12"Burn"    00 u32:60000    02 ff ff ff ff   00
+02 u16:11 str12""        09 u32:10       ff u32:300       ff   # repeat_until_calories: 300 kcal
+02 u16:12 str12"Hard"    00 u32:30000    02 ff ff ff ff   05
+02 u16:13 str12""        0b u32:12       ff u32:270       ff   # repeat_until_hr_greater_than: 170 bpm
+02 u16:14 str12"Easy"    00 u32:60000    02 ff ff ff ff   04
+02 u16:15 str12""        0a u32:14       ff u32:60        ff   # repeat_until_hr_less_than: 60 % max
+02 u16:16 str12"Push"    00 u32:60000    02 ff ff ff ff   05
+02 u16:17 str12""        0c u32:16       ff u32:1150      ff   # repeat_until_power_less_than: 150 W
+02 u16:18 str12"Lift"    00 u32:60000    02 ff ff ff ff   05
+02 u16:19 str12""        0d u32:18       ff u32:120       ff   # repeat_until_power_greater_than: 120 % FTP
+
+{crc}

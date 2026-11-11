@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol 2.0 and profile 21.218: a
+# developer data id, a field description and a workout step with a developer field, which ridrs
+# keeps opaque. The application id is a byte array.
+
+0e 20 u16:21218 {size} 2e 46 49 54 {hcrc}
+
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+# developer_data_id (207): application_id byte[16], developer_data_index uint8
+43 00 00 u16:207 02   01 10 0d   03 01 02
+03 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff   00
+
+# field_description (206): developer_data_index, field_definition_number, fit_base_type_id,
+# field_name string[16]
+44 00 00 u16:206 04   00 01 02   01 01 02   02 01 02   03 10 07
+04 00 00 84 str16"target_feel"
+
+41 00 00 u16:26 03   04 01 00   06 02 84   08 10 07
+01 02 u16:1 str16"Developer data"
+
+# workout_step with a developer field: the header's bit 5 says developer fields follow.
+# message_index, duration_type, duration_value, target_type; then 1 developer field:
+# number 0, 2 bytes, developer data index 0
+62 00 00 u16:27 04   fe 02 84   01 01 00   02 04 86   03 01 00   01   00 02 00
+02 u16:0 00 u32:600000 02   u16:7
+
+{crc}

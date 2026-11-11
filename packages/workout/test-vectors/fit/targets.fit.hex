@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol and profile 21.218: one 5-min
+# step for every target type, with the offsets of the profile: power up to 1000 is % FTP, above
+# it watts + 1000; heart rate up to 100 is % of the maximum, above it bpm + 100. A target_value
+# above 0 is a zone; 0 means the custom low and high, a range.
+
+0e 20 u16:21218 {size} 2e 46 49 54 {hcrc}
+
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+41 00 00 u16:26 04   04 01 00   0b 01 00   06 02 84   08 10 07
+01 02 05 u16:15 str16"All targets"
+
+# workout_step, 13 fields: message_index, wkt_step_name[12], duration_type, duration_value,
+# target_type, target_value, custom low, custom high, intensity, secondary_target_type,
+# secondary_target_value, secondary custom low, secondary custom high
+42 00 00 u16:27 0d   fe 02 84   00 0c 07   01 01 00   02 04 86   03 01 00   04 04 86   05 04 86
+                     06 04 86   07 01 00   13 01 00   14 04 86   15 04 86   16 04 86
+
+#  idx      name                 duration         target type, value, low, high          intensity  secondary
+# power (4), zone 3
+02 u16:0  str12"Zone 3"      00 u32:300000   04 u32:3 ff ff ff ff ff ff ff ff         00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# power, 88–94 % FTP
+02 u16:1  str12"Sweet spot"  00 u32:300000   04 u32:0 u32:88 u32:94                   00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# power, 1250–1250: 250 W exactly
+02 u16:2  str12"250 W"       00 u32:300000   04 u32:0 u32:1250 u32:1250               00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# power, 1200–1220: a range of 200–220 W
+02 u16:3  str12"200-220 W"   00 u32:300000   04 u32:0 u32:1200 u32:1220               00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# heart_rate (1), zone 2
+02 u16:4  str12"HR zone 2"   00 u32:300000   01 u32:2 ff ff ff ff ff ff ff ff         00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# heart rate, 70–80 % of the maximum
+02 u16:5  str12"HR %max"     00 u32:300000   01 u32:0 u32:70 u32:80                   00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# heart rate, 240–250: 140–150 bpm
+02 u16:6  str12"HR bpm"      00 u32:300000   01 u32:0 u32:240 u32:250                 00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# cadence (3), 85–95 rpm
+02 u16:7  str12"Cadence"     00 u32:300000   03 u32:0 u32:85 u32:95                   00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# speed (0), 8–9 m/s, stored in mm/s
+02 u16:8  str12"Speed"       00 u32:300000   00 u32:0 u32:8000 u32:9000               00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# speed zone 4: no speed zones in ridrs; kept as FIT fields
+02 u16:9  str12"Speed zone"  00 u32:300000   00 u32:4 ff ff ff ff ff ff ff ff         00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# open (2)
+02 u16:10 str12"Open"        00 u32:300000   02 ff ff ff ff ff ff ff ff ff ff ff ff   00   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# power_3s (7), 300–350 W
+02 u16:11 str12"3s power"    00 u32:300000   07 u32:0 u32:1300 u32:1350               05   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# power_lap (10), 95–100 % FTP
+02 u16:12 str12"Lap power"   00 u32:300000   0a u32:0 u32:95 u32:100                  05   ff ff ff ff ff ff ff ff ff ff ff ff ff
+# power 200–210 W with a secondary heart rate of 130–140 bpm
+02 u16:13 str12"Two targets" 00 u32:300000   04 u32:0 u32:1200 u32:1210               00   01 u32:0 u32:230 u32:240
+# heart rate zone 3 with a secondary power zone 2
+02 u16:14 str12"Two zones"   00 u32:300000   01 u32:3 ff ff ff ff ff ff ff ff         00   04 u32:2 ff ff ff ff ff ff ff ff
+
+{crc}

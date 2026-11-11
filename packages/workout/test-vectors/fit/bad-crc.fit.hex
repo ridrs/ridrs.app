@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol and profile 21.218, whose file
+# CRC is wrong (0xadde instead of the CRC of its content). Must be refused.
+
+0e 20 u16:21218 {size} 2e 46 49 54 {hcrc}
+
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+41 00 00 u16:26 03   04 01 00   06 02 84   08 10 07
+01 02 u16:1 str16"Broken"
+
+42 00 00 u16:27 04   fe 02 84   01 01 00   02 04 86   03 01 00
+02 u16:0 00 u32:600000 02
+
+# a wrong file CRC; the data size above still counts these two bytes as the CRC
+de ad

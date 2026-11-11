@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol and profile 21.218, cut off in
+# the middle: the header announces 120 bytes of data, the file ends in the workout message.
+# Must be refused.
+
+0e 20 u16:21218 u32:120 2e 46 49 54 {hcrc}
+
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+41 00 00 u16:26 03   04 01 00   06 02 84   08 10 07
+01 02 u16:1 43 75 74 20 6f                 # "Cut o", and the file ends

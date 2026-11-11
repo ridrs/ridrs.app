@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol and profile 21.218: a
+# 12-byte header (no header CRC) and every message big-endian (architecture 1). The header
+# itself is always little-endian.
+
+0c 10 u16:21218 {size} 2e 46 49 54
+
+!be
+40 00 01 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+41 00 01 u16:26 04   04 01 00   0b 01 00   06 02 84   08 10 07
+01 02 3a u16:2 str16"Big endian"
+
+# workout_step: message_index, wkt_step_name[12], duration_type, duration_value, target_type,
+# target_value, custom low, custom high, intensity
+42 00 01 u16:27 09   fe 02 84   00 0c 07   01 01 00   02 04 86   03 01 00   04 04 86   05 04 86   06 04 86   07 01 00
+# 20 min at 250 W
+02 u16:0 str12"Steady"   00 u32:1200000   04 u32:0 u32:1250 u32:1250   00
+# 1 km at 90–95 % FTP
+02 u16:1 str12"Kilometre" 01 u32:100000   04 u32:0 u32:90 u32:95       05
+
+!le
+{crc}

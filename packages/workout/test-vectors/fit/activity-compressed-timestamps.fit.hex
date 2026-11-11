@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT activity file (not a workout), written by hand from the public FIT protocol and profile
+# 21.218: records with a full timestamp and records with compressed timestamp headers, one of
+# them rolling over the 32-second window; invalid values; an array field unknown to the profile.
+
+0e 10 u16:21218 {size} 2e 46 49 54 {hcrc}
+
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 04 u16:255 u32:1100000040
+
+# record (20), local type 1: timestamp uint32, power uint16, heart_rate uint8, field 200 uint8[3]
+41 00 00 u16:20 04   fd 04 86   07 02 84   03 01 02   c8 03 02
+01 u32:1100000028 u16:200 96   01 02 ff        # 28 s into a 32-s window; one invalid array element
+
+# record, local type 2, for compressed headers: power uint16, heart_rate uint8
+42 00 00 u16:20 02   07 02 84   03 01 02
+# compressed header: 1, local type 2 (bits 5–6), time offset 30 (bits 0–4) -> ...030
+de u16:210 97
+# time offset 2 < 30: the window rolls over -> ...034
+c2 u16:220 ff                                  # heart rate invalid
+# time offset 5 -> ...037; power invalid
+c5 ff ff 98
+
+{crc}

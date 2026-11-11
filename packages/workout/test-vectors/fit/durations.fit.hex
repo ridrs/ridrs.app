@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol and profile 21.218:
+# one step for every duration type a cycling workout step has, all with an open target.
+
+0e 20 u16:21218 {size} 2e 46 49 54 {hcrc}
+
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+41 00 00 u16:26 03   04 01 00   06 02 84   08 10 07
+01 02 u16:10 str16"All durations"
+
+# workout_step: message_index, wkt_step_name[12], duration_type, duration_value, target_type, intensity
+42 00 00 u16:27 06   fe 02 84   00 0c 07   01 01 00   02 04 86   03 01 00   07 01 00
+# time (0): 5 min in ms
+02 u16:0 str12"Time"        00 u32:300000       02 00
+# distance (1): 5 km in cm
+02 u16:1 str12"Distance"    01 u32:500000       02 00
+# calories (4): 100 kcal
+02 u16:2 str12"Calories"    04 u32:100          02 00
+# open (5): until the lap button; no duration value
+02 u16:3 str12"Open"        05 ff ff ff ff      02 00
+# hr_less_than (2): 70 % of the maximum heart rate
+02 u16:4 str12"HR below"    02 u32:70           02 01
+# hr_greater_than (3): 160 bpm, stored as 160 + 100
+02 u16:5 str12"HR above"    03 u32:260          02 00
+# power_less_than (14): 55 % FTP
+02 u16:6 str12"Power below" 0e u32:55           02 04
+# power_greater_than (15): 300 W, stored as 300 + 1000
+02 u16:7 str12"Power above" 0f u32:1300         02 05
+# power_3s_greater_than (22): 400 W
+02 u16:8 str12"3s above"    16 u32:1400         02 05
+# power_lap_less_than (25): 80 % FTP
+02 u16:9 str12"Lap below"   19 u32:80           02 01
+
+{crc}
