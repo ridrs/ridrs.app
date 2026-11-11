@@ -11,6 +11,7 @@ import {
   trainingCalendarPlanService,
   trainingCalendarState,
   trainingHistoryState,
+  trainingLibraryState,
   type Workout,
   type WorkoutDetailsSubject,
 } from '@ridrs/contracts';
@@ -97,12 +98,19 @@ export function useWeek(ctx: UiContext) {
 
   // The calendar is a data source (ADR 0075): its owner learns of every change. Not of the
   // initial entries, which its owner has read from the same document.
+  // Again when a library workout an entry was dropped from changes: Today follows an edit.
+  const libraries = useStateEntries(ctx, trainingLibraryState);
+  const handedOver = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (state.calendar.entries === FIRST_WEEK.entries) return;
+    const workouts = plannedWorkouts(state.calendar.entries, localToday(), libraries);
+    const same = JSON.stringify(workouts);
+    if (handedOver.current === same) return;
+    handedOver.current = same;
     ctx
-      .call(trainingCalendarHandOverService, { workouts: plannedWorkouts(state.calendar.entries, localToday()) })
+      .call(trainingCalendarHandOverService, { workouts })
       .catch((error: unknown) => ctx.logger.warn(`Could not hand over the calendar: ${String(error)}`));
-  }, [ctx, state.calendar.entries]);
+  }, [ctx, state.calendar.entries, libraries]);
   const calendar = (update: (calendar: Calendar) => Calendar) =>
     change((s) => ({ ...s, calendar: update(s.calendar) as typeof s.calendar }));
 
@@ -198,7 +206,14 @@ export function useWeek(ctx: UiContext) {
       }
     } else if (ownEntriesOnly) {
       // The calendar of ridrs is this area's own: the workout becomes one of its entries.
-      calendar((c) => addEntry(c, { day, kind: 'workout', title: drag.name }));
+      calendar((c) =>
+        addEntry(c, {
+          day,
+          kind: 'workout',
+          title: drag.name,
+          library: { from: drag.provider, workoutId: drag.workoutId },
+        }),
+      );
     } else {
       written(
         { date, title: drag.name },

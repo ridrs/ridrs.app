@@ -83,6 +83,38 @@ describe('the planned workouts of the calendar', () => {
     ]);
     expect(plannedWorkouts(entries, '2026-11-08').map((w) => w.name)).toEqual(['B']);
   });
+
+  it('gives a linked entry the steps and name of its library workout, as the library has them now', () => {
+    const entries = [
+      { id: 'a', day: 'Thursday', kind: 'workout', title: 'Old name', library: { from: 'ridrs', workoutId: 'w' } },
+    ] as const;
+    const steps = [{ kind: 'interval', id: '1' }] as never;
+    const libraries = new Map([
+      ['ridrs', { data: { workouts: [{ id: 'w', name: 'New name', sport: 'ride', steps, durationSeconds: 600 }] } }],
+    ]);
+    expect(plannedWorkouts(entries, '2026-11-04', libraries as never)).toEqual([
+      {
+        id: 'a',
+        date: '2026-11-05',
+        name: 'New name',
+        sport: 'ride',
+        durationSeconds: 600,
+        steps,
+        library: { from: 'ridrs', workoutId: 'w' },
+      },
+    ]);
+    // The library is not there yet: the link is kept, the steps come with it.
+    expect(plannedWorkouts(entries, '2026-11-04')).toEqual([
+      {
+        id: 'a',
+        date: '2026-11-05',
+        name: 'Old name',
+        sport: 'ride',
+        steps: [],
+        library: { from: 'ridrs', workoutId: 'w' },
+      },
+    ]);
+  });
 });
 
 describe('the date of a weekday', () => {

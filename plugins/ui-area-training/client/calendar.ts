@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { CompletedWorkout, PlannedWorkout, Workout as CanonicalWorkout } from '@ridrs/contracts';
+import type {
+  CompletedWorkout,
+  LibraryWorkout,
+  PlannedWorkout,
+  Workout as CanonicalWorkout,
+} from '@ridrs/contracts';
 
 export const WEEKDAYS = [
   'Monday',
@@ -22,6 +27,8 @@ export interface Entry {
   readonly day: Weekday;
   readonly kind: EntryKind;
   readonly title: string;
+  /** The library workout a workout entry was dropped from; its steps follow that workout. */
+  readonly library?: { readonly from: string; readonly workoutId: string };
 }
 
 /** The calendar and the states before its last changes, newest last, so Undo survives a restart. */
@@ -102,27 +109,45 @@ export function localToday(at: Date = new Date()): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
 }
 
+/** The libraries as the `training.library` state has them: what the entries' links are resolved in. */
+export type Libraries = ReadonlyMap<string, { readonly data?: { readonly workouts: readonly LibraryWorkout[] } }>;
+
 /**
  * The workouts of the calendar as the data type `training.calendar` has them (ADR 0075): the
  * entries of kind workout, each on its day of the week that holds `today` (`YYYY-MM-DD`, Monday
  * first), from today on. Rest days, notes and outdoor rides are no planned workouts, nor are the
- * sample entries the area starts with (`FIRST_WEEK`): the rider did not plan them. The entries
- * have no steps.
+ * sample entries the area starts with (`FIRST_WEEK`): the rider did not plan them. An entry
+ * dropped from a library card keeps its link: it has the steps, name and length of that library
+ * workout as it is now (edits follow, structured-workouts.md section 10), and the link as
+ * `library`. An entry without a link, or whose workout the libraries do not have (yet), has no steps.
  */
-export function plannedWorkouts(entries: readonly Entry[], today: string): PlannedWorkout[] {
+export function plannedWorkouts(
+  entries: readonly Entry[],
+  today: string,
+  libraries: Libraries = new Map(),
+): PlannedWorkout[] {
   const samples = new Set(FIRST_WEEK.entries.map((entry) => entry.id));
   return entries
     .filter((entry) => entry.kind === 'workout' && !samples.has(entry.id))
     .map((entry) => ({ entry, date: weekDate(entry.day, today) }))
     .filter(({ date }) => date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(({ entry, date }) => ({
-      id: entry.id,
-      date,
-      name: entry.title,
-      sport: 'ride' as const,
-      steps: [],
-    }));
+    .map(({ entry, date }): PlannedWorkout => {
+      const link = entry.library;
+      const source = link
+        ? libraries.get(link.from)?.data?.workouts.find((workout) => workout.id === link.workoutId)
+        : undefined;
+      return {
+        id: entry.id,
+        date,
+        name: source?.name ?? entry.title,
+        sport: 'ride',
+        ...(source?.durationSeconds === undefined ? {} : { durationSeconds: source.durationSeconds }),
+        ...(source?.trainingLoad === undefined ? {} : { trainingLoad: source.trainingLoad }),
+        steps: source ? [...source.steps] : [],
+        ...(link ? { library: { from: link.from, workoutId: link.workoutId } } : {}),
+      };
+    });
 }
 
 /** Rides this close in time, of the same sport, are one ride seen by two providers. */

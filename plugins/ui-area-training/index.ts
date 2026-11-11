@@ -8,6 +8,7 @@ import {
   trainingCalendarPlanService,
   trainingCalendarRemoveService,
   trainingCalendarState,
+  trainingLibraryState,
 } from '@ridrs/contracts';
 import { localToday, plannedWorkouts } from './client/calendar.ts';
 import { INITIAL_TRAINING, TRAINING_DOCUMENT } from './document.ts';
@@ -28,8 +29,26 @@ export default definePlugin({
         data: { workouts },
       });
 
-    const kept = await ctx.settings.user(TRAINING_DOCUMENT).read();
-    publish(plannedWorkouts((kept ?? INITIAL_TRAINING).calendar.entries, localToday(new Date(ctx.clock.now()))));
+    // The entries dropped from a library carry its steps: resolved again when a library changes,
+    // also while the area is not shown (the document is kept at once, ADR 0059).
+    const publishDocument = async () => {
+      const kept = await ctx.settings.user(TRAINING_DOCUMENT).read();
+      publish(
+        plannedWorkouts(
+          (kept ?? INITIAL_TRAINING).calendar.entries,
+          localToday(new Date(ctx.clock.now())),
+          ctx.state.entries(trainingLibraryState),
+        ),
+      );
+    };
+    await publishDocument();
+    ctx.state.watch(trainingLibraryState, ({ changed }) => {
+      if (changed.length > 0) {
+        publishDocument().catch((error: unknown) =>
+          ctx.logger.warn(`Could not publish the calendar again: ${String(error)}`),
+        );
+      }
+    });
     // Only the area edits the calendar on this device: its own buttons, not the library.
     const refuse = () => ({ ok: false as const, reason: 'read-only' as const });
     ctx.services.provide(trainingCalendarPlanService, refuse);

@@ -10,6 +10,7 @@ export const entrySchema = z
     day: z.enum(WEEKDAYS),
     kind: z.enum(['workout', 'rest', 'note', 'outdoor']),
     title: z.string(),
+    library: z.object({ from: z.string(), workoutId: z.string() }).strict().optional(),
   })
   .strict();
 
