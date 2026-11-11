@@ -206,6 +206,9 @@ const SAMPLES: Record<string, unknown> = {
   'drivetrain.shift-requested': { change: 'down' },
   'trainer.erg-requested': { change: 'up' },
   'trainer.target-power': { watts: null },
+  'workout.finished': { at: T + 60_000 },
+  'workout.next-step-requested': {},
+  'workout.step-changed': { stepId: '2.1', index: 1, startedAt: T + 600_000 },
   'ui.terrain-observed': {
     revision: 2,
     originDistance: 2999,

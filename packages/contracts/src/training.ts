@@ -202,6 +202,11 @@ export const completedWorkoutSchema = z
     trainingLoad: z.number().nonnegative().optional(),
     /** The id of the ridrs session the ride was recorded in, when the provider knows it. */
     externalId: z.string().min(1).optional(),
+    /** The planned entry the ride rode, when the provider knows it: the calendar matches them by it. */
+    planned: z
+      .object({ provider: providerIdSchema, id: z.string().min(1) })
+      .strict()
+      .optional(),
   })
   .strict();
 export type CompletedWorkout = z.infer<typeof completedWorkoutSchema>;

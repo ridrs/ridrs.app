@@ -23,6 +23,8 @@ const SIMULATION = [
   'equipment.bicycle-changed',
   'trainer.control-changed',
   'trainer.erg-requested',
+  'workout.next-step-requested',
+  'workout.step-changed',
 ];
 
 /** Every event of the contracts, by its export name (topics have an id and a schema too). */

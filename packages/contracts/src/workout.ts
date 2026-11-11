@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
+import { defineState } from './app-state.ts';
 import { athleteProfileSchema } from './athlete.ts';
 import { providerIdSchema } from './data-sources.ts';
 import { defineUiCapability } from './ui-capabilities.ts';
@@ -383,3 +384,53 @@ export const workoutExportCapability = defineUiCapability('ui.workout-export', {
   input: z.object({ from: providerIdSchema, workoutId: z.string().min(1) }).strict(),
   output: { closed: z.object({}).strict() },
 });
+
+/**
+ * The elevation profile of a route (docs/ideas/ui-capabilities.md, section 3.2):
+ * `ui.route-profile`, provided by `ui-route-profile`. The host says which route; the provider
+ * reads its elevations itself. `card` for cards, `full` for details and the briefing.
+ */
+export const routeProfileCapability = defineUiCapability('ui.route-profile', {
+  input: z
+    .object({
+      /** An offer id or a world route, as `ui-area-ride` names routes. */
+      route: z.string().min(1),
+      variant: z.enum(['card', 'full']),
+    })
+    .strict(),
+});
+
+/**
+ * The choice of the briefing before a ride (structured-workouts.md, section 11): app state, a
+ * draft until "Go" makes it part of the ride (`activity.start-requested`). Key `last`: the last
+ * choice, so that Enter, Enter starts the usual ride.
+ */
+export const rideBriefingSchema = z
+  .object({
+    world: z
+      .object({ landscape: z.string().min(1), route: z.string().min(1).optional() })
+      .strict()
+      .optional(),
+    workout: z
+      .discriminatedUnion('kind', [
+        z.object({ kind: z.literal('none') }).strict(),
+        z
+          .object({
+            kind: z.literal('library'),
+            from: providerIdSchema,
+            workoutId: z.string().min(1),
+          })
+          .strict(),
+        z
+          .object({ kind: z.literal('planned'), from: providerIdSchema, id: z.string().min(1) })
+          .strict(),
+      ])
+      .optional(),
+    /** The garage's name of the bicycle. */
+    bicycle: z.string().min(1).optional(),
+  })
+  .strict();
+
+export type RideBriefing = z.infer<typeof rideBriefingSchema>;
+
+export const rideBriefingState = defineState('ride.briefing', rideBriefingSchema);

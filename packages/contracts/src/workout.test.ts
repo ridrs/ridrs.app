@@ -4,12 +4,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { activityStartRequestedEvent } from './activity.ts';
 import { athleteProfileSchema } from './athlete.ts';
 import { filesSaveService } from './files.ts';
 import { trainingLibraryRemoveService, trainingLibrarySaveService } from './training.ts';
 import { uiManifestSectionSchema } from './ui.ts';
 import { defineUiCapability } from './ui-capabilities.ts';
 import {
+  rideBriefingState,
   type Workout,
   workoutChartCapability,
   workoutEditorCapability,
@@ -17,6 +19,7 @@ import {
   workoutSchema,
 } from './workout.ts';
 import { workoutJsonSchema } from './workout-json-schema.ts';
+import { workoutStepChangedEvent } from './workout-player.ts';
 
 const sweetSpot: Workout = {
   format: 'ridrs-workout',
@@ -189,6 +192,27 @@ describe('the export', () => {
         fileName: 'w.zwo',
         mediaType: 'application/xml',
         data: '',
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe('the workout of a ride', () => {
+  it('enters the ride whole, with where it came from', () => {
+    const payload = {
+      workout: { workout: sweetSpot, planned: { provider: 'intervals.icu', id: '42' } },
+    };
+    expect(activityStartRequestedEvent.schema.parse(payload)).toEqual(payload);
+    expect(
+      workoutStepChangedEvent.schema.safeParse({ stepId: 'on', index: 2, startedAt: 1 }).success,
+    ).toBe(true);
+  });
+
+  it('keeps the briefing as a draft by its last choice', () => {
+    expect(
+      rideBriefingState.schema.safeParse({
+        workout: { kind: 'library', from: 'ridrs', workoutId: 'sweet-spot-3x12' },
+        bicycle: 'Road',
       }).success,
     ).toBe(true);
   });

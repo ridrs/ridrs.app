@@ -9,7 +9,9 @@ export {
   activityStartRequestedEvent,
   activityStateChangedEvent,
   activityStateSchema,
+  type RideWorkout,
   type RideWorld,
+  rideWorkoutSchema,
   rideWorldSchema,
 } from './activity.ts';
 export {
@@ -517,6 +519,10 @@ export {
   videoRouteSchema,
 } from './video.ts';
 export {
+  type RideBriefing,
+  rideBriefingSchema,
+  rideBriefingState,
+  routeProfileCapability,
   WORKOUT_CHART_VARIANTS,
   WORKOUT_FOCUSES,
   WORKOUT_FORMAT,
@@ -562,6 +568,13 @@ export {
   workoutTargetSchema,
   workoutTargetUnitSchema,
 } from './workout.ts';
+export {
+  type WorkoutFinishedPayload,
+  type WorkoutStepChangedPayload,
+  workoutFinishedEvent,
+  workoutNextStepRequestedEvent,
+  workoutStepChangedEvent,
+} from './workout-player.ts';
 export {
   TERRAIN_SURFACES,
   type TerrainPreview,
