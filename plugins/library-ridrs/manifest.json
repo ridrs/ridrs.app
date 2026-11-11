@@ -7,10 +7,19 @@
   ],
   "provides": [],
   "requires": [],
+  "optionalRequires": [
+    "storage.app-files"
+  ],
   "entry": "index.ts",
   "state": {
     "owns": [
       "training.library"
+    ]
+  },
+  "services": {
+    "provides": [
+      "training.library.save",
+      "training.library.remove"
     ]
   }
 }

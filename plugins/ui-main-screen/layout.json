@@ -13,5 +13,5 @@
     { "contribution": "ui-training-plan/next-workout", "columns": { "wide": 6, "medium": 6 } }
   ],
   "screens": ["ride", "training", "events"],
-  "dialogs": ["search", "setup", "settings", "garage", "me"]
+  "dialogs": ["search", "setup", "settings", "garage", "me", "workout-import"]
 }

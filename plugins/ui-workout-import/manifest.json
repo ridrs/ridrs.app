@@ -1,0 +1,30 @@
+{
+  "id": "ui-workout-import",
+  "name": "Workout Import",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "workout-import",
+        "export": "WorkoutImportScreen"
+      }
+    ],
+    "uses": [
+      "ui.workout-chart"
+    ],
+    "state": [
+      "app.language",
+      "training.library"
+    ],
+    "calls": [
+      "training.library.save"
+    ]
+  }
+}

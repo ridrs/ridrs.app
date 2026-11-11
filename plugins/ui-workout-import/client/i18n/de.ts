@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import type { NoErgReason } from '../analyse.ts';
+import type { Messages } from './en.ts';
+
+const noErg: Record<NoErgReason, (n: number) => string> = {
+  'heart-rate': (n) => `${n} ${n === 1 ? 'Schritt' : 'Schritte'} nach Herzfrequenz, kein ERG`,
+  speed: (n) => `${n} ${n === 1 ? 'Schritt' : 'Schritte'} nach Geschwindigkeit, kein ERG`,
+  rpe: (n) => `${n} ${n === 1 ? 'Schritt' : 'Schritte'} nach gefühlter Anstrengung, kein ERG`,
+  free: (n) => `${n} ${n === 1 ? 'Schritt' : 'Schritte'} ohne Vorgabe (freie Fahrt), kein ERG`,
+  'max-effort': (n) => `${n} ${n === 1 ? 'Schritt' : 'Schritte'} mit voller Anstrengung, kein ERG`,
+};
+
+export const de: Messages = {
+  title: 'Workouts importieren',
+  intro: 'Wähle Workout-Dateien oder ziehe sie hierher: ZWO, FIT, ERG, MRC, TCX oder ein ZIP davon. Es wird nichts umgerechnet: Watt bleiben Watt, % FTP bleibt % FTP.',
+  chooseFiles: 'Dateien wählen',
+  filesLabel: 'Workout-Dateien',
+  dropHint: 'Dateien oder ein ZIP hierher ziehen',
+  pasteHeading: 'Workout-Text einfügen',
+  pasteLabel: 'intervals.icu-Workout-Text',
+  pasteName: 'Name des eingefügten Workouts',
+  pasteDefaultName: 'Eingefügtes Workout',
+  readText: 'Text lesen',
+  previewHeading: 'Vorschau',
+  nothingYet: 'Noch nichts gewählt.',
+  reading: 'Wird gelesen …',
+  state: { ok: '✓', warning: '⚠', error: '✗' },
+  stateName: { ok: 'Bereit', warning: 'Hinweis', error: 'Nicht importierbar' },
+  chartLabel: (name) => `Diagramm von ${name}`,
+  duplicate: (name) => `Schon in deiner Bibliothek als „${name}“.`,
+  skip: 'Überspringen',
+  asCopy: 'Als Kopie importieren',
+  duplicateChoice: (file) => `Was mit dem Duplikat ${file} geschehen soll`,
+  import: 'Importieren',
+  clear: 'Leeren',
+  close: 'Schliessen',
+  willImport: (n) => (n === 1 ? '1 Workout wird importiert.' : `${n} Workouts werden importiert.`),
+  saving: 'Wird gespeichert …',
+  imported: (n) => (n === 1 ? '1 Workout importiert.' : `${n} Workouts importiert.`),
+  importFailed: (n) => `${n} konnten nicht gespeichert werden.`,
+  libraryRefused: 'Die Bibliothek auf diesem Gerät kann keine Workouts speichern.',
+  hours: 'Std.',
+  minutes: 'min',
+  seconds: 's',
+  units: (units) =>
+    units
+      .map((unit) =>
+        unit === 'watts'
+          ? 'Vorgaben in Watt, gefahren in Watt.'
+          : unit === 'percent-ftp'
+            ? 'Vorgaben in % FTP, beim Start der Fahrt mit deiner FTP aufgelöst.'
+            : 'Vorgaben in Leistungszonen, beim Start der Fahrt mit deinen Zonen aufgelöst.',
+      )
+      .join(' '),
+  noErg: (reason, count) => `${noErg[reason](count)}.`,
+  reasons: {
+    'empty-file': 'Die Datei ist leer.',
+    'unknown-format': 'ridrs erkennt das Workout-Format der Datei nicht. Gelesen werden ZWO, FIT, ERG, MRC, TCX und intervals.icu-Text.',
+    'bad-zip': 'Die ZIP-Datei lässt sich nicht lesen.',
+    'empty-zip': 'Die ZIP-Datei enthält keine Dateien.',
+    'import-failed': 'Die Datei konnte nicht gelesen werden.',
+    'not-cycling': 'Das ist kein Radworkout. ridrs importiert nur Radworkouts.',
+    'no-sport': 'Die Datei sagt nicht, für welche Sportart sie ist.',
+    'missing-sport': 'Die Datei sagt nicht, für welche Sportart sie ist.',
+    'invalid-xml': 'Die Datei ist beschädigt: Sie ist kein wohlgeformtes XML.',
+    'not-zwo': 'Das ist keine Zwift-Workout-Datei.',
+    'not-tcx': 'Das ist keine TCX-Datei.',
+    'no-workout': 'Die Datei enthält kein Workout (vielleicht eine aufgezeichnete Aktivität).',
+    'not-a-workout': 'Die FIT-Datei ist eine aufgezeichnete Aktivität, kein Workout.',
+    'not-fit': 'Das ist keine FIT-Datei.',
+    'bad-crc': 'Die Datei ist beschädigt: Ihre Prüfsumme stimmt nicht.',
+    'bad-header-crc': 'Die Datei ist beschädigt: Die Prüfsumme des Kopfes stimmt nicht.',
+    truncated: 'Die Datei ist abgeschnitten: Ein Teil fehlt.',
+    'missing-attribute': 'Einem Schritt fehlt ein nötiger Wert, etwa seine Dauer.',
+    'bad-number': 'Ein Schritt hat einen Wert, der keine Zahl ist.',
+    'bad-point': 'Eine Zeile des Verlaufs hat einen negativen oder unlesbaren Wert.',
+    'points-out-of-order': 'Die Minuten des Verlaufs laufen rückwärts.',
+    'no-course-data': 'Die Datei hat keine Verlaufsdaten: Sie ist keine ERG- oder MRC-Datei.',
+    'too-few-points': 'Der Verlauf braucht mindestens zwei Punkte.',
+    'no-steps': 'Der Text enthält keine Workout-Schritte. Ein Schritt ist eine Zeile wie „- 10m 75%“.',
+    'bad-repetitions': 'Eine Wiederholung hat keine gültige Anzahl.',
+    'invalid-workout': 'Das Workout entspricht nicht dem Workout-Format.',
+    'name-missing': 'Das Workout hat keinen Namen.',
+    'unsupported-target': 'Eine Vorgabe hat im Workout-Format keinen Platz; sie wird aufbewahrt, aber nicht gefahren.',
+    'unmapped-target': 'Eine Vorgabe unbekannter Art wurde aufbewahrt, aber nicht gefahren.',
+    'unknown-element': 'Die Datei hat Teile, die ridrs nicht kennt; sie werden aufbewahrt.',
+    'unknown-intensity': 'Ein Schritt hat eine Intensität, die ridrs nicht kennt; sie wird aufbewahrt.',
+    'cue-before-start': 'Ein Text steht vor dem Start des Workouts; er wird aufbewahrt.',
+    'cue-after-end': 'Ein Text steht nach dem Ende des Workouts.',
+    'unit-mismatch': 'Die Datei mischt Einheiten; sie bleiben, wie geschrieben.',
+    'no-column-header': 'Dem Verlauf fehlt die Kopfzeile; seine Werte gelten als % FTP.',
+    'bad-ftp': 'Die FTP in der Datei ist keine Leistung; sie wird ignoriert.',
+    'bad-course-text': 'Eine Textzeile des Verlaufs liess sich nicht lesen; sie wird aufbewahrt.',
+    'ramp-without-range': 'Eine Rampe hat keinen Bereich und gilt als gleichbleibend.',
+    'text-line': 'Eine Zeile ist Text, kein Schritt; sie bleibt als Text.',
+    'several-workouts': 'Die Datei enthält mehrere Workouts.',
+    'cues-kept-in-extensions': 'Texte des Workouts werden mit ihm aufbewahrt.',
+  },
+};

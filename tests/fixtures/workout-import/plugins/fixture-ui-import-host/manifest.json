@@ -1,0 +1,13 @@
+{
+  "id": "fixture-ui-import-host",
+  "name": "Workout Import Host (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "screens": [{ "id": "main", "export": "ImportHost" }]
+  }
+}

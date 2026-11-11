@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# A FIT workout file, written by hand from the public FIT protocol and profile 21.218 (the layout
+# of packages/workout/test-vectors/fit/repeat-cadence.fit.hex): "Watts 3x10", every target in
+# watts: custom power targets are watts + 1000.
+# warm-up 10 min at 150-200 W, 3 × (10 min at 260 W, 5 min at 130 W), cool-down 5 min at 100-130 W.
+
+0e 20 u16:21218 {size} 2e 46 49 54 {hcrc}
+
+# Definition, local type 0: file_id (0)
+40 00 00 u16:0 03   00 01 00   01 02 84   04 04 86
+00 05 u16:255 u32:1100000000
+
+# Definition, local type 1: workout (26): sport, sub_sport, num_valid_steps, wkt_name
+41 00 00 u16:26 04   04 01 00   0b 01 00   06 02 84   08 10 07
+01 02 06 u16:5 str16"Watts 3x10"
+
+# Definition, local type 2: workout_step (27)
+42 00 00 u16:27 09
+  fe 02 84   # message_index uint16
+  00 0c 07   # wkt_step_name string[12]
+  01 01 00   # duration_type enum
+  02 04 86   # duration_value uint32
+  03 01 00   # target_type enum
+  04 04 86   # target_value uint32
+  05 04 86   # custom_target_value_low uint32
+  06 04 86   # custom_target_value_high uint32
+  07 01 00   # intensity enum
+
+#  idx      name               dur type, value    target type (power 4), value, low, high         intensity
+02 u16:0 str12"Warm up"    00 u32:600000      04 u32:0 u32:1150 u32:1200   02
+02 u16:1 str12"On"         00 u32:600000      04 u32:0 u32:1260 u32:1260   05
+02 u16:2 str12"Off"        00 u32:300000      04 u32:0 u32:1130 u32:1130   04
+# repeat_until_steps_cmplt (6): back to step 1, 3 times
+02 u16:3 str12""           06 u32:1           ff u32:3 ff ff ff ff ff ff ff ff   ff
+02 u16:4 str12"Cool down"  00 u32:300000      04 u32:0 u32:1100 u32:1130   03
+
+{crc}
