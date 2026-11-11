@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { athleteProfileSchema } from './athlete.ts';
+import { filesSaveService } from './files.ts';
 import { trainingLibraryRemoveService, trainingLibrarySaveService } from './training.ts';
 import { uiManifestSectionSchema } from './ui.ts';
 import { defineUiCapability } from './ui-capabilities.ts';
@@ -12,6 +13,7 @@ import {
   type Workout,
   workoutChartCapability,
   workoutEditorCapability,
+  workoutExportCapability,
   workoutSchema,
 } from './workout.ts';
 import { workoutJsonSchema } from './workout-json-schema.ts';
@@ -173,6 +175,21 @@ describe('the editor and the writable library', () => {
     expect(trainingLibrarySaveService.id).toBe('training.library.save');
     expect(
       trainingLibraryRemoveService.request.safeParse({ key: 'ridrs', workoutId: 'x' }).success,
+    ).toBe(true);
+  });
+});
+
+describe('the export', () => {
+  it('opens for a library workout and saves through files.save', () => {
+    expect(workoutExportCapability.input.safeParse({ from: 'ridrs', workoutId: 'w' }).success).toBe(
+      true,
+    );
+    expect(
+      filesSaveService.request.safeParse({
+        fileName: 'w.zwo',
+        mediaType: 'application/xml',
+        data: '',
+      }).success,
     ).toBe(true);
   });
 });

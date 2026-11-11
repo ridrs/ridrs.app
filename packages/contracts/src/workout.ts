@@ -351,3 +351,14 @@ export const workoutEditorCapability = defineUiCapability('ui.workout-editor', {
 });
 
 export type WorkoutEditorSubject = z.infer<typeof workoutEditorCapability.input>;
+
+/**
+ * The export of a workout (structured-workouts.md, section 9; a workbench screen, ADR 0080):
+ * `ui.workout-export`, provided by `ui-workout-export`. The input says which library workout; the
+ * provider shows the formats, the conversions and losses as warnings before saving, and saves
+ * through `files.save`. `closed` asks the consumer to close it.
+ */
+export const workoutExportCapability = defineUiCapability('ui.workout-export', {
+  input: z.object({ from: providerIdSchema, workoutId: z.string().min(1) }).strict(),
+  output: { closed: z.object({}).strict() },
+});

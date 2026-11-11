@@ -211,6 +211,7 @@ export {
   type TimestampOrigin,
   timestampOriginSchema,
 } from './events.ts';
+export { filesSaveService } from './files.ts';
 export { bytesToHex, hexToBytes } from './hex.ts';
 export type {
   HostDescription,
@@ -545,6 +546,7 @@ export {
   workoutDurationSchema,
   workoutEditorCapability,
   workoutEffortSchema,
+  workoutExportCapability,
   workoutExtensionsSchema,
   workoutIntensitySchema,
   workoutIntervalSchema,
