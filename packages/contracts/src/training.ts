@@ -107,11 +107,28 @@ export const libraryWorkoutSchema = plannedWorkoutSchema
   .strict();
 export type LibraryWorkout = z.infer<typeof libraryWorkoutSchema>;
 
-/** The workouts of a provider's library, read only; ridrs on this device has none. */
+/**
+ * The workouts of a provider's library. A writable library (the `ridrs` library on this device)
+ * keeps the rider's own and imported workouts: `save` adds a workout or replaces the one with its
+ * id, with the bytes of the imported file kept as provenance (ADR 0081, layer 3); `remove` takes
+ * one out. Built-in workouts are read only: saving one under its id is refused, "Edit" saves a copy.
+ */
 export const trainingLibraryType = defineDataType(
   'training.library',
   z.object({ workouts: z.array(libraryWorkoutSchema) }).strict(),
-  {},
+  {
+    save: z
+      .object({
+        workout: workoutSchema,
+        /** The imported file, base64: kept as an app file and referenced by `workout.source.originalHash`. */
+        original: z
+          .object({ fileName: z.string().min(1), data: z.string().min(1) })
+          .strict()
+          .optional(),
+      })
+      .strict(),
+    remove: z.object({ workoutId: z.string().min(1) }).strict(),
+  },
 );
 
 /** Topic `training.library`, keyed by provider. */
@@ -146,6 +163,9 @@ export const trainingCalendarType = defineDataType('training.calendar', training
 
 /** Topic `training.calendar`, keyed by provider. */
 export const trainingCalendarState = trainingCalendarType.topic;
+
+export const trainingLibrarySaveService = trainingLibraryType.writes.save;
+export const trainingLibraryRemoveService = trainingLibraryType.writes.remove;
 
 export const trainingCalendarPlanService = trainingCalendarType.writes.plan;
 export const trainingCalendarMoveService = trainingCalendarType.writes.move;

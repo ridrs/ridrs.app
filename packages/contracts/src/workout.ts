@@ -326,3 +326,28 @@ export const workoutDetailsCapability = defineUiCapability('ui.workout-details',
 });
 
 export type WorkoutDetailsSubject = z.infer<typeof workoutDetailsCapability.input>;
+
+/**
+ * The workout editor (structured-workouts.md, section 12; a workbench screen, ADR 0080):
+ * `ui.workout-editor`, provided by `ui-workout-editor`. The input says what to edit: a new
+ * workout, an own workout of a library, or a copy of any library workout (built-in workouts are
+ * only edited as a copy). The editor saves through `training.library.save` of the `ridrs` library
+ * itself; `saved` names the workout it saved, `closed` asks the consumer to close it.
+ */
+export const workoutEditorCapability = defineUiCapability('ui.workout-editor', {
+  input: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('new') }).strict(),
+    z
+      .object({ kind: z.literal('edit'), from: providerIdSchema, workoutId: z.string().min(1) })
+      .strict(),
+    z
+      .object({ kind: z.literal('copy'), from: providerIdSchema, workoutId: z.string().min(1) })
+      .strict(),
+  ]),
+  output: {
+    saved: z.object({ workoutId: z.string().min(1) }).strict(),
+    closed: z.object({}).strict(),
+  },
+});
+
+export type WorkoutEditorSubject = z.infer<typeof workoutEditorCapability.input>;

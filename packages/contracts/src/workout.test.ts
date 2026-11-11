@@ -5,9 +5,15 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { athleteProfileSchema } from './athlete.ts';
+import { trainingLibraryRemoveService, trainingLibrarySaveService } from './training.ts';
 import { uiManifestSectionSchema } from './ui.ts';
 import { defineUiCapability } from './ui-capabilities.ts';
-import { type Workout, workoutChartCapability, workoutSchema } from './workout.ts';
+import {
+  type Workout,
+  workoutChartCapability,
+  workoutEditorCapability,
+  workoutSchema,
+} from './workout.ts';
 import { workoutJsonSchema } from './workout-json-schema.ts';
 
 const sweetSpot: Workout = {
@@ -146,5 +152,27 @@ describe('UI capabilities', () => {
         provides: [{ capability: 'workout-chart', export: 'A' }],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('the editor and the writable library', () => {
+  it('opens the editor for a new workout, an own one or a copy', () => {
+    const parse = (input: unknown) => workoutEditorCapability.input.safeParse(input).success;
+    expect(parse({ kind: 'new' })).toBe(true);
+    expect(parse({ kind: 'copy', from: 'ridrs', workoutId: 'sweet-spot-3x12' })).toBe(true);
+    expect(parse({ kind: 'edit', from: 'ridrs' })).toBe(false);
+  });
+
+  it('saves a workout with its original file and removes one by id', () => {
+    const save = trainingLibrarySaveService.request.safeParse({
+      key: 'ridrs',
+      workout: sweetSpot,
+      original: { fileName: 'sweet-spot.zwo', data: 'PHdvcmtvdXRfZmlsZS8+' },
+    });
+    expect(save.success).toBe(true);
+    expect(trainingLibrarySaveService.id).toBe('training.library.save');
+    expect(
+      trainingLibraryRemoveService.request.safeParse({ key: 'ridrs', workoutId: 'x' }).success,
+    ).toBe(true);
   });
 });
