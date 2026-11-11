@@ -1,0 +1,13 @@
+{
+  "id": "fixture-workout-library",
+  "name": "Workout Library and Calendar (fixture)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "state": { "owns": ["training.library", "training.calendar"] },
+  "services": {
+    "provides": ["training.calendar.plan", "training.calendar.move", "training.calendar.remove"]
+  }
+}

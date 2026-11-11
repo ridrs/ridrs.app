@@ -1,0 +1,30 @@
+{
+  "id": "ui-workout-details",
+  "name": "Workout Details",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "provides": [
+      {
+        "capability": "ui.workout-details",
+        "export": "WorkoutDetails"
+      }
+    ],
+    "uses": [
+      "ui.workout-chart"
+    ],
+    "state": [
+      "app.language",
+      "athlete.profile",
+      "data.source",
+      "training.library",
+      "training.calendar"
+    ]
+  }
+}

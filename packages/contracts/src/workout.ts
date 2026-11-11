@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { athleteProfileSchema } from './athlete.ts';
+import { providerIdSchema } from './data-sources.ts';
 import { defineUiCapability } from './ui-capabilities.ts';
 
 /**
@@ -304,3 +305,24 @@ export const workoutChartCapability = defineUiCapability('ui.workout-chart', {
     'step-focused': z.object({ stepId: z.string() }).strict(),
   },
 });
+
+/**
+ * The details of one workout: `ui.workout-details`, provided by `ui-workout-details` (ADR 0083).
+ * The input says *which* workout, never the workout itself: an entry of a provider's library or a
+ * planned entry of a provider's calendar. The provider reads it, the athlete profile and the
+ * language from the app state, so the details stay current while shown. `back`: the rider left
+ * the details; the consumer closes them and gives the focus back.
+ */
+export const workoutDetailsCapability = defineUiCapability('ui.workout-details', {
+  input: z.discriminatedUnion('kind', [
+    z
+      .object({ kind: z.literal('library'), from: providerIdSchema, workoutId: z.string().min(1) })
+      .strict(),
+    z
+      .object({ kind: z.literal('planned'), from: providerIdSchema, id: z.string().min(1) })
+      .strict(),
+  ]),
+  output: { back: z.object({}).strict() },
+});
+
+export type WorkoutDetailsSubject = z.infer<typeof workoutDetailsCapability.input>;

@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import type { Messages } from './en.ts';
+
+/** The texts of the workout details in German (ADR 0072). */
+export const de: Messages = {
+  locale: 'de-DE',
+  back: 'Zurück',
+  details: (name: string) => `Details zu ${name}`,
+  by: (author: string) => `von ${author}`,
+  plannedFor: (day: string) => `Geplant für ${day}`,
+  loading: 'Das Workout wird geladen…',
+  missing: 'Dieses Workout gibt es nicht mehr.',
+  numbers: 'Zahlen',
+  duration: 'Dauer',
+  trainingLoad: 'TSS',
+  intensityFactor: 'IF',
+  work: 'Arbeit',
+  estimated: 'Geschätzt: Nicht jeder Schritt richtet sich nach Zeit und Leistung.',
+  timeInZones: 'Zeit pro Zone',
+  zonesNeedFtp: 'Mit einer FTP in deinem Profil steht hier die Zeit pro Zone.',
+  withoutPowerTarget: 'Ohne Leistungsziel',
+  steps: 'Schritte',
+  chart: 'Diagramm',
+  chartFallback: (duration: string, load?: string) =>
+    load === undefined ? duration : `${duration} · ${load} TSS`,
+  intensities: {
+    'warm-up': 'Aufwärmen',
+    active: 'Aktiv',
+    interval: 'Intervall',
+    rest: 'Pause',
+    recovery: 'Erholung',
+    'cool-down': 'Ausfahren',
+    other: 'Schritt',
+  },
+  step: 'Schritt',
+  freeRide: 'Freie Fahrt',
+  maxEffort: 'Vollgas',
+  untilLapButton: 'bis zur Rundentaste',
+  above: 'über',
+  below: 'unter',
+  until: (quantity: string, comparison: string, value: string) =>
+    `bis ${quantity} ${comparison} ${value}`,
+  repeatFor: (what: string) => `Wiederholen für ${what}`,
+  repeatUntil: (condition: string) => `Wiederholen ${condition}`,
+  quantities: {
+    power: 'Leistung',
+    heartRate: 'Herzfrequenz',
+    cadence: 'Trittfrequenz',
+    speed: 'Geschwindigkeit',
+    effort: 'gefühlte Anstrengung',
+  },
+  units: {
+    percentLthr: '% LTHR',
+    percentMaxHr: '% HFmax',
+    heartRateZone: 'HF',
+    percentThresholdSpeed: '% Schwellentempo',
+    rpe: 'RPE',
+  },
+  marks: {
+    'heart-rate': 'Herzfrequenz',
+    distance: 'Distanz',
+    energy: 'Energie',
+    until: 'Bis',
+    open: 'Rundentaste',
+  },
+};

@@ -1,0 +1,13 @@
+{
+  "id": "fixture-ui-workout-chart",
+  "name": "Workout Chart (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "provides": [{ "capability": "ui.workout-chart", "export": "WorkoutChart" }]
+  }
+}
