@@ -13,7 +13,11 @@ Feature: A library workout is planned on a day in the chosen calendar
   2026.
 
   Background:
+<<<<<<< HEAD
     Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-settings, ui-area-training, library-ridrs, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
+=======
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-settings, ui-area-training, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan, ui-workout-chart" together with the simulated intervals.icu
+>>>>>>> c79f2a5 (Draw workouts with the UI capability ui.workout-chart on Today, the cards and the calendar)
     And a test device plugin "test-device"
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And intervals.icu has the library:
@@ -52,7 +56,7 @@ Feature: A library workout is planned on a day in the chosen calendar
     Then the next workout card shows:
       | day  | Tomorrow        |
       | name | Sweet Spot 3x12 |
-    And the next workout card shows a power profile of 8 bars
+    And the next workout card shows a workout chart of 8 steps
 
   Scenario: A workout dropped on a day is shown at once, as saving, until intervals.icu answers
     Given intervals.icu holds back its answers to writes

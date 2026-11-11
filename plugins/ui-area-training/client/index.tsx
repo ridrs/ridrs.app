@@ -1,13 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { AreaPage, iconStyle, PREVIEW_CSS, MenuEntry, reactComponent, Toggle, useBack } from '@ridrs/ui-preview';
-import { DEFAULT_PROVIDER, trainingLibraryLoadService, trainingLibraryState } from '@ridrs/contracts';
+import {
+  DEFAULT_PROVIDER,
+  type LibraryWorkout,
+  trainingLibraryLoadService,
+  trainingLibraryState,
+  WORKOUT_FOCUSES,
+} from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { WORKOUTS } from './calendar.ts';
+import {
+  type CatalogueFilter,
+  type CatalogueItem,
+  type DurationClass,
+  durationClassesIn,
+  focusesIn,
+  passes,
+} from './catalogue.ts';
 import { messages } from './i18n/index.ts';
+import { catalogueMessages } from './i18n/catalogue.ts';
 import { MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
+import { CHART_SLOT_CSS, type ChartAthlete, chartWorkout, useChartAthlete, WorkoutChartSlot } from './workout-chart.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
 const DUMBBELL = new URL('./assets/icons/dumbbell.svg', import.meta.url).href;
@@ -16,47 +31,155 @@ const STAR = new URL('./assets/icons/star.svg', import.meta.url).href;
 /** By Munbaik Cycling Clothing on Unsplash (Unsplash License, see the folder's README). */
 const PICTURE = new URL('./assets/pictures/hero.jpg', import.meta.url).href;
 
-/** The workouts of every provider's library, read only, grouped by provider (ADR 0075). */
-function Library({ ctx, week }: { readonly ctx: UiContext; readonly week: Week }) {
-  const { setDrag } = week;
+/** The screen that shows one workout in full (another plugin's): Enter on a card opens it where it is there. */
+const WORKOUT_DETAILS = 'workout-details';
+
+type Provider = { readonly provider: string; readonly label: string; readonly workouts: readonly LibraryWorkout[] };
+
+/** One workout of a library: its chart (or its plain facts without the chart plugin), draggable, and Enter opens it. */
+function LibraryCard({
+  ctx,
+  week,
+  provider,
+  workout,
+  athlete,
+  favourable = false,
+}: {
+  readonly ctx: UiContext;
+  readonly week: Week;
+  readonly provider: string;
+  readonly workout: LibraryWorkout;
+  readonly athlete: ChartAthlete | undefined;
+  /** The workouts of this device can be marked as favourites. */
+  readonly favourable?: boolean;
+}) {
   const text = useMessages(ctx, messages);
-  const providers = [...useStateEntries(ctx, trainingLibraryState).values()]
-    // The workouts of this device are the section "Workouts" above.
-    .filter((source) => source.provider !== DEFAULT_PROVIDER && (source.data?.workouts.length ?? 0) > 0)
-    .sort((a, b) => a.provider.localeCompare(b.provider));
+  const { setDrag } = week;
+  const [charted, setCharted] = useState(false);
+  const chart = chartWorkout(workout);
+  // The chart says duration and load itself; without it the card does.
+  const facts = [
+    workout.folder,
+    ...(charted
+      ? []
+      : [
+          workout.durationSeconds === undefined ? undefined : `${Math.round(workout.durationSeconds / 60)} min`,
+          workout.trainingLoad === undefined ? undefined : `${Math.round(workout.trainingLoad)} TSS`,
+        ]),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <article
+      className="pv-card tr-draggable tr-library-card"
+      draggable
+      data-library-workout={workout.id}
+      onDragStart={startDrag({ kind: 'library', provider, workoutId: workout.id, name: workout.name }, setDrag)}
+      onDragEnd={() => setDrag(undefined)}
+    >
+      {/* The card is one focus target: Enter opens the details, where that screen is there. */}
+      <button
+        type="button"
+        className="pv-open tr-library-open"
+        aria-label={workout.name}
+        onClick={() => {
+          if (ctx.hasScreen(WORKOUT_DETAILS)) ctx.navigate(WORKOUT_DETAILS);
+        }}
+      >
+        <h4>{workout.name}</h4>
+        {facts ? <span className="pv-muted">{facts}</span> : null}
+        {chart ? <WorkoutChartSlot ctx={ctx} workout={chart} athlete={athlete} variant="mini" onAvailability={setCharted} /> : null}
+      </button>
+      {favourable ? (
+        <div className="pv-row">
+          <Toggle
+            className="pv-icon"
+            label={text.favourite(workout.name)}
+            on={week.favourites.includes(workout.id)}
+            onChange={(on) =>
+              week.change((s) => ({
+                ...s,
+                favourites: on ? [...s.favourites, workout.id] : s.favourites.filter((id) => id !== workout.id),
+              }))
+            }
+          >
+            <span className="pv-glyph" aria-hidden="true" style={iconStyle(STAR)} />
+          </Toggle>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+/** Chips that narrow the catalogue; a chosen one is pressed, the same again lets everything through. */
+function FilterGroup({
+  title,
+  options,
+  chosen,
+  onChoose,
+  all,
+}: {
+  readonly title: string;
+  readonly options: readonly { readonly value: string; readonly label: string }[];
+  readonly chosen: string | undefined;
+  readonly onChoose: (value: string | undefined) => void;
+  readonly all: string;
+}) {
+  return (
+    <div className="tr-filter-group" role="group" aria-label={title}>
+      <span aria-hidden="true">{title}</span>
+      <button type="button" className="pv-chip" aria-pressed={chosen === undefined} aria-label={`${title}: ${all}`} onClick={() => onChoose(undefined)}>
+        {all}
+      </button>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className="pv-chip"
+          aria-pressed={chosen === option.value}
+          aria-label={`${title}: ${option.label}`}
+          onClick={() => onChoose(chosen === option.value ? undefined : option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The workouts of every provider's library, read only, grouped by provider (ADR 0075). */
+function Library({
+  ctx,
+  week,
+  providers,
+  filter,
+  athlete,
+}: {
+  readonly ctx: UiContext;
+  readonly week: Week;
+  readonly providers: readonly Provider[];
+  readonly filter: CatalogueFilter;
+  readonly athlete: ChartAthlete | undefined;
+}) {
+  const text = useMessages(ctx, messages);
+  const browse = useMessages(ctx, catalogueMessages);
+  const shown = providers
+    .map((source) => ({
+      ...source,
+      workouts: source.workouts.filter((workout) => passes({ provider: source.provider, workout }, filter)),
+    }))
+    .filter((source) => source.workouts.length > 0);
   return (
     <section className="pv-section" data-testid="library">
       <h2>{text.library}</h2>
       {providers.length === 0 ? <p className="pv-muted">{text.libraryEmpty}</p> : null}
-      {providers.map((source) => (
+      {providers.length > 0 && shown.length === 0 ? <p className="pv-muted">{browse.noMatch}</p> : null}
+      {shown.map((source) => (
         <div key={source.provider} data-provider={source.provider}>
-          <h3>{source.provider === DEFAULT_PROVIDER ? text.thisDevice : source.label}</h3>
+          <h3>{source.label}</h3>
           <div className="pv-cards">
-            {source.data?.workouts.map((workout) => (
-              <article
-                key={workout.id}
-                className="pv-card tr-draggable"
-                draggable
-                data-library-workout={workout.id}
-                onDragStart={startDrag(
-                  { kind: 'library', provider: source.provider, workoutId: workout.id, name: workout.name },
-                  setDrag,
-                )}
-                onDragEnd={() => setDrag(undefined)}
-              >
-                <h4>{workout.name}</h4>
-                <span className="pv-muted">
-                  {[
-                    workout.folder,
-                    workout.durationSeconds === undefined
-                      ? undefined
-                      : `${Math.round(workout.durationSeconds / 60)} min`,
-                    workout.trainingLoad === undefined ? undefined : `${Math.round(workout.trainingLoad)} TSS`,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </article>
+            {source.workouts.map((workout) => (
+              <LibraryCard key={workout.id} ctx={ctx} week={week} provider={source.provider} workout={workout} athlete={athlete} />
             ))}
           </div>
         </div>
@@ -82,11 +205,45 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   }, [ctx, libraryProviders]);
   const week = useWeek(ctx);
   const { setDrag } = week;
+  const browse = useMessages(ctx, catalogueMessages);
+  const athlete = useChartAthlete(ctx);
+  const libraries = useStateEntries(ctx, trainingLibraryState);
+  const [filter, setFilter] = useState<CatalogueFilter>({});
+  const sources = useMemo(
+    () =>
+      [...libraries.values()]
+        .map((source): Provider => ({
+          provider: source.provider,
+          label: source.provider === DEFAULT_PROVIDER ? text.thisDevice : source.label,
+          workouts: source.data?.workouts ?? [],
+        }))
+        .filter((source) => source.workouts.length > 0)
+        .sort((a, b) => a.provider.localeCompare(b.provider)),
+    [libraries, text],
+  );
+  const catalogue = useMemo<CatalogueItem[]>(
+    () => sources.flatMap((source) => source.workouts.map((workout) => ({ provider: source.provider, workout }))),
+    [sources],
+  );
+  // The workouts of this device are the section "Workouts"; the placeholders stand in until it has its own.
+  const own = sources.find((source) => source.provider === DEFAULT_PROVIDER);
+  const others = sources.filter((source) => source.provider !== DEFAULT_PROVIDER);
+  const filtering = filter.focus !== undefined || filter.duration !== undefined || filter.provider !== undefined;
+  const choose = (field: keyof CatalogueFilter) => (value: string | undefined) =>
+    setFilter((was) => {
+      const { [field]: _, ...rest } = was;
+      return value === undefined ? rest : { ...rest, [field]: value };
+    });
   // The large calendar is a subpage of the area: Back leaves it for the area first.
   const [large, setLarge] = useState(false);
   useBack(ctx, () => {
     if (large) {
       setLarge(false);
+      return true;
+    }
+    // Back first takes the filters off, then leaves the area.
+    if (filtering) {
+      setFilter({});
       return true;
     }
     return false;
@@ -97,6 +254,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
       <div className="pv-page" data-testid="large-calendar">
         <style>{PREVIEW_CSS}</style>
         <style>{WEEK_CSS}</style>
+        <style>{CHART_SLOT_CSS}</style>
         <header className="pv-title">
           <button type="button" className="pv-button" onClick={() => setLarge(false)}>
             <span className="pv-glyph" aria-hidden="true" style={iconStyle(BACK)} />
@@ -112,49 +270,54 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   return (
     <AreaPage title={text.title} intro={text.intro} picture={{ image: PICTURE, credits: text.pictureCredits }}>
       <style>{WEEK_CSS}</style>
+      <style>{CHART_SLOT_CSS}</style>
       <section className="pv-section">
         <WeekCalendar ctx={ctx} week={week} onOpenLarge={() => setLarge(true)} />
         <p className="pv-muted">{text.exportLater}</p>
       </section>
 
-      <section className="pv-section">
-        <h2>{text.workouts}</h2>
-        <div className="pv-cards">
-          {WORKOUTS.map((workout) => (
-            <article
-              key={workout.id}
-              className="pv-card tr-draggable"
-              draggable
-              onDragStart={startDrag({ kind: 'library', provider: DEFAULT_PROVIDER, workoutId: workout.id, name: workout.name }, setDrag)}
-              onDragEnd={() => setDrag(undefined)}
-            >
-              <h3>{workout.name}</h3>
-              <span className="pv-muted">
-                {workout.minutes} min · TSS {workout.tss} · {text.zones[workout.id] ?? workout.zone}
-              </span>
-              <div className="pv-row">
-                <Toggle
-                  className="pv-icon"
-                  label={text.favourite(workout.name)}
-                  on={week.favourites.includes(workout.id)}
-                  onChange={(on) =>
-                    week.change((s) => ({
-                      ...s,
-                      favourites: on
-                        ? [...s.favourites, workout.id]
-                        : s.favourites.filter((id) => id !== workout.id),
-                    }))
-                  }
-                >
-                  <span className="pv-glyph" aria-hidden="true" style={iconStyle(STAR)} />
-                </Toggle>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      {catalogue.length > 0 ? (
+        <section className="pv-section tr-filters" data-testid="catalogue-filters" aria-label={browse.filters}>
+          <FilterGroup
+            title={browse.focus}
+            all={browse.all}
+            chosen={filter.focus}
+            onChoose={choose('focus')}
+            options={focusesIn(catalogue, WORKOUT_FOCUSES).map((value) => ({ value, label: browse.focuses[value] ?? value }))}
+          />
+          <FilterGroup
+            title={browse.duration}
+            all={browse.all}
+            chosen={filter.duration}
+            onChoose={choose('duration')}
+            options={durationClassesIn(catalogue).map((value: DurationClass) => ({ value, label: browse.durations[value] }))}
+          />
+          {sources.length > 1 ? (
+            <FilterGroup
+              title={browse.provider}
+              all={browse.all}
+              chosen={filter.provider}
+              onChoose={choose('provider')}
+              options={sources.map((source) => ({ value: source.provider, label: source.label }))}
+            />
+          ) : null}
+        </section>
+      ) : null}
 
-      <Library ctx={ctx} week={week} />
+      {own ? (
+        <section className="pv-section">
+          <h2>{text.workouts}</h2>
+          <div className="pv-cards" data-testid="own-workouts">
+            {own.workouts
+              .filter((workout) => passes({ provider: own.provider, workout }, filter))
+              .map((workout) => (
+                <LibraryCard key={workout.id} ctx={ctx} week={week} provider={own.provider} workout={workout} athlete={athlete} favourable />
+              ))}
+          </div>
+        </section>
+      ) : null}
+
+      <Library ctx={ctx} week={week} providers={others} filter={filter} athlete={athlete} />
 
       <section className="pv-section">
         <h2>{text.plans}</h2>

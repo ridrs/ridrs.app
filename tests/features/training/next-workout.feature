@@ -2,7 +2,7 @@
 Feature: The next planned workout on the main screen
   Once intervals.icu is connected, the main screen shows the next planned cycling workout of the
   next 14 days as a small card: the day, the name, the duration, the training load and, when
-  intervals.icu has its steps, a power profile. Enter on the card opens the details: the
+  intervals.icu has its steps, a chart of the workout. Enter on the card opens the details: the
   description, the athlete's FTP and weight, and the steps in % FTP and in watts. Back returns to
   the main screen (AGENTS.md rule 12). The plan loads at start, after a saved ride and on Refresh.
   Offline, the last plan is shown and marked as such.
@@ -10,7 +10,7 @@ Feature: The next planned workout on the main screen
   Here intervals.icu, the browser and the secret store are simulated.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, planner-intervals-icu, ui-training-plan, ui-workout-chart" together with the simulated intervals.icu
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And the secret store holds a token for intervals.icu
     And the local time is "2026-11-04 08:00"
@@ -58,7 +58,7 @@ Feature: The next planned workout on the main screen
     And the ridrs UI is shown
     Then the training tile shows "No workout planned"
 
-  Scenario: A workout with steps shows its power profile
+  Scenario: A workout with steps shows its workout chart
     Given intervals.icu plans "Sweet Spot 3x12" on "2026-11-04" with the steps:
       | step     | duration | power  |
       | warmup   | 10m      | 50-75% |
@@ -68,15 +68,43 @@ Feature: The next planned workout on the main screen
       | cooldown | 5m       | 60-40% |
     When the host has started
     And the ridrs UI is shown
-    Then the next workout card shows a power profile of 8 bars
+    Then the next workout card shows a workout chart of 8 steps
 
-  Scenario: A workout without steps shows no power profile
+  Scenario: A workout without steps shows no workout chart
     Given intervals.icu plans:
       | date       | type | name     | duration | load |
       | 2026-11-04 | Ride | Tempo 40 | 1h       | 60   |
     When the host has started
     And the ridrs UI is shown
-    Then the next workout card shows no power profile
+    Then the next workout card shows no workout chart
+
+  Scenario: Without the chart plugin the tile shows the duration and the load
+    Given intervals.icu plans "Sweet Spot 3x12" on "2026-11-04" with the steps:
+      | step     | duration | power  |
+      | warmup   | 10m      | 50-75% |
+      | repeat   | 3x       |        |
+      | -        | 12m      | 90%    |
+      | -        | 4m       | 55%    |
+      | cooldown | 5m       | 60-40% |
+    When the host has started
+    And the ridrs UI is shown
+    And the plugin "ui-workout-chart" is stopped
+    Then the next workout card shows:
+      | duration | 1 h 3 min |
+      | load     | Load 70   |
+    And the next workout card shows no workout chart
+
+  Scenario: With the chart plugin the chart says the duration and the load itself
+    Given intervals.icu plans "Sweet Spot 3x12" on "2026-11-04" with the steps:
+      | step     | duration | power  |
+      | warmup   | 10m      | 50-75% |
+      | repeat   | 3x       |        |
+      | -        | 12m      | 90%    |
+      | -        | 4m       | 55%    |
+      | cooldown | 5m       | 60-40% |
+    When the host has started
+    And the ridrs UI is shown
+    Then the next workout card shows a workout chart saying "63 min · TSS 68"
 
   Scenario: Enter on the card opens the details, Back returns
     Given intervals.icu plans "Sweet Spot 3x12" on "2026-11-04" with the description "Stay seated in the intervals." and the steps:

@@ -1,0 +1,27 @@
+{
+  "id": "ui-workout-chart",
+  "name": "Workout Chart",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "provides": [
+      {
+        "capability": "ui.workout-chart",
+        "export": "WorkoutChart"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": []
+    },
+    "state": [
+      "app.language"
+    ]
+  }
+}

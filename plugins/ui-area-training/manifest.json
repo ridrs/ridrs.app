@@ -48,6 +48,7 @@
     },
     "state": [
       "app.language",
+      "athlete.profile",
       "data.source",
       "training.calendar",
       "training.history",
@@ -58,6 +59,9 @@
       "training.calendar.plan",
       "training.calendar.move",
       "training.library.load"
+    ],
+    "uses": [
+      "ui.workout-chart"
     ]
   }
 }

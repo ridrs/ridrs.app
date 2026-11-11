@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { CompletedWorkout, PlannedWorkout } from '@ridrs/contracts';
+import type { CompletedWorkout, PlannedWorkout, Workout as CanonicalWorkout } from '@ridrs/contracts';
 
 export const WEEKDAYS = [
   'Monday',
@@ -183,6 +183,8 @@ export interface PlannedItem {
   /** What the matching of a day with its rides compares, where the provider has it. */
   readonly durationSeconds?: number;
   readonly trainingLoad?: number;
+  /** What the calendar draws as a micro chart: the workout's structure, when the provider has it. */
+  readonly chart?: CanonicalWorkout;
   /** Shown at once, not yet taken by the calendar's provider. */
   readonly pending?: true;
 }

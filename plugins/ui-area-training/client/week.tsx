@@ -11,6 +11,7 @@ import {
   trainingCalendarPlanService,
   trainingCalendarState,
   trainingHistoryState,
+  type Workout,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
@@ -37,6 +38,7 @@ import {
   withPending,
 } from './calendar.ts';
 import { messages } from './i18n/index.ts';
+import { chartWorkout, useChartAthlete, WorkoutChartSlot } from './workout-chart.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
 const CHEVRON_LEFT = new URL('./assets/icons/chevron-left.svg', import.meta.url).href;
@@ -136,6 +138,7 @@ export function useWeek(ctx: UiContext) {
         ...(minutes(workout.durationSeconds) ? { detail: minutes(workout.durationSeconds) as string } : {}),
         ...(workout.durationSeconds === undefined ? {} : { durationSeconds: workout.durationSeconds }),
         ...(workout.trainingLoad === undefined ? {} : { trainingLoad: workout.trainingLoad }),
+        ...(chartWorkout(workout) ? { chart: chartWorkout(workout) as Workout } : {}),
       }));
     return withPending(entries, date, shownPending, claims.current);
   };
@@ -348,6 +351,7 @@ function Day({
   const { today, drag, setDrag } = week;
   const past = date < today;
   const { open, done } = week.day(date);
+  const athlete = useChartAthlete(ctx);
   return (
     <div
       className={className}
@@ -385,6 +389,7 @@ function Day({
             onDragEnd={() => setDrag(undefined)}
           >
             <span className="tw-entry-name">{entry.kind === 'workout' ? entry.title : text.kinds[entry.kind]}</span>
+            {entry.chart ? <WorkoutChartSlot ctx={ctx} workout={entry.chart} athlete={athlete} variant="micro" /> : null}
             {entry.pending ? (
               <span className="tw-entry-label">{text.saving}</span>
             ) : entry.detail ? (

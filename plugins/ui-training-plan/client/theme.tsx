@@ -36,10 +36,10 @@ const CSS = `
   line-clamp: 2; overflow-wrap: anywhere; }
 .rt-facts { display: flex; flex-wrap: wrap; gap: 0 6px; color: ${COLORS.muted}; }
 .rt-facts > span + span::before { content: "·"; margin-right: 6px; }
-.rt-profile { grid-column: 1 / -1; }
 .rt-facts { display: flex; gap: 14px; color: ${COLORS.muted}; }
-.rt-profile { display: flex; align-items: flex-end; gap: 2px; height: 36px; margin-top: 6px; }
-.rt-profile i { display: block; min-width: 2px; border-radius: 2px 2px 0 0; opacity: .85; }
+.rt-profile { grid-column: 1 / -1; margin-top: 6px; }
+.tr-chart { pointer-events: none; }
+.tr-chart:empty { display: none; }
 .rt-button:hover { border-color: ${COLORS.cyan}; }
 .rt-card:hover .rt-name { color: ${COLORS.cyan}; }
 .rt-button:focus-visible { outline: 2px solid ${COLORS.lime}; outline-offset: 2px; }

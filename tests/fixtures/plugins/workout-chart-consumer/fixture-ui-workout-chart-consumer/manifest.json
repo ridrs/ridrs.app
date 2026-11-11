@@ -1,0 +1,15 @@
+{
+  "id": "fixture-ui-workout-chart-consumer",
+  "name": "Workout Chart Consumer (fixture)",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.js",
+    "screens": [{ "id": "chart-fixture", "export": "ChartScreen" }],
+    "contributions": [{ "id": "entry", "extensionPoint": "menu/item", "export": "ChartEntry" }],
+    "uses": ["ui.workout-chart"]
+  }
+}

@@ -19,7 +19,7 @@ import {
 } from '@ridrs/contracts';
 import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
-import { type ReactNode, useEffect, useLayoutEffect, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   accountMessage,
@@ -34,7 +34,8 @@ import {
   unrolled,
 } from './format.ts';
 import { type Messages, messages } from './i18n/index.ts';
-import { COLORS, TrainingStyles } from './theme.tsx';
+import { TrainingStyles } from './theme.tsx';
+import { chartAthlete, chartWorkout, WorkoutChartSlot } from './workout-chart.tsx';
 
 /** The screens this plugin moves between. */
 const MAIN = 'main';
@@ -103,29 +104,29 @@ function callAccount(ctx: UiContext, service: ServiceDefinition<{ readonly key: 
 const nextWorkout = (plan: Plan | undefined): PlannedWorkout | undefined =>
   plan?.workouts[0];
 
-function PowerProfile({ workout, ftp }: { readonly workout: PlannedWorkout; readonly ftp?: number }) {
-  const intervals = unrolled(workout.steps);
-  if (intervals.length === 0) {
+/** The workout's chart (`mini`); the facts beside it are the tile's own text while it is not drawn. */
+function Profile({
+  ctx,
+  workout,
+  athlete,
+  onDrawn,
+}: {
+  readonly ctx: UiContext;
+  readonly workout: PlannedWorkout;
+  readonly athlete: AthleteProfile | undefined;
+  readonly onDrawn: (drawn: boolean) => void;
+}) {
+  const chart = chartWorkout(workout);
+  const colours = useMemo(() => chartAthlete(athlete), [athlete]);
+  useEffect(() => {
+    if (!chart) onDrawn(false);
+  }, [chart, onDrawn]);
+  if (!chart) {
     return null;
   }
-  const top = Math.max(120, ...intervals.map((step) => meanPercent(step, ftp)));
   return (
-    <div className="rt-profile" data-testid="next-workout-profile" aria-hidden="true">
-      {intervals.map((step, index) => {
-        const percent = meanPercent(step, ftp);
-        return (
-          <i
-            // biome-ignore lint/suspicious/noArrayIndexKey: the bars are positional and never reorder.
-            key={index}
-            data-bar
-            style={{
-              flexGrow: Math.max(stepSeconds(step), 1),
-              height: `${Math.max(8, (percent / top) * 100)}%`,
-              background: percent >= 105 ? COLORS.red : percent >= 88 ? COLORS.amber : COLORS.cyan,
-            }}
-          />
-        );
-      })}
+    <div className="rt-profile" data-testid="next-workout-chart">
+      <WorkoutChartSlot ctx={ctx} workout={chart} athlete={colours} variant="mini" onAvailability={onDrawn} />
     </div>
   );
 }
@@ -250,6 +251,8 @@ function NextWorkoutCard({
   readonly children?: ReactNode;
 }) {
   const workout = nextWorkout(plan);
+  // The chart says duration and load itself; without it the tile does.
+  const [drawn, setDrawn] = useState(false);
   return (
     <section className="rt-panel" data-testid="training-account">
       <TrainingStyles />
@@ -274,14 +277,14 @@ function NextWorkoutCard({
             </span>
             <span className="rt-facts">
               <span data-testid="next-workout-day">{dayLabel(workout.date, Date.now(), text)}</span>
-              {workout.durationSeconds !== undefined ? (
+              {!drawn && workout.durationSeconds !== undefined ? (
                 <span data-testid="next-workout-duration">{durationLabel(workout.durationSeconds)}</span>
               ) : null}
-              {workout.trainingLoad !== undefined ? (
+              {!drawn && workout.trainingLoad !== undefined ? (
                 <span data-testid="next-workout-load">{text.load(Math.round(workout.trainingLoad))}</span>
               ) : null}
             </span>
-            <PowerProfile workout={workout} {...(plan?.athlete?.ftp !== undefined ? { ftp: plan.athlete.ftp } : {})} />
+            <Profile ctx={ctx} workout={workout} athlete={plan?.athlete} onDrawn={setDrawn} />
           </>
         ) : (
           <span className="rt-name rt-muted">{plan ? text.nonePlanned : text.loadingDots}</span>
