@@ -1,18 +1,17 @@
 {
   "format": "ridrs-workout",
   "version": 1,
-  "id": "microbursts-30-30",
-  "name": "Microbursts 30/30",
-  "description": "Three 10-second max efforts in the warm-up, then two sets of ten 30-second bursts at 130 % FTP with 30 seconds easy. The two sets are written out, since ZWO has no nested repeats.",
+  "id": "race-primer",
+  "name": "Race Primer",
+  "description": "The day before a race or test: three high-cadence spin-ups, two 4-minute efforts at FTP and one 15-second sprint. Enough intensity to feel sharp, not enough to tire you.",
   "sport": "virtual-ride",
   "author": "ridrs",
   "license": "CC-BY-SA-4.0",
-  "category": "Anaerobic",
-  "focus": "anaerobic",
+  "category": "Openers",
   "source": {
     "kind": "builtin",
     "format": "zwo",
-    "fileName": "microbursts-30-30.zwo"
+    "fileName": "race-primer.zwo"
   },
   "steps": [
     {
@@ -21,7 +20,7 @@
       "intensity": "warm-up",
       "duration": {
         "kind": "time",
-        "seconds": 480
+        "seconds": 900
       },
       "effort": {
         "kind": "target",
@@ -37,6 +36,12 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Warmup",
@@ -53,26 +58,7 @@
       "id": "2",
       "duration": {
         "kind": "time",
-        "seconds": 10
-      },
-      "effort": {
-        "kind": "max-effort"
-      },
-      "extensions": {
-        "zwo": {
-          "element": "MaxEffort",
-          "attributeOrder": [
-            "Duration"
-          ]
-        }
-      }
-    },
-    {
-      "kind": "interval",
-      "id": "3",
-      "duration": {
-        "kind": "time",
-        "seconds": 50
+        "seconds": 180
       },
       "effort": {
         "kind": "target",
@@ -84,12 +70,102 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        },
+        {
+          "offsetSeconds": 165,
+          "text": "Next: three spin-ups at 110 rpm."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "SteadyState",
           "attributeOrder": [
             "Duration",
             "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "3",
+      "until": {
+        "kind": "count",
+        "reps": 3
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "3.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 30
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 115,
+                "high": 115
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 110,
+                  "high": 110
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 90
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 85,
+                  "high": 85
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower",
+            "Cadence",
+            "CadenceResting"
           ]
         }
       }
@@ -99,43 +175,94 @@
       "id": "4",
       "duration": {
         "kind": "time",
-        "seconds": 10
-      },
-      "effort": {
-        "kind": "max-effort"
-      },
-      "extensions": {
-        "zwo": {
-          "element": "MaxEffort",
-          "attributeOrder": [
-            "Duration"
-          ]
-        }
-      }
-    },
-    {
-      "kind": "interval",
-      "id": "5",
-      "duration": {
-        "kind": "time",
-        "seconds": 50
+        "seconds": 180
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 50,
-            "high": 50
+            "low": 60,
+            "high": 60
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        },
+        {
+          "offsetSeconds": 165,
+          "text": "Next: 2 × 4 minutes at FTP. Race pace, controlled."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "SteadyState",
           "attributeOrder": [
             "Duration",
             "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "5",
+      "until": {
+        "kind": "count",
+        "reps": 2
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "5.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 100,
+                "high": 100
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "5.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 60,
+                "high": 60
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower"
           ]
         }
       }
@@ -145,16 +272,34 @@
       "id": "6",
       "duration": {
         "kind": "time",
-        "seconds": 10
+        "seconds": 120
       },
       "effort": {
-        "kind": "max-effort"
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 60,
+            "high": 60
+          }
+        }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        },
+        {
+          "offsetSeconds": 105,
+          "text": "Next: one 15-second sprint, out of the saddle."
+        }
+      ],
       "extensions": {
         "zwo": {
-          "element": "MaxEffort",
+          "element": "SteadyState",
           "attributeOrder": [
-            "Duration"
+            "Duration",
+            "Power"
           ]
         }
       }
@@ -164,94 +309,51 @@
       "id": "7",
       "duration": {
         "kind": "time",
-        "seconds": 290
+        "seconds": 15
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 50,
-            "high": 50
+            "low": 150,
+            "high": 150
           }
-        }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 110,
+              "high": 110
+            }
+          }
+        ]
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Full gas."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "SteadyState",
           "attributeOrder": [
             "Duration",
-            "Power"
+            "Power",
+            "Cadence"
           ]
         }
       }
     },
     {
-      "kind": "repeat",
+      "kind": "interval",
       "id": "8",
-      "until": {
-        "kind": "count",
-        "reps": 10
-      },
-      "steps": [
-        {
-          "kind": "interval",
-          "id": "8.1",
-          "intensity": "interval",
-          "duration": {
-            "kind": "time",
-            "seconds": 30
-          },
-          "effort": {
-            "kind": "target",
-            "primary": {
-              "unit": "percent-ftp",
-              "start": {
-                "low": 130,
-                "high": 130
-              }
-            }
-          }
-        },
-        {
-          "kind": "interval",
-          "id": "8.2",
-          "intensity": "recovery",
-          "duration": {
-            "kind": "time",
-            "seconds": 30
-          },
-          "effort": {
-            "kind": "target",
-            "primary": {
-              "unit": "percent-ftp",
-              "start": {
-                "low": 50,
-                "high": 50
-              }
-            }
-          }
-        }
-      ],
-      "extensions": {
-        "zwo": {
-          "element": "IntervalsT",
-          "attributeOrder": [
-            "Repeat",
-            "OnDuration",
-            "OffDuration",
-            "OnPower",
-            "OffPower"
-          ]
-        }
-      }
-    },
-    {
-      "kind": "interval",
-      "id": "9",
+      "intensity": "cool-down",
       "duration": {
         "kind": "time",
-        "seconds": 300
+        "seconds": 600
       },
       "effort": {
         "kind": "target",
@@ -260,102 +362,26 @@
           "start": {
             "low": 50,
             "high": 50
+          },
+          "end": {
+            "low": 35,
+            "high": 35
           }
         }
       },
-      "extensions": {
-        "zwo": {
-          "element": "SteadyState",
-          "attributeOrder": [
-            "Duration",
-            "Power"
-          ]
-        }
-      }
-    },
-    {
-      "kind": "repeat",
-      "id": "10",
-      "until": {
-        "kind": "count",
-        "reps": 10
-      },
-      "steps": [
+      "cues": [
         {
-          "kind": "interval",
-          "id": "10.1",
-          "intensity": "interval",
-          "duration": {
-            "kind": "time",
-            "seconds": 30
-          },
-          "effort": {
-            "kind": "target",
-            "primary": {
-              "unit": "percent-ftp",
-              "start": {
-                "low": 130,
-                "high": 130
-              }
-            }
-          }
-        },
-        {
-          "kind": "interval",
-          "id": "10.2",
-          "intensity": "recovery",
-          "duration": {
-            "kind": "time",
-            "seconds": 30
-          },
-          "effort": {
-            "kind": "target",
-            "primary": {
-              "unit": "percent-ftp",
-              "start": {
-                "low": 50,
-                "high": 50
-              }
-            }
-          }
+          "offsetSeconds": 0,
+          "text": "Done. Keep the rest of the day easy."
         }
       ],
       "extensions": {
         "zwo": {
-          "element": "IntervalsT",
-          "attributeOrder": [
-            "Repeat",
-            "OnDuration",
-            "OffDuration",
-            "OnPower",
-            "OffPower"
-          ]
-        }
-      }
-    },
-    {
-      "kind": "interval",
-      "id": "11",
-      "duration": {
-        "kind": "time",
-        "seconds": 300
-      },
-      "effort": {
-        "kind": "target",
-        "primary": {
-          "unit": "percent-ftp",
-          "start": {
-            "low": 50,
-            "high": 50
-          }
-        }
-      },
-      "extensions": {
-        "zwo": {
-          "element": "SteadyState",
+          "element": "Cooldown",
           "attributeOrder": [
             "Duration",
-            "Power"
+            "PowerLow",
+            "PowerHigh"
           ]
         }
       }

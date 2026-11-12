@@ -1,0 +1,346 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "diesel-and-punch",
+  "name": "Diesel and Punch",
+  "description": "Two 20-minute sweet-spot blocks at 90 % FTP, then twenty 30/30s at 135 %. The 30/30s come on tired legs, like surges late in a race.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Sweet spot",
+  "focus": "sweet-spot",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "diesel-and-punch.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 45,
+            "high": 45
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Next: 2 × 20 minutes sweet spot."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "duration": {
+        "kind": "time",
+        "seconds": 1200
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Block 1 of 2: smooth and steady."
+        },
+        {
+          "offsetSeconds": 600,
+          "text": "Halfway."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 1200
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Block 2 of 2. Same pressure, stay patient."
+        },
+        {
+          "offsetSeconds": 600,
+          "text": "Halfway."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        },
+        {
+          "offsetSeconds": 285,
+          "text": "Next: 20 × 30/30. Hard on, really easy off."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "7",
+      "until": {
+        "kind": "count",
+        "reps": 20
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "7.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 30
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 135,
+                "high": 135
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "7.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 30
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "8",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 35,
+            "high": 35
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down. Solid work."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

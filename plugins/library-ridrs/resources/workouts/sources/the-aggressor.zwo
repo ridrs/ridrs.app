@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>The Aggressor</name>
+  <description>Race simulation: two breakaways (1 minute at 115 % FTP, then 4 at 95 %), 20 minutes of sweet spot, then three attacks: 35 seconds at 150 %, straight into 2 minutes at 105 %. Practises going hard and then holding the pace instead of sitting up.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="900" PowerLow="0.50" PowerHigh="0.75">
+      <textevent timeoffset="0" message="Roll in."/>
+    </Warmup>
+    <SteadyState Duration="60" Power="1.15" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Breakaway 1 of 2: go hard for a minute."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.95" Cadence="92">
+      <textevent timeoffset="0" message="Hold the gap. Don't ease off."/>
+    </SteadyState>
+    <SteadyState Duration="180" Power="0.55">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.15" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Breakaway 2 of 2: go hard for a minute."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.95" Cadence="92">
+      <textevent timeoffset="0" message="Hold the gap. Don't ease off."/>
+    </SteadyState>
+    <SteadyState Duration="180" Power="0.55">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="1200" Power="0.92" Cadence="95">
+      <textevent timeoffset="0" message="20 minutes in the bunch: steady sweet spot."/>
+      <textevent timeoffset="600" message="Halfway."/>
+      <textevent timeoffset="1185" message="First attack in 15 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="35" Power="1.50" CadenceLow="105" CadenceHigh="115">
+      <textevent timeoffset="0" message="Attack 1 of 3: out of the saddle."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="1.05" Cadence="100">
+      <textevent timeoffset="0" message="Hold it. Don't sit up."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="35" Power="1.50" CadenceLow="105" CadenceHigh="115">
+      <textevent timeoffset="0" message="Attack 2 of 3: out of the saddle."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="1.05" Cadence="100">
+      <textevent timeoffset="0" message="Hold it. Don't sit up."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="35" Power="1.50" CadenceLow="105" CadenceHigh="115">
+      <textevent timeoffset="0" message="Attack 3 of 3: out of the saddle."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="1.05" Cadence="100">
+      <textevent timeoffset="0" message="Hold it. Don't sit up."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <Cooldown Duration="600" PowerLow="0.50" PowerHigh="0.35">
+      <textevent timeoffset="0" message="Spin down."/>
+    </Cooldown>
+  </workout>
+</workout_file>

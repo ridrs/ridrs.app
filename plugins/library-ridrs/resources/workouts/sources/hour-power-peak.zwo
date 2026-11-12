@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Hour Power Peak</name>
+  <description>75 minutes without a break between 87 and 98 % FTP (about 92 % on average), with the cadence changing from 80 to 100 rpm. Long sustained work near threshold, as on a long climb or in a time trial; the gear changes keep it from going stale.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="600" PowerLow="0.50" PowerHigh="0.70">
+      <textevent timeoffset="0" message="Roll in."/>
+    </Warmup>
+    <SteadyState Duration="300" Power="0.60">
+      <textevent timeoffset="0" message="Easy. Three short openers next."/>
+    </SteadyState>
+    <IntervalsT Repeat="3" OnDuration="30" OffDuration="90" OnPower="1.05" OffPower="0.50" Cadence="100" CadenceResting="85"/>
+    <SteadyState Duration="120" Power="0.50">
+      <textevent timeoffset="0" message="Easy. Next: 75 minutes, no break."/>
+      <textevent timeoffset="105" message="Start controlled."/>
+    </SteadyState>
+    <SteadyState Duration="600" Power="0.90" Cadence="85">
+      <textevent timeoffset="0" message="1 of 8: find the rhythm."/>
+    </SteadyState>
+    <SteadyState Duration="480" Power="0.95" Cadence="92">
+      <textevent timeoffset="0" message="2 of 8: first surge, cadence up."/>
+    </SteadyState>
+    <SteadyState Duration="720" Power="0.88" Cadence="80">
+      <textevent timeoffset="0" message="3 of 8: heavier gear. Keep it above 80 rpm."/>
+    </SteadyState>
+    <SteadyState Duration="420" Power="0.97" Cadence="100">
+      <textevent timeoffset="0" message="4 of 8: high cadence, same smooth pressure."/>
+    </SteadyState>
+    <SteadyState Duration="900" Power="0.91" Cadence="85">
+      <textevent timeoffset="0" message="5 of 8: the long one. Steady, no spikes."/>
+      <textevent timeoffset="450" message="Halfway."/>
+    </SteadyState>
+    <SteadyState Duration="540" Power="0.93" Cadence="82">
+      <textevent timeoffset="0" message="6 of 8: heavy gear again."/>
+    </SteadyState>
+    <SteadyState Duration="360" Power="0.98" Cadence="95">
+      <textevent timeoffset="0" message="7 of 8: the hardest section."/>
+    </SteadyState>
+    <SteadyState Duration="480" Power="0.87" Cadence="88">
+      <textevent timeoffset="0" message="Last section. A touch easier; hold it to the end."/>
+    </SteadyState>
+    <Cooldown Duration="600" PowerLow="0.50" PowerHigh="0.35">
+      <textevent timeoffset="0" message="Done. 75 minutes near threshold."/>
+    </Cooldown>
+  </workout>
+</workout_file>

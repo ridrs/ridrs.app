@@ -1,0 +1,206 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "vo2max-4x4",
+  "name": "VO2max 4×4",
+  "description": "Four 4-minute efforts at 115 % FTP with 4 easy minutes between them: the classic VO2max set in under an hour. Aim for even power across all four; the last should be hard, not a fight.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "VO2max",
+  "focus": "vo2max",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "vo2max-4x4.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 45,
+            "high": 45
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 65,
+            "high": 65
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in."
+        },
+        {
+          "offsetSeconds": 225,
+          "text": "Next: 4 × 4 minutes. Even pacing across all four."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "3",
+      "until": {
+        "kind": "count",
+        "reps": 4
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "3.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 115,
+                "high": 115
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 240
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 420
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 35,
+            "high": 35
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

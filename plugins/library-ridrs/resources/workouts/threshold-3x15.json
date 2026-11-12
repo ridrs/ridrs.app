@@ -1,18 +1,18 @@
 {
   "format": "ridrs-workout",
   "version": 1,
-  "id": "vo2max-5x4",
-  "name": "VO2max 5×4",
-  "description": "Five 4-minute efforts at 115 % FTP with 95-105 rpm, each followed by 4 minutes easy.",
+  "id": "threshold-3x15",
+  "name": "Threshold Foundation 3×15",
+  "description": "Three 15-minute blocks at 98 % FTP and 85–95 rpm with 5 easy minutes between them. Close to your limit but sustainable; if you can't hold the power, take 2–3 % off and finish the block.",
   "sport": "virtual-ride",
   "author": "ridrs",
   "license": "CC-BY-SA-4.0",
-  "category": "VO2max",
-  "focus": "vo2max",
+  "category": "Threshold",
+  "focus": "threshold",
   "source": {
     "kind": "builtin",
     "format": "zwo",
-    "fileName": "vo2max-5x4.zwo"
+    "fileName": "threshold-3x15.zwo"
   },
   "steps": [
     {
@@ -21,7 +21,7 @@
       "intensity": "warm-up",
       "duration": {
         "kind": "time",
-        "seconds": 600
+        "seconds": 1200
       },
       "effort": {
         "kind": "target",
@@ -37,6 +37,16 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        },
+        {
+          "offsetSeconds": 1185,
+          "text": "Next: 3 × 15 minutes at threshold. Pace the first one."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Warmup",
@@ -53,7 +63,7 @@
       "id": "2",
       "until": {
         "kind": "count",
-        "reps": 5
+        "reps": 3
       },
       "steps": [
         {
@@ -62,23 +72,23 @@
           "intensity": "interval",
           "duration": {
             "kind": "time",
-            "seconds": 240
+            "seconds": 900
           },
           "effort": {
             "kind": "target",
             "primary": {
               "unit": "percent-ftp",
               "start": {
-                "low": 115,
-                "high": 115
+                "low": 98,
+                "high": 98
               }
             },
             "secondary": [
               {
                 "unit": "rpm",
                 "start": {
-                  "low": 95,
-                  "high": 105
+                  "low": 85,
+                  "high": 95
                 }
               }
             ]
@@ -90,7 +100,7 @@
           "intensity": "recovery",
           "duration": {
             "kind": "time",
-            "seconds": 240
+            "seconds": 300
           },
           "effort": {
             "kind": "target",
@@ -125,22 +135,28 @@
       "intensity": "cool-down",
       "duration": {
         "kind": "time",
-        "seconds": 300
+        "seconds": 600
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 60,
-            "high": 60
+            "low": 50,
+            "high": 50
           },
           "end": {
-            "low": 40,
-            "high": 40
+            "low": 35,
+            "high": 35
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Cooldown",

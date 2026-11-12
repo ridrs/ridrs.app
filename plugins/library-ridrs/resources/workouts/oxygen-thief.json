@@ -1,0 +1,1125 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "oxygen-thief",
+  "name": "Oxygen Thief 7×4",
+  "description": "Seven 4-minute VO2max efforts that start with 45 seconds at 135 % FTP, then hold 115 %. The fast start raises oxygen uptake sooner, so more of each rep is spent near VO2max. 3½ easy minutes between reps, zone 2 to finish.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "VO2max",
+  "focus": "vo2max",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "oxygen-thief.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 75,
+            "high": 75
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Next: three short openers."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "3",
+      "until": {
+        "kind": "count",
+        "reps": 3
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "3.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 15
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 150,
+                "high": 150
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 110,
+                  "high": 110
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 45
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy. Next: 7 × 4 minutes, each with a hard start."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 45
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 135,
+            "high": 135
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Rep 1 of 7: hard start, 45 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "duration": {
+        "kind": "time",
+        "seconds": 195
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in. If you fade, take 5 % off; don't stop."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "7",
+      "duration": {
+        "kind": "time",
+        "seconds": 210
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "8",
+      "duration": {
+        "kind": "time",
+        "seconds": 45
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 135,
+            "high": 135
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Rep 2 of 7: hard start, 45 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "9",
+      "duration": {
+        "kind": "time",
+        "seconds": 195
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in. If you fade, take 5 % off; don't stop."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "10",
+      "duration": {
+        "kind": "time",
+        "seconds": 210
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "11",
+      "duration": {
+        "kind": "time",
+        "seconds": 45
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 135,
+            "high": 135
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Rep 3 of 7: hard start, 45 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "12",
+      "duration": {
+        "kind": "time",
+        "seconds": 195
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in. If you fade, take 5 % off; don't stop."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "13",
+      "duration": {
+        "kind": "time",
+        "seconds": 210
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "14",
+      "duration": {
+        "kind": "time",
+        "seconds": 45
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 135,
+            "high": 135
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Rep 4 of 7: hard start, 45 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "15",
+      "duration": {
+        "kind": "time",
+        "seconds": 195
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in. If you fade, take 5 % off; don't stop."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "16",
+      "duration": {
+        "kind": "time",
+        "seconds": 210
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "17",
+      "duration": {
+        "kind": "time",
+        "seconds": 45
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 135,
+            "high": 135
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Rep 5 of 7: hard start, 45 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "18",
+      "duration": {
+        "kind": "time",
+        "seconds": 195
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in. If you fade, take 5 % off; don't stop."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "19",
+      "duration": {
+        "kind": "time",
+        "seconds": 210
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "20",
+      "duration": {
+        "kind": "time",
+        "seconds": 45
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 135,
+            "high": 135
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Rep 6 of 7: hard start, 45 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "21",
+      "duration": {
+        "kind": "time",
+        "seconds": 195
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in. If you fade, take 5 % off; don't stop."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "22",
+      "duration": {
+        "kind": "time",
+        "seconds": 210
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "23",
+      "duration": {
+        "kind": "time",
+        "seconds": 45
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 135,
+            "high": 135
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Last rep: hard start, 45 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "24",
+      "duration": {
+        "kind": "time",
+        "seconds": 195
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Settle in. If you fade, take 5 % off; don't stop."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "25",
+      "duration": {
+        "kind": "time",
+        "seconds": 210
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "26",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 68,
+            "high": 68
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Zone 2 to finish. Smooth pedalling."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "27",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 35,
+            "high": 35
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down. Seven done."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

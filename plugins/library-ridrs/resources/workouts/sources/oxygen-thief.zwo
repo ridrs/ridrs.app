@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Oxygen Thief 7×4</name>
+  <description>Seven 4-minute VO2max efforts that start with 45 seconds at 135 % FTP, then hold 115 %. The fast start raises oxygen uptake sooner, so more of each rep is spent near VO2max. 3½ easy minutes between reps, zone 2 to finish.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="900" PowerLow="0.50" PowerHigh="0.75">
+      <textevent timeoffset="0" message="Roll in."/>
+    </Warmup>
+    <SteadyState Duration="120" Power="0.50">
+      <textevent timeoffset="0" message="Next: three short openers."/>
+    </SteadyState>
+    <IntervalsT Repeat="3" OnDuration="15" OffDuration="45" OnPower="1.50" OffPower="0.50" Cadence="110"/>
+    <SteadyState Duration="120" Power="0.50">
+      <textevent timeoffset="0" message="Easy. Next: 7 × 4 minutes, each with a hard start."/>
+    </SteadyState>
+    <SteadyState Duration="45" Power="1.35" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Rep 1 of 7: hard start, 45 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="195" Power="1.15" CadenceLow="95" CadenceHigh="105">
+      <textevent timeoffset="0" message="Settle in. If you fade, take 5 % off; don't stop."/>
+    </SteadyState>
+    <SteadyState Duration="210" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="45" Power="1.35" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Rep 2 of 7: hard start, 45 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="195" Power="1.15" CadenceLow="95" CadenceHigh="105">
+      <textevent timeoffset="0" message="Settle in. If you fade, take 5 % off; don't stop."/>
+    </SteadyState>
+    <SteadyState Duration="210" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="45" Power="1.35" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Rep 3 of 7: hard start, 45 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="195" Power="1.15" CadenceLow="95" CadenceHigh="105">
+      <textevent timeoffset="0" message="Settle in. If you fade, take 5 % off; don't stop."/>
+    </SteadyState>
+    <SteadyState Duration="210" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="45" Power="1.35" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Rep 4 of 7: hard start, 45 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="195" Power="1.15" CadenceLow="95" CadenceHigh="105">
+      <textevent timeoffset="0" message="Settle in. If you fade, take 5 % off; don't stop."/>
+    </SteadyState>
+    <SteadyState Duration="210" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="45" Power="1.35" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Rep 5 of 7: hard start, 45 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="195" Power="1.15" CadenceLow="95" CadenceHigh="105">
+      <textevent timeoffset="0" message="Settle in. If you fade, take 5 % off; don't stop."/>
+    </SteadyState>
+    <SteadyState Duration="210" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="45" Power="1.35" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Rep 6 of 7: hard start, 45 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="195" Power="1.15" CadenceLow="95" CadenceHigh="105">
+      <textevent timeoffset="0" message="Settle in. If you fade, take 5 % off; don't stop."/>
+    </SteadyState>
+    <SteadyState Duration="210" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="45" Power="1.35" CadenceLow="100" CadenceHigh="110">
+      <textevent timeoffset="0" message="Last rep: hard start, 45 seconds."/>
+    </SteadyState>
+    <SteadyState Duration="195" Power="1.15" CadenceLow="95" CadenceHigh="105">
+      <textevent timeoffset="0" message="Settle in. If you fade, take 5 % off; don't stop."/>
+    </SteadyState>
+    <SteadyState Duration="210" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="900" Power="0.68">
+      <textevent timeoffset="0" message="Zone 2 to finish. Smooth pedalling."/>
+    </SteadyState>
+    <Cooldown Duration="300" PowerLow="0.50" PowerHigh="0.35">
+      <textevent timeoffset="0" message="Spin down. Seven done."/>
+    </Cooldown>
+  </workout>
+</workout_file>

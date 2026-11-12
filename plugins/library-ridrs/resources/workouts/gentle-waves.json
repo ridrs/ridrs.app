@@ -1,0 +1,355 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "gentle-waves",
+  "name": "Gentle Waves",
+  "description": "Zone 2 with some movement: three 15-minute waves rising from 60 to 70 % FTP, 5 easy minutes after each, then 20 steady minutes at 65 %. Aerobic volume, less monotony than a flat line.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Endurance",
+  "focus": "endurance",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "gentle-waves.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 45,
+            "high": 45
+          },
+          "end": {
+            "low": 60,
+            "high": 60
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 60,
+            "high": 60
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Wave 1 of 3: a slow rise to 70 %. Breathing stays easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Ramp",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Ease off. Good moment to drink."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 60,
+            "high": 60
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Wave 2 of 3."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Ramp",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Ease off."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 60,
+            "high": 60
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Wave 3 of 3."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Ramp",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "7",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Ease off."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "8",
+      "duration": {
+        "kind": "time",
+        "seconds": 1200
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 65,
+            "high": 65
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "20 minutes steady. Smooth, even pedalling."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "9",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          },
+          "end": {
+            "low": 40,
+            "high": 40
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

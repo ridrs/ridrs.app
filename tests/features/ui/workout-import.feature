@@ -28,11 +28,11 @@ Feature: Importing workouts from files, a ZIP or pasted text
     And the preview of "sweet-spot-3x12.zwo" notes "Targets in % FTP, resolved with your FTP when the ride starts."
     When I press "Import"
     Then the import says "Imported 1 workout."
-    And the library "ridrs" holds 6 workouts
+    And the library "ridrs" holds 17 workouts
     And the library "ridrs" holds the workout "Sweet Spot 3x12" from the file "sweet-spot-3x12.zwo" under an id of its file name and the start of its hash
     And the original of the imported "Sweet Spot 3x12" is kept as an app file named by its SHA-256
     When the host restarts
-    Then the library "ridrs" holds 6 workouts
+    Then the library "ridrs" holds 17 workouts
 
   Scenario: A ZIP is unpacked and every workout in it gets a row
     Given the host has started
@@ -46,7 +46,7 @@ Feature: Importing workouts from files, a ZIP or pasted text
       | over-unders.mrc        | over-unders                         | 26 min 30 s | ✓     |
     When I press "Import"
     Then the import says "Imported 3 workouts."
-    And the library "ridrs" holds 8 workouts
+    And the library "ridrs" holds 19 workouts
 
   Scenario: A FIT workout in watts says it is ridden in watts
     Given the host has started
@@ -93,7 +93,7 @@ Feature: Importing workouts from files, a ZIP or pasted text
     Then the preview of "threshold-2x10.erg" has the state "⚠"
     And the preview of "threshold-2x10.erg" notes "Already in your library as “Threshold 2x10”."
     And the import button "Import" is disabled
-    And the library "ridrs" holds 6 workouts
+    And the library "ridrs" holds 17 workouts
 
   Scenario: The same file again can be imported as a copy with an id of its own
     Given the host has started
@@ -106,7 +106,7 @@ Feature: Importing workouts from files, a ZIP or pasted text
     And I choose "Import as a copy" for the duplicate "threshold-2x10.erg"
     And I press "Import"
     Then the import says "Imported 1 workout."
-    And the library "ridrs" holds 7 workouts
+    And the library "ridrs" holds 18 workouts
     And the library "ridrs" holds two workouts named "Threshold 2x10" with different ids
 
   Scenario: The same file twice in one go is one workout and a duplicate
@@ -117,7 +117,7 @@ Feature: Importing workouts from files, a ZIP or pasted text
     Then the preview of the second "over-unders.mrc" has the state "⚠"
     When I press "Import"
     Then the import says "Imported 1 workout."
-    And the library "ridrs" holds 6 workouts
+    And the library "ridrs" holds 17 workouts
 
   Scenario: A pasted intervals.icu text is a workout
     Given the host has started

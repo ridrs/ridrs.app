@@ -17,6 +17,7 @@ ridrs needs workouts of its own: the Training area shows placeholders. The maint
 - **Licence:** the built-in workouts are **CC-BY-SA-4.0**, with `author` and `license` in each file's metadata. Whether purely AI-generated content is protected by copyright is open; the notice touches no one else's rights and does no harm.
 - **Conversion:** `pnpm workouts:convert` writes the canonical files from the sources with **the same importers** as the rider's import. A test checks that every canonical file is valid and matches its source: a forgotten conversion fails the build. At run time the catalogue loads canonical files only.
 - **Working material:** five example workouts as ZWO sources (Sweet Spot 3×12, VO2max 5×4, Over-Unders 3×(4×3′), Endurance 75 with drills, Microbursts 30/30), written for ridrs under CC-BY-SA-4.0. They replace the placeholders and are replaced or joined by the maintainer's workouts later.
+  - *2026-11-12:* replaced by a selection of 15 of the maintainer's own workouts (one or more of each kind: recovery, endurance, low cadence, tempo, sweet spot, threshold, over-unders, VO2max, anaerobic, openers), cleaned up and published as `ridrs` under CC-BY-SA-4.0. Sweet Spot 3×12 stays as the short classic; the other four examples went, as the new workouts cover them.
 - The conversion script is AGPL-3.0-or-later, like the plugin.
 
 ## Consequences

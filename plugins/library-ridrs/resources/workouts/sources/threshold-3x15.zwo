@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Threshold Foundation 3×15</name>
+  <description>Three 15-minute blocks at 98 % FTP and 85–95 rpm with 5 easy minutes between them. Close to your limit but sustainable; if you can't hold the power, take 2–3 % off and finish the block.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="1200" PowerLow="0.50" PowerHigh="0.75">
+      <textevent timeoffset="0" message="Roll in."/>
+      <textevent timeoffset="1185" message="Next: 3 × 15 minutes at threshold. Pace the first one."/>
+    </Warmup>
+    <IntervalsT Repeat="3" OnDuration="900" OffDuration="300" OnPower="0.98" OffPower="0.50" CadenceLow="85" CadenceHigh="95"/>
+    <Cooldown Duration="600" PowerLow="0.50" PowerHigh="0.35">
+      <textevent timeoffset="0" message="Spin down."/>
+    </Cooldown>
+  </workout>
+</workout_file>

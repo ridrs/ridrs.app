@@ -1,0 +1,250 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "recovery-spin-ups",
+  "name": "Recovery Spin-Ups",
+  "description": "An easy hour at 55 % FTP with four 1-minute spin-ups at 100–110 rpm: the legs move, the load stays low. For the day after a hard session. If the legs don't come around, cut it short.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Recovery",
+  "focus": "recovery",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "recovery-spin-ups.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 40,
+            "high": 40
+          },
+          "end": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy hour. Keep it truly easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 1200
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Conversational pace. Nothing here should feel like work."
+        },
+        {
+          "offsetSeconds": 1185,
+          "text": "Next: 4 spin-ups. Faster legs, same easy power."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "3",
+      "until": {
+        "kind": "count",
+        "reps": 4
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "3.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 60
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 100,
+                  "high": 110
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 120
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 55,
+                "high": 55
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 480
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Back to your natural cadence."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          },
+          "end": {
+            "low": 40,
+            "high": 40
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

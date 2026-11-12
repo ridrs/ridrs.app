@@ -3,7 +3,7 @@
   "version": 1,
   "id": "sweet-spot-3x12",
   "name": "Sweet Spot 3×12",
-  "description": "Three blocks of 12 minutes at 90 % FTP with 4 minutes easy between them.",
+  "description": "The short classic: three 12-minute blocks at 90 % FTP with 4 easy minutes between them. Hard but sustainable; a lot of aerobic work for an hour.",
   "sport": "virtual-ride",
   "author": "ridrs",
   "license": "CC-BY-SA-4.0",
@@ -37,6 +37,16 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        },
+        {
+          "offsetSeconds": 585,
+          "text": "Next: 3 × 12 minutes. Hard, but sustainable."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Warmup",
@@ -130,6 +140,12 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Cooldown",

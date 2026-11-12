@@ -1,0 +1,261 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "half-hour-twice",
+  "name": "Half Hour Twice",
+  "description": "Long tempo: two 30-minute blocks at 83 % FTP with 5 easy minutes between them. Breathing deeper but under control; it should feel steady, not like a threshold effort.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Tempo",
+  "focus": "tempo",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "half-hour-twice.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 45,
+            "high": 45
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy spin to open the legs."
+        },
+        {
+          "offsetSeconds": 885,
+          "text": "Next: 2 × 30 minutes tempo. Settle in, don't chase it."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 1800
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 83,
+            "high": 83
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Block 1 of 2: breathing deeper, still controlled."
+        },
+        {
+          "offsetSeconds": 900,
+          "text": "Halfway."
+        },
+        {
+          "offsetSeconds": 1500,
+          "text": "Last 5 minutes."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 1800
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 83,
+            "high": 83
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Block 2 of 2. Same rhythm as the first."
+        },
+        {
+          "offsetSeconds": 900,
+          "text": "Halfway."
+        },
+        {
+          "offsetSeconds": 1500,
+          "text": "Last 5 minutes."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          },
+          "end": {
+            "low": 40,
+            "high": 40
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

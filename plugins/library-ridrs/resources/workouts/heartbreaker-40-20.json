@@ -1,18 +1,18 @@
 {
   "format": "ridrs-workout",
   "version": 1,
-  "id": "over-unders-3x4x3",
-  "name": "Over-Unders 3×(4×3′)",
-  "description": "Three sets of four over-under cycles (2 minutes at 95 % FTP, 1 minute at 108 %), with 5 minutes easy after each set. ZWO has no nested repeats: the outer repeat is written out, the inner one is an IntervalsT.",
+  "id": "heartbreaker-40-20",
+  "name": "Heartbreaker 40/20",
+  "description": "Three sets of fourteen 40/20s at 115, 118 and 120 % FTP, 5 minutes between sets, then 15 minutes of zone 2. Each set a little harder than the last.",
   "sport": "virtual-ride",
   "author": "ridrs",
   "license": "CC-BY-SA-4.0",
-  "category": "Threshold",
-  "focus": "threshold",
+  "category": "VO2max",
+  "focus": "vo2max",
   "source": {
     "kind": "builtin",
     "format": "zwo",
-    "fileName": "over-unders-3x4x3.zwo"
+    "fileName": "heartbreaker-40-20.zwo"
   },
   "steps": [
     {
@@ -28,15 +28,25 @@
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 50,
-            "high": 50
+            "low": 45,
+            "high": 45
           },
           "end": {
-            "low": 75,
-            "high": 75
+            "low": 65,
+            "high": 65
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        },
+        {
+          "offsetSeconds": 585,
+          "text": "Next: three 10-second primers."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Warmup",
@@ -53,7 +63,7 @@
       "id": "2",
       "until": {
         "kind": "count",
-        "reps": 4
+        "reps": 3
       },
       "steps": [
         {
@@ -62,15 +72,15 @@
           "intensity": "interval",
           "duration": {
             "kind": "time",
-            "seconds": 120
+            "seconds": 10
           },
           "effort": {
             "kind": "target",
             "primary": {
               "unit": "percent-ftp",
               "start": {
-                "low": 95,
-                "high": 95
+                "low": 150,
+                "high": 150
               }
             }
           }
@@ -81,15 +91,15 @@
           "intensity": "recovery",
           "duration": {
             "kind": "time",
-            "seconds": 60
+            "seconds": 50
           },
           "effort": {
             "kind": "target",
             "primary": {
               "unit": "percent-ftp",
               "start": {
-                "low": 108,
-                "high": 108
+                "low": 50,
+                "high": 50
               }
             }
           }
@@ -113,7 +123,7 @@
       "id": "3",
       "duration": {
         "kind": "time",
-        "seconds": 300
+        "seconds": 180
       },
       "effort": {
         "kind": "target",
@@ -125,6 +135,16 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        },
+        {
+          "offsetSeconds": 165,
+          "text": "Next: set 1 of 3. Find the rhythm."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "SteadyState",
@@ -140,7 +160,7 @@
       "id": "4",
       "until": {
         "kind": "count",
-        "reps": 4
+        "reps": 14
       },
       "steps": [
         {
@@ -149,15 +169,15 @@
           "intensity": "interval",
           "duration": {
             "kind": "time",
-            "seconds": 120
+            "seconds": 40
           },
           "effort": {
             "kind": "target",
             "primary": {
               "unit": "percent-ftp",
               "start": {
-                "low": 95,
-                "high": 95
+                "low": 115,
+                "high": 115
               }
             }
           }
@@ -168,15 +188,15 @@
           "intensity": "recovery",
           "duration": {
             "kind": "time",
-            "seconds": 60
+            "seconds": 20
           },
           "effort": {
             "kind": "target",
             "primary": {
               "unit": "percent-ftp",
               "start": {
-                "low": 108,
-                "high": 108
+                "low": 50,
+                "high": 50
               }
             }
           }
@@ -212,6 +232,16 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        },
+        {
+          "offsetSeconds": 285,
+          "text": "Next: set 2 of 3, a little harder."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "SteadyState",
@@ -227,7 +257,7 @@
       "id": "6",
       "until": {
         "kind": "count",
-        "reps": 4
+        "reps": 14
       },
       "steps": [
         {
@@ -236,15 +266,15 @@
           "intensity": "interval",
           "duration": {
             "kind": "time",
-            "seconds": 120
+            "seconds": 40
           },
           "effort": {
             "kind": "target",
             "primary": {
               "unit": "percent-ftp",
               "start": {
-                "low": 95,
-                "high": 95
+                "low": 118,
+                "high": 118
               }
             }
           }
@@ -255,15 +285,15 @@
           "intensity": "recovery",
           "duration": {
             "kind": "time",
-            "seconds": 60
+            "seconds": 20
           },
           "effort": {
             "kind": "target",
             "primary": {
               "unit": "percent-ftp",
               "start": {
-                "low": 108,
-                "high": 108
+                "low": 50,
+                "high": 50
               }
             }
           }
@@ -299,6 +329,109 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        },
+        {
+          "offsetSeconds": 285,
+          "text": "Next: set 3 of 3. This is where it counts."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "8",
+      "until": {
+        "kind": "count",
+        "reps": 14
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "8.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 40
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 120,
+                "high": 120
+              }
+            }
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "8.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 20
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            }
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "9",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "SteadyState",
@@ -311,7 +444,40 @@
     },
     {
       "kind": "interval",
-      "id": "8",
+      "id": "10",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 65,
+            "high": 65
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Zone 2 by heart rate: adjust the power if needed."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "11",
       "intensity": "cool-down",
       "duration": {
         "kind": "time",
@@ -322,15 +488,21 @@
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 60,
-            "high": 60
+            "low": 50,
+            "high": 50
           },
           "end": {
-            "low": 40,
-            "high": 40
+            "low": 35,
+            "high": 35
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Cooldown",

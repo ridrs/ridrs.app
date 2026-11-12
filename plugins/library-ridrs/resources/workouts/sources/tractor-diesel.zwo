@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Tractor Diesel</name>
+  <description>Low-cadence work: four 8-minute blocks at 60–65 rpm, rising from 88 to 94 % FTP, then 36 minutes of zone 2 at your normal cadence. Practises sweet-spot power at a climbing cadence. Stay seated and keep the stroke smooth; if your knees complain, raise the cadence.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="600" PowerLow="0.45" PowerHigh="0.70">
+      <textevent timeoffset="0" message="Roll in."/>
+      <textevent timeoffset="585" message="Next: two fast spin-ups to open the legs."/>
+    </Warmup>
+    <IntervalsT Repeat="2" OnDuration="60" OffDuration="90" OnPower="1.00" OffPower="0.50" Cadence="110" CadenceResting="85"/>
+    <SteadyState Duration="480" Power="0.88" CadenceLow="60" CadenceHigh="65">
+      <textevent timeoffset="0" message="Block 1 of 4: seated, quiet upper body."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.50" CadenceLow="85" CadenceHigh="95">
+      <textevent timeoffset="0" message="Spin out light and quick."/>
+    </SteadyState>
+    <SteadyState Duration="480" Power="0.90" CadenceLow="60" CadenceHigh="65">
+      <textevent timeoffset="0" message="Block 2 of 4: a little more pressure, same cadence."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.50" CadenceLow="85" CadenceHigh="95">
+      <textevent timeoffset="0" message="Spin out light and quick."/>
+    </SteadyState>
+    <SteadyState Duration="480" Power="0.92" CadenceLow="60" CadenceHigh="65">
+      <textevent timeoffset="0" message="Block 3 of 4. Knees complaining? Raise the cadence."/>
+    </SteadyState>
+    <SteadyState Duration="240" Power="0.50" CadenceLow="85" CadenceHigh="95">
+      <textevent timeoffset="0" message="Spin out light and quick."/>
+    </SteadyState>
+    <SteadyState Duration="480" Power="0.94" CadenceLow="60" CadenceHigh="65">
+      <textevent timeoffset="0" message="Last block. Stay seated."/>
+    </SteadyState>
+    <SteadyState Duration="2160" Power="0.70">
+      <textevent timeoffset="0" message="Normal cadence now. Steady zone 2 to the end."/>
+    </SteadyState>
+    <Cooldown Duration="300" PowerLow="0.50" PowerHigh="0.40">
+      <textevent timeoffset="0" message="Spin down."/>
+    </Cooldown>
+  </workout>
+</workout_file>

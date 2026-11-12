@@ -75,15 +75,15 @@ Feature: A library workout is planned on a day in the chosen calendar
       | moving_time      | 3780                |
     And the event created in intervals.icu has the description:
       """
-      Three blocks of 12 minutes at 90 % FTP with 4 minutes easy between them.
+      The short classic: three 12-minute blocks at 90 % FTP with 4 easy minutes between them. Hard but sustainable; a lot of aerobic work for an hour.
 
-      - 10m ramp 50-75% intensity=warmup
+      - Roll in. 585^Next: 3 × 12 minutes. Hard, but sustainable. <!> 10m ramp 50-75% intensity=warmup
 
       3x
       - 12m 90% intensity=interval
       - 4m 55% intensity=recovery
 
-      - 5m ramp 65-45% intensity=cooldown
+      - Spin down. <!> 5m ramp 65-45% intensity=cooldown
       """
     When I press Back
     Then the next workout card shows:

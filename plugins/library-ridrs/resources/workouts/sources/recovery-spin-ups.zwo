@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Recovery Spin-Ups</name>
+  <description>An easy hour at 55 % FTP with four 1-minute spin-ups at 100–110 rpm: the legs move, the load stays low. For the day after a hard session. If the legs don't come around, cut it short.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="600" PowerLow="0.40" PowerHigh="0.55">
+      <textevent timeoffset="0" message="Easy hour. Keep it truly easy."/>
+    </Warmup>
+    <SteadyState Duration="1200" Power="0.55">
+      <textevent timeoffset="0" message="Conversational pace. Nothing here should feel like work."/>
+      <textevent timeoffset="1185" message="Next: 4 spin-ups. Faster legs, same easy power."/>
+    </SteadyState>
+    <IntervalsT Repeat="4" OnDuration="60" OffDuration="120" OnPower="0.55" OffPower="0.55" CadenceLow="100" CadenceHigh="110"/>
+    <SteadyState Duration="480" Power="0.55">
+      <textevent timeoffset="0" message="Back to your natural cadence."/>
+    </SteadyState>
+    <Cooldown Duration="600" PowerLow="0.55" PowerHigh="0.40">
+      <textevent timeoffset="0" message="Spin down."/>
+    </Cooldown>
+  </workout>
+</workout_file>

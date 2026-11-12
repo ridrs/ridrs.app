@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Lactate Shuttle</name>
+  <description>Over-unders: four 12-minute sets alternating 2 minutes at 90 % FTP and 1 minute at 110 %, with 5 easy minutes between sets. You hold a hard pace while recovering from surges above threshold, which is what a race asks of you.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="900" PowerLow="0.40" PowerHigh="0.75">
+      <textevent timeoffset="0" message="Roll in."/>
+    </Warmup>
+    <SteadyState Duration="120" Power="0.50">
+      <textevent timeoffset="0" message="Next: 4 sets of over-unders."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Set 1 of 4. Under: let the breathing settle."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over: cadence up, push through."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Last over of the set."/>
+    </SteadyState>
+    <SteadyState Duration="300" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Set 2 of 4. Under: let the breathing settle."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over: cadence up, push through."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Last over of the set."/>
+    </SteadyState>
+    <SteadyState Duration="300" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Set 3 of 4. Under: let the breathing settle."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over: cadence up, push through."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Last over of the set."/>
+    </SteadyState>
+    <SteadyState Duration="300" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Set 4 of 4. Under: let the breathing settle."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over: cadence up, push through."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Over."/>
+    </SteadyState>
+    <SteadyState Duration="120" Power="0.90" Cadence="95">
+      <textevent timeoffset="0" message="Under."/>
+    </SteadyState>
+    <SteadyState Duration="60" Power="1.10" Cadence="105">
+      <textevent timeoffset="0" message="Last over."/>
+    </SteadyState>
+    <Cooldown Duration="600" PowerLow="0.50" PowerHigh="0.35">
+      <textevent timeoffset="0" message="Spin down."/>
+    </Cooldown>
+  </workout>
+</workout_file>

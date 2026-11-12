@@ -1,0 +1,1617 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "lactate-shuttle",
+  "name": "Lactate Shuttle",
+  "description": "Over-unders: four 12-minute sets alternating 2 minutes at 90 % FTP and 1 minute at 110 %, with 5 easy minutes between sets. You hold a hard pace while recovering from surges above threshold, which is what a race asks of you.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Over-unders",
+  "focus": "threshold",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "lactate-shuttle.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 40,
+            "high": 40
+          },
+          "end": {
+            "low": 75,
+            "high": 75
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Next: 4 sets of over-unders."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Set 1 of 4. Under: let the breathing settle."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over: cadence up, push through."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "7",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "8",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "9",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "10",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Last over of the set."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "11",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "12",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Set 2 of 4. Under: let the breathing settle."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "13",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over: cadence up, push through."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "14",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "15",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "16",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "17",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "18",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "19",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Last over of the set."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "20",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "21",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Set 3 of 4. Under: let the breathing settle."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "22",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over: cadence up, push through."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "23",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "24",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "25",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "26",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "27",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "28",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Last over of the set."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "29",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "30",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Set 4 of 4. Under: let the breathing settle."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "31",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over: cadence up, push through."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "32",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "33",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "34",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "35",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "36",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Under."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "37",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 110,
+            "high": 110
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 105
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Last over."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "38",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 35,
+            "high": 35
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

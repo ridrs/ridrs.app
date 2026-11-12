@@ -1,0 +1,760 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "the-aggressor",
+  "name": "The Aggressor",
+  "description": "Race simulation: two breakaways (1 minute at 115 % FTP, then 4 at 95 %), 20 minutes of sweet spot, then three attacks: 35 seconds at 150 %, straight into 2 minutes at 105 %. Practises going hard and then holding the pace instead of sitting up.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Anaerobic",
+  "focus": "anaerobic",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "the-aggressor.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 75,
+            "high": 75
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Breakaway 1 of 2: go hard for a minute."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 95,
+            "high": 95
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 92,
+              "high": 92
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Hold the gap. Don't ease off."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 180
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 60
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 115,
+            "high": 115
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 110
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Breakaway 2 of 2: go hard for a minute."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 95,
+            "high": 95
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 92,
+              "high": 92
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Hold the gap. Don't ease off."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "7",
+      "duration": {
+        "kind": "time",
+        "seconds": 180
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 55,
+            "high": 55
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "8",
+      "duration": {
+        "kind": "time",
+        "seconds": 1200
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 92,
+            "high": 92
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "20 minutes in the bunch: steady sweet spot."
+        },
+        {
+          "offsetSeconds": 600,
+          "text": "Halfway."
+        },
+        {
+          "offsetSeconds": 1185,
+          "text": "First attack in 15 seconds."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "9",
+      "duration": {
+        "kind": "time",
+        "seconds": 35
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 150,
+            "high": 150
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 115
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Attack 1 of 3: out of the saddle."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "10",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 105,
+            "high": 105
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 100
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Hold it. Don't sit up."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "11",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "12",
+      "duration": {
+        "kind": "time",
+        "seconds": 35
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 150,
+            "high": 150
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 115
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Attack 2 of 3: out of the saddle."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "13",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 105,
+            "high": 105
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 100
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Hold it. Don't sit up."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "14",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "15",
+      "duration": {
+        "kind": "time",
+        "seconds": 35
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 150,
+            "high": 150
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 105,
+              "high": 115
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Attack 3 of 3: out of the saddle."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "16",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 105,
+            "high": 105
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 100
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Hold it. Don't sit up."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "17",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "18",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 35,
+            "high": 35
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

@@ -1,9 +1,9 @@
 {
   "format": "ridrs-workout",
   "version": 1,
-  "id": "endurance-75-drills",
-  "name": "Endurance 75 with drills",
-  "description": "Steady endurance with a high-cadence drill of 2 minutes at the end of each 17-minute block, and a free ride of 5 minutes.",
+  "id": "long-endurance-2x50",
+  "name": "Long Endurance 2×50",
+  "description": "The long ride indoors: two 50-minute blocks at 70 % FTP with a short break, then 15 minutes at 75 %. Fuel it like a long ride outside (60–90 g of carbohydrate per hour) and drink more than usual: indoors there is little airflow to cool you.",
   "sport": "virtual-ride",
   "author": "ridrs",
   "license": "CC-BY-SA-4.0",
@@ -12,7 +12,7 @@
   "source": {
     "kind": "builtin",
     "format": "zwo",
-    "fileName": "endurance-75-drills.zwo"
+    "fileName": "long-endurance-2x50.zwo"
   },
   "steps": [
     {
@@ -21,22 +21,28 @@
       "intensity": "warm-up",
       "duration": {
         "kind": "time",
-        "seconds": 540
+        "seconds": 900
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 50,
-            "high": 50
+            "low": 40,
+            "high": 40
           },
           "end": {
-            "low": 68,
-            "high": 68
+            "low": 65,
+            "high": 65
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in. Food and bottles within reach."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Warmup",
@@ -53,22 +59,30 @@
       "id": "2",
       "duration": {
         "kind": "time",
-        "seconds": 900
+        "seconds": 3000
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 68,
-            "high": 68
+            "low": 70,
+            "high": 70
           }
         }
       },
       "cues": [
         {
           "offsetSeconds": 0,
-          "text": "Steady and relaxed"
+          "text": "Block 1 of 2: a pace you could hold all day."
+        },
+        {
+          "offsetSeconds": 1200,
+          "text": "Eat and drink."
+        },
+        {
+          "offsetSeconds": 2400,
+          "text": "Eat and drink."
         }
       ],
       "extensions": {
@@ -86,31 +100,22 @@
       "id": "3",
       "duration": {
         "kind": "time",
-        "seconds": 120
+        "seconds": 300
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 68,
-            "high": 68
+            "low": 55,
+            "high": 55
           }
-        },
-        "secondary": [
-          {
-            "unit": "rpm",
-            "start": {
-              "low": 105,
-              "high": 115
-            }
-          }
-        ]
+        }
       },
       "cues": [
         {
           "offsetSeconds": 0,
-          "text": "Spin it up: 105-115 rpm, stay smooth"
+          "text": "Short break: sit up, stretch, drink."
         }
       ],
       "extensions": {
@@ -118,9 +123,7 @@
           "element": "SteadyState",
           "attributeOrder": [
             "Duration",
-            "Power",
-            "CadenceLow",
-            "CadenceHigh"
+            "Power"
           ]
         }
       }
@@ -130,22 +133,30 @@
       "id": "4",
       "duration": {
         "kind": "time",
-        "seconds": 900
+        "seconds": 3000
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 68,
-            "high": 68
+            "low": 70,
+            "high": 70
           }
         }
       },
       "cues": [
         {
           "offsetSeconds": 0,
-          "text": "Steady and relaxed"
+          "text": "Block 2 of 2. Same pace; shift your position now and then."
+        },
+        {
+          "offsetSeconds": 1200,
+          "text": "Eat and drink."
+        },
+        {
+          "offsetSeconds": 2400,
+          "text": "Eat and drink."
         }
       ],
       "extensions": {
@@ -163,31 +174,22 @@
       "id": "5",
       "duration": {
         "kind": "time",
-        "seconds": 120
+        "seconds": 300
       },
       "effort": {
         "kind": "target",
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 68,
-            "high": 68
+            "low": 55,
+            "high": 55
           }
-        },
-        "secondary": [
-          {
-            "unit": "rpm",
-            "start": {
-              "low": 105,
-              "high": 115
-            }
-          }
-        ]
+        }
       },
       "cues": [
         {
           "offsetSeconds": 0,
-          "text": "Spin it up: 105-115 rpm, stay smooth"
+          "text": "Short break."
         }
       ],
       "extensions": {
@@ -195,9 +197,7 @@
           "element": "SteadyState",
           "attributeOrder": [
             "Duration",
-            "Power",
-            "CadenceLow",
-            "CadenceHigh"
+            "Power"
           ]
         }
       }
@@ -214,15 +214,15 @@
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 68,
-            "high": 68
+            "low": 75,
+            "high": 75
           }
         }
       },
       "cues": [
         {
           "offsetSeconds": 0,
-          "text": "Steady and relaxed"
+          "text": "Last 15 minutes: a little more, still conversational."
         }
       ],
       "extensions": {
@@ -238,75 +238,6 @@
     {
       "kind": "interval",
       "id": "7",
-      "duration": {
-        "kind": "time",
-        "seconds": 120
-      },
-      "effort": {
-        "kind": "target",
-        "primary": {
-          "unit": "percent-ftp",
-          "start": {
-            "low": 68,
-            "high": 68
-          }
-        },
-        "secondary": [
-          {
-            "unit": "rpm",
-            "start": {
-              "low": 105,
-              "high": 115
-            }
-          }
-        ]
-      },
-      "cues": [
-        {
-          "offsetSeconds": 0,
-          "text": "Spin it up: 105-115 rpm, stay smooth"
-        }
-      ],
-      "extensions": {
-        "zwo": {
-          "element": "SteadyState",
-          "attributeOrder": [
-            "Duration",
-            "Power",
-            "CadenceLow",
-            "CadenceHigh"
-          ]
-        }
-      }
-    },
-    {
-      "kind": "interval",
-      "id": "8",
-      "duration": {
-        "kind": "time",
-        "seconds": 300
-      },
-      "effort": {
-        "kind": "free"
-      },
-      "cues": [
-        {
-          "offsetSeconds": 0,
-          "text": "Free ride: ride by feel"
-        }
-      ],
-      "extensions": {
-        "zwo": {
-          "element": "FreeRide",
-          "attributeOrder": [
-            "Duration"
-          ]
-        }
-      }
-    },
-    {
-      "kind": "interval",
-      "id": "9",
       "intensity": "cool-down",
       "duration": {
         "kind": "time",
@@ -317,8 +248,8 @@
         "primary": {
           "unit": "percent-ftp",
           "start": {
-            "low": 60,
-            "high": 60
+            "low": 55,
+            "high": 55
           },
           "end": {
             "low": 40,
@@ -326,6 +257,12 @@
           }
         }
       },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down. Long one done."
+        }
+      ],
       "extensions": {
         "zwo": {
           "element": "Cooldown",

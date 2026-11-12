@@ -1,0 +1,537 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "tractor-diesel",
+  "name": "Tractor Diesel",
+  "description": "Low-cadence work: four 8-minute blocks at 60–65 rpm, rising from 88 to 94 % FTP, then 36 minutes of zone 2 at your normal cadence. Practises sweet-spot power at a climbing cadence. Stay seated and keep the stroke smooth; if your knees complain, raise the cadence.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Low cadence",
+  "tags": [
+    "low-cadence"
+  ],
+  "focus": "sweet-spot",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "tractor-diesel.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 45,
+            "high": 45
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        },
+        {
+          "offsetSeconds": 585,
+          "text": "Next: two fast spin-ups to open the legs."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "2",
+      "until": {
+        "kind": "count",
+        "reps": 2
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "2.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 60
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 100,
+                "high": 100
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 110,
+                  "high": 110
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "2.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 90
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 85,
+                  "high": 85
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower",
+            "Cadence",
+            "CadenceResting"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "3",
+      "duration": {
+        "kind": "time",
+        "seconds": 480
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 88,
+            "high": 88
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 60,
+              "high": 65
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Block 1 of 4: seated, quiet upper body."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 85,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin out light and quick."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 480
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 60,
+              "high": 65
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Block 2 of 4: a little more pressure, same cadence."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 85,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin out light and quick."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "7",
+      "duration": {
+        "kind": "time",
+        "seconds": 480
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 92,
+            "high": 92
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 60,
+              "high": 65
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Block 3 of 4. Knees complaining? Raise the cadence."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "8",
+      "duration": {
+        "kind": "time",
+        "seconds": 240
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 85,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin out light and quick."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "9",
+      "duration": {
+        "kind": "time",
+        "seconds": 480
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 94,
+            "high": 94
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 60,
+              "high": 65
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Last block. Stay seated."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "CadenceLow",
+            "CadenceHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "10",
+      "duration": {
+        "kind": "time",
+        "seconds": 2160
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Normal cadence now. Steady zone 2 to the end."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "11",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 40,
+            "high": 40
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Spin down."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

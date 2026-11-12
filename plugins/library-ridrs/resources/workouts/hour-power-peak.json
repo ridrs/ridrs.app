@@ -1,0 +1,607 @@
+{
+  "format": "ridrs-workout",
+  "version": 1,
+  "id": "hour-power-peak",
+  "name": "Hour Power Peak",
+  "description": "75 minutes without a break between 87 and 98 % FTP (about 92 % on average), with the cadence changing from 80 to 100 rpm. Long sustained work near threshold, as on a long climb or in a time trial; the gear changes keep it from going stale.",
+  "sport": "virtual-ride",
+  "author": "ridrs",
+  "license": "CC-BY-SA-4.0",
+  "category": "Threshold",
+  "focus": "threshold",
+  "source": {
+    "kind": "builtin",
+    "format": "zwo",
+    "fileName": "hour-power-peak.zwo"
+  },
+  "steps": [
+    {
+      "kind": "interval",
+      "id": "1",
+      "intensity": "warm-up",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 70,
+            "high": 70
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Roll in."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Warmup",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "2",
+      "duration": {
+        "kind": "time",
+        "seconds": 300
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 60,
+            "high": 60
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy. Three short openers next."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "repeat",
+      "id": "3",
+      "until": {
+        "kind": "count",
+        "reps": 3
+      },
+      "steps": [
+        {
+          "kind": "interval",
+          "id": "3.1",
+          "intensity": "interval",
+          "duration": {
+            "kind": "time",
+            "seconds": 30
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 105,
+                "high": 105
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 100,
+                  "high": 100
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "interval",
+          "id": "3.2",
+          "intensity": "recovery",
+          "duration": {
+            "kind": "time",
+            "seconds": 90
+          },
+          "effort": {
+            "kind": "target",
+            "primary": {
+              "unit": "percent-ftp",
+              "start": {
+                "low": 50,
+                "high": 50
+              }
+            },
+            "secondary": [
+              {
+                "unit": "rpm",
+                "start": {
+                  "low": 85,
+                  "high": 85
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "IntervalsT",
+          "attributeOrder": [
+            "Repeat",
+            "OnDuration",
+            "OffDuration",
+            "OnPower",
+            "OffPower",
+            "Cadence",
+            "CadenceResting"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "4",
+      "duration": {
+        "kind": "time",
+        "seconds": 120
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Easy. Next: 75 minutes, no break."
+        },
+        {
+          "offsetSeconds": 105,
+          "text": "Start controlled."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "5",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 90,
+            "high": 90
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 85,
+              "high": 85
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "1 of 8: find the rhythm."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "6",
+      "duration": {
+        "kind": "time",
+        "seconds": 480
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 95,
+            "high": 95
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 92,
+              "high": 92
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "2 of 8: first surge, cadence up."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "7",
+      "duration": {
+        "kind": "time",
+        "seconds": 720
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 88,
+            "high": 88
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 80,
+              "high": 80
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "3 of 8: heavier gear. Keep it above 80 rpm."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "8",
+      "duration": {
+        "kind": "time",
+        "seconds": 420
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 97,
+            "high": 97
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 100,
+              "high": 100
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "4 of 8: high cadence, same smooth pressure."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "9",
+      "duration": {
+        "kind": "time",
+        "seconds": 900
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 91,
+            "high": 91
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 85,
+              "high": 85
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "5 of 8: the long one. Steady, no spikes."
+        },
+        {
+          "offsetSeconds": 450,
+          "text": "Halfway."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "10",
+      "duration": {
+        "kind": "time",
+        "seconds": 540
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 93,
+            "high": 93
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 82,
+              "high": 82
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "6 of 8: heavy gear again."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "11",
+      "duration": {
+        "kind": "time",
+        "seconds": 360
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 98,
+            "high": 98
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 95,
+              "high": 95
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "7 of 8: the hardest section."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "12",
+      "duration": {
+        "kind": "time",
+        "seconds": 480
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 87,
+            "high": 87
+          }
+        },
+        "secondary": [
+          {
+            "unit": "rpm",
+            "start": {
+              "low": 88,
+              "high": 88
+            }
+          }
+        ]
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Last section. A touch easier; hold it to the end."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "SteadyState",
+          "attributeOrder": [
+            "Duration",
+            "Power",
+            "Cadence"
+          ]
+        }
+      }
+    },
+    {
+      "kind": "interval",
+      "id": "13",
+      "intensity": "cool-down",
+      "duration": {
+        "kind": "time",
+        "seconds": 600
+      },
+      "effort": {
+        "kind": "target",
+        "primary": {
+          "unit": "percent-ftp",
+          "start": {
+            "low": 50,
+            "high": 50
+          },
+          "end": {
+            "low": 35,
+            "high": 35
+          }
+        }
+      },
+      "cues": [
+        {
+          "offsetSeconds": 0,
+          "text": "Done. 75 minutes near threshold."
+        }
+      ],
+      "extensions": {
+        "zwo": {
+          "element": "Cooldown",
+          "attributeOrder": [
+            "Duration",
+            "PowerLow",
+            "PowerHigh"
+          ]
+        }
+      }
+    }
+  ],
+  "extensions": {
+    "zwo": {
+      "elementOrder": [
+        "author",
+        "name",
+        "description",
+        "sportType",
+        "workout"
+      ],
+      "sportType": "bike"
+    }
+  }
+}

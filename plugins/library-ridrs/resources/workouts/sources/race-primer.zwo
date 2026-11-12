@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<workout_file>
+  <author>ridrs</author>
+  <name>Race Primer</name>
+  <description>The day before a race or test: three high-cadence spin-ups, two 4-minute efforts at FTP and one 15-second sprint. Enough intensity to feel sharp, not enough to tire you.</description>
+  <sportType>bike</sportType>
+  <workout>
+    <Warmup Duration="900" PowerLow="0.50" PowerHigh="0.75">
+      <textevent timeoffset="0" message="Roll in."/>
+    </Warmup>
+    <SteadyState Duration="180" Power="0.50">
+      <textevent timeoffset="0" message="Easy."/>
+      <textevent timeoffset="165" message="Next: three spin-ups at 110 rpm."/>
+    </SteadyState>
+    <IntervalsT Repeat="3" OnDuration="30" OffDuration="90" OnPower="1.15" OffPower="0.60" Cadence="110" CadenceResting="85"/>
+    <SteadyState Duration="180" Power="0.60">
+      <textevent timeoffset="0" message="Easy."/>
+      <textevent timeoffset="165" message="Next: 2 × 4 minutes at FTP. Race pace, controlled."/>
+    </SteadyState>
+    <IntervalsT Repeat="2" OnDuration="240" OffDuration="240" OnPower="1.00" OffPower="0.60"/>
+    <SteadyState Duration="120" Power="0.60">
+      <textevent timeoffset="0" message="Easy."/>
+      <textevent timeoffset="105" message="Next: one 15-second sprint, out of the saddle."/>
+    </SteadyState>
+    <SteadyState Duration="15" Power="1.50" Cadence="110">
+      <textevent timeoffset="0" message="Full gas."/>
+    </SteadyState>
+    <Cooldown Duration="600" PowerLow="0.50" PowerHigh="0.35">
+      <textevent timeoffset="0" message="Done. Keep the rest of the day easy."/>
+    </Cooldown>
+  </workout>
+</workout_file>
