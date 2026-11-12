@@ -85,9 +85,6 @@ export function slugOf(title: string): string {
   return slug || 'video';
 }
 
-/** Pictures larger than this are imported but not previewed: the preview travels as text. */
-const PREVIEW_PICTURE_LIMIT = 2 * 1024 * 1024;
-
 /** A picture's bytes as a URL an `<img>` can show before anything is copied. */
 function pictureUrl(name: string, bytes: Uint8Array): string {
   let binary = '';
@@ -178,10 +175,8 @@ export class LocalVideos {
       return { ok: false, reason: reasonOf(error) };
     }
     const picture = entries.find((entry) => entry.name === inspection.thumbnail)?.bytes;
-    const thumbnail =
-      inspection.thumbnail && picture && picture.length <= PREVIEW_PICTURE_LIMIT
-        ? pictureUrl(inspection.thumbnail, picture)
-        : undefined;
+    // Every picture a peek reads (PEEK_LIMIT) is shown: a photo of a few MB is the usual one.
+    const thumbnail = inspection.thumbnail && picture ? pictureUrl(inspection.thumbnail, picture) : undefined;
     return {
       ok: true,
       preview: {

@@ -40,6 +40,7 @@ fn content_type(path: &str) -> &'static str {
         Some("json") => "application/json",
         Some("gpx") => "application/gpx+xml",
         Some("jpg" | "jpeg") => "image/jpeg",
+        Some("png") => "image/png",
         _ => "application/octet-stream",
     }
 }
@@ -173,6 +174,12 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.body().len(), 100);
         assert_eq!(response.headers()[header::CONTENT_TYPE], "video/mp4");
+    }
+
+    #[test]
+    fn sends_a_route_picture_as_an_image() {
+        assert_eq!(content_type("videos/a/thumbnail.jpg"), "image/jpeg");
+        assert_eq!(content_type("videos/a/thumbnail.png"), "image/png");
     }
 
     #[test]

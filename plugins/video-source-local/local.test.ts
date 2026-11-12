@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { DataPick, MediaFiles, RouteImport, RouteOffer, VideoImporter } from '@ridrs/contracts';
+import type { DataDrop, DataPick, DroppedFile, MediaFiles, RouteImport, RouteOffer, VideoImporter } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
 import { LocalVideos, slugOf, titleOf } from './local.ts';
 
@@ -139,6 +139,32 @@ describe('LocalVideos', () => {
     const again = setup({ files: media.files });
     await again.videos.connect(again.services);
     expect(again.offers.get('video-source-local/col')).toMatchObject({ thumbnail: url });
+  });
+
+  it('previews the picture of a dragged package, also a photo of several MB', async () => {
+    const track = new TextEncoder().encode(GPX);
+    const picture = new Uint8Array(4_400_000).fill(7);
+    const dropped = {
+      id: 'drop-1',
+      name: 'Col.zip',
+      size: picture.length,
+      copyTo: async () => undefined,
+      peek: async () => ({
+        entries: [
+          { name: 'Col.gpx', size: track.length, bytes: track },
+          { name: 'preview.jpg', size: picture.length, bytes: picture },
+        ],
+      }),
+    } as DroppedFile;
+    const { videos, services } = setup();
+    const inspecting: VideoImporter = { ...importer(media), inspect: () => ({ ok: true, track: 'Col.gpx', thumbnail: 'preview.jpg' }) };
+    const drop = { file: () => dropped } as unknown as DataDrop;
+    await videos.connect({ ...services, drop, importers: () => [inspecting] });
+    const answer = await videos.preview('drop-1');
+    const url = answer.ok ? (answer.preview.thumbnail ?? '') : '';
+    expect(url.startsWith('data:image/jpeg;base64,')).toBe(true);
+    // Compared as one buffer: an element-wise comparison of 4.4 MB takes longer than the test may.
+    expect(Buffer.from(url.split(',')[1] ?? '', 'base64').equals(picture)).toBe(true);
   });
 
   it('offers the imported routes again after a restart', async () => {
