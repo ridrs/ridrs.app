@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
 import { activityStartRequestedEvent, type RideWorld } from '@ridrs/contracts';
-import { waitFor, within } from '@testing-library/dom';
+import { isInaccessible, waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 
 function ui(world: RidrsWorld): HTMLElement {
@@ -21,8 +21,22 @@ const routesIn = (world: RidrsWorld, name: string) =>
     .queryAllByRole('article')
     .map((card) => card.getAttribute('aria-label'));
 
-const card = (world: RidrsWorld, title: string) =>
-  within(ui(world)).getByRole('article', { name: title });
+/**
+ * The route card titled `title`: the one accessible article of that name, as
+ * `getByRole('article', { name: title })` finds it. A card is named by its `aria-label` (`Card` in
+ * ui-preview), so the cards are picked by it before their visibility is judged. `getByRole`
+ * computes the name and visibility of every article instead, and in the headless DOM each of these
+ * matches the style sheets of all cards: on a ride page of 24 cards a lookup took 55 to 170 ms. A
+ * `waitFor` repeating it kept the event loop so busy that React did not render a download's
+ * progress before the timeout, once a full UI run had slowed the process down.
+ */
+function card(world: RidrsWorld, title: string): HTMLElement {
+  const cards = [
+    ...ui(world).querySelectorAll<HTMLElement>('article:not([role]), [role="article"]'),
+  ].filter((element) => element.getAttribute('aria-label') === title && !isInaccessible(element));
+  assert.equal(cards.length, 1, `Expected one route card "${title}", found ${cards.length}`);
+  return cards[0] as HTMLElement;
+}
 
 /** What a route card says, without the style sheet a card carries. */
 function textOf(element: HTMLElement): string {
@@ -69,18 +83,20 @@ Then(
 Then(
   'the route {string} reads {string}',
   async function (this: RidrsWorld, title: string, text: string) {
-    await waitFor(() =>
-      assert.ok(textOf(card(this, title)).includes(text), textOf(card(this, title))),
-    );
+    await waitFor(() => {
+      const said = textOf(card(this, title));
+      assert.ok(said.includes(text), said);
+    });
   },
 );
 
 Then(
   'the route {string} does not read {string}',
   async function (this: RidrsWorld, title: string, text: string) {
-    await waitFor(() =>
-      assert.ok(!textOf(card(this, title)).includes(text), textOf(card(this, title))),
-    );
+    await waitFor(() => {
+      const said = textOf(card(this, title));
+      assert.ok(!said.includes(text), said);
+    });
   },
 );
 
