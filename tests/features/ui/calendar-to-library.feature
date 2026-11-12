@@ -70,10 +70,10 @@ Feature: A planned workout is added to the rider's own workouts by dragging it o
     Given the host has started
     And the ridrs UI is shown
     When I press "Training"
-    And I drag the workout "Sweet Spot 3×12" onto "Friday"
-    And I drag the planned workout "Sweet Spot 3×12" over the workouts
+    And I drag the workout "Gentle Waves" onto "Friday"
+    And I drag the planned workout "Gentle Waves" over the workouts
     Then the workouts refused the drop
-    And the workouts say "“Sweet Spot 3×12” is one of your workouts already."
+    And the workouts say "“Gentle Waves” is one of your workouts already."
 
   Scenario: A workout of a library is not taken by the workouts
     Given the host has started

@@ -60,11 +60,20 @@ Feature: Changes in the app's areas take effect at once and are kept
     Then the calendar day "Friday" lists "VO2 Max 5×4"
     And the calendar day "Thursday" lists no "VO2 Max 5×4"
 
-  Scenario: A day that has passed takes no workout and its workouts stay
+  Scenario: A day that has passed takes no workout
     When I press "Training"
     And I drag the workout "Gentle Waves" onto "Monday"
     Then the calendar day "Monday" lists no "Gentle Waves"
-    And the planned workout "Sweet Spot 3×12" cannot be dragged
+    When I drag the planned workout "VO2 Max 5×4" onto "Monday"
+    Then the calendar day "Thursday" lists "VO2 Max 5×4"
+
+  Scenario: A workout of a day that has passed keeps its day and can be removed
+    When I press "Training"
+    And I drag the planned workout "Sweet Spot 3×12" onto "Friday"
+    Then the calendar day "Tuesday" lists "Sweet Spot 3×12"
+    And the calendar day "Friday" lists no "Sweet Spot 3×12"
+    When I drag the planned workout "Sweet Spot 3×12" into the bin
+    Then the calendar day "Tuesday" lists no "Sweet Spot 3×12"
 
   Scenario: The calendar shows the days side by side with nothing to select
     When I press "Training"

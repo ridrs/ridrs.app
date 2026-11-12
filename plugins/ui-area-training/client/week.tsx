@@ -60,7 +60,12 @@ export const useTraining = userDocument(TRAINING_DOCUMENT, INITIAL_TRAINING);
 
 /** What is being dragged: an entry of the week, or a workout of a library. */
 export type Drag =
-  | { readonly kind: 'entry'; readonly id: string }
+  | {
+      readonly kind: 'entry';
+      readonly id: string;
+      /** An entry of a day that has passed keeps its day: it can only be dropped into the bin. */
+      readonly past?: boolean;
+    }
   | { readonly kind: 'library'; readonly provider: string; readonly workoutId: string; readonly name: string };
 
 /** What the pointer shows: a workout of a catalog is copied into the calendar (a plus), an entry of it moved. */
@@ -128,6 +133,25 @@ export function useWeek(ctx: UiContext) {
       .call(trainingCalendarHandOverService, { workouts })
       .catch((error: unknown) => ctx.logger.warn(`Could not hand over the calendar: ${String(error)}`));
   }, [ctx, state.calendar.entries, libraries]);
+  // Where nothing takes the dragged workout (the library, the menu), the drop is refused outright:
+  // left to the web view, the pointer can show a plus as if the workout could be added there.
+  useEffect(() => {
+    if (drag === undefined) return;
+    const refuse = (event: globalThis.DragEvent) => {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+    };
+    const ignore = (event: globalThis.DragEvent) => {
+      if (!event.defaultPrevented) event.preventDefault();
+    };
+    document.addEventListener('dragover', refuse);
+    document.addEventListener('drop', ignore);
+    return () => {
+      document.removeEventListener('dragover', refuse);
+      document.removeEventListener('drop', ignore);
+    };
+  }, [drag]);
   const calendar = (update: (calendar: Calendar) => Calendar) =>
     change((s) => ({ ...s, calendar: update(s.calendar) as typeof s.calendar }));
 
@@ -190,8 +214,12 @@ export function useWeek(ctx: UiContext) {
       completed.filter((ride) => ride.date === date),
     );
 
-  /** Only today and the days after it take a workout; the calendar of ridrs only this week's. */
-  const droppable = (date: string) => date >= today && (!ownEntriesOnly || thisWeeksDay(date) !== undefined);
+  /**
+   * Only today and the days after it take a workout; the calendar of ridrs only this week's. A
+   * workout of a day that has passed keeps its day.
+   */
+  const droppable = (date: string) =>
+    !(drag?.kind === 'entry' && drag.past) && date >= today && (!ownEntriesOnly || thisWeeksDay(date) !== undefined);
 
   /** Waits for the provider's answer to a change that is shown meanwhile; a refusal takes it back. */
   const written = (change: Omit<Pending, 'key'>, answer: Promise<DataWriteResult>) => {
@@ -415,16 +443,17 @@ export const WEEK_CSS = `
   text-decoration: underline; text-underline-offset: 3px; cursor: pointer; vertical-align: middle; }
 .tw-current:hover { color: var(--ridrs-text, #f1f5f9); }
 .tw-current:focus-visible { outline: 3px solid var(--ridrs-focus, #00f0ff); outline-offset: 2px; }
-/* The bin: shown at the bottom while an entry of the calendar is dragged; an entry dropped there is removed. */
-.tw-bin { position: fixed; left: 50%; bottom: 28px; z-index: 50; display: flex; align-items: center; gap: 12px;
-  padding: 16px 28px; transform: translateX(-50%); border: 2px dashed rgb(255 77 109 / .6); border-radius: 16px;
-  background: rgb(13 18 28 / .92); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
+/* The bin: right below the calendar while an entry of it is dragged, over what follows, so nothing moves. */
+.tw { position: relative; }
+.tw-bin { position: absolute; inset: calc(100% + 10px) 0 auto; z-index: 50; display: flex; align-items: center;
+  justify-content: center; gap: 12px; min-height: 64px; padding: 12px 20px;
+  border: 2px dashed rgb(255 77 109 / .7); border-radius: 14px;
+  background: rgb(13 18 28 / .94); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
   box-shadow: 0 12px 40px rgb(0 0 0 / .5); backdrop-filter: blur(8px);
-  transition: background .15s, border-color .15s, transform .15s; animation: tw-bin-in .18s ease-out; }
+  transition: background .15s, border-color .15s; animation: tw-bin-in .15s ease-out; }
 .tw-bin .pv-glyph { width: 22px; height: 22px; color: var(--ridrs-danger, #ff4d6d); }
-.tw-bin[data-over] { border-style: solid; border-color: var(--ridrs-danger, #ff4d6d); background: rgb(255 77 109 / .22);
-  transform: translateX(-50%) scale(1.06); }
-@keyframes tw-bin-in { from { opacity: 0; transform: translate(-50%, 16px); } }
+.tw-bin[data-over] { border-style: solid; border-color: var(--ridrs-danger, #ff4d6d); background: rgb(70 18 30 / .96); }
+@keyframes tw-bin-in { from { opacity: 0; transform: translateY(-8px); } }
 @media (prefers-reduced-motion: reduce) { .tw-bin { animation: none; transition: none; } }
 /* The rider's workouts and the library: where a planned workout is dropped to become one of the workouts. */
 .tr-workouts-drop { display: flex; flex-direction: column; gap: inherit; border-radius: 16px;
@@ -538,8 +567,8 @@ function Day({
             data-state="planned"
             data-kind={entry.kind}
             data-pending={entry.pending || undefined}
-            draggable={!past && !entry.pending}
-            onDragStart={startDrag({ kind: 'entry', id: entry.id }, setDrag)}
+            draggable={!entry.pending}
+            onDragStart={startDrag({ kind: 'entry', id: entry.id, ...(past ? { past } : {}) }, setDrag)}
             onDragEnd={() => setDrag(undefined)}
           >
             {subject ? (

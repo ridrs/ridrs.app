@@ -223,6 +223,13 @@ Then(
 );
 
 Then(
+  'the calendar date {string} lists no {string}',
+  async function (this: RidrsWorld, date: string, entry: string) {
+    await waitFor(() => assert.ok(!calendarDate(this, date).textContent?.includes(entry)));
+  },
+);
+
+Then(
   'the calendar date {string} shows {string} as done',
   async function (this: RidrsWorld, date: string, ride: string) {
     await waitFor(() =>
@@ -345,12 +352,13 @@ Then('the page shows no bin', async function (this: RidrsWorld) {
   await waitFor(() => assert.equal(bin(this), null));
 });
 
-Then('the planned workout {string} cannot be dragged', function (this: RidrsWorld, name: string) {
-  const entry = [...shownScreen(this).querySelectorAll<HTMLElement>('li.tr-entry')].find((e) =>
-    e.textContent?.includes(name),
+Then('the bin is part of the calendar', async function (this: RidrsWorld) {
+  await waitFor(() =>
+    assert.ok(
+      bin(this)?.closest('[data-week-start], [data-month]'),
+      'The bin is not beside the calendar',
+    ),
   );
-  assert.ok(entry, `No planned workout "${name}"`);
-  assert.notEqual(entry.getAttribute('draggable'), 'true');
 });
 
 Then('the Training area has no button {string}', function (this: RidrsWorld, name: string) {

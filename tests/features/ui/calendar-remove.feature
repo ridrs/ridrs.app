@@ -1,10 +1,13 @@
 @ui @training
 Feature: A planned workout is removed by dragging it into the bin
   A planned workout is moved by dragging it onto another day. While one is dragged, a bin appears
-  at the bottom of the screen: a workout dropped there is removed from the calendar. Like a move,
+  right below the calendar: a workout dropped there is removed from the calendar, also one of a
+  day that has passed. A workout of a day that has passed keeps its day: the bin is the only
+  place it can be dropped. Like a move,
   the removal is sent to the calendar at once; the workout is gone at once and comes back with the
   reason when the calendar refuses it. Workouts of the library are not in the calendar, so
-  dragging one shows no bin.
+  dragging one shows no bin. Where nothing takes a dragged workout, it cannot be dropped, and the
+  pointer says so instead of showing a plus.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
   2026.
@@ -18,6 +21,7 @@ Feature: A planned workout is removed by dragging it into the bin
       | Base   | Sweet Spot 3x12 | Ride | 1h15m    | 78   |
     And intervals.icu plans:
       | date       | type | name         | duration | load |
+      | 2026-11-03 | Ride | Recovery 45  | 45m      | 25   |
       | 2026-11-05 | Ride | Threshold 20 | 1h       | 80   |
     And the local time is "2026-11-04 08:00"
     And the main screen is 1400 px wide
@@ -30,6 +34,7 @@ Feature: A planned workout is removed by dragging it into the bin
     Then the page shows no bin
     When I start dragging the planned workout "Threshold 20"
     Then the page shows the bin "Drop here to remove"
+    And the bin is part of the calendar
     When I end the drag
     Then the page shows no bin
     When I start dragging the workout "Sweet Spot 3x12"
@@ -45,6 +50,22 @@ Feature: A planned workout is removed by dragging it into the bin
     Then intervals.icu received 1 requests "DELETE /api/v1/athlete/0/events/*"
     And the calendar day "Thursday" lists no "Threshold 20"
     And the page shows no bin
+
+  Scenario: A workout of a day that has passed is removed from the large calendar
+    Given the secret store holds a token for intervals.icu
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Training"
+    And I press "Open large calendar"
+    Then the calendar date "2026-11-03" lists "Recovery 45"
+    When I start dragging the planned workout "Recovery 45"
+    Then the page shows the bin "Drop here to remove"
+    And the bin is part of the calendar
+    When I end the drag
+    And the simulated intervals.icu forgets the requests so far
+    And I drag the planned workout "Recovery 45" into the bin
+    Then intervals.icu received 1 requests "DELETE /api/v1/athlete/0/events/*"
+    And the calendar date "2026-11-03" lists no "Recovery 45"
 
   Scenario: A refused removal is taken back and says why
     Given the secret store holds a token for intervals.icu
