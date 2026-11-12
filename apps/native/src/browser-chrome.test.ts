@@ -63,4 +63,38 @@ describe('suppressBrowserChrome', () => {
     expect(dispatch(text, wheel(true))).toBe(true);
     expect(dispatch(text, wheel(false))).toBe(false);
   });
+
+  // happy-dom has no DataTransfer: a drag event carries what the WebView would give.
+  const drag = (type: 'dragover' | 'drop', types: readonly string[]) => {
+    const event = new Event(type, { cancelable: true, bubbles: true });
+    const transfer = { types, dropEffect: 'none' };
+    Object.defineProperty(event, 'dataTransfer', { value: transfer });
+    return { event, transfer };
+  };
+
+  it('takes a dropped file or link no one else took, so it does not open in the WebView', () => {
+    suppressBrowserChrome(root, { allowInspect: false });
+    for (const types of [['Files'], ['text/uri-list', 'text/plain']]) {
+      const over = drag('dragover', types);
+      expect(dispatch(text, over.event)).toBe(true);
+      // Nothing takes it yet: the pointer says so.
+      expect(over.transfer.dropEffect).toBe('none');
+      expect(dispatch(text, drag('drop', types).event)).toBe(true);
+    }
+  });
+
+  it('leaves the app’s own drags and drops that a drop zone took alone', () => {
+    suppressBrowserChrome(root, { allowInspect: false });
+    expect(dispatch(text, drag('dragover', ['text/plain']).event)).toBe(false);
+    expect(dispatch(text, drag('drop', ['text/plain']).event)).toBe(false);
+
+    const zone = root.appendChild(document.createElement('section'));
+    zone.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    });
+    const over = drag('dragover', ['Files']);
+    zone.dispatchEvent(over.event);
+    expect(over.transfer.dropEffect).toBe('copy');
+  });
 });

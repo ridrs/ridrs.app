@@ -12,7 +12,7 @@ export interface BrowserChromeOptions {
 /**
  * Turns off what makes the WebView feel like a browser: its context menu (text fields keep
  * theirs, for copy and paste), reload by ⌘R / Ctrl+R / F5, which would drop the running state,
- * and page zoom by keys, Ctrl + wheel and trackpad pinch.
+ * page zoom by keys, Ctrl + wheel and trackpad pinch, and opening a file dropped onto it.
  */
 export function suppressBrowserChrome(root: HTMLElement, options: BrowserChromeOptions): void {
   root.addEventListener('contextmenu', (event) => {
@@ -40,4 +40,21 @@ export function suppressBrowserChrome(root: HTMLElement, options: BrowserChromeO
   );
   // WebKit's trackpad pinch.
   root.addEventListener('gesturestart', (event) => event.preventDefault());
+  // A file or link dragged in from outside that no drop zone took would open in the WebView and
+  // replace the app (ADR 0093): accept it here, show that nothing takes it, and drop it. The
+  // app's own drags carry `text/plain` only and stay as they are.
+  root.addEventListener('dragover', (event) => {
+    if (event.defaultPrevented || !isExternal(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+  });
+  root.addEventListener('drop', (event) => {
+    if (!event.defaultPrevented && isExternal(event)) event.preventDefault();
+  });
+}
+
+/** A drag from outside the app: files, or a link from another app. */
+function isExternal(event: DragEvent): boolean {
+  const types = event.dataTransfer?.types ?? [];
+  return types.includes('Files') || types.includes('text/uri-list');
 }
