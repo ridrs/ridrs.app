@@ -12,6 +12,6 @@
     { "contribution": "ui-area-me/weekly-goal", "columns": { "wide": 4, "medium": 6 } },
     { "contribution": "ui-training-plan/next-workout", "columns": { "wide": 6, "medium": 6 } }
   ],
-  "screens": ["ride", "training", "events"],
+  "screens": ["ride", "training", "events", "briefing"],
   "dialogs": ["search", "setup", "settings", "garage", "me", "workout-import"]
 }

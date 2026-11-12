@@ -81,6 +81,8 @@ import {
   recordingFinishService,
   recordingRecoverableState,
   recordingRideState,
+  rideBriefingSetService,
+  rideBriefingState,
   routeCancelService,
   routeFetchService,
   routeOfferState,
@@ -217,6 +219,7 @@ const STATES: readonly StateDefinition[] = [
   trainingAccountState,
   trainingCalendarState,
   trainingHistoryState,
+  rideBriefingState,
   trainingLibraryState,
   trainingUploadState,
   appLinkState,
@@ -253,6 +256,7 @@ const SERVICES: readonly ServiceDefinition[] = [
   trainingRangeLoadService,
   trainingRefreshService,
   trainingUploadService,
+  rideBriefingSetService,
 ];
 
 /** Port to the platform's "keep the display on" facility. */

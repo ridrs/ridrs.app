@@ -69,6 +69,8 @@ import {
   recordingFinishService,
   recordingRecoverableState,
   recordingRideState,
+  rideBriefingSetService,
+  rideBriefingState,
   routeCancelService,
   routeFetchService,
   routeOfferState,
@@ -175,6 +177,7 @@ const STATES: readonly StateDefinition[] = [
   trainingAccountState,
   trainingCalendarState,
   trainingHistoryState,
+  rideBriefingState,
   trainingLibraryState,
   trainingUploadState,
   appLinkState,
@@ -207,6 +210,7 @@ const SERVICES: readonly ServiceDefinition[] = [
   trainingRangeLoadService,
   trainingRefreshService,
   trainingUploadService,
+  rideBriefingSetService,
 ];
 
 /** Events the host resolves by id: what a replay republishes and validates. */

@@ -12,6 +12,8 @@ const CSS = `
 .wd-page h2 { margin: 0 0 8px; font-size: 15px; color: var(--ridrs-text-muted, #8b9db2); }
 .wd-back { align-self: flex-start; padding: 8px 18px; border: 1.5px solid var(--ridrs-line, #1f3447);
   border-radius: 999px; background: var(--ridrs-surface, #0a1520); color: inherit; font: inherit; cursor: pointer; }
+.wd-ride { border-color: var(--ridrs-accent, #27c8ff); background: var(--ridrs-accent, #27c8ff);
+  color: var(--ridrs-accent-text, #0b1220); font-weight: 700; }
 .wd-head { display: flex; flex-direction: column; gap: 6px; }
 .wd-title { margin: 0; font-size: 30px; font-weight: 500; }
 .wd-eyebrow, .wd-byline, .wd-hint { color: var(--ridrs-text-muted, #8b9db2); font-size: 13px; }

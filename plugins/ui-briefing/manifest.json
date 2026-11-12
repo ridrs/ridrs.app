@@ -1,0 +1,59 @@
+{
+  "id": "ui-briefing",
+  "name": "Briefing",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "state": {
+    "owns": [
+      "ride.briefing"
+    ]
+  },
+  "services": {
+    "provides": [
+      "ride.briefing-set"
+    ]
+  },
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "briefing",
+        "export": "Briefing"
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "equipment.bicycle-changed"
+      ],
+      "publish": [
+        "activity.start-requested"
+      ]
+    },
+    "state": [
+      "app.language",
+      "athlete.profile",
+      "data.source",
+      "device.status",
+      "ride.briefing",
+      "route.offer",
+      "training.calendar",
+      "training.library"
+    ],
+    "calls": [
+      "ride.briefing-set",
+      "route.fetch"
+    ],
+    "uses": [
+      "ui.route-profile",
+      "ui.workout-chart"
+    ]
+  }
+}

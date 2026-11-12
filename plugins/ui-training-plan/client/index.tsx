@@ -33,6 +33,7 @@ import {
   targetLabel,
   unrolled,
 } from './format.ts';
+import { openBriefing } from './briefing.ts';
 import { type Messages, messages } from './i18n/index.ts';
 import { TrainingStyles } from './theme.tsx';
 import { chartAthlete, chartWorkout, WorkoutChartSlot } from './workout-chart.tsx';
@@ -196,7 +197,7 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
     // The calendar of ridrs on this device; the service can still be connected from here.
     const offer = account && account.state !== 'connected' && account.state !== 'connecting';
     return (
-      <NextWorkoutCard ctx={ctx} text={text} plan={plan} caption={text.thisDevice}>
+      <NextWorkoutCard ctx={ctx} text={text} plan={plan} source={source} caption={text.thisDevice}>
         {offer ? (
           <button
             type="button"
@@ -244,21 +245,27 @@ function NextWorkoutView({ ctx }: { readonly ctx: UiContext }) {
     .filter(Boolean)
     .join(' · ');
   return (
-    <NextWorkoutCard ctx={ctx} text={text} plan={plan} caption={`intervals.icu · ${caption}`} />
+    <NextWorkoutCard ctx={ctx} text={text} plan={plan} source={source} caption={`intervals.icu · ${caption}`} />
   );
 }
 
-/** The card of the next workout, with the source it comes from under it. */
+/**
+ * The card of the next workout, with the source it comes from under it. Enter leads into the
+ * briefing with the workout fixed; without the briefing, into the workout's details.
+ */
 function NextWorkoutCard({
   ctx,
   text,
   plan,
+  source,
   caption,
   children,
 }: {
   readonly ctx: UiContext;
   readonly text: Messages;
   readonly plan: Plan | undefined;
+  /** The provider of the calendar the workout is planned in. */
+  readonly source: string;
   readonly caption: string;
   /** Shown under the caption. */
   readonly children?: ReactNode;
@@ -280,7 +287,10 @@ function NextWorkoutCard({
               ? text.nonePlanned
               : text.loading
         }
-        onClick={() => ctx.navigate(DETAILS)}
+        onClick={() => {
+          if (workout && openBriefing(ctx, { workout: { kind: 'planned', from: source, id: workout.id } })) return;
+          ctx.navigate(DETAILS);
+        }}
       >
         <span className="rt-classifier">{text.nextWorkout}</span>
         {workout ? (

@@ -45,7 +45,11 @@
     "calls": [
       "route.fetch",
       "route.cancel",
-      "route.remove"
+      "route.remove",
+      "ride.briefing-set"
+    ],
+    "uses": [
+      "ui.route-profile"
     ]
   }
 }

@@ -11,7 +11,7 @@ Feature: The ride page lists the routes that plugins offer
   categorised summit marked with its category and, where the catalog names it, its name.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, video-source-vangestel" running
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-vangestel" running
     And the main screen is 1400 px wide
     And the ridrs UI is shown
 

@@ -1,0 +1,10 @@
+{
+  "id": "fixture-briefing-devices",
+  "name": "Paired devices of the briefing scenarios (fixture)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "state": { "owns": ["device.status"] }
+}

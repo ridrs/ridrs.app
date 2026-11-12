@@ -1,0 +1,28 @@
+{
+  "id": "ui-route-profile",
+  "name": "Route Profile",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "provides": [
+      {
+        "capability": "ui.route-profile",
+        "export": "RouteProfile"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": []
+    },
+    "state": [
+      "app.language",
+      "route.offer"
+    ]
+  }
+}

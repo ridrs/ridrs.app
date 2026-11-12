@@ -45,7 +45,8 @@
     "calls": [
       "training.connect",
       "training.disconnect",
-      "training.refresh"
+      "training.refresh",
+      "ride.briefing-set"
     ],
     "uses": [
       "ui.workout-chart"

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { defineState } from './app-state.ts';
 import { athleteProfileSchema } from './athlete.ts';
 import { providerIdSchema } from './data-sources.ts';
+import { defineService } from './services.ts';
 import { defineUiCapability } from './ui-capabilities.ts';
 
 /**
@@ -402,8 +403,9 @@ export const routeProfileCapability = defineUiCapability('ui.route-profile', {
 
 /**
  * The choice of the briefing before a ride (structured-workouts.md, section 11): app state, a
- * draft until "Go" makes it part of the ride (`activity.start-requested`). Key `last`: the last
- * choice, so that Enter, Enter starts the usual ride.
+ * draft until "Go" makes it part of the ride (`activity.start-requested`). Key `fixed`: what the
+ * way into the briefing decided; key `last`: the last choice, so that Enter, Enter starts the
+ * usual ride. Owned by the briefing's host side, written through `ride.briefing-set`.
  */
 export const rideBriefingSchema = z
   .object({
@@ -434,3 +436,15 @@ export const rideBriefingSchema = z
 export type RideBriefing = z.infer<typeof rideBriefingSchema>;
 
 export const rideBriefingState = defineState('ride.briefing', rideBriefingSchema);
+
+/**
+ * Writes one key of `ride.briefing`, which the briefing's host side owns (ADR 0068): UI plugins
+ * cannot write app state themselves. Key `fixed`: what the way into the briefing has decided (a
+ * workout, a route), written by that way in before it opens the briefing; `{}` fixes nothing. Key
+ * `last`: the choice the briefing remembers for the next ride, written by the briefing at its start.
+ */
+export const rideBriefingSetService = defineService('ride.briefing-set', {
+  request: z.object({ key: z.string().min(1), briefing: rideBriefingSchema }).strict(),
+  response: z.object({}).strict(),
+  keyedBy: rideBriefingState,
+});

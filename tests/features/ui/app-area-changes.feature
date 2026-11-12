@@ -6,7 +6,7 @@ Feature: Changes in the app's areas take effect at once and are kept
   the card can be hidden on Today and shown again in its area.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-devices, ui-area-ride, ui-area-training, library-ridrs, ui-area-events, ui-area-me, ui-search, ui-settings, profile-local" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-devices, ui-area-ride, ui-route-profile, ui-area-training, library-ridrs, ui-area-events, ui-area-me, ui-search, ui-settings, profile-local" together with a test device plugin "test-device"
     And the local time is "2026-11-04 08:00"
     And the host has started
     And the main screen is 1400 px wide

@@ -31,6 +31,9 @@
       "data.source",
       "export.fit",
       "recording.ride"
+    ],
+    "calls": [
+      "ride.briefing-set"
     ]
   }
 }

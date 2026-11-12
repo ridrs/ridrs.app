@@ -12,6 +12,7 @@ import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk'
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { openBriefing } from './briefing.ts';
 import { messages } from './i18n/index.ts';
 import { RideSaved } from './ride-saved.tsx';
 
@@ -87,7 +88,10 @@ function RideStartView({ ctx }: { readonly ctx: UiContext }) {
         type="button"
         className="rs-start"
         data-testid="start-ride"
-        onClick={() => ctx.events.publish(activityStartRequestedEvent, {})}
+        onClick={() => {
+          // Every ride starts through the briefing, which asks for all of it from here.
+          if (!openBriefing(ctx, {})) ctx.events.publish(activityStartRequestedEvent, {});
+        }}
       >
         <span className="rs-play" aria-hidden="true" />
         {text.start}

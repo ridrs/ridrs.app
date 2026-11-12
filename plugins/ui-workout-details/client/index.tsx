@@ -30,6 +30,7 @@ import {
   stepName,
   zoneRowsOf,
 } from './format.ts';
+import { openBriefing } from './briefing.ts';
 import { type Messages, messages } from './i18n/index.ts';
 import { chosenAthlete, type EditRef, editRef, type Library, shownWorkout } from './subject.ts';
 import { DetailsStyles } from './theme.tsx';
@@ -289,8 +290,10 @@ function Details({
   athlete,
   text,
   edit,
+  ride,
 }: {
   readonly edit?: ReactNode;
+  readonly ride?: ReactNode;
   readonly ctx: UiContext;
   readonly workout: Workout;
   readonly plannedFor: string | undefined;
@@ -326,6 +329,7 @@ function Details({
         {plannedFor ? <span className="wd-eyebrow">{text.plannedFor(dayText(plannedFor, text))}</span> : null}
         <h1 className="wd-title">{workout.name}</h1>
         {byline ? <span className="wd-byline">{byline}</span> : null}
+        {ride}
         {edit}
       </header>
       {workout.description ? <p className="wd-description">{workout.description}</p> : null}
@@ -353,6 +357,19 @@ function Details({
         {zones ? <Pairs testId="workout-details-zones" pairs={zones} /> : <p className="wd-hint">{text.zonesNeedFtp}</p>}
       </section>
     </>
+  );
+}
+
+/** Leads into the briefing with the shown workout fixed: a calendar entry stays the planned one. */
+function rideThrough(ctx: UiContext, subject: WorkoutDetailsSubject): void {
+  openBriefing(
+    ctx,
+    {
+      workout:
+        subject.kind === 'library'
+          ? { kind: 'library', from: subject.from, workoutId: subject.workoutId }
+          : { kind: 'planned', from: subject.from, id: subject.id },
+    },
   );
 }
 
@@ -445,6 +462,20 @@ function DetailsView({
           plannedFor={shown.plannedFor}
           athlete={athlete}
           text={text}
+          ride={
+            // Only where a briefing is there to ride it through (structured-workouts.md, section 11).
+            ctx.hasScreen('briefing') ? (
+              <button
+                type="button"
+                className="wd-back wd-ride"
+                data-testid="workout-details-ride"
+                aria-label={text.rideThis(shown.workout.name)}
+                onClick={() => rideThrough(ctx, current)}
+              >
+                {text.ride}
+              </button>
+            ) : undefined
+          }
           edit={
             ref ? (
               <>

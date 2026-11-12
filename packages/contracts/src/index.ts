@@ -521,6 +521,7 @@ export {
 export {
   type RideBriefing,
   rideBriefingSchema,
+  rideBriefingSetService,
   rideBriefingState,
   routeProfileCapability,
   WORKOUT_CHART_VARIANTS,

@@ -3,7 +3,7 @@
 import type { RouteOffer } from '@ridrs/contracts';
 import { useEffect, useRef, useState } from 'react';
 import type { Messages } from './i18n/index.ts';
-import { type Climb, GRADES, gradeOf, stretchesOf } from './routes.ts';
+import { type Climb, GRADES, gradeOf, stretchesOf } from './profile-data.ts';
 
 /** px of the profile's own height, and of its margins for the scales. */
 const PLOT = 200;
@@ -121,7 +121,7 @@ function Summit({
  * summit marked with its category and its name or altitude, an altitude and a km scale, and a
  * legend of the colours below. Drawn in px at the width it gets, so its words keep their size.
  */
-export function RouteProfile({ offer, text }: { readonly offer: RouteOffer; readonly text: Messages }) {
+export function FullProfile({ offer, text }: { readonly offer: RouteOffer; readonly text: Messages }) {
   const { box, width } = useWidth();
   const stretches = stretchesOf(offer);
   if (stretches.length === 0) return null;

@@ -6,6 +6,8 @@ import type { WorkoutIntensity } from '@ridrs/contracts';
 export const en = {
   locale: 'en-GB',
   back: 'Back',
+  ride: 'Ride',
+  rideThis: (name: string) => `Ride ${name}`,
   edit: 'Edit',
   export: 'Export',
   exportMissing: 'The export of workouts is not installed.',

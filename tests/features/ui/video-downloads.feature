@@ -12,7 +12,7 @@ Feature: Downloading a video route
   and media storage are the real plugins on a media folder of the scenario.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, video-source-vangestel, video-import-incyclist, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-vangestel, video-import-incyclist, data-archive-node, storage-media-node" together with the simulated downloads
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown

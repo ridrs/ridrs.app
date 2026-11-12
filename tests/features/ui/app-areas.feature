@@ -9,7 +9,7 @@ Feature: The app's areas as a clickable preview
   nobody takes it for a working feature (ADR 0059).
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-devices, ui-area-ride, ui-area-training, ui-area-events, ui-area-me, ui-garage, ui-search, ui-settings" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-devices, ui-area-ride, ui-route-profile, ui-area-training, ui-area-events, ui-area-me, ui-garage, ui-search, ui-settings" together with a test device plugin "test-device"
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown

@@ -6,6 +6,8 @@ import type { Messages } from './en.ts';
 export const de: Messages = {
   locale: 'de-DE',
   back: 'Zurück',
+  ride: 'Fahren',
+  rideThis: (name: string) => `${name} fahren`,
   edit: 'Bearbeiten',
   export: 'Exportieren',
   exportMissing: 'Der Export von Workouts ist nicht installiert.',
