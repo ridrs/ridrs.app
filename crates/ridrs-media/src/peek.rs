@@ -15,7 +15,7 @@ use serde::Serialize;
 pub const PEEK_LIMIT: u64 = 8 * 1024 * 1024;
 
 /// The entries of a ZIP whose bytes a peek reads (`PEEK_EXTENSIONS` of the contracts).
-pub const PEEK_EXTENSIONS: &[&str] = &["xml", "gpx", "json", "zwo", "fit", "erg", "mrc", "tcx", "txt", "md"];
+pub const PEEK_EXTENSIONS: &[&str] = &["xml", "gpx", "json", "zwo", "fit", "erg", "mrc", "tcx", "txt", "md", "png", "jpg"];
 
 /// One file entry of a ZIP.
 #[derive(Debug, PartialEq, Serialize)]

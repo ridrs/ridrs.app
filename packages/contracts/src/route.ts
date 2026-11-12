@@ -199,6 +199,7 @@ export const routeImportPreviewSchema = z.discriminatedUnion('ok', [
           ascent: true,
           duration: true,
           sparkline: true,
+          thumbnail: true,
         })
         .strict(),
     })

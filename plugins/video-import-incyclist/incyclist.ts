@@ -17,7 +17,7 @@ import { XMLParser } from 'fast-xml-parser';
 export const INCYCLIST_FORMAT = 'incyclist-gpx-import';
 
 /** Counts up when the import makes different routes from the same package. */
-export const IMPORT_VERSION = '1';
+export const IMPORT_VERSION = '2';
 
 /** Text by its byte order mark: some control files are UTF-16; without a mark UTF-8. */
 export function decodeText(bytes: Uint8Array): string {
@@ -30,6 +30,8 @@ export function decodeText(bytes: Uint8Array): string {
 export interface Control {
   readonly video: string;
   readonly gpx: string;
+  /** The route's title (`<title>`), if the control file names one. */
+  readonly title?: string;
   readonly framerate: number;
   readonly startFrame: number;
   readonly notes: VideoRoute['notes'];
@@ -75,9 +77,11 @@ export function parseControl(text: string): Control {
     start: Number(segment.start),
     end: Number(segment.end),
   }));
+  const title = String(root?.title ?? '').trim();
   return {
     video,
     gpx,
+    ...(title ? { title } : {}),
     framerate: Number(root?.framerate) || 30,
     startFrame: Number(root?.['start-frame']) || 1,
     notes: notes.filter((note) => Number.isFinite(note.distance) && note.distance >= 0),
@@ -86,6 +90,20 @@ export function parseControl(text: string): Control {
 }
 
 const nameOf = (path: string) => path.split('/').at(-1) ?? path;
+const folderOf = (path: string) => path.slice(0, path.length - nameOf(path).length);
+
+/**
+ * The route's picture among `paths`: the first of the names Incyclist looks for next to the video
+ * (`preview.png`, `preview.jpg`, `<video>_preview.png`, `<video>_preview.jpg`), whatever their case.
+ */
+export function thumbnailOf(paths: readonly string[], video: string): string | undefined {
+  const stem = nameOf(video).replace(/\.[^.]*$/, '');
+  const folder = folderOf(video).toLowerCase();
+  return ['preview.png', 'preview.jpg', `${stem}_preview.png`, `${stem}_preview.jpg`]
+    .map((name) => `${folder}${name.toLowerCase()}`)
+    .map((wanted) => paths.find((path) => path.toLowerCase() === wanted))
+    .find((path) => path !== undefined);
+}
 
 /**
  * Whether the entries of a ZIP make an Incyclist package, without unpacking it (ADR 0093): a
@@ -107,14 +125,25 @@ export function inspectIncyclist(entries: readonly PeekedEntry[]): VideoPackageI
     const named = (name: string) => entries.find((candidate) => nameOf(candidate.name) === name);
     const missing = [control.video, control.gpx].find((name) => !named(name));
     if (missing) return { ok: false, reason: `The package has no file "${missing}"` };
-    return { ok: true, track: named(control.gpx)?.name ?? control.gpx };
+    const video = named(control.video)?.name ?? control.video;
+    const thumbnail = thumbnailOf(
+      entries.map((entry) => entry.name),
+      video,
+    );
+    return {
+      ok: true,
+      track: named(control.gpx)?.name ?? control.gpx,
+      ...(control.title ? { title: control.title } : {}),
+      ...(thumbnail ? { thumbnail } : {}),
+    };
   }
   return { ok: false, reason };
 }
 
 /**
- * Turns an Incyclist ZIP into a ridrs video route: unpacked into the folder, the video and the
- * track renamed (`video.mp4`, `track.gpx`), everything else removed, `route.json` written.
+ * Turns an Incyclist ZIP into a ridrs video route: unpacked into the folder, the video, the track
+ * and the picture renamed (`video.mp4`, `track.gpx`, `thumbnail.png` or `.jpg`), everything else
+ * removed, `route.json` written.
  */
 export function createIncyclistImporter(media: MediaFiles, archive: DataArchive): VideoImporter {
   return {
@@ -134,18 +163,23 @@ export function createIncyclistImporter(media: MediaFiles, archive: DataArchive)
         }
         return file;
       };
-      await media.move(fileNamed(control.video), `${directory}/video.mp4`);
+      const video = fileNamed(control.video);
+      const picture = thumbnailOf(files, video);
+      const thumbnail = picture ? `thumbnail.${picture.slice(-3).toLowerCase()}` : undefined;
+      await media.move(video, `${directory}/video.mp4`);
       await media.move(fileNamed(control.gpx), `${directory}/track.gpx`);
+      if (picture && thumbnail) await media.move(picture, `${directory}/${thumbnail}`);
       await media.remove(`${directory}/package`);
       const route = videoRouteSchema.parse({
         format: 'ridrs-video-route',
         version: 1,
-        title: facts.title,
+        title: facts.title ?? control.title ?? facts.fallbackTitle ?? 'Video',
         ...(facts.source ? { source: facts.source } : {}),
         notes: control.notes,
         segments: control.segments,
         video: { file: 'video.mp4', framerate: control.framerate, startFrame: control.startFrame },
         track: { file: 'track.gpx' },
+        ...(thumbnail ? { thumbnail: { file: thumbnail } } : {}),
         imported: { by: 'video-import-incyclist', version: IMPORT_VERSION },
       } satisfies VideoRoute);
       await media.write(`${directory}/${VIDEO_ROUTE_FILE}`, new TextEncoder().encode(`${JSON.stringify(route, null, 2)}\n`));

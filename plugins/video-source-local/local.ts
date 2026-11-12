@@ -37,6 +37,8 @@ const indexSchema = z
           ascent: z.number().nonnegative(),
           duration: z.number().positive().optional(),
           sparkline: z.array(z.number()).min(2),
+          /** The picture's file in the route's folder, where the package brought one. */
+          thumbnail: z.string().min(1).optional(),
         })
         .strict(),
     ),
@@ -81,6 +83,17 @@ export function slugOf(title: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return slug || 'video';
+}
+
+/** Pictures larger than this are imported but not previewed: the preview travels as text. */
+const PREVIEW_PICTURE_LIMIT = 2 * 1024 * 1024;
+
+/** A picture's bytes as a URL an `<img>` can show before anything is copied. */
+function pictureUrl(name: string, bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const type = name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+  return `data:${type};base64,${btoa(binary)}`;
 }
 
 const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -133,8 +146,10 @@ export class LocalVideos {
         ? await pick?.pick({ name: 'Incyclist', extensions: PACKAGE_EXTENSIONS })
         : this.dropped(file);
     if (!chosen) return false;
-    const title = titleOf(chosen.name);
-    const id = this.freeId(slugOf(title));
+    // The title the package names, read by the preview; a picked package's shows once imported.
+    // The folder keeps the file's name either way.
+    const title = previewed?.ok ? previewed.preview.title : titleOf(chosen.name);
+    const id = this.freeId(slugOf(titleOf(chosen.name)));
     this.set({ kind: 'video', state: 'importing', file: chosen.name });
     this.state.offer(this.offerId(id), this.importingOffer(id, title, previewed?.ok ? previewed.preview : undefined));
     // A host that stopped meanwhile takes no more state: the import ends without a word.
@@ -162,15 +177,21 @@ export class LocalVideos {
     } catch (error) {
       return { ok: false, reason: reasonOf(error) };
     }
+    const picture = entries.find((entry) => entry.name === inspection.thumbnail)?.bytes;
+    const thumbnail =
+      inspection.thumbnail && picture && picture.length <= PREVIEW_PICTURE_LIMIT
+        ? pictureUrl(inspection.thumbnail, picture)
+        : undefined;
     return {
       ok: true,
       preview: {
         kind: 'video',
-        title: titleOf(dropped.name),
+        title: inspection.title ?? titleOf(dropped.name),
         distance: facts.distance,
         ascent: facts.ascent,
         ...(facts.duration === undefined ? {} : { duration: facts.duration }),
         sparkline: [...facts.sparkline],
+        ...(thumbnail ? { thumbnail } : {}),
       },
     };
   }
@@ -215,13 +236,19 @@ export class LocalVideos {
       let route: VideoRoute;
       let facts: TrackFacts;
       try {
-        route = await importer.import(pack, folder, { title });
+        route = await importer.import(pack, folder, { fallbackTitle: title });
         facts = trackFacts(new TextDecoder().decode(await media.read(`${folder}/${route.track.file}`)));
       } catch (error) {
         await media.remove(folder);
         throw error;
       }
-      const imported: Imported = { id, title, ...facts, sparkline: [...facts.sparkline] };
+      const imported: Imported = {
+        id,
+        title: route.title,
+        ...facts,
+        sparkline: [...facts.sparkline],
+        ...(route.thumbnail ? { thumbnail: route.thumbnail.file } : {}),
+      };
       this.routes.push(imported);
       await this.save(media);
       offer = this.offerOf(media, imported, route);
@@ -257,7 +284,7 @@ export class LocalVideos {
   private importingOffer(
     id: string,
     title: string,
-    facts?: Pick<RouteOffer, 'distance' | 'ascent' | 'duration' | 'sparkline'>,
+    facts?: Pick<RouteOffer, 'distance' | 'ascent' | 'duration' | 'sparkline' | 'thumbnail'>,
   ): RouteOffer {
     const offerId = this.offerId(id);
     return {
@@ -268,6 +295,7 @@ export class LocalVideos {
       ascent: facts?.ascent ?? 0,
       ...(facts?.duration ? { duration: facts.duration } : {}),
       ...(facts?.sparkline ? { sparkline: [...facts.sparkline] } : {}),
+      ...(facts?.thumbnail ? { thumbnail: facts.thumbnail } : {}),
       tags: {},
       availability: { state: 'importing' },
       world: { landscape: 'ui-world-video/landscape', route: offerId },
@@ -286,6 +314,7 @@ export class LocalVideos {
       ascent: route.ascent,
       ...(route.duration ? { duration: route.duration } : {}),
       sparkline: [...route.sparkline],
+      ...(route.thumbnail ? { thumbnail: media.url(`${folder}/${route.thumbnail}`) } : {}),
       tags: {},
       availability: {
         state: 'ready',

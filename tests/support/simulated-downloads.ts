@@ -32,11 +32,11 @@ function utf16be(text: string): Uint8Array {
   return bytes;
 }
 
-const CONTROL = `<?xml version="1.0" encoding="utf-16" standalone="yes"?>
+/** The control file, titled `title`, or without a title when it is `null`. */
+const control = (title: string | null) => `<?xml version="1.0" encoding="utf-16" standalone="yes"?>
 <gpx-import>
   <name>FR_Test</name>
-  <title>Test route</title>
-  <video-file-path>FR_Test.mp4</video-file-path>
+${title === null ? '' : `  <title>${title}</title>\n`}  <video-file-path>FR_Test.mp4</video-file-path>
   <gpx-file-path>FR_Test.gpx</gpx-file-path>
   <framerate>25.0</framerate>
   <start-frame>1</start-frame>
@@ -48,12 +48,15 @@ const CONTROL = `<?xml version="1.0" encoding="utf-16" standalone="yes"?>
   </segments>
 </gpx-import>`;
 
-/** A small Incyclist package: video, GPX track and control file in one ZIP, as the sources ship them. */
-export async function incyclistPackage(): Promise<Uint8Array> {
+/**
+ * A small Incyclist package: video, GPX track and control file in one ZIP, as the sources ship
+ * them. Its control file is titled `title`, or names no title when it is `null`.
+ */
+export async function incyclistPackage(title: string | null = 'Test route'): Promise<Uint8Array> {
   const zip = new ZipWriter(new Uint8ArrayWriter());
   await zip.add('FR_Test.mp4', new Uint8ArrayReader(new Uint8Array(await readFile(TEST_PATTERN))));
   await zip.add('FR_Test.gpx', new Uint8ArrayReader(new TextEncoder().encode(gpx())));
-  await zip.add('FR_Test.xml', new Uint8ArrayReader(utf16be(CONTROL)));
+  await zip.add('FR_Test.xml', new Uint8ArrayReader(utf16be(control(title))));
   return zip.close();
 }
 

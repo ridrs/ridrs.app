@@ -81,7 +81,7 @@ export const dataPickCapability = defineCapability<DataPick, 'single', 'data.pic
 /** Bytes a peek reads of one file or of one entry of a ZIP, at most. */
 export const PEEK_LIMIT = 8 * 1024 * 1024;
 
-/** The entries of a ZIP whose bytes a peek reads: control files, tracks and workouts. */
+/** The entries of a ZIP whose bytes a peek reads: control files, tracks, workouts and route pictures. */
 export const PEEK_EXTENSIONS = [
   'xml',
   'gpx',
@@ -93,6 +93,8 @@ export const PEEK_EXTENSIONS = [
   'tcx',
   'txt',
   'md',
+  'png',
+  'jpg',
 ] as const;
 
 /** One entry of a dropped ZIP. */

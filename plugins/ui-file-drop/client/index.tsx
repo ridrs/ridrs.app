@@ -139,6 +139,7 @@ function RouteTile({ ctx, tile, text }: { readonly ctx: UiContext; readonly tile
           `${Math.round(preview.ascent)} m`,
           preview.duration === undefined ? undefined : duration(preview.duration),
         ]}
+        image={preview.thumbnail}
         backdrop={<div ref={profile} className="fd-profile" />}
       />
     </div>

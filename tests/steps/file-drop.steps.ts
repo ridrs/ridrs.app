@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Given, Then, When } from '@cucumber/cucumber';
 import { waitFor, within } from '@testing-library/dom';
-import { SimulatedDrop } from '../support/simulated-drop.ts';
+import { PICTURE_BYTES, SimulatedDrop } from '../support/simulated-drop.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv, useRealPlugins } from './devices-and-metrics.steps.ts';
 
@@ -68,6 +68,13 @@ Given(
   'the rider drags the Incyclist package {string} onto the window',
   async function (this: RidrsWorld, name: string) {
     await drop(this).drag(name, 'incyclist');
+  },
+);
+
+Given(
+  'the rider drags the Incyclist package {string} with a preview picture onto the window',
+  async function (this: RidrsWorld, name: string) {
+    await drop(this).drag(name, 'pictured');
   },
 );
 
@@ -177,6 +184,27 @@ Then('the call resolved with the preview {string}', function (this: RidrsWorld, 
   );
 });
 
+Then("the preview shows the package's picture", function (this: RidrsWorld) {
+  const answer = this.lastCall?.resolved
+    ? (this.lastCall.value as { preview?: { thumbnail?: string } })
+    : undefined;
+  const url = answer?.preview?.thumbnail ?? '';
+  assert.ok(url.startsWith('data:image/jpeg;base64,'), `The preview shows "${url}"`);
+  assert.deepEqual(new Uint8Array(Buffer.from(url.split(',')[1] ?? '', 'base64')), PICTURE_BYTES);
+});
+
+Then(
+  'the route offer {string} shows the picture {string}',
+  async function (this: RidrsWorld, key: string, file: string) {
+    await this.waitForIo(() => {
+      const offer = this.ensureHost().getState('route.offer').get(key) as
+        | { thumbnail?: string }
+        | undefined;
+      return offer?.thumbnail?.endsWith(`/${key}/${file}`) === true;
+    }, `"${key}" to show ${file}`);
+  },
+);
+
 Then('the drop layer shows the tile {string}', async function (this: RidrsWorld, title: string) {
   const shown = await shownLayer(this);
   await waitFor(() => within(shown).getByRole('article', { name: title }));
@@ -232,6 +260,18 @@ Given('copying the dropped file waits', function (this: RidrsWorld) {
 When('copying the dropped file goes on', function (this: RidrsWorld) {
   drop(this).goOn();
 });
+
+Then(
+  'the route offer {string} is titled {string}',
+  async function (this: RidrsWorld, key: string, title: string) {
+    await this.waitForIo(
+      () =>
+        (this.ensureHost().getState('route.offer').get(key) as { title?: string } | undefined)
+          ?.title === title,
+      `"${key}" to be titled ${title}`,
+    );
+  },
+);
 
 Then(
   'the route offer {string} reads {string}',

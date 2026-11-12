@@ -15,11 +15,34 @@ import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.j
 import { incyclistPackage } from './simulated-downloads.ts';
 
 /** The files a package can be made of in the scenarios. */
-export type SimulatedPackage = 'incyclist' | 'video2gpx' | 'no-control-file';
+export type SimulatedPackage = 'incyclist' | 'video2gpx' | 'pictured' | 'no-control-file';
 
-/** video2gpx's packages add its own facts and a read-me to Incyclist's three files. */
+/** A small JPEG's first bytes: enough to be a picture by its name and its start. */
+export const PICTURE_BYTES = new Uint8Array([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9,
+]);
+
+/** An Incyclist package with the picture Incyclist shows for it, `preview.jpg` next to the video. */
+async function picturedPackage(): Promise<Uint8Array> {
+  const reader = new ZipReader(new Uint8ArrayReader(await incyclistPackage(null)));
+  const zip = new ZipWriter(new Uint8ArrayWriter());
+  for (const entry of await reader.getEntries()) {
+    if (!entry.directory)
+      await zip.add(
+        entry.filename,
+        new Uint8ArrayReader(await entry.getData(new Uint8ArrayWriter())),
+      );
+  }
+  await reader.close();
+  await zip.add('preview.jpg', new Uint8ArrayReader(PICTURE_BYTES));
+  return zip.close();
+}
+
+/** video2gpx's packages add its own facts and a read-me to Incyclist's three files, and name their title. */
 async function video2gpxPackage(): Promise<Uint8Array> {
-  const reader = new ZipReader(new Uint8ArrayReader(await incyclistPackage()));
+  const reader = new ZipReader(
+    new Uint8ArrayReader(await incyclistPackage('Driving the Amalfi Coast')),
+  );
   const zip = new ZipWriter(new Uint8ArrayWriter());
   for (const entry of await reader.getEntries()) {
     if (entry.directory) continue;
@@ -45,8 +68,10 @@ async function holidayPackage(): Promise<Uint8Array> {
 }
 
 const PACKAGES: Record<SimulatedPackage, () => Promise<Uint8Array>> = {
-  incyclist: incyclistPackage,
+  // A plain Incyclist package names no title: the route is named after the file.
+  incyclist: () => incyclistPackage(null),
   video2gpx: video2gpxPackage,
+  pictured: picturedPackage,
   'no-control-file': holidayPackage,
 };
 

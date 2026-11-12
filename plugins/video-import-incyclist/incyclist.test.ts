@@ -2,7 +2,7 @@
 
 import type { DataArchive, MediaFiles } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { createIncyclistImporter, decodeText, inspectIncyclist, parseControl } from './incyclist.ts';
+import { createIncyclistImporter, decodeText, inspectIncyclist, parseControl, thumbnailOf } from './incyclist.ts';
 
 const CONTROL = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <gpx-import>
@@ -43,6 +43,12 @@ describe('parseControl', () => {
     });
   });
 
+  it('takes the title the control file names', () => {
+    const titled = CONTROL.replace('<video-file-path>', '<title>Col de Pennes &amp; Jansac</title>\n    <video-file-path>');
+    expect(parseControl(titled).title).toBe('Col de Pennes & Jansac');
+    expect(parseControl(CONTROL)).not.toHaveProperty('title');
+  });
+
   it('refuses a control file without video or track', () => {
     expect(() => parseControl('<gpx-import><name>x</name></gpx-import>')).toThrow('names no video');
   });
@@ -58,6 +64,21 @@ describe('inspectIncyclist', () => {
     expect(inspectIncyclist([video, track, control, extra])).toEqual({ ok: true, track: 'pack/FR_Col_de_Pennes.gpx' });
   });
 
+  it('names the picture next to the video for the preview', () => {
+    const picture = { name: 'pack/FR_Col_de_Pennes_preview.jpg', size: 3, bytes: new Uint8Array(3) };
+    expect(inspectIncyclist([video, track, control, picture])).toEqual({
+      ok: true,
+      track: track.name,
+      thumbnail: picture.name,
+    });
+  });
+
+  it('names the title of the control file for the preview', () => {
+    const text = CONTROL.replace('<video-file-path>', '<title>Col de Pennes</title><video-file-path>');
+    const titled = { ...control, bytes: new TextEncoder().encode(text) };
+    expect(inspectIncyclist([video, track, titled])).toEqual({ ok: true, track: track.name, title: 'Col de Pennes' });
+  });
+
   it('says why a ZIP is no package', () => {
     expect(inspectIncyclist([video])).toEqual({ ok: false, reason: 'The package has no control file' });
     expect(inspectIncyclist([control, video])).toEqual({
@@ -66,6 +87,18 @@ describe('inspectIncyclist', () => {
     });
     const empty = { name: 'x.xml', size: 5, bytes: new TextEncoder().encode('<a/>') };
     expect(inspectIncyclist([empty])).toEqual({ ok: false, reason: 'The control file names no video or no GPX track' });
+  });
+});
+
+describe('thumbnailOf', () => {
+  it("takes the picture Incyclist looks for next to the video, in Incyclist's order", () => {
+    const video = 'pack/FR_Col.mp4';
+    expect(thumbnailOf(['pack/FR_Col_preview.jpg', 'pack/preview.JPG', video], video)).toBe('pack/preview.JPG');
+    expect(thumbnailOf(['pack/FR_Col_preview.jpg', 'pack/FR_Col_preview.png'], video)).toBe('pack/FR_Col_preview.png');
+  });
+
+  it('ignores other pictures and pictures in another folder', () => {
+    expect(thumbnailOf(['pack/FR_Col.png', 'preview.png', 'pack/profile.jpg'], 'pack/FR_Col.mp4')).toBeUndefined();
   });
 });
 
@@ -91,6 +124,54 @@ describe('createIncyclistImporter', () => {
     const source = { name: 'Van Gestel', author: 'Fred Van Gestel', url: 'https://example.org/', license: 'CC BY-NC-SA 4.0' };
     const route = await createIncyclistImporter(media, archive).import('r.zip', 'r', { title: 'Col de Pennes', source });
     expect(route).toMatchObject({ title: 'Col de Pennes', video: { file: 'video.mp4', startFrame: 12 }, track: { file: 'track.gpx' } });
+    expect(route).not.toHaveProperty('thumbnail');
     expect([...files.keys()].sort()).toEqual(['r/route.json', 'r/track.gpx', 'r/video.mp4']);
+  });
+
+  it('titles the route as its control file does, not as its package is named', async () => {
+    const text = CONTROL.replace('<video-file-path>', '<title>Driving the Amalfi Coast</title><video-file-path>');
+    const files = new Map<string, Uint8Array>([['r/package/c.xml', new TextEncoder().encode(text)]]);
+    const media = {
+      read: async (path: string) => files.get(path) ?? new Uint8Array(),
+      write: async (path: string, bytes: Uint8Array) => void files.set(path, bytes),
+      move: async () => undefined,
+      remove: async () => undefined,
+    } as unknown as MediaFiles;
+    const archive: DataArchive = {
+      extract: async (_archive, directory) => [
+        ...files.keys(),
+        `${directory}/FR_Col_de_Pennes.mp4`,
+        `${directory}/FR_Col_de_Pennes.gpx`,
+      ],
+    };
+    const route = await createIncyclistImporter(media, archive).import('r.zip', 'r', { fallbackTitle: 'IT Driving the Amalfi Coast' });
+    expect(route.title).toBe('Driving the Amalfi Coast');
+    const named = await createIncyclistImporter(media, archive).import('r.zip', 'r', { title: 'Amalfi', fallbackTitle: 'x' });
+    expect(named.title).toBe('Amalfi');
+  });
+
+  it('keeps the picture Incyclist would show as thumbnail.png', async () => {
+    const files = new Map<string, Uint8Array>([['r/package/c.xml', new TextEncoder().encode(CONTROL)]]);
+    const media = {
+      read: async (path: string) => files.get(path) ?? new Uint8Array(),
+      write: async (path: string, bytes: Uint8Array) => void files.set(path, bytes),
+      move: async (from: string, to: string) => {
+        files.set(to, files.get(from) ?? new Uint8Array());
+        files.delete(from);
+      },
+      remove: async (path: string) => [...files.keys()].filter((key) => key.startsWith(path)).forEach((key) => files.delete(key)),
+    } as unknown as MediaFiles;
+    const archive: DataArchive = {
+      extract: async (_archive, directory) => {
+        for (const name of ['FR_Col_de_Pennes.mp4', 'FR_Col_de_Pennes.gpx', 'FR_Col_de_Pennes.png', 'FR_Col_de_Pennes_preview.PNG']) {
+          files.set(`${directory}/${name}`, new TextEncoder().encode(name));
+        }
+        return [...files.keys()].filter((key) => key.startsWith(directory));
+      },
+    };
+    const route = await createIncyclistImporter(media, archive).import('r.zip', 'r', { fallbackTitle: 'Col' });
+    expect(route.thumbnail).toEqual({ file: 'thumbnail.png' });
+    expect(new TextDecoder().decode(files.get('r/thumbnail.png'))).toBe('FR_Col_de_Pennes_preview.PNG');
+    expect([...files.keys()].sort()).toEqual(['r/route.json', 'r/thumbnail.png', 'r/track.gpx', 'r/video.mp4']);
   });
 });

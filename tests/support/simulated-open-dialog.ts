@@ -41,7 +41,10 @@ export class SimulatedOpenDialog {
   }
 
   choose(name: string, kind: 'incyclist' | 'no-control-file'): void {
-    this.choice = { name, bytes: kind === 'incyclist' ? incyclistPackage : holidayPackage };
+    this.choice = {
+      name,
+      bytes: kind === 'incyclist' ? () => incyclistPackage(null) : holidayPackage,
+    };
   }
 
   cancel(): void {

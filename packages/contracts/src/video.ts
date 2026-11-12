@@ -50,6 +50,11 @@ export const videoRouteSchema = z
       .strict(),
     /** The original GPX track, next to `route.json`; its times are the video's. */
     track: z.object({ file: z.string().min(1) }).strict(),
+    /** A picture of the route, next to `route.json`, where the package brings one. */
+    thumbnail: z
+      .object({ file: z.string().min(1) })
+      .strict()
+      .optional(),
     /** Who made it: the importer plugin and its version. */
     imported: z.object({ by: z.string().min(1), version: z.string().min(1) }).strict(),
   })
@@ -62,13 +67,24 @@ export const VIDEO_ROUTE_FILE = 'route.json';
 
 /** What a source knows about a route that its package may not say. */
 export interface VideoRouteFacts {
-  readonly title: string;
+  /** The source's own title; it wins over the one the package names. */
+  readonly title?: string;
+  /** The title when neither the source nor the package names one, such as one from the file name. */
+  readonly fallbackTitle?: string;
   readonly source?: VideoRoute['source'];
 }
 
-/** A package an importer can read, and the entry with its track; or why it cannot. */
+/**
+ * A package an importer can read, the entry with its track, the title it names and the entry with
+ * its picture; or why it cannot.
+ */
 export type VideoPackageInspection =
-  | { readonly ok: true; readonly track: string }
+  | {
+      readonly ok: true;
+      readonly track: string;
+      readonly title?: string;
+      readonly thumbnail?: string;
+    }
   | { readonly ok: false; readonly reason: string };
 
 /**

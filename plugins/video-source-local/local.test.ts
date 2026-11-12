@@ -33,7 +33,7 @@ function memoryMedia(files = new Map<string, Uint8Array>()): MediaFiles & { file
 }
 
 /** An importer that writes the route's files, or fails with `failure`. */
-function importer(media: MediaFiles, failure?: string): VideoImporter {
+function importer(media: MediaFiles, failure?: string, title?: string, thumbnail?: string): VideoImporter {
   return {
     format: 'incyclist-gpx-import',
     inspect: () => ({ ok: false, reason: 'Not inspected here' }),
@@ -44,11 +44,12 @@ function importer(media: MediaFiles, failure?: string): VideoImporter {
       const route = {
         format: 'ridrs-video-route' as const,
         version: 1 as const,
-        title: facts.title,
+        title: title ?? facts.title ?? facts.fallbackTitle ?? 'Video',
         notes: [],
         segments: [],
         video: { file: 'video.mp4', framerate: 30, startFrame: 1 },
         track: { file: 'track.gpx' },
+        ...(thumbnail ? { thumbnail: { file: thumbnail } } : {}),
         imported: { by: 'test', version: '1' },
       };
       await media.write(`${directory}/route.json`, new TextEncoder().encode(JSON.stringify(route)));
@@ -66,7 +67,15 @@ function dialog(name: string | undefined): DataPick {
 
 let media = memoryMedia();
 
-function setup(options: { readonly chosen?: string; readonly failure?: string; readonly files?: Map<string, Uint8Array> } = {}) {
+function setup(
+  options: {
+    readonly chosen?: string;
+    readonly failure?: string;
+    readonly title?: string;
+    readonly thumbnail?: string;
+    readonly files?: Map<string, Uint8Array>;
+  } = {},
+) {
   media = memoryMedia(options.files);
   const offers = new Map<string, RouteOffer>();
   const imports: (RouteImport | undefined)[] = [];
@@ -74,7 +83,7 @@ function setup(options: { readonly chosen?: string; readonly failure?: string; r
     offer: (id, offer) => (offer ? offers.set(id, offer) : offers.delete(id)),
     importer: (state) => imports.push(state),
   });
-  const services = { media, pick: dialog(options.chosen), importers: () => [importer(media, options.failure)] };
+  const services = { media, pick: dialog(options.chosen), importers: () => [importer(media, options.failure, options.title, options.thumbnail)] };
   return { videos, offers, imports, services };
 }
 
@@ -107,6 +116,29 @@ describe('LocalVideos', () => {
     expect(imports.at(-2)).toEqual({ kind: 'video', state: 'importing', file: 'Col de Test.zip' });
     expect(imports.at(-1)).toEqual({ kind: 'video', state: 'idle' });
     expect([...media.files.keys()].filter((file) => file.endsWith('.zip'))).toEqual([]);
+  });
+
+  it('lists the route under the title its package names', async () => {
+    const { videos, offers, services } = setup({ chosen: 'IT_Amalfi.zip', title: 'Driving the Amalfi Coast' });
+    await videos.connect(services);
+    await videos.import();
+    await videos.settled();
+    expect(offers.get('video-source-local/it-amalfi')).toMatchObject({ title: 'Driving the Amalfi Coast' });
+    expect(JSON.parse(new TextDecoder().decode(media.files.get('videos/video-source-local/routes.json')))).toMatchObject({
+      routes: [{ title: 'Driving the Amalfi Coast' }],
+    });
+  });
+
+  it("offers the package's picture as the route's thumbnail, after a restart too", async () => {
+    const { videos, offers, services } = setup({ chosen: 'Col.zip', thumbnail: 'thumbnail.jpg' });
+    await videos.connect(services);
+    await videos.import();
+    await videos.settled();
+    const url = 'media://videos/video-source-local/col/thumbnail.jpg';
+    expect(offers.get('video-source-local/col')).toMatchObject({ thumbnail: url });
+    const again = setup({ files: media.files });
+    await again.videos.connect(again.services);
+    expect(again.offers.get('video-source-local/col')).toMatchObject({ thumbnail: url });
   });
 
   it('offers the imported routes again after a restart', async () => {
