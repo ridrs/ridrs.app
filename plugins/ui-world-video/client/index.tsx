@@ -13,6 +13,8 @@ import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type FrameDecoder, FramePlayer } from './frame-player.ts';
+import { isPqBt2020 } from './hdr.ts';
+import { createHdrRenderer, type HdrRenderer } from './hdr-renderer.ts';
 import { messages } from './i18n/index.ts';
 import { loadDownloadedRoute, parseGpx, type VideoRoute } from './library.ts';
 import { buildVideoTime, type VideoTime, videoTimeAt } from './playback.ts';
@@ -166,7 +168,10 @@ function useRoute(ctx: UiContext): { readonly id: string | undefined; readonly l
  */
 function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTime: VideoTime, video: VideoIndex) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  /** A canvas of its own: once it has a WebGPU context it can have no 2D one (ADR 0091). */
+  const hdrCanvas = useRef<HTMLCanvasElement>(null);
   const [finished, setFinished] = useState(false);
+  const [hdr, setHdr] = useState(false);
 
   useEffect(() => {
     const presentation = createPhysicsPresentation(ctx.events);
@@ -180,6 +185,36 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
     let ride: string | undefined;
     let distance = 0;
     let drawn: VideoFrame | undefined;
+    let disposed = false;
+    // An HDR video is shown on the HDR canvas when the platform has one, else on the 2D canvas.
+    let renderer: HdrRenderer | undefined;
+    const leaveHdr = (why: string) => {
+      renderer?.destroy();
+      renderer = undefined;
+      drawn = undefined;
+      setHdr(false);
+      ctx.logger.info(`The video of "${route.id}" is shown in SDR: ${why}`);
+    };
+    if (isPqBt2020(video.colour) && hdrCanvas.current) {
+      createHdrRenderer(hdrCanvas.current, video.colour).then(
+        (created) => {
+          if (disposed) {
+            created?.destroy();
+          } else if (created) {
+            renderer = created;
+            drawn = undefined;
+            setHdr(true);
+          } else {
+            leaveHdr('this system has no HDR canvas');
+          }
+        },
+        (error: unknown) => {
+          if (!disposed) {
+            leaveHdr(String(error));
+          }
+        },
+      );
+    }
     const stopWatching = ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
       publisher.rideState(payload);
       ride = 'sessionId' in payload ? payload.sessionId : undefined;
@@ -195,11 +230,19 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
       }
       const time = videoTimeAt(videoTime, distance, offset);
       const picture = player.frameAt(time);
-      const element = canvas.current;
+      const element = renderer ? hdrCanvas.current : canvas.current;
       if (picture && picture !== drawn && element) {
-        element.getContext('2d')?.drawImage(picture, 0, 0, element.width, element.height);
-        drawn = picture;
-        element.dataset.frameTime = (picture.timestamp / 1e6).toFixed(3);
+        const result = renderer ? renderer.draw(picture) : undefined;
+        if (result === 'unsupported') {
+          leaveHdr(`decoded frames are ${picture.format}`);
+        } else if (result !== 'busy') {
+          // A frame the HDR canvas could not take yet is offered again next render frame.
+          if (!result) {
+            element.getContext('2d')?.drawImage(picture, 0, 0, element.width, element.height);
+          }
+          drawn = picture;
+          element.dataset.frameTime = (picture.timestamp / 1e6).toFixed(3);
+        }
       }
       if (element) {
         element.dataset.distance = distance.toFixed(2);
@@ -213,14 +256,16 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
       setFinished(distance >= track.length);
     });
     return () => {
+      disposed = true;
       stopFrames();
       stopWatching();
       presentation.dispose();
       player.close();
+      renderer?.destroy();
     };
   }, [ctx, route, track, videoTime, video]);
 
-  return { canvas, finished };
+  return { canvas, hdrCanvas, hdr, finished };
 }
 
 const OVERLAY = {
@@ -250,15 +295,24 @@ function VideoWorld({
 }) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);
-  const { canvas, finished } = useVideoWorld(ctx, route, track, videoTime, video);
+  const { canvas, hdrCanvas, hdr, finished } = useVideoWorld(ctx, route, track, videoTime, video);
+  const shown = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } as const;
   return (
     <div data-testid="video-world" data-route={route.id} style={{ position: 'absolute', inset: 0, background: '#000' }}>
       <canvas
         ref={canvas}
-        data-testid="route-video"
+        data-testid={hdr ? undefined : 'route-video'}
         width={video.width}
         height={video.height}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        style={{ ...shown, display: hdr ? 'none' : 'block' }}
+      />
+      <canvas
+        ref={hdrCanvas}
+        data-testid={hdr ? 'route-video' : undefined}
+        data-dynamic-range={hdr ? 'high' : undefined}
+        width={video.width}
+        height={video.height}
+        style={{ ...shown, display: hdr ? 'block' : 'none' }}
       />
       <div style={{ ...OVERLAY, top: 16 }}>
         {route.title} · {text.km(localizeNumber((track.length / 1000).toFixed(1), language))}

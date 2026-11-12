@@ -18,7 +18,7 @@ Setting `currentTime` every render frame is a seek every frame: not workable wit
 - **The render clock chooses the frame.** Each render frame shows the decoded video frame with the latest presentation time at or before `videoTimeAt(track, presented distance)`. There is no playback rate, no seek threshold and no rate cap; standing still shows the same frame.
 - **WebCodecs decodes ahead into a small buffer.** The plugin fetches the samples by HTTP range from the file's own byte offsets, feeds them in decode order and keeps the decoded frames from the shown one up to a short lead. When the shown time leaves what the decoder can reach in time (behind the buffer, or past a keyframe ahead of what was fed), it resets the decoder and starts at the last keyframe at or before that time. Until the frame arrives, the last picture stays.
 - **mp4box.js** (`mp4box` 2.4.1, BSD-3-Clause, pure ESM, the demuxer of the WebCodecs samples) reads the sample table and the decoder configuration (`avcC`, `av1C`). Only `ftyp` and `moov` are fetched (0.3–3.6 MB for the library's files, `moov` at the end); the media data is never read in full. 2.5.0 was 12 days old when chosen; 2.4.1 had been out for four months.
-- The frame is drawn on a `<canvas>`; the `<video>` element is gone.
+- The frame is drawn on a `<canvas>`; the `<video>` element is gone. (HDR videos: ADR 0091.)
 
 ## Consequences
 

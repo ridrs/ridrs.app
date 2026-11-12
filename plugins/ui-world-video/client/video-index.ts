@@ -13,6 +13,8 @@ export interface VideoIndex {
   readonly height: number;
   /** The codec configuration record (`avcC`, `av1C`, …) without its box header; none for some codecs. */
   readonly description?: Uint8Array;
+  /** The colour the container declares (`colr` nclx, else `vpcC`); none when it declares none. */
+  readonly colour?: VideoColour;
   /** Byte offset in the file, per sample in decode order. */
   readonly offsets: Float64Array;
   readonly sizes: Uint32Array;
@@ -20,6 +22,19 @@ export interface VideoIndex {
   readonly times: Float64Array;
   /** 1 for a keyframe. */
   readonly keyframes: Uint8Array;
+}
+
+/**
+ * A video's colour as code points of ISO/IEC 23091-2 (H.273): primaries (1 BT.709, 9 BT.2020),
+ * transfer (1 BT.709, 16 PQ, 18 HLG) and matrix (1 BT.709, 9 BT.2020 non-constant luminance).
+ * Read from the container, not from the decoded frames: WebKit labels decoded VP9 as BT.709
+ * whatever it is (ADR 0091).
+ */
+export interface VideoColour {
+  readonly primaries: number;
+  readonly transfer: number;
+  readonly matrix: number;
+  readonly fullRange: boolean;
 }
 
 /** Fetches `length` bytes of the file from `offset`. */
@@ -118,6 +133,33 @@ function descriptionOf(entry: Record<string, unknown>): Uint8Array | undefined {
   return new Uint8Array(stream.buffer, 8);
 }
 
+/** The colour of a sample entry: its `colr` box of type nclx, else the fields of its `vpcC`. */
+function colourOf(entry: Record<string, unknown>): VideoColour | undefined {
+  const colr = entry.colr as
+    | { colour_type?: string; colour_primaries?: number; transfer_characteristics?: number; matrix_coefficients?: number; full_range_flag?: number }
+    | undefined;
+  if (colr?.colour_type === 'nclx' && colr.transfer_characteristics !== undefined) {
+    return {
+      primaries: colr.colour_primaries ?? 2,
+      transfer: colr.transfer_characteristics,
+      matrix: colr.matrix_coefficients ?? 2,
+      fullRange: colr.full_range_flag === 1,
+    };
+  }
+  const vpcc = entry.vpcC as
+    | { colourPrimaries?: number; transferCharacteristics?: number; matrixCoefficients?: number; videoFullRangeFlag?: number }
+    | undefined;
+  if (vpcc?.transferCharacteristics !== undefined) {
+    return {
+      primaries: vpcc.colourPrimaries ?? 2,
+      transfer: vpcc.transferCharacteristics,
+      matrix: vpcc.matrixCoefficients ?? 2,
+      fullRange: vpcc.videoFullRangeFlag === 1,
+    };
+  }
+  return undefined;
+}
+
 /**
  * Reads the index of the first video track: only `ftyp` and `moov` are fetched, wherever `moov`
  * lies. Sample offsets are positions in the file, so the samples are then read by range.
@@ -167,6 +209,7 @@ export async function readVideoIndex(read: RangeReader): Promise<VideoIndex> {
     width: track.video?.width ?? track.track_width,
     height: track.video?.height ?? track.track_height,
     description: entry ? descriptionOf(entry) : undefined,
+    colour: entry ? colourOf(entry) : undefined,
     offsets,
     sizes,
     times,

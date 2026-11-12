@@ -18,6 +18,13 @@ function reader() {
 }
 
 describe('readVideoIndex', () => {
+  it('reads the colour the container declares, none when it declares none', async () => {
+    const pq = readFileSync(new URL('./fixtures/pq-test-pattern.mp4', import.meta.url));
+    const tagged = await readVideoIndex(async (offset, length) => new Uint8Array(pq.subarray(offset, offset + length)));
+    expect(tagged.colour).toEqual({ primaries: 9, transfer: 16, matrix: 9, fullRange: false });
+    expect((await readVideoIndex(reader().read)).colour).toBeUndefined();
+  });
+
   it('reads codec, size and every sample in decode order', async () => {
     const video = await readVideoIndex(reader().read);
     expect(video.codec).toMatch(/^avc1\./);
