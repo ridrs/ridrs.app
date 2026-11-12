@@ -7,8 +7,8 @@ import { createNodeArchive } from './archive.ts';
 export default definePlugin({
   initialize(ctx) {
     ctx.capabilities.provide(dataArchiveCapability, {
-      extract: (archive, directory) =>
-        createNodeArchive(ctx.capabilities.get(storageMediaCapability)).extract(archive, directory),
+      extract: (archive, directory, onProgress) =>
+        createNodeArchive(ctx.capabilities.get(storageMediaCapability)).extract(archive, directory, onProgress),
     });
   },
 });

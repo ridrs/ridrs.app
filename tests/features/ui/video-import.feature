@@ -6,9 +6,11 @@ Feature: Importing an own video route from an Incyclist package
   storage, `data.archive` unpacks it and the importer of the Incyclist format turns it into a
   ridrs video route (`route.json`, `video.mp4`, `track.gpx`). The route is then an offer of the
   local source in the app state `route.offer`, on this device and removable, with its distance,
-  its climb and its profile from the track. Import is a call of the service `route.import`; while
-  the package is imported, and when it failed, the card says so through the source's key of the
-  app state `route.import` (ADR 0068).
+  its climb and its profile from the track. Import is a call of the service `route.import`. While
+  the package is imported, its route is listed at once and says how far the import is, as a
+  download does: copying the package is the first half, unpacking it the second. The import card
+  then says nothing of it; when an import failed, the card says why through the source's key of
+  the app state `route.import` (ADR 0068).
 
   Here the open dialog is simulated: it chooses a small Incyclist package with its control file in
   UTF-16, or the rider cancels it. Unpacking, import and media storage are the real plugins on a
@@ -51,6 +53,20 @@ Feature: Importing an own video route from an Incyclist package
     And the route "Col de Test" shows the status "Importing"
     When I press "Col de Test"
     Then the route details offer no "Go" button
+    When copying the chosen package goes on
+    Then the route details offer a "Go" button
+
+  Scenario: A package being imported shows how far it is, and the import card stays quiet
+    Given the rider chooses the Incyclist package "Col de Test.zip"
+    And copying the chosen package waits halfway
+    When I press "Ride"
+    And I press "Import video"
+    Then the route "Col de Test" shows the status "Importing"
+    And the route "Col de Test" reads "25 %"
+    And the route "Import video" does not read "Col de Test.zip"
+    And the route "Import video" does not read "Importing"
+    When I press "Col de Test"
+    Then the route details read "Importing: 25 %"
     When copying the chosen package goes on
     Then the route details offer a "Go" button
 

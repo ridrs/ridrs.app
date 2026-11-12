@@ -99,8 +99,16 @@ export interface VideoImporter {
    * entry with the route's GPX track, or why not. Entries other than the ones it needs are fine.
    */
   inspect(entries: readonly PeekedEntry[]): VideoPackageInspection;
-  /** Imports `pack` into the empty folder `directory`, writes `route.json` there and returns it. */
-  import(pack: string, directory: string, facts: VideoRouteFacts): Promise<VideoRoute>;
+  /**
+   * Imports `pack` into the empty folder `directory`, writes `route.json` there and returns it.
+   * `onProgress` hears now and then how far it is, from 0 to 1.
+   */
+  import(
+    pack: string,
+    directory: string,
+    facts: VideoRouteFacts,
+    onProgress?: (progress: number) => void,
+  ): Promise<VideoRoute>;
 }
 
 export const videoImporterCapability = defineCapability<

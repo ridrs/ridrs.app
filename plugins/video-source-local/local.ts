@@ -5,6 +5,7 @@ import {
   type DataPick,
   type DroppedFile,
   type MediaFiles,
+  type PickedFile,
   type RouteImport,
   type RouteImportPreview,
   type RouteOffer,
@@ -148,9 +149,10 @@ export class LocalVideos {
     const title = previewed?.ok ? previewed.preview.title : titleOf(chosen.name);
     const id = this.freeId(slugOf(titleOf(chosen.name)));
     this.set({ kind: 'video', state: 'importing', file: chosen.name });
-    this.state.offer(this.offerId(id), this.importingOffer(id, title, previewed?.ok ? previewed.preview : undefined));
+    const listed = this.importingOffer(id, title, previewed?.ok ? previewed.preview : undefined);
+    this.state.offer(listed.id, listed);
     // A host that stopped meanwhile takes no more state: the import ends without a word.
-    this.running = this.run(media, importer, chosen, id, title).catch(() => undefined);
+    this.running = this.run(media, importer, chosen, id, title, this.progressOf(listed)).catch(() => undefined);
     return true;
   }
 
@@ -217,21 +219,31 @@ export class LocalVideos {
   private async run(
     media: MediaFiles,
     importer: VideoImporter,
-    chosen: { readonly name: string; copyTo(target: string): Promise<void> },
+    chosen: Pick<PickedFile, 'name' | 'copyTo'>,
     id: string,
     title: string,
+    tell: (share: number) => void,
   ): Promise<void> {
+    // A late word of the copy or the unpacking changes no route that is ready or gone.
+    let open = true;
+    const progress = (share: number) => {
+      if (open) tell(share);
+    };
     const folder = `${FOLDER}/${id}`;
     const pack = `${folder}.zip`;
     let next: RouteImport;
     let offer: RouteOffer | undefined;
     try {
-      await chosen.copyTo(pack);
+      // Copying the package is the first half of the import, unpacking it the second.
+      await chosen.copyTo(pack, ({ received, size }) => {
+        if (size) progress(Math.min(received / size, 1) / 2);
+      });
+      progress(0.5);
       await media.remove(folder);
       let route: VideoRoute;
       let facts: TrackFacts;
       try {
-        route = await importer.import(pack, folder, { fallbackTitle: title });
+        route = await importer.import(pack, folder, { fallbackTitle: title }, (share) => progress(0.5 + share / 2));
         facts = trackFacts(new TextDecoder().decode(await media.read(`${folder}/${route.track.file}`)));
       } catch (error) {
         await media.remove(folder);
@@ -254,9 +266,24 @@ export class LocalVideos {
     // The package goes before the import says it is done: a done import leaves nothing behind.
     await media.remove(pack).catch(() => undefined);
     this.running = undefined;
+    open = false;
     // The route listed while it was imported is ready now, or gone with the failure.
     this.state.offer(this.offerId(id), offer);
     this.set(next);
+  }
+
+  /**
+   * Tells how far the import of `listed` is, from 0 to 1, as its offer: once per whole percent,
+   * so a large package does not flood the app state.
+   */
+  private progressOf(listed: RouteOffer): (share: number) => void {
+    let shown = -1;
+    return (share) => {
+      const percent = Math.floor(share * 100);
+      if (percent <= shown) return;
+      shown = percent;
+      this.state.offer(listed.id, { ...listed, availability: { state: 'importing', progress: percent / 100 } });
+    };
   }
 
   private importer(): VideoImporter | undefined {

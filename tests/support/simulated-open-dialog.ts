@@ -21,18 +21,21 @@ export class SimulatedOpenDialog {
   private choice: { readonly name: string; readonly bytes: () => Promise<Uint8Array> } | undefined;
   readonly filters: { readonly name: string; readonly extensions: readonly string[] }[] = [];
 
-  /** While set, a copy waits until `goOn` is called: the import stays on its way. */
-  private held: { promise: Promise<void>; release: () => void } | undefined;
+  /**
+   * While set, a copy waits until `goOn` is called: the import stays on its way. A copy held
+   * halfway says it copied half of the file first.
+   */
+  private held: { promise: Promise<void>; release: () => void; halfway: boolean } | undefined;
 
   constructor(private readonly mediaRoot: string) {}
 
-  /** Copies wait from now until `goOn`. */
-  holdCopies(): void {
+  /** Copies wait from now until `goOn`, before they start or, `halfway`, with half of the file copied. */
+  holdCopies(halfway = false): void {
     let release = () => {};
     const promise = new Promise<void>((resolve) => {
       release = resolve;
     });
-    this.held = { promise, release };
+    this.held = { promise, release, halfway };
   }
 
   goOn(): void {
@@ -60,7 +63,9 @@ export class SimulatedOpenDialog {
       return {
         name: choice.name,
         size: bytes.length,
-        copyTo: async (target) => {
+        copyTo: async (target, onProgress) => {
+          if (this.held?.halfway)
+            onProgress?.({ received: Math.floor(bytes.length / 2), size: bytes.length });
           await this.held?.promise;
           const file = join(this.mediaRoot, ...target.split('/'));
           await mkdir(dirname(file), { recursive: true });

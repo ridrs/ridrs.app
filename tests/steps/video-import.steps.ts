@@ -92,6 +92,10 @@ Given('copying the chosen package waits', function (this: RidrsWorld) {
   dialog(this).holdCopies();
 });
 
+Given('copying the chosen package waits halfway', function (this: RidrsWorld) {
+  dialog(this).holdCopies(true);
+});
+
 When('copying the chosen package goes on', function (this: RidrsWorld) {
   dialog(this).goOn();
 });

@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { dataDropCapability, definePlugin } from '@ridrs/contracts';
-import { invoke } from '@tauri-apps/api/core';
-import { watchDrags } from './drop.ts';
+import { Channel, invoke } from '@tauri-apps/api/core';
+import { type ProgressChannel, watchDrags } from './drop.ts';
+
+/** A channel for a copy's progress from Rust. */
+const progressChannel: ProgressChannel = (onProgress) => {
+  const channel = new Channel<{ received: number; size: number | null }>();
+  channel.onmessage = ({ received, size }) => onProgress?.({ received, size: size ?? undefined });
+  return channel;
+};
 
 let stopWatching: (() => void) | undefined;
 
@@ -14,7 +21,7 @@ let stopWatching: (() => void) | undefined;
  */
 export default definePlugin({
   initialize(ctx) {
-    const watched = watchDrags(window, invoke, (error) =>
+    const watched = watchDrags(window, invoke, progressChannel, (error) =>
       ctx.logger.warn({ error: String(error) }, 'data-drop-tauri: a drag could not be read'),
     );
     stopWatching = watched.stop;

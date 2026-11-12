@@ -11,6 +11,7 @@ export interface DataFetchJob {
   readonly expected?: { readonly size?: number; readonly etag?: string };
 }
 
+/** How far a download, a copy or an unpacking is, in bytes. */
 export interface DataFetchProgress {
   readonly received: number;
   /** Bytes in all, once known. */
@@ -40,8 +41,15 @@ export const dataFetchCapability = defineCapability<DataFetch, 'single', 'data.f
 
 /** Archives in the media storage, unpacked by a provider of the platform. */
 export interface DataArchive {
-  /** Unpacks every file of a ZIP into `directory` (media paths); resolves to the files' media paths. */
-  extract(archive: string, directory: string): Promise<readonly string[]>;
+  /**
+   * Unpacks every file of a ZIP into `directory` (media paths); resolves to the files' media paths.
+   * `onProgress` hears of the bytes unpacked of the ZIP's files, unpacked, now and then.
+   */
+  extract(
+    archive: string,
+    directory: string,
+    onProgress?: (progress: DataFetchProgress) => void,
+  ): Promise<readonly string[]>;
 }
 
 export const dataArchiveCapability = defineCapability<DataArchive, 'single', 'data.archive'>(
@@ -57,8 +65,11 @@ export interface PickedFile {
   readonly name: string;
   /** Bytes. */
   readonly size: number;
-  /** Copies it to the media path `target`, creating its directories; once. */
-  copyTo(target: string): Promise<void>;
+  /**
+   * Copies it to the media path `target`, creating its directories; once. `onProgress` hears of
+   * the bytes copied now and then.
+   */
+  copyTo(target: string, onProgress?: (progress: DataFetchProgress) => void): Promise<void>;
 }
 
 /**

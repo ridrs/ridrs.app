@@ -36,7 +36,7 @@ async fn main() -> Result<(), String> {
     )
     .await?;
     eprintln!("fetched {} bytes in {:.0} s", fetched.size, started.elapsed().as_secs_f64());
-    let files = ridrs_media::archive::extract(&root, target, directory)?;
+    let files = ridrs_media::archive::extract(&root, target, directory, |_, _| {})?;
     eprintln!("extracted {files:?} after {:.0} s", started.elapsed().as_secs_f64());
     Ok(())
 }

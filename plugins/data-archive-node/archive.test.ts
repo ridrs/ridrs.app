@@ -27,6 +27,14 @@ describe('createNodeArchive', () => {
     expect(readFileSync(join(root, 'out', 'sub', 'y.txt'), 'utf8')).toBe('two');
   });
 
+  it('tells how many bytes of the files are unpacked', async () => {
+    writeFileSync(join(root, 'b.zip'), await zipOf({ 'x.txt': 'one', 'sub/y.txt': 'three' }));
+    const heard: { received: number; size?: number }[] = [];
+    await createNodeArchive(media).extract('b.zip', 'out-b', (progress) => heard.push(progress));
+    expect(heard.at(-1)).toEqual({ received: 8, size: 8 });
+    expect(heard.every(({ size }) => size === 8)).toBe(true);
+  });
+
   // zip.js refuses such a name itself; the path check stays for any other reader.
   it('refuses a name that would leave the folder', async () => {
     // zip.js will not write such a name, so the name is changed in the bytes, in both headers.

@@ -63,17 +63,21 @@ class FileWriter extends Writer<void> {
  */
 export function createNodeArchive(media: MediaFiles): DataArchive {
   return {
-    async extract(archive, directory) {
+    async extract(archive, directory, onProgress) {
       const file = new FileRangeReader(media.location(archive));
       const zip = new ZipReader(file);
       try {
         const extracted: string[] = [];
-        for (const entry of await zip.getEntries()) {
-          if (entry.directory) {
-            continue;
-          }
+        const files = (await zip.getEntries()).filter((entry) => !entry.directory);
+        const size = files.reduce((sum, entry) => sum + entry.uncompressedSize, 0);
+        let done = 0;
+        for (const entry of files) {
           const path = assertAppFilePath(`${directory}/${entry.filename}`);
-          await entry.getData(new FileWriter(media.location(path)));
+          await entry.getData(new FileWriter(media.location(path)), {
+            onprogress: async (received) => onProgress?.({ received: done + received, size }),
+          });
+          done += entry.uncompressedSize;
+          onProgress?.({ received: done, size });
           extracted.push(path);
         }
         return extracted;

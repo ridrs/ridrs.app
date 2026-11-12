@@ -3,6 +3,7 @@
 import {
   assertAppFilePath,
   type DataDrop,
+  type DataFetchProgress,
   type DropEvent,
   type DroppedFile,
   type FilePeek,
@@ -11,6 +12,9 @@ import {
 
 /** Tauri's `invoke`, or a stand-in in the tests. */
 export type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+
+/** Tauri's `Channel` for the progress of a copy from Rust, or a stand-in in the tests. */
+export type ProgressChannel = (onProgress?: (progress: DataFetchProgress) => void) => unknown;
 
 /** A file of the drag, as `media_drop_files` names it. */
 interface Dragged {
@@ -38,6 +42,7 @@ const carriesFiles = (event: Event) => [...((event as DragEvent).dataTransfer?.t
 export function watchDrags(
   target: EventTarget,
   invoke: Invoke,
+  channel: ProgressChannel,
   failed: (error: unknown) => void,
 ): { readonly drop: DataDrop; stop(): void } {
   const listeners = new Set<(event: DropEvent) => void>();
@@ -72,7 +77,8 @@ export function watchDrags(
     name,
     size,
     peek: () => peek(token),
-    copyTo: (path) => invoke<void>('media_pick_copy', { token, target: assertAppFilePath(path) }),
+    copyTo: (path, onProgress) =>
+      invoke<void>('media_pick_copy', { token, target: assertAppFilePath(path), onProgress: channel(onProgress) }),
   });
 
   /** The files of the drag from Rust; a file it named before stays the same object. */

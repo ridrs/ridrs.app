@@ -167,6 +167,51 @@ describe('LocalVideos', () => {
     expect(Buffer.from(url.split(',')[1] ?? '', 'base64').equals(picture)).toBe(true);
   });
 
+  it('says how far an import is: copying is its first half, unpacking its second', async () => {
+    media = memoryMedia();
+    const shown: RouteOffer['availability'][] = [];
+    const videos = new LocalVideos({
+      offer: (_id, offer) => offer && shown.push(offer.availability),
+      importer: () => {},
+    });
+    const unpacking = importer(media);
+    await videos.connect({
+      media,
+      pick: {
+        pick: async () => ({
+          name: 'Col de Test.zip',
+          size: 4,
+          copyTo: async (target, onProgress) => {
+            onProgress?.({ received: 1, size: 4 });
+            onProgress?.({ received: 1.01, size: 4 });
+            onProgress?.({ received: 4, size: 4 });
+            media.files.set(target, new Uint8Array(4));
+          },
+        }),
+      },
+      importers: () => [
+        {
+          ...unpacking,
+          import: async (pack, directory, facts, onProgress) => {
+            onProgress?.(0.5);
+            return unpacking.import(pack, directory, facts);
+          },
+        },
+      ],
+    });
+    await videos.import();
+    await videos.settled();
+    // Once per whole percent: a copy that moved less than one says nothing new.
+    expect(shown.map((availability) => availability.state === 'importing' && availability.progress)).toEqual([
+      undefined,
+      0.12,
+      0.5,
+      0.75,
+      false,
+    ]);
+    expect(shown.at(-1)?.state).toBe('ready');
+  });
+
   it('offers the imported routes again after a restart', async () => {
     const first = setup({ chosen: 'Col de Test.zip' });
     await first.videos.connect(first.services);

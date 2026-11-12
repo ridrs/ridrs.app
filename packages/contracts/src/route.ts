@@ -80,7 +80,13 @@ export const routeOfferSchema = z
         })
         .strict(),
       z.object({ state: z.literal('fetchable'), size: z.number().int().positive() }).strict(),
-      z.object({ state: z.literal('importing') }).strict(),
+      z
+        .object({
+          state: z.literal('importing'),
+          /** How far the import is, from 0 to 1, once it started copying. */
+          progress: z.number().min(0).max(1).optional(),
+        })
+        .strict(),
       z
         .object({
           state: z.literal('fetching'),

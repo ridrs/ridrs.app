@@ -229,7 +229,9 @@ function downloadState(offer: RouteOffer, text: Messages): string | undefined {
     case 'failed':
       return text.failedBecause(availability.reason);
     case 'importing':
-      return text.importingRoute;
+      return availability.progress === undefined
+        ? text.importingRoute
+        : text.importingPercent(Math.floor(availability.progress * 100));
     case 'ready':
       return undefined;
   }
@@ -251,8 +253,9 @@ const facts = (offer: RouteOffer, text: Messages): CardFact[] =>
       ];
 
 /**
- * A corner badge for a route that needs a download: the download's progress, a failure, or an icon
- * once it is on this device. A route still to download shows only its Download button.
+ * A corner badge for a route that needs a download: the download's or the import's progress, a
+ * failure, or an icon once it is on this device. A route still to download shows only its Download
+ * button.
  */
 function DownloadBadge({ offer, text }: { readonly offer: RouteOffer; readonly text: Messages }) {
   const { availability } = offer;
@@ -264,9 +267,10 @@ function DownloadBadge({ offer, text }: { readonly offer: RouteOffer; readonly t
     case 'failed':
       return <Badge tone="warn">{text.failed}</Badge>;
     case 'importing':
+      // How far it is, as a download says it, once the import started copying.
       return (
         <Badge tone="busy" label={text.importing}>
-          {text.importing}
+          {availability.progress === undefined ? text.importing : `${Math.floor(availability.progress * 100)} %`}
         </Badge>
       );
     case 'ready':
@@ -346,8 +350,9 @@ function RouteCard({
 
 /**
  * The first card of a list whose routes a provider can import (ADR 0090): it opens the system's
- * open dialog through `route.import`. While a package is imported it says which, and when an
- * import failed or was refused it says why, until the next import.
+ * open dialog through `route.import`. A package being imported is a route of the list that says
+ * how far it is, so the card says nothing of it and opens no second import meanwhile. When an
+ * import failed or was refused, the card says why, until the next import.
  */
 function ImportCard({
   ctx,
@@ -372,20 +377,8 @@ function ImportCard({
       classifier={text.importKind}
       icon={IMPORT}
       title={text.importVideo}
-      details={[
-        importing
-          ? text.importingFile(state.file)
-          : failure
-            ? text.importFailedBecause(failure)
-            : text.importAbout,
-      ]}
-      tools={
-        importing ? (
-          <Badge tone="busy">{text.importing}</Badge>
-        ) : failure ? (
-          <Badge tone="warn">{text.importFailed}</Badge>
-        ) : null
-      }
+      details={[failure ? text.importFailedBecause(failure) : text.importAbout]}
+      tools={failure ? <Badge tone="warn">{text.importFailed}</Badge> : null}
       onOpen={importing ? undefined : start}
     />
   );

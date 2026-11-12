@@ -150,8 +150,11 @@ export function createIncyclistImporter(media: MediaFiles, archive: DataArchive)
   return {
     format: INCYCLIST_FORMAT,
     inspect: inspectIncyclist,
-    async import(pack, directory, facts) {
-      const files = await archive.extract(pack, `${directory}/package`);
+    async import(pack, directory, facts, onProgress) {
+      // Unpacking is the import's work; renaming and writing route.json take no time.
+      const files = await archive.extract(pack, `${directory}/package`, ({ received, size }) => {
+        if (size) onProgress?.(Math.min(received / size, 1));
+      });
       const controlFile = files.find((file) => file.toLowerCase().endsWith('.xml'));
       if (!controlFile) {
         throw new Error('The package has no control file');

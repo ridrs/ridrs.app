@@ -73,5 +73,5 @@ strip = true
 tauri-plugin-blec = { path = "../../../crates/vendor/tauri-plugin-blec" }
 
 [dev-dependencies]
-# Temporary files for the tests of media_drop.rs; the version ridrs-media uses.
+# Temporary files for the tests of media_drop.rs and media_pick.rs; the version ridrs-media uses.
 tempfile = "3.27.0"

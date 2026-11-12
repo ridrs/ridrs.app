@@ -3,7 +3,11 @@
 
 import type { DropEvent } from '@ridrs/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Invoke, watchDrags } from './drop.ts';
+import { type Invoke, type ProgressChannel, watchDrags } from './drop.ts';
+
+/** Stands in for Tauri's `Channel`: Rust's messages are calls of it. */
+const channel: ProgressChannel = (onProgress) => (progress: { received: number; size: number }) =>
+  onProgress?.(progress);
 
 /** Rust's side: the files of the drag by token, and every call made. */
 class FakeRust {
@@ -65,7 +69,7 @@ describe('watchDrags', () => {
   });
 
   const watch = () => {
-    const watched = watchDrags(window, rust.invoke, (error) => errors.push(error));
+    const watched = watchDrags(window, rust.invoke, channel, (error) => errors.push(error));
     stops.push(watched.stop);
     watched.drop.subscribe((event) => events.push(event));
     return watched;
@@ -147,11 +151,15 @@ describe('watchDrags', () => {
         { name: 'Col.mp4', size: 15_000_000_000 },
       ],
     });
-    await file?.copyTo('videos/video-source-local/col.zip');
+    const heard: unknown[] = [];
+    await file?.copyTo('videos/video-source-local/col.zip', (progress) => heard.push(progress));
     expect(rust.calls.at(-1)).toEqual({
       command: 'media_pick_copy',
-      args: { token: '1', target: 'videos/video-source-local/col.zip' },
+      args: { token: '1', target: 'videos/video-source-local/col.zip', onProgress: expect.any(Function) },
     });
+    // What Rust sends over the channel reaches the copy's listener.
+    (rust.calls.at(-1)?.args as { onProgress: (progress: unknown) => void }).onProgress({ received: 5, size: 10 });
+    expect(heard).toEqual([{ received: 5, size: 10 }]);
   });
 
   it('stops watching', async () => {

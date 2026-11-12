@@ -23,7 +23,7 @@ pub struct MediaState {
     running: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
-/// A download's progress, at most four times a second.
+/// How far a download, a copy or an unpacking is, at most four times a second.
 #[derive(Clone, Serialize)]
 pub struct Progress {
     received: u64,
@@ -31,6 +31,17 @@ pub struct Progress {
 }
 
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Sends progress over `channel` at most four times a second, and always once it is complete.
+pub fn throttled(channel: Channel<Progress>) -> impl FnMut(u64, Option<u64>) {
+    let mut last = Instant::now() - PROGRESS_INTERVAL;
+    move |received, size| {
+        if last.elapsed() >= PROGRESS_INTERVAL || size == Some(received) {
+            last = Instant::now();
+            let _ = channel.send(Progress { received, size });
+        }
+    }
+}
 
 /// `media` in the app data directory: the root of every media path.
 pub fn root(app: &AppHandle) -> Result<PathBuf, String> {
@@ -90,13 +101,14 @@ pub async fn media_fetch(
     let target = paths::resolve(&root(&app)?, &target)?;
     let cancel = Arc::new(AtomicBool::new(false));
     state.running.lock().map_err(|e| e.to_string())?.insert(job.clone(), cancel.clone());
-    let mut last = Instant::now() - PROGRESS_INTERVAL;
-    let result = fetch::fetch(&state.client, &target, &url, expected_etag.as_deref(), &cancel, |received, size| {
-        if last.elapsed() >= PROGRESS_INTERVAL || size == Some(received) {
-            last = Instant::now();
-            let _ = on_progress.send(Progress { received, size });
-        }
-    })
+    let result = fetch::fetch(
+        &state.client,
+        &target,
+        &url,
+        expected_etag.as_deref(),
+        &cancel,
+        throttled(on_progress),
+    )
     .await;
     state.running.lock().map_err(|e| e.to_string())?.remove(&job);
     result
@@ -111,11 +123,20 @@ pub fn media_fetch_cancel(state: State<'_, MediaState>, job: String) -> Result<(
     Ok(())
 }
 
-/// Unpacks a ZIP of the media storage into a folder of it, off the async runtime.
+/// Unpacks a ZIP of the media storage into a folder of it, off the async runtime, telling how
+/// many of its files' bytes are unpacked.
 #[tauri::command]
-pub async fn media_extract(app: AppHandle, archive: String, directory: String) -> Result<Vec<String>, String> {
+pub async fn media_extract(
+    app: AppHandle,
+    archive: String,
+    directory: String,
+    on_progress: Channel<Progress>,
+) -> Result<Vec<String>, String> {
     let root = root(&app)?;
-    tauri::async_runtime::spawn_blocking(move || archive::extract(&root, &archive, &directory))
+    let mut progress = throttled(on_progress);
+    tauri::async_runtime::spawn_blocking(move || {
+        archive::extract(&root, &archive, &directory, |received, size| progress(received, Some(size)))
+    })
         .await
         .map_err(|e| e.to_string())?
 }

@@ -122,14 +122,21 @@ describe('createIncyclistImporter', () => {
       remove: async (path: string) => [...files.keys()].filter((key) => key.startsWith(path)).forEach((key) => files.delete(key)),
     } as unknown as MediaFiles;
     const archive: DataArchive = {
-      extract: async (_archive, directory) => {
+      extract: async (_archive, directory, onProgress) => {
+        onProgress?.({ received: 1, size: 4 });
+        onProgress?.({ received: 2 });
         files.set(`${directory}/FR_Col_de_Pennes.mp4`, new Uint8Array([1]));
         files.set(`${directory}/FR_Col_de_Pennes.gpx`, new Uint8Array([2]));
         return [...files.keys()].filter((key) => key.startsWith(directory));
       },
     };
     const source = { name: 'Van Gestel', author: 'Fred Van Gestel', url: 'https://example.org/', license: 'CC BY-NC-SA 4.0' };
-    const route = await createIncyclistImporter(media, archive).import('r.zip', 'r', { title: 'Col de Pennes', source });
+    const heard: number[] = [];
+    const route = await createIncyclistImporter(media, archive).import('r.zip', 'r', { title: 'Col de Pennes', source }, (share) =>
+      heard.push(share),
+    );
+    // Unpacking is the import's work; a word without the size in all says nothing.
+    expect(heard).toEqual([0.25]);
     expect(route).toMatchObject({ title: 'Col de Pennes', video: { file: 'video.mp4', startFrame: 12 }, track: { file: 'track.gpx' } });
     expect(route).not.toHaveProperty('thumbnail');
     expect([...files.keys()].sort()).toEqual(['r/route.json', 'r/track.gpx', 'r/video.mp4']);
