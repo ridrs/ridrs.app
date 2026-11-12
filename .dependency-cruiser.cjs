@@ -220,7 +220,7 @@ module.exports = {
     {
       name: 'control-plugins-import-contracts-only',
       comment:
-        'The virtual gears and the ERG driver import packages/contracts only, and the pure workout logic of packages/workout (the steps of the ride\'s workout, ADR 0088): no device plugin, no BLE, no physics (Phase 8, ADR 0055, ADR 0056).',
+        "The virtual gears and the ERG driver import packages/contracts only, and the pure workout logic of packages/workout (the steps of the ride's workout, ADR 0088): no device plugin, no BLE, no physics (Phase 8, ADR 0055, ADR 0056).",
       severity: 'error',
       from: { path: '^plugins/control-', pathNot: '\\.test\\.ts$' },
       to: { path: '^(packages/(?!contracts/|workout/)|apps/|tests/)' },
