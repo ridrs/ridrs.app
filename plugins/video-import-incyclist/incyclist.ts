@@ -94,12 +94,13 @@ const folderOf = (path: string) => path.slice(0, path.length - nameOf(path).leng
 
 /**
  * The route's picture among `paths`: the first of the names Incyclist looks for next to the video
- * (`preview.png`, `preview.jpg`, `<video>_preview.png`, `<video>_preview.jpg`), whatever their case.
+ * (`preview.png`, `preview.jpg`, `<video>_preview.png`, `<video>_preview.jpg`), then ridrs' own
+ * (`thumbnail.png`, `thumbnail.jpg`), whatever their case. Incyclist shows only its own names.
  */
 export function thumbnailOf(paths: readonly string[], video: string): string | undefined {
   const stem = nameOf(video).replace(/\.[^.]*$/, '');
   const folder = folderOf(video).toLowerCase();
-  return ['preview.png', 'preview.jpg', `${stem}_preview.png`, `${stem}_preview.jpg`]
+  return ['preview.png', 'preview.jpg', `${stem}_preview.png`, `${stem}_preview.jpg`, 'thumbnail.png', 'thumbnail.jpg']
     .map((name) => `${folder}${name.toLowerCase()}`)
     .map((wanted) => paths.find((path) => path.toLowerCase() === wanted))
     .find((path) => path !== undefined);

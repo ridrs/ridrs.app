@@ -5,7 +5,8 @@ Feature: A video route dragged onto the window is previewed and imported
   with the route's title, distance, climb and profile, or with why it cannot import the package.
   The title is the one the control file names (`<title>`); without one, the file's name. The
   picture is the one Incyclist shows next to the video (`preview.png`, `preview.jpg`,
-  `<video>_preview.png`, `<video>_preview.jpg`); without one, the route has none.
+  `<video>_preview.png`, `<video>_preview.jpg`), else ridrs' own `thumbnail.png` or `thumbnail.jpg`;
+  without one, the route has none.
   Letting go imports it through `route.import` with the dropped file instead of the open dialog;
   progress and failure are the source's key of `route.import`, as for a chosen file (ADR 0090).
 

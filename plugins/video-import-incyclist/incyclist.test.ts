@@ -97,6 +97,13 @@ describe('thumbnailOf', () => {
     expect(thumbnailOf(['pack/FR_Col_preview.jpg', 'pack/FR_Col_preview.png'], video)).toBe('pack/FR_Col_preview.png');
   });
 
+  it('takes thumbnail.png or .jpg after the names Incyclist looks for', () => {
+    const video = 'pack/FR_Col.mp4';
+    expect(thumbnailOf(['pack/thumbnail.jpg', video], video)).toBe('pack/thumbnail.jpg');
+    expect(thumbnailOf(['pack/Thumbnail.PNG', 'pack/thumbnail.jpg'], video)).toBe('pack/Thumbnail.PNG');
+    expect(thumbnailOf(['pack/thumbnail.jpg', 'pack/FR_Col_preview.jpg'], video)).toBe('pack/FR_Col_preview.jpg');
+  });
+
   it('ignores other pictures and pictures in another folder', () => {
     expect(thumbnailOf(['pack/FR_Col.png', 'preview.png', 'pack/profile.jpg'], 'pack/FR_Col.mp4')).toBeUndefined();
   });
