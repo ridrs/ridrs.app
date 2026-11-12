@@ -138,12 +138,13 @@ export function useWeek(ctx: UiContext) {
       const day = thisWeeksDay(date);
       return day === undefined
         ? []
-        : state.calendar.entries.filter((entry) => entry.day === day).map((entry) => ({ ...entry, key: entry.id }));
+        : state.calendar.entries.filter((entry) => entry.day === day).map((entry) => ({ ...entry, key: entry.id, provider: chosen }));
     }
     const entries = providerWorkouts
       .filter((workout) => workout.date === date)
       .map((workout) => ({
         id: workout.id,
+        provider: chosen,
         kind: 'workout' as const,
         title: workout.name,
         ...(minutes(workout.durationSeconds) ? { detail: minutes(workout.durationSeconds) as string } : {}),

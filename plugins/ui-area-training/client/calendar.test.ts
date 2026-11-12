@@ -261,6 +261,25 @@ describe('a plan that was ridden', () => {
     expect(done.map((d) => d.plan?.key)).toEqual(['p1', 'p2']);
   });
 
+  it('pairs a ride with the entry it names, whatever its name, duration and load', () => {
+    const named = { ...ride('r1', 'Morning Ride', 20, 10), planned: { provider: 'ridrs', id: 'e2' } };
+    const { open, done } = matchDone(
+      [
+        { ...plan('p1', 'Morning Ride', 20, 10), provider: 'ridrs', id: 'e1' },
+        { ...plan('p2', 'Threshold 20', 60, 80), provider: 'ridrs', id: 'e2' },
+      ],
+      [named],
+    );
+    expect(done[0]?.plan?.key).toBe('p2');
+    expect(open.map((p) => p.key)).toEqual(['p1']);
+  });
+
+  it('does not pair by an entry of another provider', () => {
+    const named = { ...ride('r1', 'Morning Ride', 20, 10), planned: { provider: 'intervals', id: 'e2' } };
+    const { done } = matchDone([{ ...plan('p2', 'Threshold 20', 60, 80), provider: 'ridrs', id: 'e2' }], [named]);
+    expect(done[0]?.plan).toBeUndefined();
+  });
+
   it('never pairs a plan its provider has not kept yet', () => {
     expect(matchDone([{ ...plan('p1', 'Tempo'), pending: true as const }], [ride('r1', 'Tempo', 60, 50)]).open).toHaveLength(1);
   });

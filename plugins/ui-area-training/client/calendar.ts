@@ -193,6 +193,8 @@ export interface PlannedItem {
   /** What the matching of a day with its rides compares, where the provider has it. */
   readonly durationSeconds?: number;
   readonly trainingLoad?: number;
+  /** The provider whose calendar holds the entry: a ride that names its planned entry is paired by it. */
+  readonly provider?: string;
   /** What the calendar draws as a micro chart: the workout's structure, when the provider has it. */
   readonly chart?: CanonicalWorkout;
   /** Shown at once, not yet taken by the calendar's provider. */
@@ -275,6 +277,9 @@ export function monthDays(month: string): string[] {
 /** A planned workout as the matching of a day sees it. */
 export interface PlannedOfDay {
   readonly key: string;
+  /** The entry's provider and id: a ride that names them (`ride.planned`) is paired by them. */
+  readonly provider?: string;
+  readonly id?: string;
   readonly title: string;
   readonly durationSeconds?: number;
   readonly trainingLoad?: number;
@@ -304,8 +309,8 @@ const ridden = (plan: PlannedOfDay, ride: CompletedWorkout): boolean =>
 
 /**
  * The rides of a day paired with the plans of the same day they did: a plan that was ridden is
- * listed once, as a done ride (ADR 0076). A ride matches by its name first, then by its duration
- * and load; each plan and each ride is paired at most once, and a plan not yet kept by its
+ * listed once, as a done ride (ADR 0076). A ride that names its planned entry (`planned`) is
+ * paired with that entry first, then by its name, then by its duration and load; each plan and each ride is paired at most once, and a plan not yet kept by its
  * provider is never paired.
  */
 export function matchDone<P extends PlannedOfDay>(
@@ -314,14 +319,16 @@ export function matchDone<P extends PlannedOfDay>(
 ): { readonly open: P[]; readonly done: { readonly ride: CompletedWorkout; readonly plan?: P }[] } {
   const taken = new Set<string>();
   const pairs = new Map<string, P>();
-  for (const byName of [true, false]) {
+  for (const by of ['entry', 'name', 'likeness'] as const) {
     for (const ride of rides) {
       if (pairs.has(ride.id)) continue;
       const plan = plans.find(
         (candidate) =>
           !candidate.pending &&
           !taken.has(candidate.key) &&
-          (byName ? normalName(candidate.title) === normalName(ride.name) && normalName(ride.name) !== '' : ridden(candidate, ride)),
+          (by === 'entry'
+            ? ride.planned !== undefined && candidate.provider === ride.planned.provider && candidate.id === ride.planned.id
+            : by === 'name' ? normalName(candidate.title) === normalName(ride.name) && normalName(ride.name) !== '' : ridden(candidate, ride)),
       );
       if (plan) {
         taken.add(plan.key);
