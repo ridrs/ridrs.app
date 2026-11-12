@@ -96,6 +96,14 @@ export const deviceKindSchema = z.enum(['trainer', 'heart-rate', 'controller']);
 
 export type DeviceKind = z.infer<typeof deviceKindSchema>;
 
+/**
+ * A part of a device made of several BLE devices, e.g. the left and the right controller of a
+ * pair: each part is a connection of its own, the device is one.
+ */
+export const devicePartSchema = z.enum(['left', 'right']);
+
+export type DevicePart = z.infer<typeof devicePartSchema>;
+
 export const deviceConnectionChangedEvent = defineEvent(
   'device.connection-changed',
   z.object({
@@ -112,6 +120,15 @@ export const deviceConnectionChangedEvent = defineEvent(
      * to, e.g. a control point that not every device has. Absent when the plugin has none.
      */
     characteristics: z.array(z.string().min(1)).optional(),
+    /**
+     * A device made of several parts: the id of each part found so far, as its link knows it.
+     * Its raw inputs carry these ids; a replay maps them to the device. Absent for a device of one
+     * part, and in recordings from before the parts.
+     */
+    parts: z
+      .array(z.object({ part: devicePartSchema, deviceId: z.string().min(1) }))
+      .min(1)
+      .optional(),
   }),
 );
 
@@ -139,6 +156,14 @@ export type DeviceCandidate = z.infer<typeof deviceCandidateSchema>;
 /** A battery level in percent, 0 to 100. */
 const batteryLevelSchema = z.number().int().min(0).max(100);
 
+/** The level of one battery of a device; `part` names it on a device made of several parts. */
+export const deviceBatterySchema = z.object({
+  part: devicePartSchema.optional(),
+  level: batteryLevelSchema,
+});
+
+export type DeviceBattery = z.infer<typeof deviceBatterySchema>;
+
 export const deviceStatusSchema = z.object({
   kind: deviceKindSchema,
   /** Empty while searching: no device is known yet. */
@@ -153,8 +178,16 @@ export const deviceStatusSchema = z.object({
   candidates: z.array(deviceCandidateSchema).optional(),
   /** The links over which device plugins look for devices of the kind now; absent in early recordings. */
   scanning: z.array(bleRouteSchema).optional(),
-  /** The battery level of the device, in percent, once it told it; absent for one that does not. */
-  battery: batteryLevelSchema.optional(),
+  /**
+   * The battery levels of the device, once it told them: one without `part` for a device of one
+   * part, one per part that told it otherwise. Absent for a device that tells none.
+   */
+  batteries: z.array(deviceBatterySchema).min(1).optional(),
+  /**
+   * A device made of several parts, while some of its parts are connected and others are not
+   * (`connecting` or `reconnecting`): the parts it waits for.
+   */
+  missingParts: z.array(devicePartSchema).min(1).optional(),
 });
 
 export type DeviceStatus = z.infer<typeof deviceStatusSchema>;

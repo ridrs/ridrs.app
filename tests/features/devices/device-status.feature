@@ -48,7 +48,7 @@ Feature: One status per kind of device
     Then the device status lists no device
 
   Scenario: The controller has a status of its own
-    Given a simulated BLE environment with a Zwift Ride "Zwift Ride"
+    Given a simulated BLE environment with the Zwift Ride pair "Zwift Ride"
     And the simulated BLE environment also contains an FTMS trainer "KICKR CORE 1234"
     And the ridrs plugins "device-ftms-trainer, device-zwift-ride" running with the simulated BLE central
     Then the device status is:

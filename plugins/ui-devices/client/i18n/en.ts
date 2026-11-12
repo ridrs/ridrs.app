@@ -71,6 +71,11 @@ export const en = {
     reconnecting: { status: 'Reconnecting…' },
     disconnected: { status: 'Disconnected' },
   } as Readonly<Record<string, { readonly status: string; readonly tip?: string }>>,
+  /** A device made of several parts waits for some of them: their names, in a sentence. */
+  waitingFor: (parts: readonly string[]) =>
+    `Waiting for ${parts.join(' and ')}: wake it and keep it close.`,
+  /** The parts of a device made of several, as the tip names them. */
+  parts: { left: 'the left side', right: 'the right side' },
   watts: (watts: number) => `${watts} W`,
   bpm: (bpm: number) => `${bpm} bpm`,
   allConnected: 'Everything is connected.',
@@ -138,6 +143,8 @@ export const en = {
   switchTo: (link: string) => `Switch to ${link}`,
   signal: (bars: number) => `Signal ${bars} of 4`,
   battery: (level: number) => `Battery ${level} %`,
+  /** The battery of each part of a device made of several. */
+  batteryOf: { left: 'Left battery', right: 'Right battery' },
   control: 'Control',
   /** How ridrs controls the trainer, in a word or two (ADR 0056). */
   controlValues: {

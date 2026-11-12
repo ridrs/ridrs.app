@@ -53,6 +53,19 @@ export const ZWIFT_RIDE_NOTIFY_CHARACTERISTIC_UUID = '00000002-19ca-4651-86e5-fa
 /** Zwift Ride control point: written without response. */
 export const ZWIFT_RIDE_CONTROL_POINT_CHARACTERISTIC_UUID = '00000003-19ca-4651-86e5-fa29dcdd09d1';
 
+/**
+ * Zwift's company id (0x094A, Bluetooth SIG) as `BleDiscoveredPeripheral.manufacturerData` keys it.
+ * The first byte of its manufacturer data is the device type: which controller of a pair it is
+ * (ADR 0089; not yet captured from ridrs' own hardware).
+ */
+export const ZWIFT_MANUFACTURER_ID = '094a';
+
+/** Device type of the left Zwift Ride controller, the first byte of its manufacturer data. */
+export const ZWIFT_RIDE_LEFT = 0x08;
+
+/** Device type of the right Zwift Ride controller, the first byte of its manufacturer data. */
+export const ZWIFT_RIDE_RIGHT = 0x07;
+
 const BLUETOOTH_BASE_UUID_REGEX = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/;
 
 /**

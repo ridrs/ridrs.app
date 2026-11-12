@@ -14,6 +14,7 @@ import {
   deviceConnectService,
   deviceForgetService,
   deviceKindSchema,
+  devicePartSchema,
   type PluginContext,
 } from '@ridrs/contracts';
 import { fireEvent, waitFor, within } from '@testing-library/dom';
@@ -782,7 +783,45 @@ Then('the rider asked to connect the companion', async function (this: RidrsWorl
 Given(
   '{string} reported the battery of its {string} at {int} %',
   async function (this: RidrsWorld, pluginId: string, kind: string, level: number) {
-    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).batteryLevel(`${kind}-1`, level);
+    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).batteries(`${kind}-1`, [
+      { level },
+    ]);
+    await this.flushState();
+  },
+);
+
+Given(
+  '{string} reported the batteries of its {string}:',
+  async function (this: RidrsWorld, pluginId: string, kind: string, table: DataTable) {
+    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).batteries(
+      `${kind}-1`,
+      table
+        .hashes()
+        .map((row) => ({ part: devicePartSchema.parse(row.part), level: Number(row.level) })),
+    );
+    await this.flushState();
+  },
+);
+
+Given(
+  '{string} reported its {string} {string} as {string}, waiting for its {string} part',
+  async function (
+    this: RidrsWorld,
+    pluginId: string,
+    kind: string,
+    name: string,
+    state: string,
+    part: string,
+  ) {
+    const payload: DeviceConnectionChangedPayload = {
+      deviceId: `${kind}-1`,
+      deviceName: name,
+      kind: deviceKindSchema.parse(kind),
+      state: deviceConnectionStateSchema.parse(state),
+    };
+    testDeviceLink(this, pluginId, deviceKindSchema.parse(kind)).connection(payload, [
+      devicePartSchema.parse(part),
+    ]);
     await this.flushState();
   },
 );
@@ -802,10 +841,10 @@ Then('the details card shows no battery', async function (this: RidrsWorld) {
 Then(
   'the device status gives the {string} a battery of {int} %',
   function (this: RidrsWorld, kind: string, level: number) {
-    assert.equal(statusOf(this, kind).battery, level);
+    assert.deepEqual(statusOf(this, kind).batteries, [{ level }]);
   },
 );
 
 Then('the device status gives the {string} no battery level', function (this: RidrsWorld, kind) {
-  assert.equal(statusOf(this, kind).battery, undefined);
+  assert.equal(statusOf(this, kind).batteries, undefined);
 });

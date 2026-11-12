@@ -178,11 +178,12 @@ export function BoltIcon() {
 }
 
 /** The small icons of the details grid. */
-export type FactKind = 'status';
+export type FactKind = 'status' | 'battery';
 
 export function FactIcon({ icon }: { readonly icon: FactKind }) {
   const paths: Record<FactKind, string> = {
     status: 'M3 12h4l3-7 4 14 3-7h4',
+    battery: 'M3 8h15v8H3zM21 11v2',
   };
   return (
     <svg {...svg} strokeWidth={1.8} width="18" height="18" viewBox="0 0 24 24">

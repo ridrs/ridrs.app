@@ -39,6 +39,7 @@ import {
   useRealPlugins as withRealPlugins,
   useSimulatedCentral as withSimulatedCentral,
 } from './devices-and-metrics.steps.ts';
+import { addZwiftRidePair } from './zwift-ride.steps.ts';
 
 const COMPANION_ADDRESS = '192.168.178.110:42229';
 const MOVED_ADDRESS = '192.168.178.111:42229';
@@ -198,10 +199,10 @@ Given(
 );
 
 Given(
-  'a companion {string} wrapping a simulated BLE environment with a Zwift Ride {string}',
+  'a companion {string} wrapping a simulated BLE environment with the Zwift Ride pair {string}',
   function (this: RidrsWorld, name: string, controllerName: string) {
     this.bleSimulator = new BleSimulator({ clock: this.clock });
-    this.bleSimulator.addZwiftRide(controllerName);
+    addZwiftRidePair(this, this.bleSimulator, controllerName);
     this.companionCentral = this.bleSimulator;
     pendingCompanion.set(this, { name });
   },

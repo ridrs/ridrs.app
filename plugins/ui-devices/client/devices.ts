@@ -4,6 +4,7 @@ import type {
   BleRoute,
   BridgeState,
   ControllerButton,
+  DeviceBattery,
   DeviceCandidate,
   DeviceConnectionState,
   DeviceKind,
@@ -56,8 +57,10 @@ export interface DeviceRow {
   readonly state: DeviceConnectionState | 'none';
   readonly status: string;
   readonly tone: Tone;
-  /** The battery level of the device in percent, once it told it. */
+  /** The battery level of the device in percent, once it told it: the weakest of its parts. */
   readonly battery?: number;
+  /** Every battery level the device told, of each of its parts. */
+  readonly batteries: readonly DeviceBattery[];
   /** Buttons held down on the connected controller: they take the place of the check. */
   readonly held?: readonly ControllerButton[];
 }
@@ -66,8 +69,7 @@ export interface DeviceRow {
 export interface Readings {
   readonly power?: { readonly deviceId: string; readonly watts: number };
   readonly heartRate?: { readonly deviceId: string; readonly bpm: number };
-  /** Per controller: a pair is two devices, the row stands for both. */
-  readonly buttons?: Readonly<Record<string, readonly ControllerButton[]>>;
+  readonly buttons?: { readonly deviceId: string; readonly held: readonly ControllerButton[] };
 }
 
 /** How a held button shows in the badge; its name for screen readers is in `Messages.buttons`. */
@@ -101,10 +103,19 @@ const TONES: Record<DeviceRow['state'], Tone> = {
   disconnected: 'warn',
 };
 
-/** A state's status, tone and tip in the rider's language. */
-function stateOf(state: DeviceRow['state'], text: Messages): Pick<DeviceRow, 'status' | 'tone' | 'tip'> {
+/**
+ * A state's status, tone and tip in the rider's language. A device made of several parts that
+ * waits for some of them names them in the tip.
+ */
+function stateOf(
+  state: DeviceRow['state'],
+  device: DeviceStatus | undefined,
+  text: Messages,
+): Pick<DeviceRow, 'status' | 'tone' | 'tip'> {
   const words = text.states[state] ?? { status: state };
-  return { status: words.status, tone: TONES[state], ...(words.tip ? { tip: words.tip } : {}) };
+  const missing = device?.missingParts ?? [];
+  const tip = missing.length > 0 ? text.waitingFor(missing.map((p) => text.parts[p])) : words.tip;
+  return { status: words.status, tone: TONES[state], ...(tip ? { tip } : {}) };
 }
 
 type Proof = Pick<DeviceRow, 'held'> & { readonly status?: string };
@@ -134,7 +145,7 @@ function proofOf(
       return bpm ? { status: text.bpm(Math.round(bpm)) } : {};
     }
     case 'controller': {
-      const all = new Set(Object.values(readings.buttons ?? {}).flat());
+      const all = new Set(own(readings.buttons)?.held);
       const held = (Object.keys(BUTTON_FACES) as ControllerButton[]).filter((b) => all.has(b));
       return held.length > 0 ? { held } : {};
     }
@@ -161,7 +172,8 @@ function row(
     deviceId: device?.deviceId ?? '',
     deviceName: device?.deviceName ?? '',
     ...(device?.route ? { route: device.route } : {}),
-    ...(device?.battery === undefined ? {} : { battery: device.battery }),
+    ...(device?.batteries ? { battery: Math.min(...device.batteries.map((b) => b.level)) } : {}),
+    batteries: device?.batteries ?? [],
     candidates,
     scanning: device?.scanning ?? [],
     // A device seen over both links counts once.
@@ -177,7 +189,7 @@ function row(
     type: text.kinds[deviceKind].title,
     about: text.kinds[kind].about,
     state,
-    ...stateOf(state, text),
+    ...stateOf(state, device, text),
     ...proofOf(kind, device, readings, text),
   };
 }

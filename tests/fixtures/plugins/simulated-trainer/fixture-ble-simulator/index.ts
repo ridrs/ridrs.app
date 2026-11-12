@@ -79,7 +79,12 @@ export default definePlugin({
 
     let started = false;
     let trainer: SimulatedPeripheral | undefined;
-    const ride = simulator.addZwiftRide('Zwift Ride');
+    // The pair: the left controller forwards the right one's buttons, so it presses them.
+    const ride = simulator.addZwiftRide('Zwift Ride', {
+      peripheralId: 'sim-ride-left',
+      side: 'left',
+    });
+    simulator.addZwiftRide('Zwift Ride', { peripheralId: 'sim-ride-right', side: 'right' });
     simulator.onScanStart(() => {
       if (started) {
         return;

@@ -2,11 +2,13 @@
 
 import { z } from 'zod';
 import { defineState } from './app-state.ts';
+import { bleRouteSchema } from './ble.ts';
 import {
   type DeviceCandidate,
   type DeviceConnectionState,
   type DeviceStatus,
   deviceKindSchema,
+  devicePartSchema,
   deviceStatusSchema,
 } from './events.ts';
 import { defineService } from './services.ts';
@@ -41,6 +43,35 @@ export const deviceDiscoverService = defineService('device.discover', {
   response: done,
   keyedBy: deviceStatusState,
 });
+
+/**
+ * What a link to a device made of several parts remembers on this machine (ADR 0054, ADR 0089):
+ * the device's id and each part it connected last, by its link and its id on that link, with the
+ * part it was taken for; or that the rider forgot the device.
+ */
+export const rememberedPartsSchema = z.discriminatedUnion('state', [
+  z
+    .object({
+      state: z.literal('chosen'),
+      deviceId: z.string().min(1),
+      parts: z
+        .array(
+          z
+            .object({
+              part: devicePartSchema.optional(),
+              route: bleRouteSchema,
+              peripheralId: z.string().min(1),
+              name: z.string(),
+            })
+            .strict(),
+        )
+        .min(1),
+    })
+    .strict(),
+  z.object({ state: z.literal('forgotten') }).strict(),
+]);
+
+export type RememberedParts = z.infer<typeof rememberedPartsSchema>;
 
 /** Which status of a kind stands for it when several links report one: the most connected. */
 const RANK: Readonly<Record<DeviceConnectionState, number>> = {

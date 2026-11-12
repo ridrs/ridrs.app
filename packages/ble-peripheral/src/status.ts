@@ -2,9 +2,11 @@
 
 import {
   type BleRoute,
+  type DeviceBattery,
   type DeviceCandidate,
   type DeviceConnectionChangedPayload,
   type DeviceKind,
+  type DevicePart,
   type DeviceStatus,
   deviceConnectService,
   deviceDiscoverService,
@@ -23,14 +25,18 @@ export interface DeviceLinkCommands {
 /**
  * The status of one device link as the app shows it: its key of the app state `device.status`
  * (ADR 0069), built from its connection states, the devices it found, the links it scans over and
- * the battery level its device told. Once the link reported its first connection state, every
+ * the battery levels its device told. Once the link reported its first connection state, every
  * change sets the key; until then, nothing is shown.
  */
 export class DeviceStatusBoard {
   private status: DeviceStatus | undefined;
   private candidates: readonly DeviceCandidate[] | undefined;
   private scanning: readonly BleRoute[] | undefined;
-  private battery: { readonly deviceId: string; readonly level: number } | undefined;
+  private battery:
+    | { readonly deviceId: string; readonly levels: readonly DeviceBattery[] }
+    | undefined;
+  /** The parts a device made of several waits for, while others are connected. */
+  private missing: readonly DevicePart[] = [];
   /** The name of the device connected last in this run. */
   private lastName: string | undefined;
 
@@ -40,7 +46,12 @@ export class DeviceStatusBoard {
     readonly key: string,
   ) {}
 
-  connection(payload: DeviceConnectionChangedPayload): void {
+  /** A connection state; a device made of several parts names the parts it waits for. */
+  connection(
+    payload: DeviceConnectionChangedPayload,
+    missingParts: readonly DevicePart[] = [],
+  ): void {
+    this.missing = missingParts;
     const known = this.status;
     // A state without a device keeps the last name, but "searching": the device was let go.
     const named = payload.deviceId !== '' || !known || payload.state === 'searching';
@@ -68,8 +79,9 @@ export class DeviceStatusBoard {
     this.publish();
   }
 
-  batteryLevel(deviceId: string, level: number): void {
-    this.battery = { deviceId, level };
+  /** The battery levels device `deviceId` told: one per part that told it, or one without part. */
+  batteries(deviceId: string, levels: readonly DeviceBattery[]): void {
+    this.battery = { deviceId, levels };
     this.publish();
   }
 
@@ -78,8 +90,8 @@ export class DeviceStatusBoard {
     if (!status || this.ctx.signal.aborted) {
       return;
     }
-    // Only the device that told it has the level: another device of the kind may have none.
-    const level = this.battery?.deviceId === status.deviceId ? this.battery.level : undefined;
+    // Only the device that told them has the levels: another device of the kind may have none.
+    const levels = this.battery?.deviceId === status.deviceId ? this.battery.levels : [];
     // Without a device, the one connected last names the kind.
     const last = status.deviceName === '' ? this.lastName : undefined;
     this.ctx.state.set(deviceStatusState, this.key, {
@@ -87,7 +99,8 @@ export class DeviceStatusBoard {
       ...(last ? { lastDeviceName: last } : {}),
       ...(this.candidates ? { candidates: [...this.candidates] } : {}),
       ...(this.scanning ? { scanning: [...this.scanning] } : {}),
-      ...(level === undefined ? {} : { battery: level }),
+      ...(levels.length > 0 ? { batteries: levels.map((b) => ({ ...b })) } : {}),
+      ...(this.missing.length > 0 ? { missingParts: [...this.missing] } : {}),
     });
   }
 }

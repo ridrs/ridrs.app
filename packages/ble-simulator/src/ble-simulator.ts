@@ -16,7 +16,10 @@ import {
   INDOOR_BIKE_DATA_CHARACTERISTIC_UUID,
   normalizeBleUuid,
   type TimeSource,
+  ZWIFT_MANUFACTURER_ID,
+  ZWIFT_RIDE_LEFT,
   ZWIFT_RIDE_NOTIFY_CHARACTERISTIC_UUID,
+  ZWIFT_RIDE_RIGHT,
   ZWIFT_RIDE_SERVICE_UUID,
 } from '@ridrs/contracts';
 import { type SimulatedFtmsControlOptions, SimulatedFtmsControlPoint } from './ftms-control.ts';
@@ -526,12 +529,29 @@ export class BleSimulator implements BleCentral {
     });
   }
 
-  /** A Zwift Ride: the left controller advertises and holds the link for the pair. */
-  addZwiftRide(name: string, options?: { readonly peripheralId?: string }): SimulatedPeripheral {
+  /**
+   * One controller of a Zwift Ride pair: both have the pair's name and service. With `side`, its
+   * advertisements say which one it is, as Zwift's manufacturer data does (ADR 0089).
+   */
+  addZwiftRide(
+    name: string,
+    options?: {
+      readonly peripheralId?: string;
+      readonly side?: 'left' | 'right';
+      readonly rssi?: number;
+    },
+  ): SimulatedPeripheral {
+    const side = options?.side;
+    const type =
+      side === 'left' ? ZWIFT_RIDE_LEFT : side === 'right' ? ZWIFT_RIDE_RIGHT : undefined;
     return this.addPeripheral({
       peripheralId: options?.peripheralId,
       name,
       serviceUuids: [ZWIFT_RIDE_SERVICE_UUID],
+      rssi: options?.rssi,
+      ...(type === undefined
+        ? {}
+        : { manufacturerData: { [ZWIFT_MANUFACTURER_ID]: type.toString(16).padStart(2, '0') } }),
     });
   }
 

@@ -10,6 +10,7 @@ import {
   type BleRoute,
   type BleWriteOptions,
   bytesToHex,
+  type DeviceCandidate,
   type DeviceConnectionChangedPayload,
   type DeviceConnectionState,
   type DeviceKind,
@@ -30,7 +31,7 @@ import {
   advertisesNews,
 } from './advertising.ts';
 import type { DeviceMemory } from './memory.ts';
-import { type DeviceLinkCommands, registerDeviceLink } from './status.ts';
+import { registerDeviceLink } from './status.ts';
 
 const RECONNECT_BACKOFF = {
   retries: Number.POSITIVE_INFINITY,
@@ -70,11 +71,6 @@ export interface BlePeripheralLinkOptions {
   readonly label: string;
   /** What the device is for; every connection state carries it. */
   readonly kind: DeviceKind;
-  /**
-   * Whether to take a found device. Several links of one plugin share out devices that look
-   * alike this way; a device is taken once this returns true. Every device by default.
-   */
-  readonly accept?: (peripheral: BleDiscoveredPeripheral) => boolean;
   /**
    * Written once on every connection, after subscribing, for devices that only start notifying
    * when greeted. The connection counts as `connected` only once it is written.
@@ -127,6 +123,42 @@ export interface BlePeripheralLink {
 }
 
 /**
+ * A device a link found, as it reports it: the candidate, with its link, its id on the link and its
+ * advertisement as last seen (which part of a device it is, when it says).
+ */
+export interface FoundDevice extends DeviceCandidate {
+  readonly route: BleRoute;
+  readonly peripheralId: string;
+  /** Its id on its link, its name and its advertising data as last seen. */
+  readonly peripheral: BleDiscoveredPeripheral;
+}
+
+/** Where a link reports what it does; the link of a device of one part reports to its status. */
+export interface LinkPort {
+  state(payload: DeviceConnectionChangedPayload): void;
+  found(devices: readonly FoundDevice[]): void;
+  scans(routes: readonly BleRoute[]): void;
+  battery(deviceId: string, level: number): void;
+}
+
+/** What a device made of several parts asks of the link of one part. */
+export interface LinkControl {
+  connect(deviceId: string): void;
+  /** Lets the device go and stops looking on its own, also when it holds none yet. */
+  forget(): void;
+  discover(active: boolean): void;
+  /** Lets the device go, and connects the best device found it takes, as with nothing remembered. */
+  seek(): void;
+}
+
+export interface LinkCoreOptions extends BlePeripheralLinkOptions {
+  /** Whether to take a found device; asked every time. Every device by default. */
+  readonly accept?: (device: FoundDevice) => boolean;
+  /** Whether the link decodes its raw inputs itself (default); else its owner does. */
+  readonly decode?: boolean;
+}
+
+/**
  * A device seen over one link. A device both links see is two devices, one per link: the rider
  * switches links by connecting the other one.
  */
@@ -143,6 +175,8 @@ interface Sighting {
   rssi: number | undefined;
   /** Its advertising data as the link reported it: tells devices of one name apart. */
   advertised: Advertised;
+  /** Its manufacturer and service data as last reported. */
+  data: Pick<BleDiscoveredPeripheral, 'manufacturerData' | 'serviceData'>;
   /** When its link last reported it, or started to scan again. */
   heardAt: number;
 }
@@ -169,11 +203,10 @@ function routeOf(central: BleCentral): BleRoute {
   return central.route ?? 'local';
 }
 
-function asPeripheral(sighting: Sighting): BleDiscoveredPeripheral {
+function dataOf(p: BleDiscoveredPeripheral): Sighting['data'] {
   return {
-    peripheralId: sighting.deviceId,
-    name: sighting.name,
-    serviceUuids: sighting.serviceUuids,
+    ...(p.manufacturerData ? { manufacturerData: p.manufacturerData } : {}),
+    ...(p.serviceData ? { serviceData: p.serviceData } : {}),
   };
 }
 
@@ -189,6 +222,54 @@ function asPeripheral(sighting: Sighting): BleDiscoveredPeripheral {
  * signal fires.
  */
 export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePeripheralLink {
+  const { ctx, kind } = options;
+  /** What the rider asks of this link; set once the link exists. */
+  let control: LinkControl | undefined;
+  const board = registerDeviceLink(ctx, kind, {
+    connect: (deviceId) => control?.connect(deviceId),
+    forget: () => control?.forget(),
+    discover: (active) => control?.discover(active),
+  });
+  const started = createLink(
+    options,
+    {
+      state: (payload) => {
+        // Connection results come from BLE I/O: they enter the simulation as inputs.
+        ctx.inputs.accept(deviceConnectionChangedEvent, payload);
+        // The app's view of the link is app state (ADR 0069).
+        board.connection(payload);
+      },
+      found: (devices) => board.found(devices.map(candidateOf)),
+      scans: (routes) => board.scans(routes),
+      battery: (deviceId, level) => board.batteries(deviceId, [{ level }]),
+    },
+    // Without a device, the rider's Remove does nothing.
+    { forgetsOnlyAHeldDevice: true },
+  );
+  control = started.control;
+  return started.link;
+}
+
+/** The candidate of a device found, for the device status. */
+function candidateOf(found: FoundDevice): DeviceCandidate {
+  return {
+    deviceId: found.deviceId,
+    deviceName: found.deviceName,
+    routes: [...found.routes],
+    ...(found.rssi === undefined ? {} : { rssi: found.rssi }),
+    ...(found.sameDeviceAs === undefined ? {} : { sameDeviceAs: found.sameDeviceAs }),
+  };
+}
+
+/**
+ * The connection lifecycle of `startBlePeripheralLink`, reporting to `port`: a device of one part
+ * reports to its status, a device made of several parts runs one per part (`startBlePartsLink`).
+ */
+export function createLink(
+  options: LinkCoreOptions,
+  port: LinkPort,
+  behaviour: { readonly forgetsOnlyAHeldDevice?: boolean } = {},
+): { readonly link: BlePeripheralLink; readonly control: LinkControl } {
   const { ctx, characteristic, label, kind } = options;
   const serviceUuid = normalizeBleUuid(characteristic.serviceUuid);
   const characteristicUuid = normalizeBleUuid(characteristic.characteristicUuid);
@@ -197,13 +278,6 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     centrals.set(routeOf(central), central);
   }
 
-  /** What the rider asks of this link; set once the handlers below exist. */
-  const commands: DeviceLinkCommands = { connect: () => {}, forget: () => {}, discover: () => {} };
-  const board = registerDeviceLink(ctx, kind, {
-    connect: (deviceId) => commands.connect(deviceId),
-    forget: () => commands.forget(),
-    discover: (active) => commands.discover(active),
-  });
   const sightings: Sighting[] = [];
   const scans = new Map<BleRoute, AbortController>();
   const memory = options.memory;
@@ -221,19 +295,13 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
   let lastState: DeviceConnectionState = 'searching';
   /** Open device setups; while there is one, every link keeps looking for devices. */
   let discovery = 0;
-  /** Devices the plugin took: it takes each once, so a forgotten one can come back. */
-  const taken = new Set<Sighting>();
   /** Running while a device only the companion saw waits for the direct link. */
   let directLinkWait: ReturnType<typeof setTimeout> | undefined;
   /** Running while any link scans: drops the devices that fell silent. */
   let silenceCheck: ReturnType<typeof setInterval> | undefined;
 
-  const takes = (sighting: Sighting): boolean => {
-    if (!taken.has(sighting) && (options.accept?.(asPeripheral(sighting)) ?? true)) {
-      taken.add(sighting);
-    }
-    return taken.has(sighting);
-  };
+  const takes = (sighting: Sighting): boolean =>
+    options.accept?.(foundOf(sighting, twinOf(sighting))) ?? true;
 
   const publishState = (
     state: DeviceConnectionState,
@@ -253,10 +321,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       ...(route ? { route } : {}),
       ...(characteristics ? { characteristics: [...characteristics] } : {}),
     };
-    // Connection results come from BLE I/O: they enter the simulation as inputs.
-    ctx.inputs.accept(deviceConnectionChangedEvent, connection);
-    // The app's view of the link is app state (ADR 0069).
-    board.connection(connection);
+    port.state(connection);
   };
 
   /** The same device over the other link: same name, nothing in their data tells them apart. */
@@ -275,20 +340,26 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     return sightings.filter((o) => alike(twin, o)).length === 1 ? twin : undefined;
   };
 
+  const foundOf = (s: Sighting, twin: Sighting | undefined): FoundDevice => ({
+    deviceId: s.deviceId,
+    deviceName: s.name,
+    routes: [s.route],
+    ...(s.rssi === undefined ? {} : { rssi: s.rssi }),
+    ...(twin ? { sameDeviceAs: twin.deviceId } : {}),
+    route: s.route,
+    peripheralId: s.peripheralId,
+    peripheral: {
+      peripheralId: s.peripheralId,
+      name: s.name,
+      serviceUuids: s.serviceUuids,
+      ...(s.rssi === undefined ? {} : { rssi: s.rssi }),
+      ...s.data,
+    },
+  });
+
   // Devices found are app state (ADR 0069): the ride does not need them.
   const publishCandidates = (): void => {
-    board.found(
-      sightings.map((s) => {
-        const twin = twinOf(s);
-        return {
-          deviceId: s.deviceId,
-          deviceName: s.name,
-          routes: [s.route],
-          ...(s.rssi === undefined ? {} : { rssi: s.rssi }),
-          ...(twin ? { sameDeviceAs: twin.deviceId } : {}),
-        };
-      }),
-    );
+    port.found(sightings.map((s) => foundOf(s, twinOf(s))));
   };
 
   /** The links named as scanning last; published again only when they change. */
@@ -302,7 +373,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     }
     scanning = routes.join();
     // Which links look for devices is app state (ADR 0069): the ride does not need it.
-    board.scans(routes);
+    port.scans(routes);
   };
 
   /**
@@ -340,7 +411,6 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     }
     for (const sighting of dropped) {
       sightings.splice(sightings.indexOf(sighting), 1);
-      taken.delete(sighting);
     }
     publishCandidates();
   };
@@ -422,6 +492,9 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         known.advertised = advertisedAfter(known.advertised, peripheral);
         news = true;
       }
+      if (peripheral.manufacturerData || peripheral.serviceData) {
+        known.data = { ...known.data, ...dataOf(peripheral) };
+      }
       if (news) {
         publishCandidates();
       }
@@ -437,6 +510,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       serviceUuids: peripheral.serviceUuids.map(normalizeBleUuid),
       rssi: peripheral.rssi,
       advertised: advertisedAfter(undefined, peripheral),
+      data: dataOf(peripheral),
       heardAt: ctx.clock.now(),
     });
     publishCandidates();
@@ -550,7 +624,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
         const level = data[0];
         if (level !== undefined && level <= 100 && !ctx.signal.aborted) {
           // The level is app state (ADR 0069): the ride does not need it.
-          board.batteryLevel(sighting.deviceId, level);
+          port.battery(sighting.deviceId, level);
         }
       };
       try {
@@ -701,6 +775,16 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
   /** Lets the device go: no device connects on its own until a device setup opens again. */
   const forgetRequested = (): void => {
     if (!chosen) {
+      if (!behaviour.forgetsOnlyAHeldDevice && want !== 'none') {
+        // Nothing held yet: the link only stops taking a device on its own.
+        want = 'none';
+        target = undefined;
+        clearTimeout(directLinkWait);
+        directLinkWait = undefined;
+        memory?.save({ state: 'forgotten' });
+        publishState(discovery > 0 ? 'searching' : 'disconnected');
+        reconcileScans();
+      }
       return;
     }
     want = 'none';
@@ -737,19 +821,42 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     }
   };
 
+  /** Lets the device go and takes the best device found, as with nothing remembered. */
+  const seekRequested = (): void => {
+    want = 'first';
+    target = undefined;
+    if (!chosen) {
+      chooseFirst();
+      return;
+    }
+    chosen = undefined;
+    void release().then(() => {
+      if (ctx.signal.aborted || chosen) {
+        return;
+      }
+      lastRoute = undefined;
+      publishState('searching');
+      reconcileScans();
+      chooseFirst();
+    });
+  };
+
   // The rider's requests and the open device setups are services (ADR 0069): never recorded,
   // never done again when a ride continues.
-  commands.connect = connectRequested;
-  commands.forget = forgetRequested;
-  commands.discover = (active: boolean): void => {
-    const before = discovery;
-    discovery = Math.max(0, discovery + (active ? 1 : -1));
-    if (before === 0 && discovery > 0) {
-      discoveryStarted();
-    } else if (before > 0 && discovery === 0) {
-      discoveryEnded();
-    }
-    reconcileScans();
+  const control: LinkControl = {
+    connect: connectRequested,
+    forget: forgetRequested,
+    seek: seekRequested,
+    discover: (active: boolean): void => {
+      const before = discovery;
+      discovery = Math.max(0, discovery + (active ? 1 : -1));
+      if (before === 0 && discovery > 0) {
+        discoveryStarted();
+      } else if (before > 0 && discovery === 0) {
+        discoveryEnded();
+      }
+      reconcileScans();
+    },
   };
 
   // Decoding runs in the turn of the raw input, live and on replay alike: a replay injects the
@@ -759,7 +866,11 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     ...(options.optionalSubscriptions ?? []).map((t) => normalizeBleUuid(t.characteristicUuid)),
   ]);
   ctx.events.subscribe(deviceRawNotificationEvent, ({ source, payload }) => {
-    if (source !== ctx.manifest.id || !heard.has(payload.characteristicUuid)) {
+    if (
+      options.decode === false ||
+      source !== ctx.manifest.id ||
+      !heard.has(payload.characteristicUuid)
+    ) {
       return;
     }
     options.onNotification(
@@ -814,7 +925,7 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
     });
   };
 
-  return {
+  const link: BlePeripheralLink = {
     write,
     async stop(): Promise<void> {
       clearTimeout(directLinkWait);
@@ -829,4 +940,5 @@ export function startBlePeripheralLink(options: BlePeripheralLinkOptions): BlePe
       publishState('disconnected');
     },
   };
+  return { link, control };
 }

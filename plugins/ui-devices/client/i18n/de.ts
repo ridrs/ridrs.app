@@ -69,6 +69,9 @@ export const de: Messages = {
     reconnecting: { status: 'Verbinde erneut…' },
     disconnected: { status: 'Getrennt' },
   },
+  waitingFor: (parts: readonly string[]) =>
+    `Wartet auf ${parts.join(' und ')}: aufwecken und in der Nähe halten.`,
+  parts: { left: 'die linke Seite', right: 'die rechte Seite' },
   watts: (watts: number) => `${watts} W`,
   bpm: (bpm: number) => `${bpm} bpm`,
   allConnected: 'Alles ist verbunden.',
@@ -130,6 +133,7 @@ export const de: Messages = {
   switchTo: (link: string) => `Zu ${link} wechseln`,
   signal: (bars: number) => `Signal ${bars} von 4`,
   battery: (level: number) => `Akku ${level} %`,
+  batteryOf: { left: 'Akku links', right: 'Akku rechts' },
   control: 'Steuerung',
   controlValues: {
     erg: (watts: string) => `ERG ${watts} W`,

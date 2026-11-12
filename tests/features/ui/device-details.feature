@@ -5,8 +5,9 @@ Feature: Device details in the device setup
   whether ridrs looks for devices of the kind at the top right ("Searching…" or "Not searching",
   as the device plugin tells); below, the current device as one card: its icon, its name, its
   link's icon, the signal and, while connected, the battery level of a device that tells it, at the
-  top right; below the name its status with the check and its reading, as its row has them. Below that, a tip while something needs the rider (not while it
-  reconnects: the status says it all), and the actions. Without a current device there is no
+  top right (the weakest of a device made of parts, whose details list the battery of each part); below the name its status with the check and its reading, as its row has them. Below that, a tip while something needs the rider (not while it
+  reconnects: the status says it all, unless a device made of parts waits for one of them: the
+  tip names it), and the actions. Without a current device there is no
   card, and the devices found follow the heading. Back (or Escape) returns to the rows; Continue
   (or Done) is only offered there. Details have Remove (with a bin icon) while a device is
   connected or tried, which returns to the rows at once, and Connect once it is disconnected.
@@ -82,6 +83,38 @@ Feature: Device details in the device setup
     And I open the device setup from the main screen
     When I open the "Heart Rate Monitor" in the device setup
     Then the details card shows no battery
+
+  Scenario: A device made of parts shows its weakest battery on top and every part's below
+    Given "test-device" reported its "controller" "Zwift Ride" as "connected"
+    And "test-device" reported the batteries of its "controller":
+      | part  | level |
+      | left  | 80    |
+      | right | 15    |
+    And I open the device setup from the main screen
+    When I open the "Controller" in the device setup
+    Then the details card shows the battery "Battery 15 %"
+    And the details show the fact "Left battery" "80 %"
+    And the details show the fact "Right battery" "15 %"
+
+  Scenario: A device of one part lists no battery of a part
+    Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
+    And "test-device" reported the battery of its "heart-rate" at 80 %
+    And I open the device setup from the main screen
+    When I open the "Heart Rate Monitor" in the device setup
+    Then the details show no fact "Left battery"
+    And the details show no fact "Right battery"
+
+  Scenario Outline: A device made of parts names the part it waits for (<state>)
+    Given "test-device" reported its "controller" "Zwift Ride" as "<state>", waiting for its "right" part
+    And I open the device setup from the main screen
+    When I open the "Controller" in the device setup
+    Then the details are headed "Controller", the card "Zwift Ride" with the status "<status>"
+    And the details give the tip "Waiting for the right side: wake it and keep it close."
+
+    Examples:
+      | state        | status         |
+      | connecting   | Connecting…    |
+      | reconnecting | Reconnecting…  |
 
   Scenario: The top right says whether ridrs looks for devices of the kind
     Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"

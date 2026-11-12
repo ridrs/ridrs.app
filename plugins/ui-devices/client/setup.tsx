@@ -549,10 +549,13 @@ function Signal({ rssi }: { readonly rssi: number }) {
   );
 }
 
+/** A battery level that wants charging soon, in percent. */
+const LOW_BATTERY = 20;
+
 /** The battery level: a battery filled to the level, and the level in percent. */
 function Battery({ level }: { readonly level: number }) {
   const name = useText().battery(level);
-  const low = level <= 20;
+  const low = level <= LOW_BATTERY;
   return (
     <span
       role="img"
@@ -748,6 +751,28 @@ function FoundGroup({
   );
 }
 
+/**
+ * The battery of each part of a device made of several, while it is connected: the card's top
+ * shows the weakest.
+ */
+function batteryFacts(row: DeviceRow, text: Messages): Fact[] {
+  if (row.state !== 'connected') {
+    return [];
+  }
+  return row.batteries.flatMap(({ part, level }) =>
+    part === undefined
+      ? []
+      : [
+          {
+            icon: 'battery' as const,
+            term: text.batteryOf[part],
+            value: `${level} %`,
+            ...(level <= LOW_BATTERY ? { tone: 'warn' as const } : {}),
+          },
+        ],
+  );
+}
+
 /** States in which the device is held or tried: Remove ends that. */
 const HELD = new Set(['connecting', 'connected', 'reconnecting']);
 
@@ -821,8 +846,8 @@ function DeviceDetails({
   shown.current = others.map((c) => c.deviceId);
   // The device itself, seen over another link: its card offers that link next to Remove.
   const itself = (c: DeviceCandidate) => known && c.sameDeviceAs === row.deviceId;
-  const links = kind === 'controller' ? [] : others.filter(itself);
-  const groups = kind === 'controller' ? [] : byDevice(others.filter((c) => !itself(c)));
+  const links = others.filter(itself);
+  const groups = byDevice(others.filter((c) => !itself(c)));
   // The device the rider asked to connect: the details show how it goes and close once it is.
   const [awaited, setAwaited] = useState<string>();
   useEffect(() => {
@@ -851,7 +876,7 @@ function DeviceDetails({
           // The level a device told before it was lost may be long gone: shown while connected.
           battery={row.state === 'connected' ? row.battery : undefined}
           status={row}
-          facts={controlled ? [controlled] : []}
+          facts={[...(controlled ? [controlled] : []), ...batteryFacts(row, text)]}
           tip={row.tip}
         >
           {(HELD.has(row.state) || reconnect || links.length > 0) && (
@@ -903,7 +928,6 @@ function DeviceDetails({
           )}
         </DetailsCard>
       )}
-      {/* A controller pair is one row for two devices: they are not swapped one by one. */}
       {groups.length > 0 && (
         <ul
           aria-label={text.devicesFound}

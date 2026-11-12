@@ -84,12 +84,13 @@ Feature: The device setup shows the controller once found, and proof of every de
     When the "controller" holds down ""
     Then the badge of the "Controller" shows "✓"
 
-  Scenario: The buttons of both controllers show together
+  Scenario: Only the buttons of the controller shown prove it
     Given "test-device" reported its "controller" "Zwift Ride" as "connected"
     And I open the device setup from the main screen
     And the device setup shows the "Controller" as "Connected"
-    When the "controller" holds down "left"
-    And the other "controller" of the pair holds down "a"
+    When another "controller" holds down "a"
+    Then the badge of the "Controller" shows "✓"
+    When the "controller" holds down "left, a"
     Then the badge of the "Controller" shows "D-pad left, A"
 
   Scenario: Every controller button has a symbol of its own

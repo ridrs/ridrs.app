@@ -147,7 +147,7 @@ When(
 );
 
 When(
-  'the other {string} of the pair holds down {string}',
+  'another {string} holds down {string}',
   async function (this: RidrsWorld, kind: string, buttons: string) {
     await holdDown(this, `${kind}-2`, buttons);
   },

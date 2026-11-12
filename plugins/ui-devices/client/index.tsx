@@ -41,7 +41,7 @@ function useReadings(ctx: UiContext): Readings {
         ),
       ),
       ctx.events.subscribe(controllerButtonsChangedEvent, ({ payload }) =>
-        setReadings((r) => ({ ...r, buttons: { ...r.buttons, [payload.deviceId]: payload.buttons } })),
+        setReadings((r) => ({ ...r, buttons: { deviceId: payload.deviceId, held: payload.buttons } })),
       ),
     ];
     return () => {

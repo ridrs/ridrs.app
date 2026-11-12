@@ -1,22 +1,26 @@
 @devices @fake-timers
 Feature: The Zwift Ride controller
-  The Zwift Ride plugin connects both controllers of the pair, greets each with "RideOn" on
-  its control point and turns their keypad packets into the buttons that are held down. No
+  The Zwift Ride is a pair of two controllers, the left and the right one: two BLE devices with
+  the same name and service. The left one forwards the right one's buttons, the right one does
+  not forward the left's: only both connections together hear every button. The Zwift Ride plugin
+  presents the pair as one device (ADR 0089): it connects both controllers, greets each with
+  "RideOn" on its control point and turns their keypad packets into the buttons the pair holds
+  down, under the pair's id. The pair counts as connected only once both controllers are. No
   other plugin ever sees protocol bytes.
 
-  Rule: A controller is greeted and tells its buttons
+  Rule: The pair is greeted and tells its buttons
 
     Background:
-      Given a simulated BLE environment with a Zwift Ride "Zwift Ride"
+      Given a simulated BLE environment with the Zwift Ride pair "Zwift Ride"
       And the ridrs plugins "device-zwift-ride" running with the simulated BLE central
-      And the controller "Zwift Ride" is connected
+      And both controllers of "Zwift Ride" are connected
 
-    Scenario: The controller is greeted once it is listened to
-      Then the controller "Zwift Ride" received "RideOn" 1 time
-      And it was already listened to when it received "RideOn"
+    Scenario: Each controller is greeted once it is listened to
+      Then each controller of "Zwift Ride" received "RideOn" 1 time
+      And each controller was already listened to when it received "RideOn"
 
     Scenario Outline: Keypad packets say which buttons are held down (<description>)
-      When the controller sends the keypad packet "<bytes>"
+      When the left controller sends the keypad packet "<bytes>"
       Then the buttons held down are "<buttons>"
 
       Examples:
@@ -33,17 +37,17 @@ Feature: The Zwift Ride controller
         | paddle pulled, no button | 23 08 ff ff ff ff 0f 1a 05 08 00 10 c7 01 1a 04 08 01 10 00                                | none                   |
 
     Scenario: The same buttons sent again are no news
-      When the controller sends the keypad packet "23 08 fe ff ff ff 0f"
-      And the controller sends the keypad packet "23 08 fe ff ff ff 0f"
-      And the controller sends the keypad packet "23 08 ff ff ff ff 0f"
-      And the controller sends the keypad packet "23 08 ff ff ff ff 0f"
+      When the left controller sends the keypad packet "23 08 fe ff ff ff 0f"
+      And the left controller sends the keypad packet "23 08 fe ff ff ff 0f"
+      And the left controller sends the keypad packet "23 08 ff ff ff ff 0f"
+      And the left controller sends the keypad packet "23 08 ff ff ff ff 0f"
       Then the buttons held down were:
         | buttons |
         | left    |
         | none    |
 
     Scenario Outline: Other packets say nothing about buttons (<description>)
-      When the controller sends the packet "<bytes>"
+      When the left controller sends the packet "<bytes>"
       Then no button change was published
       And the host reported no problems
 
@@ -56,10 +60,10 @@ Feature: The Zwift Ride controller
         | keypad without a map  | 23 1a 04 08 00 10 00                                          |
 
     Scenario Outline: Malformed keypad packets publish nothing (<description>)
-      When the controller sends the packet "<bytes>"
+      When the left controller sends the packet "<bytes>"
       Then no button change was published
       And the host reported exactly one "malformed-packet" problem for plugin "device-zwift-ride" mentioning "Zwift Ride"
-      And the controller "Zwift Ride" is still connected
+      And both controllers of "Zwift Ride" are still connected
 
       Examples:
         | description             | bytes                |
@@ -70,16 +74,21 @@ Feature: The Zwift Ride controller
       Then every connection state of "device-zwift-ride" is for a "controller"
 
     Scenario: A reconnected controller is greeted again
-      When the controller "Zwift Ride" drops the connection and refuses new connections
-      Then the connection state of "Zwift Ride" is "reconnecting"
-      When the controller "Zwift Ride" accepts connections again
+      When the right controller drops the connection and refuses new connections
+      Then the device status is:
+        | kind       | state        | device     |
+        | controller | reconnecting | Zwift Ride |
+      When the right controller accepts connections again
       And 2 seconds pass
-      Then the connection state of "Zwift Ride" is "connected"
-      And the controller "Zwift Ride" received "RideOn" 2 times
+      Then the device status is:
+        | kind       | state     | device     |
+        | controller | connected | Zwift Ride |
+      And the right controller received "RideOn" 2 times
+      And the left controller received "RideOn" 1 time
 
-    Scenario: Buttons held when the link drops are released
-      Given the controller sends the keypad packet "23 08 fe ff ff ff 0f"
-      When the controller "Zwift Ride" drops the connection and refuses new connections
+    Scenario: Buttons held when a controller drops are released
+      Given the left controller sends the keypad packet "23 08 fe ff ff ff 0f"
+      When the right controller drops the connection and refuses new connections
       Then the buttons held down are "none"
 
     Scenario: Device plugins do not take each other's devices
@@ -88,10 +97,8 @@ Feature: The Zwift Ride controller
       Then the plugin "device-zwift-ride" never connected to "HRM-Pro 42"
       And the plugin "device-heart-rate" never connected to "Zwift Ride"
 
-  Rule: The pair is two controllers, and both are connected
-    The left and the right controller are two devices with the same name and service. The
-    left one forwards the right one's buttons, the right one does not forward the left's: only
-    both connections together hear every button.
+  Rule: The pair is one device
+    Here neither controller says which side it is: the one found first is taken as the left one.
 
     Background:
       Given a simulated BLE environment with the Zwift Ride controllers "ride-left" and "ride-right"
@@ -103,12 +110,160 @@ Feature: The Zwift Ride controller
       And the controller with the id "ride-left" received "RideOn" 1 time
       And the controller with the id "ride-right" received "RideOn" 1 time
 
-    Scenario: Each controller tells its own buttons
+    Scenario: The pair has one status, under the id of the controller found first
+      Then the device status is:
+        | kind       | state     | device     |
+        | controller | connected | Zwift Ride |
+      And the device status gives the "controller" the id "ride-left"
+      And the latest connection state of "device-zwift-ride" names the parts:
+        | part  | id         |
+        | left  | ride-left  |
+        | right | ride-right |
+
+    Scenario: The buttons of both controllers are the pair's
       When the controller with the id "ride-left" sends the keypad packet "23 08 fe ff ff ff 0f"
       And the controller with the id "ride-right" sends the keypad packet "23 08 ef ff ff ff 0f"
-      Then the buttons held down on "ride-left" are "left"
-      And the buttons held down on "ride-right" are "a"
+      Then the buttons held down on "ride-left" are "left, a"
+      And no button change was published for "ride-right"
 
-    Scenario: A third controller is left alone
-      Given the simulated BLE environment also contains a Zwift Ride with the id "ride-other"
+    Scenario: A button both controllers tell counts once
+      When the controller with the id "ride-left" sends the keypad packet "23 08 ff df ff ff 0f"
+      And the controller with the id "ride-right" sends the keypad packet "23 08 ff df ff ff 0f"
+      And the controller with the id "ride-right" sends the keypad packet "23 08 ff ff ff ff 0f"
+      Then the buttons held down were:
+        | buttons        |
+        | shift-up-right |
+
+    Scenario: The pair is connected only once both controllers are
+      When the controller with the id "ride-right" drops the connection and refuses new connections
+      Then the device status is:
+        | kind       | state        | device     |
+        | controller | reconnecting | Zwift Ride |
+      And the device status of the "controller" waits for its "right" part
+      When the controller with the id "ride-right" accepts connections again
+      And 2 seconds pass
+      Then the device status is:
+        | kind       | state     | device     |
+        | controller | connected | Zwift Ride |
+      And the device status of the "controller" waits for no part
+
+    Scenario: The devices found are pairs
+      Given the device setup looks for devices
+      When the simulated BLE environment also contains a Zwift Ride with the id "ride-other"
       Then the controller with the id "ride-other" was never connected
+      And the device status offers the "controller" devices "ride-left, ride-other"
+
+    Scenario: Forgetting the pair lets both controllers go
+      When the device setup looks for devices
+      And the rider forgets the "controller"
+      Then the controller with the id "ride-left" is not connected
+      And the controller with the id "ride-right" is not connected
+      And the device status is:
+        | kind       | state     | device |
+        | controller | searching |        |
+
+  Rule: The controllers of a pair are chosen once
+    The controllers say which side they are; nothing they advertise says which belong together
+    (ADR 0089). In a room with two sets, the strongest left and the strongest right controller
+    make the pair. Once connected, the pair is remembered with both controllers until the rider
+    forgets it.
+
+    Background:
+      Given a simulated BLE environment with the Zwift Ride controllers:
+        | id      | side  | signal |
+        | a-left  | left  | -70    |
+        | a-right | right | -72    |
+        | b-left  | left  | -50    |
+        | b-right | right | -75    |
+
+    Scenario: The strongest left and the strongest right controller make the pair
+      Given the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      And the device setup looks for devices
+      And the rider forgot the "controller"
+      And the device setup stopped looking for devices
+      When the device setup looks for devices
+      Then the controllers with the ids "b-left, a-right" are connected
+      And the controllers with the ids "a-left, b-right" are not connected
+
+    Scenario: Two sets are found as two pairs, never as single controllers
+      Given the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      When the device setup looks for devices
+      Then the device status lists the "controller" devices "Zwift Ride, Zwift Ride"
+
+    Scenario: Connecting a pair found connects both its controllers
+      Given the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      And the device setup looks for devices
+      When the rider connects the other "controller" pair
+      Then the controllers with the ids "b-left, b-right" are connected
+      And the controllers with the ids "a-left, a-right" are not connected
+      And the device status is:
+        | kind       | state     | device     |
+        | controller | connected | Zwift Ride |
+
+    Scenario: The pair is remembered with both controllers
+      Given the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      And the device setup looks for devices
+      And the rider connected the other "controller" pair
+      And the controllers with the ids "b-left, b-right" are connected
+      When ridrs restarts
+      Then the controllers with the ids "b-left, b-right" are connected
+      And the controllers with the ids "a-left, a-right" are not connected
+      And "device-zwift-ride" remembers the pair "b-left" with the controllers "b-left, b-right"
+
+    Scenario: A forgotten pair stays forgotten after a restart
+      Given the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      And the device setup looks for devices
+      And the rider forgot the "controller"
+      When ridrs restarts
+      And 60 seconds pass
+      Then the controllers with the ids "a-left, a-right, b-left, b-right" are not connected
+
+    Scenario: The two controllers remembered before the pair become one remembered pair
+      Given "device-zwift-ride" remembered "b-left" and "b-right" with one link each, as before the pair
+      When the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      Then the controllers with the ids "b-left, b-right" are connected
+      And the controllers with the ids "a-left, a-right" are not connected
+      And "device-zwift-ride" remembers the pair "b-left" with the controllers "b-left, b-right"
+
+    Scenario: An unreadable document from before the pair does not stop the start
+      Given "device-zwift-ride" remembered "b-left" with its first link, and its second link's document holds "{not json", as before the pair
+      When the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      Then the controller with the id "b-left" is connected
+      And "device-zwift-ride" remembers the pair "b-left" with the controllers "b-left, a-right"
+      And the host reported a "settings-invalid" problem for plugin "device-zwift-ride"
+
+  Rule: A pair with a controller away waits for it
+
+    Scenario: The pair waits for the controller not found yet
+      Given a simulated BLE environment with the Zwift Ride controllers:
+        | id        | side |
+        | ride-left | left |
+      And the ridrs plugins "device-zwift-ride" running with the simulated BLE central
+      Then the controller with the id "ride-left" is connected
+      And the device status is:
+        | kind       | state      | device     |
+        | controller | connecting | Zwift Ride |
+      And the device status of the "controller" waits for its "right" part
+      When the simulated BLE environment also contains the right Zwift Ride controller "ride-right"
+      Then the controller with the id "ride-right" is connected
+      And the device status is:
+        | kind       | state     | device     |
+        | controller | connected | Zwift Ride |
+      And the device status of the "controller" waits for no part
+
+  Rule: Recordings from before the pair
+    Before the pair was one device, each controller published its buttons under its own id. The
+    raw packets are the plugin's inputs, also on replay: an old recording has no connection state
+    of the pair, so each controller still stands for itself, and the plugins after it (virtual
+    gears) see the same buttons as before.
+
+    Scenario: A recording from before the pair replays as it was recorded
+      Given a recording from before the pair with "device-zwift-ride" and "control-virtual-gears", in which:
+        | controller | keypad packet        |
+        | ride-right | 23 08 ff df ff ff 0f |
+        | ride-right | 23 08 ff ff ff ff 0f |
+        | ride-left  | 23 08 fe ff ff ff 0f |
+      When the recording is replayed
+      Then the replay is identical
+      And the replay compared every "controller.buttons-changed" event of the ride, and there was at least one
+      And the replay compared every "drivetrain.gear-changed" event of the ride, and there was at least one
