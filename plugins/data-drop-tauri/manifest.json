@@ -1,0 +1,9 @@
+{
+  "id": "data-drop-tauri",
+  "name": "Dragged Files (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["data.drop"],
+  "requires": [],
+  "entry": "index.ts"
+}

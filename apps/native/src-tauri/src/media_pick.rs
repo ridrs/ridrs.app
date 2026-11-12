@@ -14,11 +14,44 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
-/// The files chosen and not yet copied, by token.
+/// The files chosen and not yet copied, by token: of the open dialog and of drags onto the
+/// window (media_drop.rs, ADR 0093).
 #[derive(Default)]
 pub struct PickState {
     next: Mutex<u64>,
     chosen: Mutex<HashMap<String, PathBuf>>,
+}
+
+impl PickState {
+    /// Keeps `path` behind a new token.
+    pub fn register(&self, path: PathBuf) -> Result<String, String> {
+        let token = {
+            let mut next = self.next.lock().map_err(|e| e.to_string())?;
+            *next += 1;
+            next.to_string()
+        };
+        self.chosen.lock().map_err(|e| e.to_string())?.insert(token.clone(), path);
+        Ok(token)
+    }
+
+    /// The file behind `token`, while it is not copied or forgotten.
+    pub fn path(&self, token: &str) -> Result<PathBuf, String> {
+        self.chosen
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(token)
+            .cloned()
+            .ok_or_else(|| format!("no chosen file \"{token}\""))
+    }
+
+    /// Forgets the files behind `tokens`, copied or not.
+    pub fn forget(&self, tokens: &[String]) -> Result<(), String> {
+        let mut chosen = self.chosen.lock().map_err(|e| e.to_string())?;
+        for token in tokens {
+            chosen.remove(token);
+        }
+        Ok(())
+    }
 }
 
 /// A file the rider chose: never its place on the device.
@@ -54,12 +87,7 @@ pub async fn media_pick(
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "file".into());
-    let token = {
-        let mut next = state.next.lock().map_err(|e| e.to_string())?;
-        *next += 1;
-        next.to_string()
-    };
-    state.chosen.lock().map_err(|e| e.to_string())?.insert(token.clone(), path);
+    let token = state.register(path)?;
     Ok(Some(Picked { token, name, size }))
 }
 

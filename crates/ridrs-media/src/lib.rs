@@ -9,4 +9,5 @@ pub mod commands;
 pub mod fetch;
 pub mod files;
 pub mod paths;
+pub mod peek;
 pub mod protocol;

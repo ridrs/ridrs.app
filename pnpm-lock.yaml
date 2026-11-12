@@ -499,6 +499,15 @@ importers:
         specifier: 2.12.4
         version: 2.12.4
 
+  plugins/data-drop-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
+
   plugins/data-fetch-node:
     dependencies:
       '@ridrs/contracts':

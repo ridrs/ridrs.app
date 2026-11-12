@@ -4,6 +4,7 @@ mod app_files;
 #[cfg(all(debug_assertions, target_os = "macos"))]
 mod debug_snapshot;
 mod keep_awake;
+mod media_drop;
 mod media_pick;
 
 use ridrs_ble::commands as ble;
@@ -70,6 +71,7 @@ pub fn run() {
         .manage(bridge::ClientState::default())
         .manage(media::MediaState::default())
         .manage(media_pick::PickState::default())
+        .manage(media_drop::DropState::default())
         .invoke_handler(tauri::generate_handler![
             ble::ble_check_permissions,
             ble::ble_adapter_state,
@@ -105,6 +107,10 @@ pub fn run() {
             media::media_extract,
             media_pick::media_pick,
             media_pick::media_pick_copy,
+            media_drop::media_drop_files,
+            media_drop::media_drop_leave,
+            media_drop::media_drop_peek,
+            media_drop::media_drop_read,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

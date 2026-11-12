@@ -142,6 +142,8 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   'data-archive-tauri',
   // The system's open dialog for own video packages; the headless app has none.
   'data-pick-tauri',
+  // Files dragged onto the window (ADR 0093); the headless app has no window.
+  'data-drop-tauri',
   'net-http-tauri',
   'auth-sign-in-tauri',
   'storage-secrets-tauri',
