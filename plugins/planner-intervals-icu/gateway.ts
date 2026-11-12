@@ -108,8 +108,9 @@ export function createGateway(options: GatewayOptions): Gateway {
     if (now() < blockedUntil) {
       throw new RateLimited(blockedUntil - now());
     }
-    const wait = nextAt - now();
-    if (wait > 0) {
+    // The spacing is measured on `now`, so the wait ends on `now` too: a timer may wake before the
+    // clock has moved as far (a slewed or coarse clock), and then it waits for the rest.
+    for (let wait = nextAt - now(); wait > 0; wait = nextAt - now()) {
       await sleep(wait);
     }
     count(purpose, now());

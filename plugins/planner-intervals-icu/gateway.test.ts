@@ -56,6 +56,34 @@ describe('the intervals.icu gateway', () => {
     expect(sent[2]!.at - sent[1]!.at).toBeGreaterThanOrEqual(200);
   });
 
+  it('keeps the spacing on its clock when the timer wakes before the clock has moved as far', async () => {
+    let now = Date.UTC(2026, 10, 4, 8, 7, 0);
+    const sent: number[] = [];
+    const gateway = createGateway({
+      http: {
+        request: async () => {
+          sent.push(now);
+          return ok();
+        },
+      },
+      now: () => now,
+      // The clock lags the timer: of every sleep, only 88 % shows on it (220 ms of 250 ms).
+      sleep: async (ms) => {
+        now += Math.max(1, Math.floor(ms * 0.88));
+      },
+      logger: { info: (() => undefined) as PluginLogger['info'] },
+      pacing: { minIntervalMs: 200, writeSpacingMs: 250 },
+    });
+    await Promise.all([
+      gateway.request('calendar-write', { method: 'POST', url: 'https://intervals.icu/w1' }),
+      gateway.request('calendar-write', { method: 'POST', url: 'https://intervals.icu/w2' }),
+      gateway.request('calendar-write', { method: 'PUT', url: 'https://intervals.icu/w3' }),
+    ]);
+    expect(sent).toHaveLength(3);
+    expect(sent[1]! - sent[0]!).toBeGreaterThanOrEqual(250);
+    expect(sent[2]! - sent[1]!).toBeGreaterThanOrEqual(250);
+  });
+
   it('honours Retry-After on 429, stops sending, and does not retry', async () => {
     let calls = 0;
     const { gateway, sent, advance } = harness(() => {
