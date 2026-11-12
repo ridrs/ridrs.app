@@ -4,6 +4,7 @@ mod app_files;
 #[cfg(all(debug_assertions, target_os = "macos"))]
 mod debug_snapshot;
 mod keep_awake;
+mod media_pick;
 
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
@@ -28,6 +29,7 @@ pub fn run() {
         // Scoped to $APPDATA/recordings/** by capabilities/default.json.
         .plugin(tauri_plugin_fs::init())
         // The save dialog of `files.save` (ADR 0085); `dialog:allow-save` only, see capabilities/default.json.
+        // The open dialog of `data.pick` (ADR 0090) runs from Rust (media_pick.rs) and needs no permission.
         .plugin(tauri_plugin_dialog::init())
         // intervals.icu (ADR 0049): HTTP from Rust, scoped to its API by capabilities/default.json;
         // the system browser for the sign-in, and the one-shot loopback server for its redirect.
@@ -67,6 +69,7 @@ pub fn run() {
         .manage(keep_awake::KeepAwakeState::default())
         .manage(bridge::ClientState::default())
         .manage(media::MediaState::default())
+        .manage(media_pick::PickState::default())
         .invoke_handler(tauri::generate_handler![
             ble::ble_check_permissions,
             ble::ble_adapter_state,
@@ -100,6 +103,8 @@ pub fn run() {
             media::media_fetch,
             media::media_fetch_cancel,
             media::media_extract,
+            media_pick::media_pick,
+            media_pick::media_pick_copy,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

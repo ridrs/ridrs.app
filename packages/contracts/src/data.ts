@@ -50,3 +50,30 @@ export const dataArchiveCapability = defineCapability<DataArchive, 'single', 'da
     cardinality: 'single',
   },
 );
+
+/** A file the rider chose, not yet in the media storage. */
+export interface PickedFile {
+  /** Its name with its extension, e.g. `Col de la Madone.zip`; never its place on the device. */
+  readonly name: string;
+  /** Bytes. */
+  readonly size: number;
+  /** Copies it to the media path `target`, creating its directories; once. */
+  copyTo(target: string): Promise<void>;
+}
+
+/**
+ * Files the rider brings into the media storage, chosen in the system's open dialog (ADR 0090).
+ * The provider of the platform opens the dialog and copies; the caller never learns where the
+ * file lies, and reads it only once it is a media file.
+ */
+export interface DataPick {
+  /** Resolves once the dialog closed: the chosen file, or nothing when the rider cancelled. */
+  pick(filter: {
+    readonly name: string;
+    readonly extensions: readonly string[];
+  }): Promise<PickedFile | undefined>;
+}
+
+export const dataPickCapability = defineCapability<DataPick, 'single', 'data.pick'>('data.pick', {
+  cardinality: 'single',
+});

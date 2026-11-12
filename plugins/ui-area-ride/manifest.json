@@ -40,12 +40,14 @@
     },
     "state": [
       "app.language",
-      "route.offer"
+      "route.offer",
+      "route.import"
     ],
     "calls": [
       "route.fetch",
       "route.cancel",
       "route.remove",
+      "route.import",
       "ride.briefing-set"
     ],
     "uses": [

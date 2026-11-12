@@ -129,8 +129,11 @@ export {
   type DataFetch,
   type DataFetchJob,
   type DataFetchProgress,
+  type DataPick,
   dataArchiveCapability,
   dataFetchCapability,
+  dataPickCapability,
+  type PickedFile,
 } from './data.ts';
 export {
   DATA_SOURCE_STATUSES,
@@ -372,9 +375,13 @@ export {
   recoverableRideSchema,
 } from './recording.ts';
 export {
+  type RouteImport,
   type RouteOffer,
   routeCancelService,
   routeFetchService,
+  routeImportSchema,
+  routeImportService,
+  routeImportState,
   routeOfferSchema,
   routeOfferState,
   routeRemoveService,

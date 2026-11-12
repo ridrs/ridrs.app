@@ -2,7 +2,7 @@
 
 # Proposal: Video Sources, Route Offers and Local Media
 
-**Status: proposal of 2026-11-06. Built: the catalog tool (section 6), V1 (route offers on the ride page) and V2 (downloads, headless and native, section 8).** Everything else is a plan. Each step is taken up with its use case, its Cucumber scenarios and its ADRs (AGENTS.md rules 1, 3 and 9).
+**Status: proposal of 2026-11-06. Built: the catalog tool (section 6), V1 (route offers on the ride page) and V2 (downloads, headless and native, section 8); the import of own Incyclist packages (ADR 0090).** Everything else is a plan. Each step is taken up with its use case, its Cucumber scenarios and its ADRs (AGENTS.md rules 1, 3 and 9).
 
 The goal: every video ride of [cycling.vangestel.online](https://cycling.vangestel.online/indoor/videos/) shows up on the ride page with its metadata, preview image, altitude profile and credits. A rider can download one, ridrs prepares it, and it plays in the video world. Further sources come as further small plugins.
 

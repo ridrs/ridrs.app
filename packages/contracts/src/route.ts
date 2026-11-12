@@ -136,3 +136,43 @@ export const routeRemoveService = defineService('route.remove', {
   response: z.object({}).strict(),
   keyedBy: routeOfferState,
 });
+
+/**
+ * A provider that imports routes from packages the rider brings (ADR 0090), by its plugin id: the
+ * list its routes go to, and how its last import went. `importing` names the chosen file while it
+ * becomes a route, `failed` says why it could not; once a route is imported it is an offer and the
+ * provider is `idle` again. The ride page shows an import in a list only while its provider is here.
+ */
+export const routeImportSchema = z.discriminatedUnion('state', [
+  z.object({ kind: routeOfferSchema.shape.kind, state: z.literal('idle') }).strict(),
+  z
+    .object({
+      kind: routeOfferSchema.shape.kind,
+      state: z.literal('importing'),
+      file: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: routeOfferSchema.shape.kind,
+      state: z.literal('failed'),
+      file: z.string().min(1),
+      reason: z.string().min(1),
+    })
+    .strict(),
+]);
+
+export type RouteImport = z.infer<typeof routeImportSchema>;
+
+export const routeImportState = defineState('route.import', routeImportSchema);
+
+/**
+ * Imports a route from a package the rider chooses in the system's open dialog: answered once the
+ * dialog closed, `started: false` when the rider cancelled. The import's progress and a failure
+ * are the provider's key of `route.import`; the route is then a key of `route.offer`.
+ */
+export const routeImportService = defineService('route.import', {
+  request: z.object({ key: z.string().min(1) }).strict(),
+  response: z.object({ started: z.boolean() }).strict(),
+  keyedBy: routeImportState,
+});

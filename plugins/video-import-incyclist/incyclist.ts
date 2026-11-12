@@ -113,7 +113,7 @@ export function createIncyclistImporter(media: MediaFiles, archive: DataArchive)
         format: 'ridrs-video-route',
         version: 1,
         title: facts.title,
-        source: facts.source,
+        ...(facts.source ? { source: facts.source } : {}),
         notes: control.notes,
         segments: control.segments,
         video: { file: 'video.mp4', framerate: control.framerate, startFrame: control.startFrame },

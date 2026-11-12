@@ -12,6 +12,7 @@ export const videoRouteSchema = z
     format: z.literal('ridrs-video-route'),
     version: z.literal(1),
     title: z.string().min(1),
+    /** Where the route comes from; none for a package the rider imported themselves. */
     source: z
       .object({
         name: z.string().min(1),
@@ -19,7 +20,8 @@ export const videoRouteSchema = z
         url: z.string().url(),
         license: z.string().min(1),
       })
-      .strict(),
+      .strict()
+      .optional(),
     /** Notes along the route: m from the start, text by language (`en`, `de`, …). */
     notes: z.array(
       z
@@ -60,7 +62,7 @@ export const VIDEO_ROUTE_FILE = 'route.json';
 /** What a source knows about a route that its package may not say. */
 export interface VideoRouteFacts {
   readonly title: string;
-  readonly source: VideoRoute['source'];
+  readonly source?: VideoRoute['source'];
 }
 
 /**

@@ -1,0 +1,28 @@
+{
+  "id": "video-source-local",
+  "name": "Own Video Routes",
+  "version": "0.1.0",
+  "types": [
+    "transport"
+  ],
+  "provides": [],
+  "requires": [],
+  "optionalRequires": [
+    "storage.media",
+    "data.pick",
+    "video.importer"
+  ],
+  "entry": "index.ts",
+  "state": {
+    "owns": [
+      "route.offer",
+      "route.import"
+    ]
+  },
+  "services": {
+    "provides": [
+      "route.import",
+      "route.remove"
+    ]
+  }
+}

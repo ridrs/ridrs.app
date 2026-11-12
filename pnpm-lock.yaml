@@ -511,6 +511,15 @@ importers:
         specifier: 2.12.4
         version: 2.12.4
 
+  plugins/data-pick-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
+
   plugins/device-ftms-trainer:
     dependencies:
       '@ridrs/ble-peripheral':
@@ -1531,6 +1540,18 @@ importers:
       fast-xml-parser:
         specifier: 5.11.2
         version: 5.11.2
+
+  plugins/video-source-local:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   plugins/video-source-vangestel:
     dependencies:

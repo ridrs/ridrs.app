@@ -1,0 +1,9 @@
+{
+  "id": "data-pick-tauri",
+  "name": "Open Files (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["data.pick"],
+  "requires": [],
+  "entry": "index.ts"
+}

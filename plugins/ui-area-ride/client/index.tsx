@@ -2,9 +2,12 @@
 
 import {
   activityStartRequestedEvent,
+  type RouteImport,
   type RouteOffer,
   routeCancelService,
   routeFetchService,
+  routeImportService,
+  routeImportState,
   routeOfferState,
   routeProfileCapability,
   routeRemoveService,
@@ -56,6 +59,7 @@ const DOWNLOAD = new URL('./assets/icons/download.svg', import.meta.url).href;
 const CANCEL = new URL('./assets/icons/x.svg', import.meta.url).href;
 const ON_DEVICE = new URL('./assets/icons/check.svg', import.meta.url).href;
 const DURATION = new URL('./assets/icons/clock.svg', import.meta.url).href;
+const IMPORT = new URL('./assets/icons/upload.svg', import.meta.url).href;
 
 /** What the rider changed in this area, kept at once (ADR 0059). */
 const useRide = userDocument(
@@ -82,6 +86,13 @@ function useOffers(ctx: UiContext): readonly RouteOffer[] {
     [ctx],
   );
   return offers;
+}
+
+/** The providers that import routes of their own (`route.import`), by their key. */
+function useImporters(ctx: UiContext): ReadonlyMap<string, RouteImport> {
+  const [importers, setImporters] = useState<ReadonlyMap<string, RouteImport>>(new Map());
+  useEffect(() => ctx.state.watch(routeImportState, ({ entries }) => setImporters(new Map(entries))), [ctx]);
+  return importers;
 }
 
 /** What a refused call says to the rider: the reason of the plugin that refused. */
@@ -318,6 +329,53 @@ function RouteCard({
   );
 }
 
+/**
+ * The first card of a list whose routes a provider can import (ADR 0090): it opens the system's
+ * open dialog through `route.import`. While a package is imported it says which, and when an
+ * import failed or was refused it says why, until the next import.
+ */
+function ImportCard({
+  ctx,
+  provider,
+  state,
+}: {
+  readonly ctx: UiContext;
+  readonly provider: string;
+  readonly state: RouteImport;
+}) {
+  const text = useMessages(ctx, messages);
+  const [refusal, setRefusal] = useState<string>();
+  const importing = state.state === 'importing';
+  const start = () => {
+    setRefusal(undefined);
+    ctx.call(routeImportService, { key: provider }).catch((error: unknown) => setRefusal(reasonOf(error)));
+  };
+  const failure = refusal ?? (state.state === 'failed' ? state.reason : undefined);
+  return (
+    <Card
+      label={text.importVideo}
+      classifier={text.importKind}
+      icon={IMPORT}
+      title={text.importVideo}
+      details={[
+        importing
+          ? text.importingFile(state.file)
+          : failure
+            ? text.importFailedBecause(failure)
+            : text.importAbout,
+      ]}
+      tools={
+        importing ? (
+          <Badge tone="busy">{text.importing}</Badge>
+        ) : failure ? (
+          <Badge tone="warn">{text.importFailed}</Badge>
+        ) : null
+      }
+      onOpen={importing ? undefined : start}
+    />
+  );
+}
+
 /** One of the route's numbers in the details: a small label with its icon over a large figure. */
 function Stat({ icon, label, value }: { readonly icon: string; readonly label: string; readonly value: string }) {
   return (
@@ -470,6 +528,7 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const [state, change] = useRide(ctx);
   const offers = useOffers(ctx);
+  const importers = useImporters(ctx);
   const [openId, setOpenId] = useState<string>();
   const open = offers.find((offer) => offer.id === openId);
   useBack(ctx, () => {
@@ -482,20 +541,25 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
     change((s) => ({ ...s, filters: on ? [...s.filters, filter] : s.filters.filter((f) => f !== filter) }));
   const section = (title: string, kind: RouteOffer['kind'], none: string) => {
     const routes = shown.filter((offer) => offer.kind === kind);
+    const imports = [...importers].filter(([, state]) => state.kind === kind);
     return (
       <section className="pv-section" aria-label={title}>
         <h2>{title}</h2>
-        {routes.length === 0 ? (
+        {routes.length === 0 && (imports.length === 0 || offers.some((offer) => offer.kind === kind)) ? (
           <p className="pv-muted">
             {offers.some((offer) => offer.kind === kind) ? text.noMatch : none}
           </p>
-        ) : (
+        ) : null}
+        {routes.length + imports.length > 0 ? (
           <div className="pv-cards" data-wide>
+            {imports.map(([provider, state]) => (
+              <ImportCard key={provider} ctx={ctx} provider={provider} state={state} />
+            ))}
             {routes.map((offer) => (
               <RouteCard key={offer.id} ctx={ctx} offer={offer} onOpen={() => setOpenId(offer.id)} />
             ))}
           </div>
-        )}
+        ) : null}
       </section>
     );
   };
