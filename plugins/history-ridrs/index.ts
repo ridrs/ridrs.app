@@ -1,16 +1,41 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  activityStateChangedEvent,
+  activityStateSchema,
   type CompletedWorkout,
   DEFAULT_PROVIDER,
   definePlugin,
   linkIdOf,
   type PluginContext,
+  type RideWorkout,
   recordingRideState,
   storageAppFilesCapability,
   trainingHistoryState,
 } from '@ridrs/contracts';
-import { RECORDING_EXTENSION, RECORDINGS_DIRECTORY, readRecording } from '@ridrs/recording';
+import {
+  RECORDING_EXTENSION,
+  RECORDINGS_DIRECTORY,
+  type Recording,
+  readRecording,
+} from '@ridrs/recording';
+
+/**
+ * The workout a recorded ride rode: it is part of the ride's activity states (rule 13), so the
+ * recording keeps it, with the planned entry it came from.
+ */
+export function workoutOf(recording: Pick<Recording, 'events'>): RideWorkout | undefined {
+  for (const { envelope } of recording.events) {
+    if (envelope.type !== activityStateChangedEvent.id) {
+      continue;
+    }
+    const state = activityStateSchema.safeParse(envelope.payload);
+    if (state.success && state.data.state !== 'idle' && state.data.workout) {
+      return state.data.workout;
+    }
+  }
+  return undefined;
+}
 
 /**
  * The rider's local date of a start, from the offset of the host the ride was recorded on: days
@@ -34,7 +59,8 @@ function localDateOf(startedAt: number, offsetMinutes: number): string {
 /**
  * The rides saved on this device as `training.history` of the provider `ridrs` (ADR 0076): one
  * entry per sealed recording, read from its header and footer. Rides are indoor rides, named
- * "Ride". It reconciles like the FIT export (ADR 0069): at start every recording in the app
+ * after their workout, else "Ride"; a ride of a planned workout names its planned entry, so the
+ * calendar can match it with its plan. It reconciles like the FIT export (ADR 0069): at start every recording in the app
  * files is read once, and a ride saved or deleted later changes the list at once.
  */
 export default definePlugin({
@@ -53,15 +79,18 @@ export default definePlugin({
       });
 
     const read = async (file: string): Promise<void> => {
-      const { header, footer } = await readRecording(await storage.read(file));
+      const recording = await readRecording(await storage.read(file));
+      const { header, footer } = recording;
+      const workout = workoutOf(recording);
       rides.set(header.sessionId, {
         id: header.sessionId,
         date: localDateOf(header.startedAt, header.timeZoneOffsetMinutes),
         startedAt: header.startedAt,
-        name: 'Ride',
+        name: workout?.workout.name ?? 'Ride',
         sport: 'virtual-ride',
         ...(footer ? { durationSeconds: Math.max(0, (footer.endedAt - header.startedAt) / 1000) } : {}),
         externalId: linkIdOf(header.sessionId),
+        ...(workout?.planned ? { planned: workout.planned } : {}),
       });
     };
 

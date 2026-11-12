@@ -8,7 +8,10 @@ import {
   definePlugin,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  workoutFinishedEvent,
+  workoutStepChangedEvent,
 } from '@ridrs/contracts';
+import { type TimelineSegment, workoutTimeline } from '@ridrs/workout';
 
 const ERG_DEFAULTS = Object.freeze({
   /** W, the target ERG starts with. */
@@ -22,6 +25,11 @@ const ERG_DEFAULTS = Object.freeze({
  * the activity screen (`trainer.erg-requested`) and the power-up buttons of a controller into the
  * input `trainer.target-power`, which a replay injects as recorded. The right power-up button
  * starts ERG or raises the target, the left one lowers it. A finished ride leaves ERG.
+ *
+ * While a step of the ride's workout has a power target, the workout player alone sets the target
+ * (structured-workouts.md, section 11a): what the rider asks for then is ignored. The step comes
+ * from `workout.step-changed`, its target from the workout of the activity state, so the HUD can
+ * tell the same from the same two events.
  */
 export default definePlugin({
   initialize(ctx) {
@@ -34,7 +42,12 @@ export default definePlugin({
   start(ctx) {
     /** The target in force, as this driver set it last or heard it from another source. */
     let target: number | null = null;
-    const held = new Map<string, readonly ControllerButton[]>();
+    const pressed = new Map<string, readonly ControllerButton[]>();
+
+    /** The unrolled steps of the ride's workout, and whether the current one holds the target. */
+    let steps: readonly TimelineSegment[] = [];
+    let workoutSession: string | undefined;
+    let held = false;
 
     const set = (watts: number | null): void => {
       if (watts === target) {
@@ -56,6 +69,9 @@ export default definePlugin({
     });
 
     ctx.events.subscribe(trainerErgRequestedEvent, ({ payload }) => {
+      if (held) {
+        return;
+      }
       switch (payload.change) {
         case 'enter':
           if (target === null) {
@@ -77,10 +93,10 @@ export default definePlugin({
     });
 
     ctx.events.subscribe(controllerButtonsChangedEvent, ({ payload }) => {
-      const before = held.get(payload.deviceId) ?? [];
-      held.set(payload.deviceId, payload.buttons);
+      const before = pressed.get(payload.deviceId) ?? [];
+      pressed.set(payload.deviceId, payload.buttons);
       for (const button of payload.buttons) {
-        if (before.includes(button)) {
+        if (before.includes(button) || held) {
           continue;
         }
         if (button === 'power-up-right') {
@@ -91,7 +107,24 @@ export default definePlugin({
       }
     });
 
+    ctx.events.subscribe(workoutStepChangedEvent, ({ payload }) => {
+      const effort = steps[payload.index]?.effort;
+      held = effort?.kind === 'target' && effort.primary.unit === 'watts';
+    });
+    ctx.events.subscribe(workoutFinishedEvent, () => {
+      held = false;
+    });
+
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
+      if (payload.state === 'idle' || payload.state === 'finished') {
+        steps = [];
+        workoutSession = undefined;
+        held = false;
+      } else if (payload.sessionId !== workoutSession) {
+        workoutSession = payload.sessionId;
+        steps = payload.workout ? workoutTimeline(payload.workout.workout).segments : [];
+        held = false;
+      }
       if (payload.state === 'finished') {
         set(null);
       }

@@ -1,0 +1,10 @@
+{
+  "id": "workout-player",
+  "name": "Workout Player",
+  "version": "0.1.0",
+  "types": ["control"],
+  "provides": [],
+  "requires": [],
+  "optionalRequires": ["metric.power", "metric.heart-rate", "metric.cadence"],
+  "entry": "index.ts"
+}

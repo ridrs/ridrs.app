@@ -34,8 +34,15 @@ function reject(ctx: PluginContext, request: string, current: ActivityState): vo
   );
 }
 
-/** The world of a ride, kept from its start to its end; none for a free ride. */
-const worldOf = (state: ActivityState) => ('world' in state && state.world ? { world: state.world } : {});
+/**
+ * What a ride's start fixed, kept from its start to its end: its world (none for a free ride) and
+ * its workout (none without one). Both are ride input (AGENTS.md rule 13): a replay and a
+ * continued ride read them from the recorded states.
+ */
+const fixedOf = (state: ActivityState) => ({
+  ...('world' in state && state.world ? { world: state.world } : {}),
+  ...('workout' in state && state.workout ? { workout: state.workout } : {}),
+});
 
 /**
  * Ride lifecycle `idle -> running <-> paused -> finished`, driven by request events (ADR 0056).
@@ -43,8 +50,9 @@ const worldOf = (state: ActivityState) => ('world' in state && state.world ? { w
  * new session and announces it as `activity.equipment` right before the session runs; pause,
  * resume and a continued ride keep it (ADR 0060). The athlete is frozen the same way, from
  * `athlete.profile-changed` into `activity.athlete` (ADR 0075). Without a bicycle or an athlete
- * it announces none. The world a
- start asks for (a landscape and its route) stays with the ride in every state until it ends.
+ * it announces none. The world a start asks for (a landscape and its route) and its workout,
+ * resolved at the start (structured-workouts.md, section 11), stay with the ride in every state
+ * until it ends.
  */
 export default definePlugin({
   start(ctx) {
@@ -77,6 +85,7 @@ export default definePlugin({
         sessionId,
         startedAt: ctx.clock.now(),
         ...(payload.world ? { world: payload.world } : {}),
+        ...(payload.workout ? { workout: payload.workout } : {}),
       });
     });
 
@@ -92,7 +101,7 @@ export default definePlugin({
         startedAt: state.startedAt,
         pausedAt: ctx.clock.now(),
         reason,
-        ...worldOf(state),
+        ...fixedOf(state),
       });
     };
     ctx.events.subscribe(activityPauseRequestedEvent, () => pause('pause', 'rider'));
@@ -109,7 +118,7 @@ export default definePlugin({
         sessionId: state.sessionId,
         startedAt: state.startedAt,
         resumedAt: ctx.clock.now(),
-        ...worldOf(state),
+        ...fixedOf(state),
       });
     });
 
@@ -124,7 +133,7 @@ export default definePlugin({
         sessionId: state.sessionId,
         startedAt: state.startedAt,
         endedAt: ctx.clock.now(),
-        ...worldOf(state),
+        ...fixedOf(state),
       });
     });
   },

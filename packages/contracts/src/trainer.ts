@@ -68,7 +68,11 @@ export const trainerErgRequestedEvent = defineEvent(
 
 export type TrainerErgRequestedPayload = z.infer<typeof trainerErgRequestedEvent.schema>;
 
-/** The rider's target power, an input: watts for ERG, `null` to leave it. */
+/**
+ * The target power for ERG: watts, `null` to leave it. The ERG driver publishes it as an input
+ * (the rider's own target); the workout player derives it from the ride's workout and its clock,
+ * so a replay or a continued ride computes it again (ADR 0088).
+ */
 export const trainerTargetPowerEvent = defineEvent(
   'trainer.target-power',
   z.object({ watts: z.number().int().nonnegative().nullable() }),

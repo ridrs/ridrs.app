@@ -468,6 +468,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ridrs/workout':
+        specifier: workspace:*
+        version: link:../../packages/workout
 
   plugins/control-virtual-gears:
     dependencies:
@@ -1501,6 +1504,15 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+
+  plugins/workout-player:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/workout':
+        specifier: workspace:*
+        version: link:../../packages/workout
 
   plugins/world-driver-ui:
     dependencies:
