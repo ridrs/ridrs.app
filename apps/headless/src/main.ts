@@ -102,6 +102,9 @@ import {
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
   videoImporterCapability,
+  workoutFinishedEvent,
+  workoutNextStepRequestedEvent,
+  workoutStepChangedEvent,
   worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
@@ -243,6 +246,9 @@ const EVENTS: readonly EventDefinition[] = [
   uiTerrainObservedEvent,
   worldPositionEvent,
   worldTerrainPreviewEvent,
+  workoutFinishedEvent,
+  workoutNextStepRequestedEvent,
+  workoutStepChangedEvent,
 ];
 
 function versionOf(packageJson: URL): string {

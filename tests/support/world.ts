@@ -137,6 +137,9 @@ import {
   uiRegistryChangedEvent,
   uiTerrainObservedEvent,
   videoImporterCapability,
+  workoutFinishedEvent,
+  workoutNextStepRequestedEvent,
+  workoutStepChangedEvent,
   worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
@@ -239,6 +242,9 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  workoutFinishedEvent,
+  workoutNextStepRequestedEvent,
+  workoutStepChangedEvent,
 ];
 
 /** App state topics of ridrs and of the scenarios of ADR 0068; `test.nowhere` stays unregistered. */

@@ -116,6 +116,9 @@ import {
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
   videoImporterCapability,
+  workoutFinishedEvent,
+  workoutNextStepRequestedEvent,
+  workoutStepChangedEvent,
   worldPositionEvent,
   worldTerrainPreviewEvent,
 } from '@ridrs/contracts';
@@ -163,6 +166,9 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   trainerControlChangedEvent,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  workoutFinishedEvent,
+  workoutNextStepRequestedEvent,
+  workoutStepChangedEvent,
 ];
 
 /** Every capability the host resolves. */

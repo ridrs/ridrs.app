@@ -114,8 +114,8 @@ describe('the full chart', () => {
     expect(markup).toContain('aria-label="Warm-up, 12 min, 50–75 % FTP · 125–188 W"');
   });
 
-  it('draws edit and hud as full until their phases', () => {
-    expect(html({ workout: sweetSpot, variant: 'hud' })).toContain('data-variant="full"');
+  it('draws the hud variant as its own, not as the full chart', () => {
+    expect(html({ workout: sweetSpot, variant: 'hud' })).toContain('data-variant="hud"');
   });
 });
 
@@ -157,6 +157,44 @@ describe('the edit chart', () => {
 
   it('shows none when nobody listens for changes', () => {
     expect(editable('warm', false)).not.toContain('workout-chart-handle');
+  });
+});
+
+describe('the hud variant', () => {
+  const hud = (progressSeconds?: number) =>
+    renderToStaticMarkup(
+      createElement(Chart, {
+        input: {
+          workout: sweetSpot,
+          athlete: { ftp: 250 },
+          variant: 'hud',
+          ...(progressSeconds === undefined ? {} : { progressSeconds }),
+        } as ChartInput,
+        text: messages.en,
+        onStepFocused: () => {},
+      }),
+    );
+
+  it('draws every step small, with a mark at the progress and nothing to focus', () => {
+    const markup = hud(1000);
+    expect(markup).toContain('data-variant="hud"');
+    expect(markup).toContain('data-seconds="1000"');
+    expect(markup).not.toContain('tabindex');
+    expect(markup).not.toContain('workout-chart-tooltip');
+    expect(markup).not.toContain('workout-chart-zone-bar');
+  });
+
+  it('highlights the step under the mark', () => {
+    // 720 s warm-up, then 720 s on: 800 s is the first "on".
+    const markup = hud(800);
+    expect(markup.match(/data-current/g)).toHaveLength(1);
+    expect(markup).toMatch(/data-step-id="on"[^>]*data-start-seconds="720"[^>]*data-current/);
+  });
+
+  it('keeps the mark on the chart: before the start and after the end', () => {
+    expect(hud(-5)).toContain('data-seconds="0"');
+    expect(hud(99999)).toContain(`data-seconds="${720 + 3 * (720 + 240) + 300}"`);
+    expect(hud()).toContain('data-seconds="0"');
   });
 });
 

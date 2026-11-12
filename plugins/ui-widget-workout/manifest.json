@@ -1,0 +1,37 @@
+{
+  "id": "ui-widget-workout",
+  "name": "Workout Widget",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "workout",
+        "extensionPoint": "hud/widget",
+        "export": "WorkoutWidget",
+        "order": 20
+      }
+    ],
+    "uses": [
+      "ui.workout-chart"
+    ],
+    "events": {
+      "subscribe": [
+        "activity.state-changed",
+        "activity.athlete",
+        "workout.step-changed",
+        "workout.finished"
+      ],
+      "publish": []
+    },
+    "state": [
+      "app.language"
+    ]
+  }
+}

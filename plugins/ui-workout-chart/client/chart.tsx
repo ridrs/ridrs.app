@@ -32,6 +32,7 @@ const SIZES = {
   mini: { width: 240, height: 56 },
   full: { width: 720, height: 180 },
   edit: { width: 720, height: 220 },
+  hud: { width: 360, height: 56 },
 } as const;
 const DEFAULT_ZONE_COUNT = 7;
 /** Room around the full chart: left for the axis, right edge, a row per bracket depth, the time axis and the zone bar. */
@@ -54,7 +55,7 @@ const layouts = new Map<string, WorkoutLayout>();
  */
 export function cachedLayout(
   input: Pick<ChartInput, 'workout' | 'athlete'>,
-  variant: 'micro' | 'mini' | 'full' | 'edit',
+  variant: 'micro' | 'mini' | 'full' | 'edit' | 'hud',
 ): WorkoutLayout {
   const { width, height } = SIZES[variant];
   const key = JSON.stringify([input.workout, input.athlete, variant]);
@@ -74,16 +75,15 @@ export function cachedLayout(
 const path = (points: readonly ChartPoint[]) =>
   `${points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ')} Z`;
 
-/** The variant drawn: `hud` comes with its phase and draws as `full` until then. */
-export const variantOf = (variant: ChartInput['variant']): 'micro' | 'mini' | 'full' | 'edit' =>
-  variant === 'micro' || variant === 'mini' || variant === 'edit' ? variant : 'full';
+/** The variant drawn. */
+export const variantOf = (variant: ChartInput['variant']): 'micro' | 'mini' | 'full' | 'edit' | 'hud' => variant;
 
 export const CHART_CSS = `${PALETTE_CSS}
 .wc { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--wc-text);
   font: 500 12px system-ui, sans-serif; }
 .wc svg { display: block; width: 100%; overflow: visible; }
 .wc[data-variant="micro"] svg { height: 18px; }
-.wc[data-variant="mini"] svg { height: 56px; }
+.wc[data-variant="mini"] svg, .wc[data-variant="hud"] svg { height: 56px; }
 .wc [data-shape] { stroke: none; }
 .wc [data-selected] path[data-fill] { stroke: var(--wc-text); stroke-width: 2; }
 .wc [data-focused] path[data-fill] { stroke: var(--wc-focus); stroke-width: 3; }
@@ -93,6 +93,9 @@ export const CHART_CSS = `${PALETTE_CSS}
 .wc-axis, .wc-bracket { fill: var(--wc-muted); font-size: 11px; }
 .wc-bracket-line { stroke: var(--wc-muted); stroke-width: 1.25; fill: none; }
 .wc-facts { color: var(--wc-muted); font-size: 12px; }
+.wc-hud-current path[data-fill] { stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.wc-progress { stroke: #ccff00; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.wc-progress-head { fill: #ccff00; }
 .wc-hint { color: var(--wc-muted); font-size: 11px; font-style: italic; }
 .wc-handle { fill: var(--wc-text); stroke: var(--wc-surface); stroke-width: 1.5; touch-action: none; }
 .wc-handle[data-handle="duration"] { cursor: ew-resize; }
@@ -149,6 +152,18 @@ export function Chart({ input, text, onStepFocused, onStepChanged }: Props): Rea
     );
   }
 
+  if (variant === 'hud') {
+    return (
+      <HudChart
+        layout={layout}
+        description={description}
+        patternId={patternId}
+        zoneCount={zoneCount}
+        progressSeconds={input.progressSeconds ?? 0}
+      />
+    );
+  }
+
   const { width, height } = SIZES[variant];
   const load = layout.summary.trainingLoad;
   return (
@@ -182,6 +197,58 @@ export function Chart({ input, text, onStepFocused, onStepChanged }: Props): Rea
           ) : null}
         </>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The player's chart: small, not focusable, a mark at the ride's progress and the step under it
+ * in full colour. The progress is the consumer's, read from the bus and only drawn here.
+ */
+function HudChart({
+  layout,
+  description,
+  patternId,
+  zoneCount,
+  progressSeconds,
+}: {
+  readonly layout: WorkoutLayout;
+  readonly description: string;
+  readonly patternId: string;
+  readonly zoneCount: number;
+  readonly progressSeconds: number;
+}) {
+  const { width, height } = SIZES.hud;
+  const total = layout.durationSeconds;
+  const seconds = Math.min(Math.max(progressSeconds, 0), total);
+  const x = total > 0 ? (seconds / total) * width : 0;
+  const last = layout.shapes.length - 1;
+  const at = layout.shapes.findIndex((shape, index) => x >= shape.x0 && (x < shape.x1 || index === last));
+  return (
+    <div className="wc" data-testid="workout-chart" data-variant="hud" data-zoned={layout.zoned}>
+      <svg role="img" aria-label={description} viewBox={`0 0 ${width} ${height + 6}`} preserveAspectRatio="none" focusable="false">
+        <Hatch id={patternId} />
+        {layout.shapes.map((shape, index) => (
+          <g
+            key={shape.segmentIndex}
+            data-shape
+            data-step-id={shape.stepId}
+            data-start-seconds={total > 0 ? Math.round((shape.x0 / width) * total) : 0}
+            data-current={index === at || undefined}
+            className={index === at ? 'wc-hud-current' : undefined}
+            opacity={index === at ? 1 : 0.55}
+          >
+            <ShapeFill shape={shape} patternId={patternId} zoneCount={zoneCount} />
+          </g>
+        ))}
+        {layout.ftpLine ? (
+          <line className="wc-ftp" data-testid="workout-chart-ftp-line" x1={0} x2={width} y1={layout.ftpLine.y} y2={layout.ftpLine.y} />
+        ) : null}
+        <g data-testid="workout-chart-progress" data-seconds={Math.round(seconds)}>
+          <line className="wc-progress" x1={x} x2={x} y1={0} y2={height} />
+          <path className="wc-progress-head" d={`M${x - 5},${height + 6} L${x + 5},${height + 6} L${x},${height} Z`} />
+        </g>
+      </svg>
     </div>
   );
 }
