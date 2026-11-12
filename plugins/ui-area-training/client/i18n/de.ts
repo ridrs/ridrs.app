@@ -49,6 +49,17 @@ export const de: Messages = {
       ? `${source} kann hier nicht geändert werden: Es wurde nichts entfernt.`
       : `${source} war nicht erreichbar: Es wurde nichts entfernt.`,
   dropToRemove: 'Zum Entfernen hier ablegen',
+  dropToKeep: (name: string) => `Hier ablegen, um „${name}“ zu deinen Workouts hinzuzufügen`,
+  noSteps: (name: string) => `„${name}“ hat keine Schritte: Nur ein strukturiertes Workout kann eines deiner Workouts werden.`,
+  kindNoSteps: {
+    rest: 'Ein Ruhetag hat keine Schritte: Nur ein strukturiertes Workout kann eines deiner Workouts werden.',
+    note: 'Eine Notiz hat keine Schritte: Nur ein strukturiertes Workout kann eines deiner Workouts werden.',
+    outdoor: 'Eine Ausfahrt draußen hat keine Schritte: Nur ein strukturiertes Workout kann eines deiner Workouts werden.',
+  },
+  alreadyKept: (name: string) => `„${name}“ ist schon eines deiner Workouts.`,
+  kept: (name: string) => `„${name}“ ist jetzt eines deiner Workouts.`,
+  keepRefused: (name: string) => `„${name}“ wurde nicht hinzugefügt: Deine Workouts können auf diesem Gerät nicht geändert werden.`,
+  keepFailed: (name: string) => `„${name}“ konnte nicht zu deinen Workouts hinzugefügt werden.`,
   libraryEmpty: 'Deine Quellen haben noch keine Workouts.',
   thisDevice: 'ridrs (dieses Gerät)',
   plans: 'Trainingspläne',

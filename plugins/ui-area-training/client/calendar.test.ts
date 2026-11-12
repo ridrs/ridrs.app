@@ -12,6 +12,7 @@ import {
   monthDays,
   withPending,
   moveEntry,
+  newWorkoutId,
   plannedWorkouts,
   removeEntry,
   UNDO_DEPTH,
@@ -282,5 +283,13 @@ describe('a plan that was ridden', () => {
 
   it('never pairs a plan its provider has not kept yet', () => {
     expect(matchDone([{ ...plan('p1', 'Tempo'), pending: true as const }], [ride('r1', 'Tempo', 60, 50)]).open).toHaveLength(1);
+  });
+});
+
+describe('the id of a planned workout added to the library of ridrs', () => {
+  it('is its name as a slug, unique among the ids the library has', () => {
+    expect(newWorkoutId('Over-Unders 3×(4+2)', new Set())).toBe('over-unders-3-4-2');
+    expect(newWorkoutId('Süß Spot', new Set(['suss-spot', 'suss-spot-2']))).toBe('suss-spot-3');
+    expect(newWorkoutId('!!!', new Set())).toBe('workout');
   });
 });

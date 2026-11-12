@@ -2,8 +2,15 @@
 
 import assert from 'node:assert/strict';
 import { Then, When } from '@cucumber/cucumber';
-import { type Bicycle, equipmentBicycleChangedEvent } from '@ridrs/contracts';
-import { fireEvent, waitFor, within } from '@testing-library/dom';
+import {
+  type Bicycle,
+  equipmentBicycleChangedEvent,
+  type LibraryWorkout,
+  type PlannedWorkout,
+  trainingCalendarState,
+  trainingLibraryState,
+} from '@ridrs/contracts';
+import { createEvent, fireEvent, waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
 
@@ -440,6 +447,137 @@ Then(
       assert.ok(bicycle, 'Expected an "equipment.bicycle-changed" event');
       assert.equal(bicycle.mass, mass);
       assert.equal(bicycle.drivetrain.shifting.mode, mode);
+    });
+  },
+);
+
+/** The rider's workouts below the calendar: where a planned workout is dropped to keep it as one. */
+const workoutsDrop = (world: RidrsWorld): Promise<HTMLElement> =>
+  waitFor(() => {
+    const element = shownScreen(world).querySelector<HTMLElement>('[data-workouts-drop]');
+    assert.ok(element, 'The page shows no workouts to drop onto');
+    return element;
+  });
+
+/** What the pointer showed over the workouts at the last drag: `none` when the drop was not taken. */
+const dropEffects = new WeakMap<RidrsWorld, string>();
+
+/** The handlers set the effect on the very object they are handed (the DOM here has no `DataTransfer`). */
+const dataTransfers = new WeakMap<RidrsWorld, { dropEffect: string }>();
+
+function withData(world: RidrsWorld, event: Event): Event {
+  let dataTransfer = dataTransfers.get(world);
+  if (!dataTransfer) {
+    dataTransfer = { dropEffect: 'none' };
+    dataTransfers.set(world, dataTransfer);
+  }
+  Object.defineProperty(event, 'dataTransfer', {
+    value: Object.assign(dataTransfer, { effectAllowed: 'all', setData: () => undefined }),
+  });
+  return event;
+}
+
+/** Drags `source` over the workouts and keeps it there: what the pointer shows is kept for the checks. */
+async function dragOverWorkouts(world: RidrsWorld, source: HTMLElement): Promise<boolean> {
+  const target = await workoutsDrop(world);
+  dataTransfers.delete(world);
+  await startDragging(world, source);
+  // A drag over that nothing takes leaves the default unprevented: the web view refuses the drop.
+  const taken = !fireEvent(target, withData(world, createEvent.dragOver(target)));
+  const effect = taken ? (dataTransfers.get(world)?.dropEffect ?? 'none') : 'none';
+  dropEffects.set(world, effect);
+  await world.settle();
+  return effect !== 'none';
+}
+
+When(
+  'I drag the planned workout {string} over the workouts',
+  async function (this: RidrsWorld, name: string) {
+    await dragOverWorkouts(this, await draggable(this, 'li[draggable="true"]', name));
+  },
+);
+
+When(
+  'I drag the workout {string} over the workouts',
+  async function (this: RidrsWorld, name: string) {
+    await dragOverWorkouts(this, await draggable(this, 'article[draggable="true"]', name));
+  },
+);
+
+When(
+  'I drag the planned workout {string} onto the workouts',
+  async function (this: RidrsWorld, name: string) {
+    const source = await draggable(this, 'li[draggable="true"]', name);
+    const taken = await dragOverWorkouts(this, source);
+    const target = await workoutsDrop(this);
+    // The web view drops only where the drag over was taken.
+    if (taken) fireEvent(target, withData(this, createEvent.drop(target)));
+    fireEvent.dragEnd(source);
+    await this.settle();
+  },
+);
+
+Then('the workouts took the drop as a copy', function (this: RidrsWorld) {
+  assert.equal(dropEffects.get(this), 'copy');
+});
+
+Then('the workouts refused the drop', function (this: RidrsWorld) {
+  assert.equal(dropEffects.get(this), 'none');
+});
+
+Then('the workouts say {string}', async function (this: RidrsWorld, text: string) {
+  const zone = await workoutsDrop(this);
+  await waitFor(() =>
+    assert.equal(zone.querySelector('[data-workouts-drop-hint]')?.textContent?.trim(), text),
+  );
+});
+
+Then('the workouts say nothing about a drop', async function (this: RidrsWorld) {
+  const zone = await workoutsDrop(this);
+  await waitFor(() => assert.equal(zone.querySelector('[data-workouts-drop-hint]'), null));
+});
+
+/** The names on the tiles of the section "Workouts", the library of ridrs on this device. */
+const ownWorkouts = (world: RidrsWorld): string[] =>
+  [...shownScreen(world).querySelectorAll('[data-testid="own-workouts"] article h4')].map(
+    (title) => title.textContent ?? '',
+  );
+
+Then(
+  'the section "Workouts" shows the workout {string}',
+  async function (this: RidrsWorld, name: string) {
+    await waitFor(() =>
+      assert.ok(ownWorkouts(this).includes(name), `Workouts: ${ownWorkouts(this).join(', ')}`),
+    );
+  },
+);
+
+Then(
+  'the section "Workouts" shows no workout {string}',
+  async function (this: RidrsWorld, name: string) {
+    await this.settle();
+    assert.ok(!ownWorkouts(this).includes(name), `Workouts: ${ownWorkouts(this).join(', ')}`);
+  },
+);
+
+Then(
+  'the ridrs library holds {string} with the steps planned in intervals.icu',
+  async function (this: RidrsWorld, name: string) {
+    const host = this.ensureHost();
+    const planned = (
+      host.getState(trainingCalendarState.id).get('intervals.icu') as
+        | { data?: { workouts: PlannedWorkout[] } }
+        | undefined
+    )?.data?.workouts.find((workout) => workout.name === name);
+    assert.ok(planned && planned.steps.length > 0, `intervals.icu plans no "${name}" with steps`);
+    await waitFor(() => {
+      const source = host.getState(trainingLibraryState.id).get('ridrs') as
+        | { data?: { workouts: LibraryWorkout[] } }
+        | undefined;
+      const saved = source?.data?.workouts.find((workout) => workout.name === name);
+      assert.ok(saved, `The ridrs library has no workout "${name}"`);
+      assert.notEqual(saved.id, planned.id);
+      assert.deepEqual(saved.workout?.steps, planned.steps);
     });
   },
 );

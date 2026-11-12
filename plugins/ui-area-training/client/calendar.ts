@@ -150,6 +150,25 @@ export function plannedWorkouts(
     });
 }
 
+/**
+ * An id for a workout added to the library of ridrs: its name as a slug, made unique among the
+ * ids the library has (`taken`), so the copy never replaces a workout.
+ */
+export function newWorkoutId(name: string, taken: ReadonlySet<string>): string {
+  const slug =
+    name
+      .replace(/ß/g, 'ss')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'workout';
+  if (!taken.has(slug)) return slug;
+  let n = 2;
+  while (taken.has(`${slug}-${n}`)) n += 1;
+  return `${slug}-${n}`;
+}
+
 /** Rides this close in time, of the same sport, are one ride seen by two providers. */
 const SAME_RIDE_MS = 5 * 60_000;
 

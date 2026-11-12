@@ -9,7 +9,7 @@ import {
   WORKOUT_FOCUSES,
 } from '@ridrs/contracts';
 import type { UiContext } from '@ridrs/ui-sdk';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import {
   type CatalogueFilter,
@@ -207,6 +207,57 @@ function Library({
   );
 }
 
+/**
+ * The rider's workouts and the library below the calendar, as one place a planned workout is
+ * dropped onto to become one of the rider's workouts (a copy, with its steps). While an entry of
+ * the calendar is dragged, they say whether it can, and why not; a drop they do not take is
+ * refused outright, as is every workout of a library, which is in a library already.
+ */
+function WorkoutsDrop({ ctx, week, children }: { readonly ctx: UiContext; readonly week: Week; readonly children: ReactNode }) {
+  const text = useMessages(ctx, messages);
+  const [over, setOver] = useState(false);
+  const { drag, setDrag } = week;
+  useEffect(() => {
+    if (drag === undefined) setOver(false);
+  }, [drag]);
+  const keeping = drag?.kind === 'entry' ? week.keepable(drag.id) : undefined;
+  const takes = keeping !== undefined && 'workout' in keeping;
+  return (
+    <div
+      className="tr-workouts-drop"
+      data-workouts-drop
+      data-over={(over && takes) || undefined}
+      onDragOver={(event) => {
+        if (drag === undefined) return;
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = takes ? 'copy' : 'none';
+        setOver(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
+      }}
+      onDrop={(event) => {
+        if (drag === undefined) return;
+        event.preventDefault();
+        setOver(false);
+        if (takes) week.keep();
+        setDrag(undefined);
+      }}
+    >
+      {keeping ? (
+        <p className="tr-workouts-drop-hint" data-workouts-drop-hint data-refused={!takes || undefined} role="status">
+          {'workout' in keeping ? text.dropToKeep(keeping.name) : keeping.why}
+        </p>
+      ) : week.kept ? (
+        <p className="tw-note" role="status">
+          {week.kept}
+        </p>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
 /** The import of workout files (ui-workout-import), a dialog over the page when that plugin is there. */
 const WORKOUT_IMPORT = 'workout-import';
 
@@ -387,6 +438,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         </section>
       ) : null}
 
+      <WorkoutsDrop ctx={ctx} week={week}>
       {own ? (
         <section className="pv-section">
           <h2>{text.workouts}</h2>
@@ -401,6 +453,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
       ) : null}
 
       <Library ctx={ctx} week={week} providers={others} filter={filter} athlete={athlete} />
+      </WorkoutsDrop>
 
       <section className="pv-section">
         <h2>{text.plans}</h2>

@@ -50,6 +50,17 @@ export const en = {
       ? `${source} cannot be changed here: nothing was removed.`
       : `${source} could not be reached: nothing was removed.`,
   dropToRemove: 'Drop here to remove',
+  dropToKeep: (name: string) => `Drop here to add “${name}” to your workouts`,
+  noSteps: (name: string) => `“${name}” has no steps: only a structured workout can become one of your workouts.`,
+  kindNoSteps: {
+    rest: 'A rest day has no steps: only a structured workout can become one of your workouts.',
+    note: 'A note has no steps: only a structured workout can become one of your workouts.',
+    outdoor: 'An outdoor ride has no steps: only a structured workout can become one of your workouts.',
+  },
+  alreadyKept: (name: string) => `“${name}” is one of your workouts already.`,
+  kept: (name: string) => `“${name}” is now one of your workouts.`,
+  keepRefused: (name: string) => `“${name}” could not be added to your workouts: they cannot be changed on this device.`,
+  keepFailed: (name: string) => `“${name}” could not be added to your workouts.`,
   libraryEmpty: 'Your sources have no workouts yet.',
   thisDevice: 'ridrs (this device)',
   plans: 'Training plans',

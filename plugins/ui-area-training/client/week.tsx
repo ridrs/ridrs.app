@@ -12,6 +12,7 @@ import {
   trainingCalendarRemoveService,
   trainingCalendarState,
   trainingHistoryState,
+  trainingLibrarySaveService,
   trainingLibraryState,
   type Workout,
   type WorkoutDetailsSubject,
@@ -32,6 +33,7 @@ import {
   mergeCompleted,
   monthDays,
   moveEntry,
+  newWorkoutId,
   type Pending,
   type PlannedItem,
   plannedWorkouts,
@@ -71,6 +73,14 @@ export const startDrag = (drag: Drag, set: (drag: Drag | undefined) => void) => 
   set(drag);
 };
 
+/**
+ * What a planned entry becomes when it is dropped onto the rider's workouts: a copy of its
+ * workout, with its steps, or why it cannot be one.
+ */
+export type Keeping =
+  | { readonly name: string; readonly workout: Workout }
+  | { readonly name: string; readonly why: string };
+
 /** "45 min"; nothing for a ride of no length. */
 const minutes = (seconds: number | undefined) =>
   seconds !== undefined && Math.round(seconds / 60) > 0 ? `${Math.round(seconds / 60)} min` : undefined;
@@ -96,6 +106,8 @@ export function useWeek(ctx: UiContext) {
   // Plans and moves a provider has not answered: shown at once, with a sign that they are not kept yet.
   const [pending, setPending] = useState<readonly Pending[]>([]);
   const nextKey = useRef(1);
+  // What became of the last entry dropped onto the rider's workouts.
+  const [kept, setKept] = useState<string>();
   // Entries dropped into the bin that the provider has not answered for: hidden at once, shown again on a refusal.
   const [removing, setRemoving] = useState<readonly string[]>([]);
   const monday = addDays(weekDate('Monday', today), offset * 7);
@@ -263,6 +275,50 @@ export function useWeek(ctx: UiContext) {
     );
   };
 
+  /**
+   * What the entry `id` becomes as one of the rider's workouts (the library of ridrs): a copy of
+   * the workout with its steps, under an id of its own. Rest days, notes and outdoor rides have no
+   * steps, nor has a planned workout its calendar keeps without them; a workout planned from the
+   * library of ridrs is there already.
+   */
+  const keepable = (id: string): Keeping => {
+    const own = ownEntriesOnly ? state.calendar.entries.find((entry) => entry.id === id) : undefined;
+    const planned = ownEntriesOnly ? undefined : providerWorkouts.find((workout) => workout.id === id);
+    if (own && own.kind !== 'workout') return { name: own.title, why: text.kindNoSteps[own.kind] };
+    const link = own?.library ?? planned?.library;
+    const linked = link ? libraries.get(link.from)?.data?.workouts.find((workout) => workout.id === link.workoutId) : undefined;
+    const name = linked?.name ?? planned?.name ?? own?.title ?? '';
+    if (link?.from === DEFAULT_PROVIDER && linked) return { name, why: text.alreadyKept(name) };
+    // The workout the library has where the entry links one, else the entry's own steps.
+    const source = linked ?? planned;
+    const workout = source ? chartWorkout(source) : undefined;
+    if (!source || !workout) return { name, why: text.noSteps(name) };
+    const taken = new Set((libraries.get(DEFAULT_PROVIDER)?.data?.workouts ?? []).map((each) => each.id));
+    return {
+      name,
+      workout: {
+        ...workout,
+        id: newWorkoutId(workout.name, taken),
+        ...(workout.description === undefined && source.description ? { description: source.description } : {}),
+      },
+    };
+  };
+
+  /** Adds the dragged entry's workout to the library of ridrs, and says how that went. */
+  const keep = () => {
+    if (drag?.kind !== 'entry') return;
+    const keeping = keepable(drag.id);
+    if (!('workout' in keeping)) return;
+    setKept(undefined);
+    ctx.call(trainingLibrarySaveService, { key: DEFAULT_PROVIDER, workout: keeping.workout }).then(
+      (result) => setKept(result.ok ? text.kept(keeping.name) : text.keepRefused(keeping.name)),
+      (error: unknown) => {
+        ctx.logger.warn(`Could not add to the workouts: ${String(error)}`);
+        setKept(text.keepFailed(keeping.name));
+      },
+    );
+  };
+
   /** The details an entry of the calendar opens: a workout the provider has, not one still being saved or the area's samples. */
   const detailsOf = (entry: PlannedItem): WorkoutDetailsSubject | undefined =>
     entry.kind !== 'workout' || entry.pending || (ownEntriesOnly && FIRST_WEEK.entries.some((sample) => sample.id === entry.id))
@@ -280,6 +336,9 @@ export function useWeek(ctx: UiContext) {
     droppable,
     drop,
     remove,
+    keepable,
+    keep,
+    kept,
     drag,
     setDrag,
     refusal,
@@ -367,6 +426,17 @@ export const WEEK_CSS = `
   transform: translateX(-50%) scale(1.06); }
 @keyframes tw-bin-in { from { opacity: 0; transform: translate(-50%, 16px); } }
 @media (prefers-reduced-motion: reduce) { .tw-bin { animation: none; transition: none; } }
+/* The rider's workouts and the library: where a planned workout is dropped to become one of the workouts. */
+.tr-workouts-drop { display: flex; flex-direction: column; gap: inherit; border-radius: 16px;
+  transition: background .15s, box-shadow .15s; }
+.tr-workouts-drop[data-over] { background: rgb(0 240 255 / .06); box-shadow: 0 0 0 2px var(--ridrs-info, #00f0ff); }
+.tr-workouts-drop-hint { position: sticky; top: 12px; z-index: 40; display: flex; align-items: center;
+  justify-content: center; min-height: 56px; margin: 0; padding: 12px 20px;
+  border: 2px dashed rgb(0 240 255 / .7); border-radius: 14px;
+  background: rgb(13 18 28 / .94); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
+  text-align: center; box-shadow: 0 12px 40px rgb(0 0 0 / .5); backdrop-filter: blur(8px); }
+.tr-workouts-drop[data-over] .tr-workouts-drop-hint { border-style: solid; border-color: var(--ridrs-info, #00f0ff); }
+.tr-workouts-drop-hint[data-refused] { border-color: rgb(139 155 180 / .6); color: var(--ridrs-text-muted, #8b9bb4); }
 /* The month: whole weeks, each day a cell with its number and what it lists. */
 .tm .tw-bar-range { font-size: 30px; }
 .tm-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden;
