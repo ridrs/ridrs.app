@@ -2,8 +2,8 @@
 
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { type DataTable, Given, Then } from '@cucumber/cucumber';
-import { waitFor, within } from '@testing-library/dom';
+import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
+import { fireEvent, waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 
 const FIXTURES = resolve(import.meta.dirname, '../fixtures/plugins/briefing');
@@ -223,4 +223,22 @@ Then(
 
 Then('the route card {string} has no profile', async function (this: RidrsWorld, title: string) {
   await waitFor(() => assert.equal(routeCard(this, title).querySelector('svg[role="img"]'), null));
+});
+
+/**
+ * Every ride starts through the briefing (structured-workouts.md, section 11): from Today's "Start
+ * ride" it asks for the route and the workout. A free ride without a workout is what "Start ride"
+ * started at once before the briefing.
+ */
+When('I start a free ride in the briefing', async function (this: RidrsWorld) {
+  const shown = await within(ui(this)).findByTestId('briefing');
+  for (const choice of ['Free ride', 'No workout']) {
+    const option = within(shown).queryByRole('button', { name: choice });
+    if (option) {
+      fireEvent.click(option);
+      await this.settle();
+    }
+  }
+  fireEvent.click(await within(shown).findByRole('button', { name: 'Start' }));
+  await this.settle();
 });

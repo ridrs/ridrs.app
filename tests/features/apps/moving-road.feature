@@ -10,6 +10,7 @@ Feature: The road moves with the virtual speed
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then eventually the virtual-speed widget shows more than "10.0" "km/h"
     And the lane markings move
     When I close the ridrs app
@@ -21,6 +22,7 @@ Feature: The road moves with the virtual speed
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the virtual-speed widget shows "0.0" "km/h"
     And the lane markings stand still
     When I close the ridrs app

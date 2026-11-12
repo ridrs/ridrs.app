@@ -10,6 +10,7 @@ Feature: Ride with a trainer and a heart-rate sensor
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the power widget shows "220" "W"
     And the cadence widget shows "92" "rpm"
     And the heart-rate widget shows "145" "bpm"
@@ -29,6 +30,7 @@ Feature: Ride with a trainer and a heart-rate sensor
     And the simulated trainer is switched off
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the heart-rate widget shows "145" "bpm"
     And the power widget is unavailable without a reason
     And the power-heart-rate-ratio widget is unavailable with the reason "no source"
@@ -42,6 +44,7 @@ Feature: Ride with a trainer and a heart-rate sensor
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the slot "hud/widget" contains the contributions "ui-widget-power/power, ui-widget-cadence/cadence, ui-widget-heart-rate/heart-rate, ui-widget-power-heart-rate-ratio/power-heart-rate-ratio, ui-widget-virtual-speed/virtual-speed, ui-widget-virtual-distance/virtual-distance, ui-widget-gradient/gradient, ui-widget-erg-dispatch/erg-dispatch, ui-widget-target-power/erg, ui-widget-workout/workout" in this order
     When I close the ridrs app
     Then the app reported no lifecycle problems

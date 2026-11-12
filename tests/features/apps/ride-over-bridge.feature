@@ -26,6 +26,7 @@ Feature: Ride with the trainer connected to a companion
     When I press "Back"
     And I press "Continue"
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the power widget shows "220" "W"
     And the cadence widget shows "92" "rpm"
     When I close the ridrs app

@@ -11,6 +11,7 @@ Feature: Ride, save, export and replay
     And the app stores its files in a fresh temporary data directory
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the power widget shows "220" "W"
     When 5 seconds pass in real time
     And I press "Finish ride"

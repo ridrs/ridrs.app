@@ -12,6 +12,7 @@ Feature: Continue an interrupted ride in the app
     And the app stores its files in a fresh temporary data directory
     And I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     And the power widget shows "220" "W"
     And 3 seconds pass in real time
     And I close the ridrs app

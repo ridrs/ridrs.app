@@ -11,6 +11,7 @@ Feature: Start a ride and see power and cadence
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the power widget shows "220" "W"
     And the cadence widget shows "92" "rpm"
     When I press "Finish ride"
@@ -27,6 +28,7 @@ Feature: Start a ride and see power and cadence
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the power widget is unavailable without a reason
     And the cadence widget is unavailable without a reason
     When I close the ridrs app
@@ -39,6 +41,7 @@ Feature: Start a ride and see power and cadence
     When I start the ridrs app with these options
     Then the app lets the screen sleep
     When I press "Start ride"
+    And I start a free ride in the briefing
     Then the app keeps the screen awake
     When I press "Finish ride"
     Then the app lets the screen sleep

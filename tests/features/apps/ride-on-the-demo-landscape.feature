@@ -11,6 +11,7 @@ Feature: The landscape shows the road the physics rides
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then eventually the landscape observed 1 window, from 0 m with 21 samples 1 m apart
     And the landscape shows "asphalt" under the rider
     When 1 second passes in the app
@@ -26,6 +27,7 @@ Feature: The landscape shows the road the physics rides
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then eventually the landscape presents a distance of more than 25.00 m
     And every window of the ride went out with less than 10 m left of the one before, from the whole metre at or behind the odometer
     And "world-driver-ui" accepted every window the landscape observed

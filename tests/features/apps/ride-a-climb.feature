@@ -10,6 +10,7 @@ Feature: Ride onto a climb
     And the plugin "ui-landscape-demo" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then the gradient widget shows "0.0" "%"
     And eventually the gradient widget shows "5.0" "%"
     And the virtual-speed widget keeps falling

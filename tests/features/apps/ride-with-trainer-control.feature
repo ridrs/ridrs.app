@@ -13,6 +13,7 @@ Feature: Ride with trainer control in the app
     And the plugin "transport-ble-noble" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then eventually the simulated trainer received a simulation command
     And eventually the virtual gear widget shows gear "1×7" in "34 × 17"
     When the simulated controller presses "shift-up-right"

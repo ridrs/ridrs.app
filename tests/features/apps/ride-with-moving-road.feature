@@ -11,6 +11,7 @@ Feature: The road moves smoothly while I ride
     And the app renders with a 60 FPS frame source
     When I start the ridrs app with these options
     And I press "Start ride"
+    And I start a free ride in the briefing
     Then eventually the landscape presents a distance of more than 1.00 m
     And the landscape's distance never decreases over 30 frames
     And between 50 and 62 frames are rendered per second
