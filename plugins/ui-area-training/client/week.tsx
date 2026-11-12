@@ -9,6 +9,7 @@ import {
   trainingCalendarHandOverService,
   trainingCalendarMoveService,
   trainingCalendarPlanService,
+  trainingCalendarRemoveService,
   trainingCalendarState,
   trainingHistoryState,
   trainingLibraryState,
@@ -34,6 +35,7 @@ import {
   type Pending,
   type PlannedItem,
   plannedWorkouts,
+  removeEntry,
   WEEKDAYS,
   type Weekday,
   weekDate,
@@ -49,6 +51,7 @@ const CHEVRON_LEFT = new URL('./assets/icons/chevron-left.svg', import.meta.url)
 const CHEVRON_RIGHT = new URL('./assets/icons/chevron-right.svg', import.meta.url).href;
 export const MAXIMIZE = new URL('./assets/icons/maximize-2.svg', import.meta.url).href;
 const CHECK = new URL('./assets/icons/check.svg', import.meta.url).href;
+const TRASH = new URL('./assets/icons/trash-2.svg', import.meta.url).href;
 
 /** What the rider changed in this area, kept at once (ADR 0059). */
 export const useTraining = userDocument(TRAINING_DOCUMENT, INITIAL_TRAINING);
@@ -93,6 +96,8 @@ export function useWeek(ctx: UiContext) {
   // Plans and moves a provider has not answered: shown at once, with a sign that they are not kept yet.
   const [pending, setPending] = useState<readonly Pending[]>([]);
   const nextKey = useRef(1);
+  // Entries dropped into the bin that the provider has not answered for: hidden at once, shown again on a refusal.
+  const [removing, setRemoving] = useState<readonly string[]>([]);
   const monday = addDays(weekDate('Monday', today), offset * 7);
   const dateOf = (day: Weekday) => addDays(monday, WEEKDAYS.indexOf(day));
 
@@ -131,6 +136,11 @@ export function useWeek(ctx: UiContext) {
   useEffect(() => {
     if (shownPending.length !== pending.length) setPending(shownPending);
   }, [pending, shownPending]);
+  // A removal is done once the provider's calendar no longer lists its entry.
+  const stillListed = removing.filter((id) => providerWorkouts.some((workout) => workout.id === id));
+  useEffect(() => {
+    if (stillListed.length !== removing.length) setRemoving(stillListed);
+  }, [removing, stillListed]);
   /** The weekday a date has in this week; none for a date of another week. */
   const thisWeeksDay = (date: string): Weekday | undefined => WEEKDAYS.find((day) => weekDate(day, today) === date);
   const planned = (date: string): readonly PlannedItem[] => {
@@ -141,7 +151,7 @@ export function useWeek(ctx: UiContext) {
         : state.calendar.entries.filter((entry) => entry.day === day).map((entry) => ({ ...entry, key: entry.id, provider: chosen }));
     }
     const entries = providerWorkouts
-      .filter((workout) => workout.date === date)
+      .filter((workout) => workout.date === date && !removing.includes(workout.id))
       .map((workout) => ({
         id: workout.id,
         provider: chosen,
@@ -223,6 +233,36 @@ export function useWeek(ctx: UiContext) {
     }
   };
 
+  /** Removes the dragged entry from the calendar: at once in the calendar of ridrs, else by its provider. */
+  const remove = () => {
+    if (drag?.kind !== 'entry') return;
+    const { id } = drag;
+    setRefusal(undefined);
+    if (ownEntriesOnly) {
+      calendar((c) => removeEntry(c, id));
+      return;
+    }
+    const label = calendars.get(chosen)?.label ?? chosen;
+    setRemoving((all) => [...all, id]);
+    const shownAgain = () => setRemoving((all) => all.filter((other) => other !== id));
+    ctx.call(trainingCalendarRemoveService, { key: chosen, id }).then(
+      (result) => {
+        if (result.ok) {
+          // Should the provider's calendar not follow (a refresh that failed), the entry does not stay hidden for good.
+          setTimeout(shownAgain, 4000);
+        } else {
+          shownAgain();
+          setRefusal(text.removeRefused(label, result.reason));
+        }
+      },
+      (error: unknown) => {
+        shownAgain();
+        ctx.logger.warn(`Could not remove from the calendar: ${String(error)}`);
+        setRefusal(text.writeFailed(label));
+      },
+    );
+  };
+
   /** The details an entry of the calendar opens: a workout the provider has, not one still being saved or the area's samples. */
   const detailsOf = (entry: PlannedItem): WorkoutDetailsSubject | undefined =>
     entry.kind !== 'workout' || entry.pending || (ownEntriesOnly && FIRST_WEEK.entries.some((sample) => sample.id === entry.id))
@@ -239,6 +279,7 @@ export function useWeek(ctx: UiContext) {
     day,
     droppable,
     drop,
+    remove,
     drag,
     setDrag,
     refusal,
@@ -315,6 +356,17 @@ export const WEEK_CSS = `
   text-decoration: underline; text-underline-offset: 3px; cursor: pointer; vertical-align: middle; }
 .tw-current:hover { color: var(--ridrs-text, #f1f5f9); }
 .tw-current:focus-visible { outline: 3px solid var(--ridrs-focus, #00f0ff); outline-offset: 2px; }
+/* The bin: shown at the bottom while an entry of the calendar is dragged; an entry dropped there is removed. */
+.tw-bin { position: fixed; left: 50%; bottom: 28px; z-index: 50; display: flex; align-items: center; gap: 12px;
+  padding: 16px 28px; transform: translateX(-50%); border: 2px dashed rgb(255 77 109 / .6); border-radius: 16px;
+  background: rgb(13 18 28 / .92); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
+  box-shadow: 0 12px 40px rgb(0 0 0 / .5); backdrop-filter: blur(8px);
+  transition: background .15s, border-color .15s, transform .15s; animation: tw-bin-in .18s ease-out; }
+.tw-bin .pv-glyph { width: 22px; height: 22px; color: var(--ridrs-danger, #ff4d6d); }
+.tw-bin[data-over] { border-style: solid; border-color: var(--ridrs-danger, #ff4d6d); background: rgb(255 77 109 / .22);
+  transform: translateX(-50%) scale(1.06); }
+@keyframes tw-bin-in { from { opacity: 0; transform: translate(-50%, 16px); } }
+@media (prefers-reduced-motion: reduce) { .tw-bin { animation: none; transition: none; } }
 /* The month: whole weeks, each day a cell with its number and what it lists. */
 .tm .tw-bar-range { font-size: 30px; }
 .tm-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden;
@@ -466,6 +518,39 @@ function Day({
   );
 }
 
+/** The bin an entry of the calendar is dragged into to remove it: there only while one is dragged. */
+function Bin({ ctx, week }: { readonly ctx: UiContext; readonly week: Week }) {
+  const text = useMessages(ctx, messages);
+  const [over, setOver] = useState(false);
+  const { drag, setDrag } = week;
+  useEffect(() => {
+    if (drag === undefined) setOver(false);
+  }, [drag]);
+  if (drag?.kind !== 'entry') return null;
+  return (
+    <div
+      className="tw-bin"
+      data-calendar-bin
+      data-over={over || undefined}
+      onDragOver={(event) => {
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setOver(false);
+        week.remove();
+        setDrag(undefined);
+      }}
+    >
+      <span className="pv-glyph" aria-hidden="true" style={iconStyle(TRASH)} />
+      {text.dropToRemove}
+    </div>
+  );
+}
+
 /**
  * The bar above a calendar: back and forth, what is shown, and the way back to today's week or
  * month. "This week" names the week that is today's; on another one it is the link back to it.
@@ -578,6 +663,7 @@ export function WeekCalendar({
           );
         })}
       </div>
+      <Bin ctx={ctx} week={week} />
     </div>
   );
 }
@@ -628,6 +714,7 @@ export function MonthCalendar({ ctx, week }: { readonly ctx: UiContext; readonly
           />
         ))}
       </div>
+      <Bin ctx={ctx} week={week} />
     </div>
   );
 }

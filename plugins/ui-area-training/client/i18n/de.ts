@@ -6,7 +6,7 @@ import type { Messages } from './en.ts';
 export const de: Messages = {
   title: 'Training',
   intro:
-    'Der Kalender ist die Zentrale: Ein Workout von unten auf einen Tag ziehen plant es, ein geplantes Workout auf einen anderen Tag ziehen verschiebt es.',
+    'Der Kalender ist die Zentrale: Ein Workout von unten auf einen Tag ziehen plant es, ein geplantes Workout auf einen anderen Tag ziehen verschiebt es, in den Papierkorb ziehen entfernt es.',
   pictureCredits: 'Foto: Munbaik Cycling Clothing, Unsplash',
   weekdays: {
     Monday: 'Montag',
@@ -44,6 +44,11 @@ export const de: Messages = {
       : `${source} war nicht erreichbar: Es wurde nichts eingeplant.`,
   saving: 'Wird gespeichert…',
   writeFailed: (source: string) => `${source} hat die Änderung nicht angenommen.`,
+  removeRefused: (source: string, reason: 'read-only' | 'unreachable') =>
+    reason === 'read-only'
+      ? `${source} kann hier nicht geändert werden: Es wurde nichts entfernt.`
+      : `${source} war nicht erreichbar: Es wurde nichts entfernt.`,
+  dropToRemove: 'Zum Entfernen hier ablegen',
   libraryEmpty: 'Deine Quellen haben noch keine Workouts.',
   thisDevice: 'ridrs (dieses Gerät)',
   plans: 'Trainingspläne',

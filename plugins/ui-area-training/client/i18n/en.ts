@@ -4,7 +4,7 @@
 export const en = {
   title: 'Training',
   intro:
-    'The calendar is the hub: drag a workout from below onto a day to plan it, and a planned workout onto another day to move it.',
+    'The calendar is the hub: drag a workout from below onto a day to plan it, a planned workout onto another day to move it, and into the bin to remove it.',
   pictureCredits: 'Photo: Munbaik Cycling Clothing, Unsplash',
   weekdays: {
     Monday: 'Monday',
@@ -45,6 +45,11 @@ export const en = {
       : `${source} could not be reached: nothing was planned.`,
   saving: 'Saving…',
   writeFailed: (source: string) => `${source} did not take the change.`,
+  removeRefused: (source: string, reason: 'read-only' | 'unreachable') =>
+    reason === 'read-only'
+      ? `${source} cannot be changed here: nothing was removed.`
+      : `${source} could not be reached: nothing was removed.`,
+  dropToRemove: 'Drop here to remove',
   libraryEmpty: 'Your sources have no workouts yet.',
   thisDevice: 'ridrs (this device)',
   plans: 'Training plans',

@@ -281,6 +281,63 @@ When(
   },
 );
 
+/** The bin a dragged entry of the calendar is dropped into, while the screen shows it. */
+const bin = (world: RidrsWorld): HTMLElement | null =>
+  shownScreen(world).querySelector<HTMLElement>('[data-calendar-bin]');
+
+/** The element a drag was started on, ended by `I end the drag`. */
+const dragged = new WeakMap<RidrsWorld, HTMLElement>();
+
+async function startDragging(world: RidrsWorld, source: HTMLElement): Promise<void> {
+  dragged.set(world, source);
+  fireEvent.dragStart(source);
+  await world.settle();
+}
+
+When(
+  'I start dragging the planned workout {string}',
+  async function (this: RidrsWorld, name: string) {
+    await startDragging(this, await draggable(this, 'li[draggable="true"]', name));
+  },
+);
+
+When('I start dragging the workout {string}', async function (this: RidrsWorld, name: string) {
+  await startDragging(this, await draggable(this, 'article[draggable="true"]', name));
+});
+
+When('I end the drag', async function (this: RidrsWorld) {
+  const source = dragged.get(this);
+  assert.ok(source, 'Nothing is being dragged');
+  fireEvent.dragEnd(source);
+  await this.settle();
+});
+
+When(
+  'I drag the planned workout {string} into the bin',
+  async function (this: RidrsWorld, name: string) {
+    const source = await draggable(this, 'li[draggable="true"]', name);
+    await startDragging(this, source);
+    const target = await waitFor(() => {
+      const element = bin(this);
+      assert.ok(element, 'No bin is shown');
+      return element;
+    });
+    fireEvent.dragOver(target);
+    await this.settle();
+    fireEvent.drop(target);
+    fireEvent.dragEnd(source);
+    await this.settle();
+  },
+);
+
+Then('the page shows the bin {string}', async function (this: RidrsWorld, label: string) {
+  await waitFor(() => assert.equal(bin(this)?.textContent?.trim(), label));
+});
+
+Then('the page shows no bin', async function (this: RidrsWorld) {
+  await waitFor(() => assert.equal(bin(this), null));
+});
+
 Then('the planned workout {string} cannot be dragged', function (this: RidrsWorld, name: string) {
   const entry = [...shownScreen(this).querySelectorAll<HTMLElement>('li.tr-entry')].find((e) =>
     e.textContent?.includes(name),

@@ -60,6 +60,7 @@
       "training.calendar.hand-over",
       "training.calendar.plan",
       "training.calendar.move",
+      "training.calendar.remove",
       "training.library.load",
       "training.range.load"
     ],
