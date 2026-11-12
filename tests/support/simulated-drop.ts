@@ -85,10 +85,31 @@ export class SimulatedDrop {
   private files = new Map<string, DroppedFile>();
   private next = 0;
 
+  /** While set, a copy waits until `goOn` is called: the import stays on its way. */
+  private held: { promise: Promise<void>; release: () => void } | undefined;
+
   constructor(private readonly mediaRoot: string) {}
 
+  /** Copies wait from now until `goOn`. */
+  holdCopies(): void {
+    let release = () => {};
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.held = { promise, release };
+  }
+
+  goOn(): void {
+    this.held?.release();
+    this.held = undefined;
+  }
+
   async drag(name: string, kind: SimulatedPackage): Promise<DroppedFile> {
-    const bytes = await PACKAGES[kind]();
+    return this.dragBytes(name, await PACKAGES[kind]());
+  }
+
+  /** Drags a file with these bytes: a workout, a ZIP of workouts, a picture. */
+  dragBytes(name: string, bytes: Uint8Array): DroppedFile {
     this.next += 1;
     let copied = false;
     const file: DroppedFile = {
@@ -99,6 +120,7 @@ export class SimulatedDrop {
       copyTo: async (target) => {
         if (copied) throw new Error(`"${name}" was copied already`);
         copied = true;
+        await this.held?.promise;
         const path = join(this.mediaRoot, ...target.split('/'));
         await mkdir(dirname(path), { recursive: true });
         await writeFile(path, bytes);

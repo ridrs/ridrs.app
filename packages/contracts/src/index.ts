@@ -233,6 +233,16 @@ export {
   type TimestampOrigin,
   timestampOriginSchema,
 } from './events.ts';
+export {
+  type DroppedFileVerdict,
+  droppedFileSchema,
+  droppedWorkoutSchema,
+  FILE_DROP_KEY,
+  type FileDrop,
+  fileDropImportService,
+  fileDropSchema,
+  fileDropState,
+} from './file-drop.ts';
 export { filesSaveService } from './files.ts';
 export { bytesToHex, hexToBytes } from './hex.ts';
 export type {

@@ -21,4 +21,5 @@ export {
   WORKOUT_IMPORTERS,
   type WorkoutFileFormat,
 } from './formats.ts';
+export { chooseWorkoutId, importTime } from './ids.ts';
 export { type FileEntry, unzipFiles } from './zip.ts';

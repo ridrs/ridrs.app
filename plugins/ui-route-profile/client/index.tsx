@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { type RouteOffer, routeOfferState, type routeProfileCapability } from '@ridrs/contracts';
+import {
+  type RouteOffer,
+  routeOfferState,
+  type routeProfileCapability,
+  type UiCapabilityInput,
+} from '@ridrs/contracts';
 import type { UiCapabilityComponent, UiContext } from '@ridrs/ui-sdk';
 import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useState } from 'react';
@@ -19,17 +24,13 @@ function useOffer(ctx: UiContext, route: string): RouteOffer | undefined {
   return offer;
 }
 
-function RouteProfileView({
-  ctx,
-  route,
-  variant,
-}: {
-  readonly ctx: UiContext;
-  readonly route: string;
-  readonly variant: 'card' | 'full';
-}) {
+type Input = UiCapabilityInput<typeof routeProfileCapability>;
+
+function RouteProfileView({ ctx, input: { route, variant, preview } }: { readonly ctx: UiContext; readonly input: Input }) {
   const text = useMessages(ctx, messages);
   const offer = useOffer(ctx, route);
+  // A route that is no offer yet brings its title and elevations; its card needs no more.
+  if (preview && variant === 'card') return <CardProfile offer={{ id: route, ...preview }} text={text} />;
   if (!offer?.sparkline) return null;
   return variant === 'card' ? <CardProfile offer={offer} text={text} /> : <FullProfile offer={offer} text={text} />;
 }
@@ -37,8 +38,7 @@ function RouteProfileView({
 /** Provides `ui.route-profile` (ADR 0083): one React root per drawing, new input without a new mount. */
 export const RouteProfile: UiCapabilityComponent<typeof routeProfileCapability> = (container, ctx, input) => {
   const root = createRoot(container);
-  const draw = ({ route, variant }: { readonly route: string; readonly variant: 'card' | 'full' }) =>
-    root.render(<RouteProfileView ctx={ctx} route={route} variant={variant} />);
+  const draw = (next: Input) => root.render(<RouteProfileView ctx={ctx} input={next} />);
   draw(input);
   return { update: draw, release: () => root.unmount() };
 };

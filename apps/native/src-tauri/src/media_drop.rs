@@ -26,24 +26,37 @@ pub struct Dragged {
     size: u64,
 }
 
+/// The files of a drag with their places.
+type Files = Vec<(Dragged, PathBuf)>;
+
 /// The drag the tokens belong to: the drag pasteboard's change count, and its files.
 #[derive(Default)]
 pub struct DropState {
-    drag: Mutex<Option<(isize, Vec<Dragged>)>>,
+    drag: Mutex<Option<(isize, Files)>>,
+}
+
+fn tokens(files: &[(Dragged, PathBuf)]) -> Vec<String> {
+    files.iter().map(|(file, _)| file.token.clone()).collect()
 }
 
 impl DropState {
     /// The files of the drag with `count` on the pasteboard: the same tokens for the same drag (its
-    /// enter and its drop), new ones for a new drag, whose files of the last one are forgotten.
+    /// enter and its drop), new ones for a new drag, whose files of the last one are forgotten. A
+    /// file of the same drag that was copied already gets a new token: it can be imported again.
     fn files(&self, pick: &PickState, count: isize, paths: Vec<PathBuf>) -> Result<Vec<Dragged>, String> {
         let mut drag = self.drag.lock().map_err(|e| e.to_string())?;
-        if let Some((known, files)) = drag.as_ref() {
+        if let Some((known, files)) = drag.as_mut() {
             if *known == count {
-                return Ok(files.clone());
+                for (file, path) in files.iter_mut() {
+                    if pick.path(&file.token).is_err() {
+                        file.token = pick.register(path.clone())?;
+                    }
+                }
+                return Ok(files.iter().map(|(file, _)| file.clone()).collect());
             }
         }
         if let Some((_, old)) = drag.take() {
-            pick.forget(&old.into_iter().map(|file| file.token).collect::<Vec<_>>())?;
+            pick.forget(&tokens(&old))?;
         }
         let mut files = Vec::new();
         for path in paths {
@@ -56,16 +69,17 @@ impl DropState {
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "file".into());
-            files.push(Dragged { token: pick.register(path)?, name, size: metadata.len() });
+            files.push((Dragged { token: pick.register(path.clone())?, name, size: metadata.len() }, path));
         }
-        *drag = Some((count, files.clone()));
-        Ok(files)
+        let dragged = files.iter().map(|(file, _)| file.clone()).collect();
+        *drag = Some((count, files));
+        Ok(dragged)
     }
 
     /// The drag left the window: its files are forgotten.
     fn leave(&self, pick: &PickState) -> Result<(), String> {
         if let Some((_, old)) = self.drag.lock().map_err(|e| e.to_string())?.take() {
-            pick.forget(&old.into_iter().map(|file| file.token).collect::<Vec<_>>())?;
+            pick.forget(&tokens(&old))?;
         }
         Ok(())
     }
@@ -73,7 +87,7 @@ impl DropState {
     /// Whether `token` is a file of the current drag: peeks reach no file of the open dialog.
     fn holds(&self, token: &str) -> Result<bool, String> {
         let drag = self.drag.lock().map_err(|e| e.to_string())?;
-        Ok(drag.as_ref().is_some_and(|(_, files)| files.iter().any(|file| file.token == token)))
+        Ok(drag.as_ref().is_some_and(|(_, files)| files.iter().any(|(file, _)| file.token == token)))
     }
 }
 
@@ -111,6 +125,42 @@ fn dragged_paths() -> (isize, Vec<PathBuf>) {
 #[cfg(not(target_os = "macos"))]
 fn dragged_paths() -> (isize, Vec<PathBuf>) {
     (0, Vec::new())
+}
+
+/// Lets the page refuse a drag (ADR 0093). Without its own drag handler (`dragDropEnabled:
+/// false`), wry's web view still answers `draggingUpdated:` itself and turns WebKit's "no
+/// operation" into `Copy` (wry 0.57, `wkwebview/drag_drop.rs`): the pointer shows a plus over
+/// every file the page does not take, and the page gets its drop anyway. This puts WebKit's own
+/// answer back, which is what the page's `dropEffect` says. It changes the method only where wry's
+/// class defines it, never WebKit's own.
+#[cfg(target_os = "macos")]
+pub fn honour_refused_drags(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    use objc2::runtime::{AnyObject, Imp, Sel};
+    use objc2::{ClassType, msg_send, sel};
+    use objc2_app_kit::NSDragOperation;
+    use objc2_web_kit::WKWebView;
+
+    unsafe extern "C-unwind" fn dragging_updated(this: &AnyObject, _cmd: Sel, info: *mut AnyObject) -> NSDragOperation {
+        // SAFETY: `this` is a WKWebView (wry's subclass of it); WebKit answers for the page.
+        unsafe { msg_send![super(this, WKWebView::class()), draggingUpdated: info] }
+    }
+
+    window.with_webview(|webview| {
+        // SAFETY: `inner` is the window's web view, and the closure runs on the main thread.
+        let view: &AnyObject = unsafe { &*(webview.inner() as *const AnyObject) };
+        let class = view.class();
+        let selector = sel!(draggingUpdated:);
+        let (Some(own), Some(webkit)) = (class.instance_method(selector), WKWebView::class().instance_method(selector))
+        else {
+            return;
+        };
+        if class == WKWebView::class() || std::ptr::eq(own, webkit) {
+            return;
+        }
+        type Updated = unsafe extern "C-unwind" fn(&AnyObject, Sel, *mut AnyObject) -> NSDragOperation;
+        // SAFETY: the same selector and signature as the method it replaces.
+        unsafe { own.set_implementation(std::mem::transmute::<Updated, Imp>(dragging_updated)) };
+    })
 }
 
 /// The files being dragged; the page calls it when a drag of files enters and when it is let go.
@@ -203,6 +253,19 @@ mod tests {
         assert!(pick.path(&files[0].token).is_err());
         // The same drag entering again is new to it.
         assert_eq!(drop.files(&pick, 1, files_in(dir.path(), &["a.zip"])).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn gives_a_copied_file_of_the_same_drag_a_new_token() {
+        let dir = tempfile::tempdir().unwrap();
+        let (pick, drop) = (PickState::default(), DropState::default());
+        let entered = drop.files(&pick, 3, files_in(dir.path(), &["a.ride"])).unwrap();
+        // What media_pick_copy does with a token it copied.
+        pick.forget(&[entered[0].token.clone()]).unwrap();
+        let again = drop.files(&pick, 3, Vec::new()).unwrap();
+        assert_ne!(again[0].token, entered[0].token);
+        assert!(pick.path(&again[0].token).is_ok());
+        assert!(drop.holds(&again[0].token).unwrap());
     }
 
     #[test]

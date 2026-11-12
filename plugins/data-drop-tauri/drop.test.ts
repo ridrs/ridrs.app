@@ -92,7 +92,7 @@ describe('watchDrags', () => {
       entered?.kind === 'enter' && entered.files[0],
     );
     expect(drop.file('drop-1')?.name).toBe('Col_de_Test.ride');
-    expect(rust.commands()).toEqual(['media_drop_files', 'media_drop_files']);
+    expect(rust.commands()).toEqual(['media_drop_files', 'media_drop_files', 'media_drop_files']);
     expect(errors).toEqual([]);
   });
 
@@ -104,8 +104,18 @@ describe('watchDrags', () => {
     inner.dispatchEvent(drag('dragleave'));
     await settle();
     expect(events.map((event) => event.kind)).toEqual(['enter', 'leave']);
-    expect(rust.commands()).toEqual(['media_drop_files', 'media_drop_leave']);
+    expect(rust.commands()).toEqual(['media_drop_files', 'media_drop_files', 'media_drop_leave']);
     expect(drop.file('drop-1')).toBeUndefined();
+  });
+
+  it('tells of a new drag even when the leave of the last one went missing', async () => {
+    watch();
+    document.body.dispatchEvent(drag('dragenter'));
+    await settle();
+    rust.dragged = [{ token: '2', name: 'b.zwo', size: 9 }];
+    inner.dispatchEvent(drag('dragenter'));
+    await settle();
+    expect(events.map((event) => event.kind === 'enter' && event.files[0]?.id)).toEqual(['drop-1', 'drop-2']);
   });
 
   it('leaves the app’s own drags alone', async () => {

@@ -42,6 +42,7 @@ export const en = {
   downloading: (percent: number) => `Downloading: ${percent} %`,
   failed: 'Download failed',
   failedBecause: (reason: string) => `Download failed: ${reason}`,
+  importingRoute: 'Importing: it can be ridden once it is on this device',
   onDevice: 'On this device',
   importVideo: 'Import video',
   importKind: 'Import',

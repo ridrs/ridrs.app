@@ -125,6 +125,9 @@ export class LocalVideos {
     const importer = this.importer();
     if (!media || !importer || (file === undefined && !pick)) throw new Error('This app cannot import videos');
     if (this.running) throw new Error('An import is on its way');
+    // A dragged package was previewed: its route is listed with its track's facts at once.
+    const previewed = file === undefined ? undefined : await this.preview(file).catch(() => undefined);
+    if (this.running) throw new Error('An import is on its way');
     const chosen =
       file === undefined
         ? await pick?.pick({ name: 'Incyclist', extensions: PACKAGE_EXTENSIONS })
@@ -133,6 +136,7 @@ export class LocalVideos {
     const title = titleOf(chosen.name);
     const id = this.freeId(slugOf(title));
     this.set({ kind: 'video', state: 'importing', file: chosen.name });
+    this.state.offer(this.offerId(id), this.importingOffer(id, title, previewed?.ok ? previewed.preview : undefined));
     // A host that stopped meanwhile takes no more state: the import ends without a word.
     this.running = this.run(media, importer, chosen, id, title).catch(() => undefined);
     return true;
@@ -228,7 +232,8 @@ export class LocalVideos {
     // The package goes before the import says it is done: a done import leaves nothing behind.
     await media.remove(pack).catch(() => undefined);
     this.running = undefined;
-    if (offer) this.state.offer(offer.id, offer);
+    // The route listed while it was imported is ready now, or gone with the failure.
+    this.state.offer(this.offerId(id), offer);
     this.set(next);
   }
 
@@ -246,6 +251,27 @@ export class LocalVideos {
 
   private offerId(id: string): string {
     return `${PLUGIN}/${id}`;
+  }
+
+  /** A route while it is imported: its title, and its track's facts where a preview read them. */
+  private importingOffer(
+    id: string,
+    title: string,
+    facts?: Pick<RouteOffer, 'distance' | 'ascent' | 'duration' | 'sparkline'>,
+  ): RouteOffer {
+    const offerId = this.offerId(id);
+    return {
+      id: offerId,
+      kind: 'video',
+      title,
+      distance: facts?.distance ?? 0,
+      ascent: facts?.ascent ?? 0,
+      ...(facts?.duration ? { duration: facts.duration } : {}),
+      ...(facts?.sparkline ? { sparkline: [...facts.sparkline] } : {}),
+      tags: {},
+      availability: { state: 'importing' },
+      world: { landscape: 'ui-world-video/landscape', route: offerId },
+    };
   }
 
   private offerOf(media: MediaFiles, route: Imported, stored?: VideoRoute): RouteOffer {

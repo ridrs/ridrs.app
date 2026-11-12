@@ -42,12 +42,32 @@ Feature: Importing an own video route from an Incyclist package
     Then the "activity" screen is shown
     And the ride was requested in the world "ui-world-video/landscape" on the route "video-source-local/col-de-test"
 
+  Scenario: A package being imported is listed at once, and can be ridden once it is imported
+    Given the rider chooses the Incyclist package "Col de Test.zip"
+    And copying the chosen package waits
+    When I press "Ride"
+    And I press "Import video"
+    Then the section "Real video" lists "Col de Test"
+    And the route "Col de Test" shows the status "Importing"
+    When I press "Col de Test"
+    Then the route details offer no "Go" button
+    When copying the chosen package goes on
+    Then the route details offer a "Go" button
+
+  Scenario: A package that fails to import is listed no more
+    Given the rider chooses a ZIP "Holiday.zip" without a control file
+    When I press "Ride"
+    And I press "Import video"
+    Then the route "Import video" reads "Import failed: The package has no control file"
+    And the section "Real video" does not list "Holiday"
+
   Scenario: A .ride file is an Incyclist package
     Given the rider chooses the Incyclist package "Col_de_Test.ride"
     When I press "Ride"
     And I press "Import video"
     Then the open dialog offered Incyclist packages as "zip, ride"
     And the section "Real video" lists "Col de Test"
+    And the route "Col de Test" shows the status "On this device"
     And the media storage holds the route "video-source-local/col-de-test" titled "Col de Test"
     And the media storage holds no downloaded package
 
@@ -56,6 +76,7 @@ Feature: Importing an own video route from an Incyclist package
     When I press "Ride"
     And I press "Import video"
     Then the section "Real video" lists "Col de Test"
+    And the route "Col de Test" shows the status "On this device"
     When ridrs restarted
     And I reload the UI
     And I press "Ride"
@@ -67,8 +88,10 @@ Feature: Importing an own video route from an Incyclist package
     When I press "Ride"
     And I press "Import video"
     Then the section "Real video" lists "Col de Test"
+    And the route "Col de Test" shows the status "On this device"
     When I press "Import video"
     Then the section "Real video" lists 3 routes
+    And the route offer "video-source-local/col-de-test-2" is "ready"
     And the media storage holds the route "video-source-local/col-de-test-2" titled "Col de Test"
 
   Scenario: A cancelled choice imports nothing

@@ -29,9 +29,10 @@ const carriesFiles = (event: Event) => [...((event as DragEvent).dataTransfer?.t
 
 /**
  * Watches the drags of files over `target` (the window) and tells `data.drop` of them. The page
- * learns nothing of a hovering file, so the files come from Rust when a drag enters and again
- * when it is let go (the same drag keeps its files); `dragenter` and `dragleave` of the elements
- * inside are counted, so the drag leaves once it left the window. The app's own drags carry no
+ * learns nothing of a hovering file, so the files come from Rust whenever a drag enters an element
+ * and again when it is let go (the same drag keeps its files, and is told of once);
+ * `dragenter` and `dragleave` of the elements inside are counted, so the drag leaves once it left
+ * the window. The app's own drags carry no
  * files and pass by. The calls to Rust run one after another, in the order of the events.
  */
 export function watchDrags(
@@ -81,13 +82,17 @@ export function watchDrags(
     return [...files.values()];
   };
 
+  /** The ids of the files last told of: a new drag is told of even if a leave went missing. */
+  let told = '';
   const onEnter = (event: Event) => {
     if (!carriesFiles(event)) return;
     depth += 1;
-    if (depth !== 1) return;
     then(async () => {
       const entered = await sync();
-      if (entered.length > 0) emit({ kind: 'enter', files: entered });
+      const ids = entered.map((file) => file.id).join('\n');
+      if (entered.length === 0 || ids === told) return;
+      told = ids;
+      emit({ kind: 'enter', files: entered });
     });
   };
   const onLeave = (event: Event) => {
@@ -96,6 +101,7 @@ export function watchDrags(
     if (depth !== 0) return;
     then(async () => {
       files = new Map();
+      told = '';
       await invoke<void>('media_drop_leave');
       emit({ kind: 'leave' });
     });
@@ -105,6 +111,7 @@ export function watchDrags(
     depth = 0;
     then(async () => {
       const dropped = await sync();
+      told = '';
       if (dropped.length > 0) emit({ kind: 'drop', files: dropped });
     });
   };

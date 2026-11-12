@@ -3,8 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { analyseWorkoutEntry } from '@ridrs/workout';
-import { chooseId, planImport } from './plan.ts';
+import { analyseWorkoutEntry, chooseWorkoutId } from '@ridrs/workout';
+import { planImport } from './plan.ts';
 
 const FILES = resolve(import.meta.dirname, '../../../tests/fixtures/workout-import/files');
 const bytes = (name: string) => new Uint8Array(readFileSync(resolve(FILES, name)));
@@ -30,6 +30,6 @@ describe('planImport', () => {
 
   it('counts when even the hashed id is taken', () => {
     const taken = new Set(['a', 'a-12345678']);
-    expect(chooseId('A', '12345678abcdef', taken, false)).toBe('a-12345678-2');
+    expect(chooseWorkoutId('A', '12345678abcdef', taken, false)).toBe('a-12345678-2');
   });
 });

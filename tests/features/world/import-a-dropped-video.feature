@@ -31,10 +31,14 @@ Feature: A video route dragged onto the window is previewed and imported
 
   Scenario: Letting go imports the package without the open dialog
     Given the rider drags the Incyclist package "Col_de_Test.ride" onto the window
+    And copying the dropped file waits
     When the rider lets go of it
     And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1"}'
     Then the call resolved with '{"started":true}'
-    And the route offer "video-source-local/col-de-test" is "ready"
+    And the route offer "video-source-local/col-de-test" is "importing"
+    And the route offer "video-source-local/col-de-test" reads "0.3 km"
+    When copying the dropped file goes on
+    Then the route offer "video-source-local/col-de-test" is "ready"
     And the media storage holds the route "video-source-local/col-de-test" titled "Col de Test"
     And the media storage holds no downloaded package
 

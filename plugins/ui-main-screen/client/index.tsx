@@ -189,6 +189,12 @@ function Action({ ctx, contribution }: { readonly ctx: UiContext; readonly contr
   return <div ref={action} data-action-slot={contribution} style={{ display: 'contents' }} />;
 }
 
+/** A layer over everything: it places itself, and shows nothing while it has nothing to say. */
+function Overlay({ ctx, contribution }: { readonly ctx: UiContext; readonly contribution: string }) {
+  const overlay = useSlot(ctx, 'main/overlay', contribution);
+  return <div ref={overlay} data-overlay-slot={contribution} style={{ display: 'contents' }} />;
+}
+
 /** The tiles: what the main screen shows while no other screen is in its content area. */
 function Home({
   ctx,
@@ -385,6 +391,9 @@ function MainScreenView({ ctx, layout, view }: { readonly ctx: UiContext; readon
         <div className="ms-outlet" data-testid="main-outlet" ref={outlet} hidden={!framing} />
       </div>
       <Dialog ctx={ctx} open={open} container={dialog} />
+      {layout.overlays.map((overlay) => (
+        <Overlay key={overlay} ctx={ctx} contribution={overlay} />
+      ))}
     </div>
   );
 }

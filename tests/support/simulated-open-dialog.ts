@@ -21,7 +21,24 @@ export class SimulatedOpenDialog {
   private choice: { readonly name: string; readonly bytes: () => Promise<Uint8Array> } | undefined;
   readonly filters: { readonly name: string; readonly extensions: readonly string[] }[] = [];
 
+  /** While set, a copy waits until `goOn` is called: the import stays on its way. */
+  private held: { promise: Promise<void>; release: () => void } | undefined;
+
   constructor(private readonly mediaRoot: string) {}
+
+  /** Copies wait from now until `goOn`. */
+  holdCopies(): void {
+    let release = () => {};
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.held = { promise, release };
+  }
+
+  goOn(): void {
+    this.held?.release();
+    this.held = undefined;
+  }
 
   choose(name: string, kind: 'incyclist' | 'no-control-file'): void {
     this.choice = { name, bytes: kind === 'incyclist' ? incyclistPackage : holidayPackage };
@@ -41,6 +58,7 @@ export class SimulatedOpenDialog {
         name: choice.name,
         size: bytes.length,
         copyTo: async (target) => {
+          await this.held?.promise;
           const file = join(this.mediaRoot, ...target.split('/'));
           await mkdir(dirname(file), { recursive: true });
           await writeFile(file, bytes);

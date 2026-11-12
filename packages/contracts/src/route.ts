@@ -66,7 +66,8 @@ export const routeOfferSchema = z
       .optional(),
     /**
      * `ready` can be ridden now; `fetchable` needs a download of `size` bytes first, `fetching` is
-     * downloading it, `failed` could not and says why. A downloaded route names the URL of each of
+     * downloading it, `failed` could not and says why; `importing` is a route the rider brought
+     * that becomes one now (ADR 0093), listed at once and ridden once it is `ready`. A downloaded route names the URL of each of
      * its files on this device by file name (`route.json`, `video.mp4`, … for a video): only the
      * media storage knows how to make them, so the UI never builds one. It may be removable.
      */
@@ -79,6 +80,7 @@ export const routeOfferSchema = z
         })
         .strict(),
       z.object({ state: z.literal('fetchable'), size: z.number().int().positive() }).strict(),
+      z.object({ state: z.literal('importing') }).strict(),
       z
         .object({
           state: z.literal('fetching'),

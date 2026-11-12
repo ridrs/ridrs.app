@@ -1,0 +1,26 @@
+{
+  "id": "ui-file-drop",
+  "name": "Drop Layer",
+  "version": "0.1.0",
+  "types": ["ui"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "drop-layer",
+        "extensionPoint": "main/overlay",
+        "export": "DropLayer"
+      }
+    ],
+    "events": {
+      "subscribe": [],
+      "publish": []
+    },
+    "state": ["app.language", "file.drop"],
+    "calls": ["file.drop.import"],
+    "uses": ["ui.workout-chart", "ui.route-profile"]
+  }
+}

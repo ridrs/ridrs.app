@@ -43,6 +43,7 @@ export const de: Messages = {
   downloading: (percent: number) => `Wird heruntergeladen: ${percent} %`,
   failed: 'Download fehlgeschlagen',
   failedBecause: (reason: string) => `Download fehlgeschlagen: ${reason}`,
+  importingRoute: 'Wird importiert: fahrbar, sobald sie auf diesem Gerät ist',
   onDevice: 'Auf diesem Gerät',
   importVideo: 'Video importieren',
   importKind: 'Import',

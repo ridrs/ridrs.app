@@ -29,17 +29,20 @@ export const layoutSchema = z
     ),
     screens: z.array(uiPathSchema).default([]),
     dialogs: z.array(uiPathSchema).default([]),
+    /** Layers over everything the main screen shows, such as the one of dragged files (ADR 0093). */
+    overlays: z.array(contributionKey).default([]),
   })
-  .superRefine(({ tiles, actions, screens, dialogs }, issues) => {
-    actions.forEach((action, index) => {
-      if (actions.indexOf(action) !== index) {
-        issues.addIssue({
-          code: 'custom',
-          path: ['actions', index],
-          message: `"${action}" is placed twice`,
-        });
-      }
-    });
+  .superRefine(({ tiles, actions, screens, dialogs, overlays }, issues) => {
+    for (const [field, keys] of [
+      ['actions', actions],
+      ['overlays', overlays],
+    ] as const) {
+      keys.forEach((key, index) => {
+        if (keys.indexOf(key) !== index) {
+          issues.addIssue({ code: 'custom', path: [field, index], message: `"${key}" is placed twice` });
+        }
+      });
+    }
     const seen = new Set<string>();
     tiles.forEach(({ contribution }, index) => {
       if (seen.has(contribution)) {

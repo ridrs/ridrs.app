@@ -1,0 +1,18 @@
+{
+  "id": "file-drop",
+  "name": "Files Dragged onto the Window",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": [],
+  "requires": [],
+  "optionalRequires": ["data.drop"],
+  "entry": "index.ts",
+  "state": {
+    "owns": ["file.drop"],
+    "watches": ["training.library", "route.import"]
+  },
+  "services": {
+    "provides": ["file.drop.import"],
+    "calls": ["route.import-preview", "route.import", "training.library.save"]
+  }
+}

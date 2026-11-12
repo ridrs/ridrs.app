@@ -228,6 +228,8 @@ function downloadState(offer: RouteOffer, text: Messages): string | undefined {
       return text.downloading(Math.floor((availability.received / availability.size) * 100));
     case 'failed':
       return text.failedBecause(availability.reason);
+    case 'importing':
+      return text.importingRoute;
     case 'ready':
       return undefined;
   }
@@ -236,11 +238,17 @@ function downloadState(offer: RouteOffer, text: Messages): string | undefined {
 const minutes = (offer: RouteOffer, text: Messages) =>
   offer.duration === undefined ? undefined : formatDuration(offer.duration, text);
 
-/** What a card says under the title: the route's length and climb, each by its icon. */
-const facts = (offer: RouteOffer, text: Messages): CardFact[] => [
-  { icon: DISTANCE, text: formatDistance(offer, text) },
-  { icon: ASCENT, text: formatAscent(offer, text) },
-];
+/**
+ * What a card says under the title: the route's length and climb, each by its icon. A route being
+ * imported from a chosen package knows neither until its track is read.
+ */
+const facts = (offer: RouteOffer, text: Messages): CardFact[] =>
+  offer.availability.state === 'importing' && offer.distance === 0
+    ? []
+    : [
+        { icon: DISTANCE, text: formatDistance(offer, text) },
+        { icon: ASCENT, text: formatAscent(offer, text) },
+      ];
 
 /**
  * A corner badge for a route that needs a download: the download's progress, a failure, or an icon
@@ -255,6 +263,12 @@ function DownloadBadge({ offer, text }: { readonly offer: RouteOffer; readonly t
       return <Badge tone="busy">{Math.floor((availability.received / availability.size) * 100)} %</Badge>;
     case 'failed':
       return <Badge tone="warn">{text.failed}</Badge>;
+    case 'importing':
+      return (
+        <Badge tone="busy" label={text.importing}>
+          {text.importing}
+        </Badge>
+      );
     case 'ready':
       // Only a downloaded route can be removed; a world's route is always here and needs no icon.
       return availability.removable ? (
@@ -279,7 +293,8 @@ function DownloadTool({ ctx, offer }: { readonly ctx: UiContext; readonly offer:
     setRefusal(undefined);
     run().catch((error: unknown) => setRefusal(reasonOf(error)));
   };
-  if (availability.state === 'ready') return <DownloadBadge offer={offer} text={text} />;
+  // A route on this device, or one being imported, has nothing to download.
+  if (availability.state === 'ready' || availability.state === 'importing') return <DownloadBadge offer={offer} text={text} />;
   const fetching = availability.state === 'fetching';
   return (
     <>

@@ -92,7 +92,8 @@ export function CardProfile({
   offer,
   text,
 }: {
-  readonly offer: RouteOffer;
+  /** An offer, or what a preview knows of a route that is none yet (ADR 0093). */
+  readonly offer: Pick<RouteOffer, 'id' | 'title' | 'sparkline'>;
   readonly text: Messages;
 }) {
   const elevations = offer.sparkline ?? [];

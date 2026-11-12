@@ -31,6 +31,12 @@ describe('layoutSchema', () => {
     expect(layoutSchema.safeParse({ version: 1, tiles: [tile('plugin', 6)] }).success).toBe(false);
   });
 
+  it('places overlays in order, each once', () => {
+    expect(layoutSchema.parse({ version: 1, tiles: [] }).overlays).toEqual([]);
+    const twice = layoutSchema.safeParse({ version: 1, tiles: [], overlays: ['a/b', 'a/b'] });
+    expect(twice.error?.issues[0]?.message).toBe('"a/b" is placed twice');
+  });
+
   it('places global actions in order, each once', () => {
     expect(layoutSchema.parse({ version: 1, tiles: [] }).actions).toEqual([]);
     const twice = layoutSchema.safeParse({ version: 1, tiles: [], actions: ['a/b', 'a/b'] });

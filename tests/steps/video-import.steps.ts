@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Given, Then } from '@cucumber/cucumber';
+import { Given, Then, When } from '@cucumber/cucumber';
 import { waitFor, within } from '@testing-library/dom';
 import { SimulatedOpenDialog } from '../support/simulated-open-dialog.ts';
 import type { RidrsWorld } from '../support/world.ts';
@@ -87,3 +87,11 @@ Then(
     });
   },
 );
+
+Given('copying the chosen package waits', function (this: RidrsWorld) {
+  dialog(this).holdCopies();
+});
+
+When('copying the chosen package goes on', function (this: RidrsWorld) {
+  dialog(this).goOn();
+});

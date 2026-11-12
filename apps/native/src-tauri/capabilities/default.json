@@ -39,6 +39,9 @@
         },
         {
           "path": "$APPDATA/training"
+        },
+        {
+          "path": "$APPDATA/training/originals"
         }
       ]
     },
@@ -50,6 +53,9 @@
         },
         {
           "path": "$APPDATA/training"
+        },
+        {
+          "path": "$APPDATA/training/workouts"
         },
         {
           "path": "$APPDATA/config"

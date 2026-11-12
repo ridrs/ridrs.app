@@ -397,6 +397,14 @@ export const routeProfileCapability = defineUiCapability('ui.route-profile', {
       /** An offer id or a world route, as `ui-area-ride` names routes. */
       route: z.string().min(1),
       variant: z.enum(['card', 'full']),
+      /**
+       * A route that is no offer yet, such as a package dragged onto the window (ADR 0093): its
+       * title and elevations, which the provider then takes instead of the offer's.
+       */
+      preview: z
+        .object({ title: z.string().min(1), sparkline: z.array(z.number()).min(2) })
+        .strict()
+        .optional(),
     })
     .strict(),
 });

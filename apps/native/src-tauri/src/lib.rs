@@ -64,6 +64,9 @@ pub fn run() {
             if let Some(window) = _app.get_webview_window("main") {
                 let webview: &tauri::Webview<_> = window.as_ref();
                 webview.set_focus()?;
+                // The pointer shows no plus over files the page does not take (ADR 0093).
+                #[cfg(target_os = "macos")]
+                media_drop::honour_refused_drags(&window)?;
             }
             Ok(())
         })

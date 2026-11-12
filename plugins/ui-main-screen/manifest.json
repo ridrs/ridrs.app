@@ -18,6 +18,7 @@
           "main/menu",
           "main/top-bar",
           "main/action",
+          "main/overlay",
           "main/tile"
         ]
       }
