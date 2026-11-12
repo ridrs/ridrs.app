@@ -5,16 +5,16 @@ import { configure, Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from '@zip.j
 // The entries are workout files of a few kilobytes: no web workers (ADR 0065).
 configure({ useWebWorkers: false });
 
-export interface Entry {
+export interface FileEntry {
   readonly fileName: string;
   readonly bytes: Uint8Array;
 }
 
 /** The files of a ZIP, folders and macOS resource forks left out. */
-export async function unzip(bytes: Uint8Array): Promise<Entry[]> {
+export async function unzipFiles(bytes: Uint8Array): Promise<FileEntry[]> {
   const reader = new ZipReader(new Uint8ArrayReader(bytes));
   try {
-    const entries: Entry[] = [];
+    const entries: FileEntry[] = [];
     for (const entry of await reader.getEntries()) {
       const name = entry.filename;
       const base = name.slice(name.lastIndexOf('/') + 1);

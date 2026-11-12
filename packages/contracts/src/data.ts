@@ -77,3 +77,67 @@ export interface DataPick {
 export const dataPickCapability = defineCapability<DataPick, 'single', 'data.pick'>('data.pick', {
   cardinality: 'single',
 });
+
+/** Bytes a peek reads of one file or of one entry of a ZIP, at most. */
+export const PEEK_LIMIT = 8 * 1024 * 1024;
+
+/** The entries of a ZIP whose bytes a peek reads: control files, tracks and workouts. */
+export const PEEK_EXTENSIONS = [
+  'xml',
+  'gpx',
+  'json',
+  'zwo',
+  'fit',
+  'erg',
+  'mrc',
+  'tcx',
+  'txt',
+  'md',
+] as const;
+
+/** One entry of a dropped ZIP. */
+export interface PeekedEntry {
+  /** Its path inside the ZIP, e.g. `FR_Test.gpx`. */
+  readonly name: string;
+  /** Bytes, unpacked. */
+  readonly size: number;
+  /** Its bytes, for an entry of {@link PEEK_EXTENSIONS} up to {@link PEEK_LIMIT}. */
+  readonly bytes?: Uint8Array;
+}
+
+/** What a preview may read of a dropped file before it is copied (ADR 0093). */
+export interface FilePeek {
+  /** The file's bytes, when it is no ZIP and at most {@link PEEK_LIMIT}. */
+  readonly bytes?: Uint8Array;
+  /** Its entries, when it is a ZIP; a ZIP that cannot be read has none. */
+  readonly entries?: readonly PeekedEntry[];
+}
+
+/** A file dragged onto the window: a {@link PickedFile} that a preview can peek into. */
+export interface DroppedFile extends PickedFile {
+  /** Unique while the app runs. */
+  readonly id: string;
+  peek(): Promise<FilePeek>;
+}
+
+/** Files dragged over the window, let go on it, or taken out of it again. */
+export type DropEvent =
+  | { readonly kind: 'enter'; readonly files: readonly DroppedFile[] }
+  | { readonly kind: 'drop'; readonly files: readonly DroppedFile[] }
+  | { readonly kind: 'leave' };
+
+/**
+ * Files the rider drags onto the window (ADR 0093). The provider of the platform reads what is
+ * dragged while it hovers and keeps where the files lie to itself, as `data.pick` does; a file
+ * is good for one copy and for the drag it came with and the drop that follows it.
+ */
+export interface DataDrop {
+  /** Tells `listener` of every drag from now on; returns its end. */
+  subscribe(listener: (event: DropEvent) => void): () => void;
+  /** A file of the drag on its way or of the last drop; nothing once it is gone. */
+  file(id: string): DroppedFile | undefined;
+}
+
+export const dataDropCapability = defineCapability<DataDrop, 'single', 'data.drop'>('data.drop', {
+  cardinality: 'single',
+});

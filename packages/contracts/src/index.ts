@@ -126,13 +126,21 @@ export {
 } from './config.ts';
 export {
   type DataArchive,
+  type DataDrop,
   type DataFetch,
   type DataFetchJob,
   type DataFetchProgress,
   type DataPick,
+  type DropEvent,
+  type DroppedFile,
   dataArchiveCapability,
+  dataDropCapability,
   dataFetchCapability,
   dataPickCapability,
+  type FilePeek,
+  PEEK_EXTENSIONS,
+  PEEK_LIMIT,
+  type PeekedEntry,
   type PickedFile,
 } from './data.ts';
 export {
@@ -376,9 +384,12 @@ export {
 } from './recording.ts';
 export {
   type RouteImport,
+  type RouteImportPreview,
   type RouteOffer,
   routeCancelService,
   routeFetchService,
+  routeImportPreviewSchema,
+  routeImportPreviewService,
   routeImportSchema,
   routeImportService,
   routeImportState,
@@ -529,6 +540,7 @@ export {
 export {
   VIDEO_ROUTE_FILE,
   type VideoImporter,
+  type VideoPackageInspection,
   type VideoRoute,
   type VideoRouteFacts,
   videoImporterCapability,

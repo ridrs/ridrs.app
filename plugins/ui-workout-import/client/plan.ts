@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { Analysis } from './analyse.ts';
+import type { WorkoutAnalysis } from '@ridrs/workout';
 
 export type DuplicateChoice = 'skip' | 'copy';
 
@@ -13,7 +13,7 @@ export interface KnownWorkout {
 
 export interface PlannedRow {
   readonly key: string;
-  readonly analysis: Analysis;
+  readonly analysis: WorkoutAnalysis;
   /** The workout this one repeats: the same file content and name, in the library or above it. */
   readonly duplicateOf?: string;
   readonly choice: DuplicateChoice;
@@ -49,7 +49,7 @@ export function chooseId(base: string, hash: string, taken: ReadonlySet<string>,
  * saved, their ids. Recomputed whenever the rows or a choice change.
  */
 export function planImport(
-  analyses: readonly { key: string; analysis: Analysis }[],
+  analyses: readonly { key: string; analysis: WorkoutAnalysis }[],
   known: readonly KnownWorkout[],
   choices: ReadonlyMap<string, DuplicateChoice>,
 ): PlannedRow[] {

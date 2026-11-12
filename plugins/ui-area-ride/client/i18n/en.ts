@@ -45,7 +45,7 @@ export const en = {
   onDevice: 'On this device',
   importVideo: 'Import video',
   importKind: 'Import',
-  importAbout: 'An Incyclist package: a ZIP with video, GPX track and control file',
+  importAbout: 'An Incyclist package (.zip or .ride) with video, GPX track and control file',
   importing: 'Importing',
   importingFile: (file: string) => `Importing ${file}`,
   importFailed: 'Import failed',

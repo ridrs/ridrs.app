@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { WorkoutImporter } from '@ridrs/workout';
-import { importErg, importFit, importIntervalsText, importMrc, importTcx, importZwo } from '@ridrs/workout';
+import type { WorkoutImporter } from '../codec.ts';
+import { importFit } from '../codecs/fit/index.ts';
+import {
+  importErg,
+  importIntervalsText,
+  importMrc,
+  importTcx,
+  importZwo,
+} from '../codecs/text/index.ts';
 
-export type ImportFormat = 'zwo' | 'fit' | 'erg' | 'mrc' | 'tcx' | 'intervals';
+export type WorkoutFileFormat = 'zwo' | 'fit' | 'erg' | 'mrc' | 'tcx' | 'intervals';
 
-export const IMPORTERS: Record<ImportFormat, WorkoutImporter> = {
+export const WORKOUT_IMPORTERS: Record<WorkoutFileFormat, WorkoutImporter> = {
   zwo: importZwo,
   fit: importFit,
   erg: importErg,
@@ -14,7 +21,7 @@ export const IMPORTERS: Record<ImportFormat, WorkoutImporter> = {
   intervals: importIntervalsText,
 };
 
-const BY_EXTENSION: Record<string, ImportFormat> = {
+const BY_EXTENSION: Record<string, WorkoutFileFormat> = {
   zwo: 'zwo',
   fit: 'fit',
   erg: 'erg',
@@ -24,10 +31,11 @@ const BY_EXTENSION: Record<string, ImportFormat> = {
   md: 'intervals',
 };
 
-const extensionOf = (fileName: string) => fileName.slice(fileName.lastIndexOf('.') + 1).toLowerCase();
+const extensionOf = (fileName: string) =>
+  fileName.slice(fileName.lastIndexOf('.') + 1).toLowerCase();
 
 /** A ZIP starts with "PK" and a local file header (or the end of an empty one). */
-export const isZip = (bytes: Uint8Array): boolean =>
+export const isZipArchive = (bytes: Uint8Array): boolean =>
   bytes.length > 3 && bytes[0] === 0x50 && bytes[1] === 0x4b && (bytes[2] === 3 || bytes[2] === 5);
 
 /** A FIT file has ".FIT" at byte 8 of its 12- or 14-byte header. */
@@ -38,8 +46,11 @@ const isFit = (bytes: Uint8Array): boolean =>
  * The format of a file: its extension decides (the importer then says what is wrong with a file
  * that does not fit it), else its content. `undefined` is a file ridrs cannot read.
  */
-export function detectFormat(fileName: string, bytes: Uint8Array): ImportFormat | 'zip' | undefined {
-  if (isZip(bytes) || extensionOf(fileName) === 'zip') return 'zip';
+export function detectWorkoutFormat(
+  fileName: string,
+  bytes: Uint8Array,
+): WorkoutFileFormat | 'zip' | undefined {
+  if (isZipArchive(bytes) || extensionOf(fileName) === 'zip') return 'zip';
   const byName = BY_EXTENSION[extensionOf(fileName)];
   if (byName) return byName;
   if (isFit(bytes)) return 'fit';

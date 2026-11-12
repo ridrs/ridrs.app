@@ -42,6 +42,15 @@ Feature: Importing an own video route from an Incyclist package
     Then the "activity" screen is shown
     And the ride was requested in the world "ui-world-video/landscape" on the route "video-source-local/col-de-test"
 
+  Scenario: A .ride file is an Incyclist package
+    Given the rider chooses the Incyclist package "Col_de_Test.ride"
+    When I press "Ride"
+    And I press "Import video"
+    Then the open dialog offered Incyclist packages as "zip, ride"
+    And the section "Real video" lists "Col de Test"
+    And the media storage holds the route "video-source-local/col-de-test" titled "Col de Test"
+    And the media storage holds no downloaded package
+
   Scenario: An imported route stays on the device
     Given the rider chooses the Incyclist package "Col de Test.zip"
     When I press "Ride"

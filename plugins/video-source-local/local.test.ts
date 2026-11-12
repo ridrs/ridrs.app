@@ -36,6 +36,7 @@ function memoryMedia(files = new Map<string, Uint8Array>()): MediaFiles & { file
 function importer(media: MediaFiles, failure?: string): VideoImporter {
   return {
     format: 'incyclist-gpx-import',
+    inspect: () => ({ ok: false, reason: 'Not inspected here' }),
     async import(_pack, directory, facts) {
       if (failure) throw new Error(failure);
       await media.write(`${directory}/track.gpx`, new TextEncoder().encode(GPX));
@@ -80,6 +81,7 @@ function setup(options: { readonly chosen?: string; readonly failure?: string; r
 describe('titleOf and slugOf', () => {
   it('name a route after its package', () => {
     expect(titleOf('Col_de_la_Madone.zip')).toBe('Col de la Madone');
+    expect(titleOf('Col_de_la_Madone.RIDE')).toBe('Col de la Madone');
     expect(slugOf('Côte d’Azur: Col de Vence 4K')).toBe('cote-d-azur-col-de-vence-4k');
     expect(slugOf('???')).toBe('video');
   });

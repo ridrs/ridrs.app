@@ -46,7 +46,7 @@ export const de: Messages = {
   onDevice: 'Auf diesem Gerät',
   importVideo: 'Video importieren',
   importKind: 'Import',
-  importAbout: 'Ein Incyclist-Paket: ZIP mit Video, GPX-Track und Steuerdatei',
+  importAbout: 'Ein Incyclist-Paket (.zip oder .ride) mit Video, GPX-Track und Steuerdatei',
   importing: 'Wird importiert',
   importingFile: (file: string) => `${file} wird importiert`,
   importFailed: 'Import fehlgeschlagen',

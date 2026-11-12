@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type DataDrop,
   type DataPick,
+  type DroppedFile,
   type MediaFiles,
   type RouteImport,
+  type RouteImportPreview,
   type RouteOffer,
   VIDEO_ROUTE_FILE,
   type VideoImporter,
@@ -46,6 +49,8 @@ type Imported = z.infer<typeof indexSchema>['routes'][number];
 export interface ImportServices {
   readonly media?: MediaFiles;
   readonly pick?: DataPick;
+  /** Files dragged onto the window (ADR 0093). */
+  readonly drop?: DataDrop;
   readonly importers: () => readonly VideoImporter[];
 }
 
@@ -55,10 +60,13 @@ export interface ImportState {
   importer(state: RouteImport | undefined): void;
 }
 
-/** A route's title from its package's name: `Col_de_la_Madone.zip` is `Col de la Madone`. */
+/** The extensions of Incyclist packages: `.ride` is the same ZIP under the name ridrs gives it (ADR 0093). */
+export const PACKAGE_EXTENSIONS = ['zip', 'ride'] as const;
+
+/** A route's title from its package's name: `Col_de_la_Madone.zip` and `Col_de_la_Madone.ride` are `Col de la Madone`. */
 export function titleOf(fileName: string): string {
   const title = fileName
-    .replace(/\.zip$/i, '')
+    .replace(/\.(zip|ride)$/i, '')
     .replace(/[_]+/g, ' ')
     .trim();
   return title || 'Video';
@@ -104,19 +112,23 @@ export class LocalVideos {
       }
     }
     for (const route of this.routes) this.state.offer(this.offerId(route.id), this.offerOf(media, route));
-    if (this.importer() && services.pick) this.state.importer(this.last);
+    if (this.importer() && (services.pick || services.drop)) this.state.importer(this.last);
   }
 
   /**
    * Asks for a package and imports it; resolves once the dialog closed, `false` when the rider
-   * cancelled. Refuses while an import is on its way, or when this app cannot import.
+   * cancelled. With `file`, imports that file dragged onto the window instead (ADR 0093). Refuses
+   * while an import is on its way, or when this app cannot import.
    */
-  async import(): Promise<boolean> {
+  async import(file?: string): Promise<boolean> {
     const { media, pick } = this.services;
     const importer = this.importer();
-    if (!media || !pick || !importer) throw new Error('This app cannot import videos');
+    if (!media || !importer || (file === undefined && !pick)) throw new Error('This app cannot import videos');
     if (this.running) throw new Error('An import is on its way');
-    const chosen = await pick.pick({ name: 'Incyclist', extensions: ['zip'] });
+    const chosen =
+      file === undefined
+        ? await pick?.pick({ name: 'Incyclist', extensions: PACKAGE_EXTENSIONS })
+        : this.dropped(file);
     if (!chosen) return false;
     const title = titleOf(chosen.name);
     const id = this.freeId(slugOf(title));
@@ -124,6 +136,46 @@ export class LocalVideos {
     // A host that stopped meanwhile takes no more state: the import ends without a word.
     this.running = this.run(media, importer, chosen, id, title).catch(() => undefined);
     return true;
+  }
+
+  /**
+   * What a file dragged onto the window would be as a route, read from its package's track
+   * without copying it; or why it cannot be imported (ADR 0093).
+   */
+  async preview(file: string): Promise<RouteImportPreview> {
+    const importer = this.importer();
+    if (!importer) throw new Error('This app cannot import videos');
+    const dropped = this.dropped(file);
+    const { entries } = await dropped.peek();
+    if (!entries) return { ok: false, reason: 'The file is no ZIP package' };
+    const inspection = importer.inspect(entries);
+    if (!inspection.ok) return inspection;
+    const track = entries.find((entry) => entry.name === inspection.track)?.bytes;
+    if (!track) return { ok: false, reason: 'The track is too large for a preview' };
+    let facts: TrackFacts;
+    try {
+      facts = trackFacts(new TextDecoder().decode(track));
+    } catch (error) {
+      return { ok: false, reason: reasonOf(error) };
+    }
+    return {
+      ok: true,
+      preview: {
+        kind: 'video',
+        title: titleOf(dropped.name),
+        distance: facts.distance,
+        ascent: facts.ascent,
+        ...(facts.duration === undefined ? {} : { duration: facts.duration }),
+        sparkline: [...facts.sparkline],
+      },
+    };
+  }
+
+  /** A file dragged onto the window, while the drag or its drop lasts. */
+  private dropped(file: string): DroppedFile {
+    const dropped = this.services.drop?.file(file);
+    if (!dropped) throw new Error(`The dragged file "${file}" is gone`);
+    return dropped;
   }
 
   /** Removes an imported route from the device and from the offers. */

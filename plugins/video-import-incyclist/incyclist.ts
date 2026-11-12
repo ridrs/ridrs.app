@@ -3,8 +3,10 @@
 import {
   type DataArchive,
   type MediaFiles,
+  type PeekedEntry,
   VIDEO_ROUTE_FILE,
   type VideoImporter,
+  type VideoPackageInspection,
   type VideoRoute,
   videoRouteSchema,
 } from '@ridrs/contracts';
@@ -86,12 +88,38 @@ export function parseControl(text: string): Control {
 const nameOf = (path: string) => path.split('/').at(-1) ?? path;
 
 /**
+ * Whether the entries of a ZIP make an Incyclist package, without unpacking it (ADR 0093): a
+ * control file that names a video and a track the ZIP holds. Other entries are fine; video2gpx
+ * adds its own. The reasons are the ones the import gives.
+ */
+export function inspectIncyclist(entries: readonly PeekedEntry[]): VideoPackageInspection {
+  const controls = entries.filter((entry) => entry.name.toLowerCase().endsWith('.xml') && entry.bytes);
+  if (controls.length === 0) return { ok: false, reason: 'The package has no control file' };
+  let reason = 'The control file names no video or no GPX track';
+  for (const entry of controls) {
+    let control: Control;
+    try {
+      control = parseControl(decodeText(entry.bytes ?? new Uint8Array()));
+    } catch (error) {
+      reason = error instanceof Error ? error.message : String(error);
+      continue;
+    }
+    const named = (name: string) => entries.find((candidate) => nameOf(candidate.name) === name);
+    const missing = [control.video, control.gpx].find((name) => !named(name));
+    if (missing) return { ok: false, reason: `The package has no file "${missing}"` };
+    return { ok: true, track: named(control.gpx)?.name ?? control.gpx };
+  }
+  return { ok: false, reason };
+}
+
+/**
  * Turns an Incyclist ZIP into a ridrs video route: unpacked into the folder, the video and the
  * track renamed (`video.mp4`, `track.gpx`), everything else removed, `route.json` written.
  */
 export function createIncyclistImporter(media: MediaFiles, archive: DataArchive): VideoImporter {
   return {
     format: INCYCLIST_FORMAT,
+    inspect: inspectIncyclist,
     async import(pack, directory, facts) {
       const files = await archive.extract(pack, `${directory}/package`);
       const controlFile = files.find((file) => file.toLowerCase().endsWith('.xml'));

@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { defineCapability } from './capabilities.ts';
+import type { PeekedEntry } from './data.ts';
 
 /**
  * A video route in the unified format, `route.json` next to its files (docs/ideas/video-sources.md,
@@ -65,6 +66,11 @@ export interface VideoRouteFacts {
   readonly source?: VideoRoute['source'];
 }
 
+/** A package an importer can read, and the entry with its track; or why it cannot. */
+export type VideoPackageInspection =
+  | { readonly ok: true; readonly track: string }
+  | { readonly ok: false; readonly reason: string };
+
 /**
  * Turns a package of one format into a video route in the unified format (post-processing per
  * format, docs/ideas/video-sources.md, section 5). Paths are media paths (`storage.media`).
@@ -72,6 +78,11 @@ export interface VideoRouteFacts {
 export interface VideoImporter {
   /** The package format it reads, e.g. `incyclist-gpx-import`. */
   readonly format: string;
+  /**
+   * Whether a package with these entries is of its format, before it is copied (ADR 0093): the
+   * entry with the route's GPX track, or why not. Entries other than the ones it needs are fine.
+   */
+  inspect(entries: readonly PeekedEntry[]): VideoPackageInspection;
   /** Imports `pack` into the empty folder `directory`, writes `route.json` there and returns it. */
   import(pack: string, directory: string, facts: VideoRouteFacts): Promise<VideoRoute>;
 }

@@ -12,6 +12,7 @@
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
     "@ridrs/fit": "workspace:*",
+    "@zip.js/zip.js": "2.24.0",
     "fast-xml-parser": "5.11.2"
   }
 }

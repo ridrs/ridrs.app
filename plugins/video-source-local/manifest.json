@@ -10,6 +10,7 @@
   "optionalRequires": [
     "storage.media",
     "data.pick",
+    "data.drop",
     "video.importer"
   ],
   "entry": "index.ts",
@@ -22,6 +23,7 @@
   "services": {
     "provides": [
       "route.import",
+      "route.import-preview",
       "route.remove"
     ]
   }

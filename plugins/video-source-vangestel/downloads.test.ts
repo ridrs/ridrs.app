@@ -48,6 +48,7 @@ function setup(options: { failFetch?: string; failImport?: string } = {}) {
   };
   const importer: VideoImporter = {
     format: 'test-format',
+    inspect: () => ({ ok: false, reason: 'Not inspected here' }),
     import: async (_pack, directory, facts) => {
       if (options.failImport) throw new Error(options.failImport);
       files.add(`${directory}/route.json`);

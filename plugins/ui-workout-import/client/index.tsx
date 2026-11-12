@@ -9,16 +9,21 @@ import {
 import { reactComponent, useBack } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { workoutMetrics } from '@ridrs/workout';
+import {
+  analyseWorkoutFile,
+  analyseWorkoutText,
+  type WorkoutAnalysis,
+  type WorkoutNote,
+  workoutMetrics,
+} from '@ridrs/workout';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type Analysis, analyseFile, analyseText, type Note } from './analyse.ts';
 import { type Messages, messages } from './i18n/index.ts';
 import { type DuplicateChoice, type KnownWorkout, type PlannedRow, planImport } from './plan.ts';
 import { ImportStyles } from './theme.tsx';
 
 interface Row {
   readonly key: string;
-  readonly analysis: Analysis;
+  readonly analysis: WorkoutAnalysis;
 }
 
 /** Bytes as base64, in chunks: `String.fromCharCode(...bytes)` would overflow the stack. */
@@ -44,14 +49,14 @@ function durationText(seconds: number, estimated: boolean, text: Messages): stri
   return `${estimated ? '≈ ' : ''}${parts.join(' ')}`;
 }
 
-function noteText(note: Note, text: Messages): string {
+function noteText(note: WorkoutNote, text: Messages): string {
   if (note.kind === 'units') return text.units(note.units);
   if (note.kind === 'no-erg') return text.noErg(note.reason, note.count);
   return text.reasons[note.diagnostic.code] ?? note.diagnostic.message;
 }
 
 /** The reasons of a refused file, in plain words, without repeats. */
-function reasonTexts(analysis: Analysis & { kind: 'error' }, text: Messages): string[] {
+function reasonTexts(analysis: WorkoutAnalysis & { kind: 'error' }, text: Messages): string[] {
   const errors = analysis.diagnostics.filter((d) => d.severity === 'error');
   const shown = errors.length > 0 ? errors : analysis.diagnostics;
   return [...new Set(shown.map((d) => text.reasons[d.code] ?? d.message))];
@@ -87,7 +92,7 @@ function ErrorRow({
   analysis,
   text,
 }: {
-  readonly analysis: Analysis & { kind: 'error' };
+  readonly analysis: WorkoutAnalysis & { kind: 'error' };
   readonly text: Messages;
 }) {
   return (
@@ -118,7 +123,7 @@ function WorkoutRow({
 }: {
   readonly ctx: UiContext;
   readonly row: PlannedRow;
-  readonly analysis: Analysis & { kind: 'workout' };
+  readonly analysis: WorkoutAnalysis & { kind: 'workout' };
   readonly onChoice: (choice: DuplicateChoice) => void;
   readonly text: Messages;
 }) {
@@ -190,7 +195,7 @@ function ImportView({ ctx }: { readonly ctx: UiContext }) {
   const plan = useMemo(() => planImport(rows, known, choices), [rows, known, choices]);
   const accepted = plan.filter((row) => row.id !== undefined);
 
-  const add = (analyses: readonly Analysis[]) => {
+  const add = (analyses: readonly WorkoutAnalysis[]) => {
     setRows((current) => [
       ...current,
       ...analyses.map((analysis) => ({ key: `row-${(counter.current += 1)}`, analysis })),
@@ -203,7 +208,7 @@ function ImportView({ ctx }: { readonly ctx: UiContext }) {
     try {
       for (const file of files) {
         const bytes = new Uint8Array(await file.arrayBuffer());
-        add(await analyseFile({ fileName: file.name, bytes }, new Date().toISOString()));
+        add(await analyseWorkoutFile({ fileName: file.name, bytes }, new Date().toISOString()));
       }
     } finally {
       setReading((n) => n - 1);
@@ -211,7 +216,7 @@ function ImportView({ ctx }: { readonly ctx: UiContext }) {
   };
 
   const addText = async () => {
-    const analyses = await analyseText(pasted, pastedName ?? text.pasteDefaultName, new Date().toISOString());
+    const analyses = await analyseWorkoutText(pasted, pastedName ?? text.pasteDefaultName, new Date().toISOString());
     add(analyses);
     if (analyses.some((analysis) => analysis.kind === 'workout')) setPasted('');
   };

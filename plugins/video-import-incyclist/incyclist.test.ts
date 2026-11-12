@@ -2,7 +2,7 @@
 
 import type { DataArchive, MediaFiles } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { createIncyclistImporter, decodeText, parseControl } from './incyclist.ts';
+import { createIncyclistImporter, decodeText, inspectIncyclist, parseControl } from './incyclist.ts';
 
 const CONTROL = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <gpx-import>
@@ -45,6 +45,27 @@ describe('parseControl', () => {
 
   it('refuses a control file without video or track', () => {
     expect(() => parseControl('<gpx-import><name>x</name></gpx-import>')).toThrow('names no video');
+  });
+});
+
+describe('inspectIncyclist', () => {
+  const control = { name: 'pack/FR_Col_de_Pennes.xml', size: CONTROL.length, bytes: new TextEncoder().encode(CONTROL) };
+  const video = { name: 'pack/FR_Col_de_Pennes.mp4', size: 15_000_000_000 };
+  const track = { name: 'pack/FR_Col_de_Pennes.gpx', size: 1000, bytes: new Uint8Array(1000) };
+
+  it('finds the track of a package, whatever else it holds', () => {
+    const extra = { name: 'LIESMICH.txt', size: 10, bytes: new TextEncoder().encode('Hallo') };
+    expect(inspectIncyclist([video, track, control, extra])).toEqual({ ok: true, track: 'pack/FR_Col_de_Pennes.gpx' });
+  });
+
+  it('says why a ZIP is no package', () => {
+    expect(inspectIncyclist([video])).toEqual({ ok: false, reason: 'The package has no control file' });
+    expect(inspectIncyclist([control, video])).toEqual({
+      ok: false,
+      reason: 'The package has no file "FR_Col_de_Pennes.gpx"',
+    });
+    const empty = { name: 'x.xml', size: 5, bytes: new TextEncoder().encode('<a/>') };
+    expect(inspectIncyclist([empty])).toEqual({ ok: false, reason: 'The control file names no video or no GPX track' });
   });
 });
 

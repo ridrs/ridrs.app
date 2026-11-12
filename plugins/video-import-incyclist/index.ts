@@ -6,13 +6,14 @@ import {
   storageMediaCapability,
   videoImporterCapability,
 } from '@ridrs/contracts';
-import { createIncyclistImporter, INCYCLIST_FORMAT } from './incyclist.ts';
+import { createIncyclistImporter, INCYCLIST_FORMAT, inspectIncyclist } from './incyclist.ts';
 
 /** Post-processing of the format `incyclist-gpx-import`, for every source that ships it. */
 export default definePlugin({
   initialize(ctx) {
     ctx.capabilities.provide(videoImporterCapability, {
       format: INCYCLIST_FORMAT,
+      inspect: inspectIncyclist,
       import: (pack, directory, facts) =>
         createIncyclistImporter(
           ctx.capabilities.get(storageMediaCapability),

@@ -166,13 +166,49 @@ export type RouteImport = z.infer<typeof routeImportSchema>;
 
 export const routeImportState = defineState('route.import', routeImportSchema);
 
+/** A file the rider dragged onto the window, by its id of `data.drop` (ADR 0093). */
+const droppedFileId = z.string().min(1);
+
 /**
  * Imports a route from a package the rider chooses in the system's open dialog: answered once the
- * dialog closed, `started: false` when the rider cancelled. The import's progress and a failure
- * are the provider's key of `route.import`; the route is then a key of `route.offer`.
+ * dialog closed, `started: false` when the rider cancelled. With `file`, from that file dragged
+ * onto the window instead, without a dialog (ADR 0093). The import's progress and a failure are
+ * the provider's key of `route.import`; the route is then a key of `route.offer`.
  */
 export const routeImportService = defineService('route.import', {
-  request: z.object({ key: z.string().min(1) }).strict(),
+  request: z.object({ key: z.string().min(1), file: droppedFileId.optional() }).strict(),
   response: z.object({ started: z.boolean() }).strict(),
+  keyedBy: routeImportState,
+});
+
+/**
+ * What a route would be once a dragged file is imported, or why the provider cannot import it:
+ * the route's card before the route exists. Read from the package's track, nothing is copied.
+ */
+export const routeImportPreviewSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      ok: z.literal(true),
+      preview: routeOfferSchema
+        .pick({
+          kind: true,
+          title: true,
+          distance: true,
+          ascent: true,
+          duration: true,
+          sparkline: true,
+        })
+        .strict(),
+    })
+    .strict(),
+  z.object({ ok: z.literal(false), reason: z.string().min(1) }).strict(),
+]);
+
+export type RouteImportPreview = z.infer<typeof routeImportPreviewSchema>;
+
+/** Previews a file dragged onto the window as a route of the provider `key` (ADR 0093). */
+export const routeImportPreviewService = defineService('route.import-preview', {
+  request: z.object({ key: z.string().min(1), file: droppedFileId }).strict(),
+  response: routeImportPreviewSchema,
   keyedBy: routeImportState,
 });

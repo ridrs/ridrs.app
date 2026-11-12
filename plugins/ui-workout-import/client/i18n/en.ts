@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { NoErgReason } from '../analyse.ts';
+import type { NoErgReason } from '@ridrs/workout';
 
 const noErg: Record<NoErgReason, (n: number) => string> = {
   'heart-rate': (n) => `${n} ${n === 1 ? 'step' : 'steps'} by heart rate, no ERG`,

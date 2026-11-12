@@ -68,6 +68,15 @@ Given('the rider cancels the open dialog', function (this: RidrsWorld) {
 });
 
 Then(
+  'the open dialog offered Incyclist packages as {string}',
+  function (this: RidrsWorld, extensionsCsv: string) {
+    const filter = dialog(this).filters.at(-1);
+    assert.ok(filter, 'Expected the open dialog to have been opened');
+    assert.deepEqual(filter.extensions, splitCsv(extensionsCsv));
+  },
+);
+
+Then(
   'the section {string} lists {string} first',
   async function (this: RidrsWorld, name: string, title: string) {
     await waitFor(() => {

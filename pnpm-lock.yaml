@@ -429,6 +429,9 @@ importers:
       '@ridrs/fit':
         specifier: workspace:*
         version: link:../fit
+      '@zip.js/zip.js':
+        specifier: 2.24.0
+        version: 2.24.0
       fast-xml-parser:
         specifier: 5.11.2
         version: 5.11.2
@@ -1495,9 +1498,6 @@ importers:
       '@ridrs/workout':
         specifier: workspace:*
         version: link:../../packages/workout
-      '@zip.js/zip.js':
-        specifier: 2.24.0
-        version: 2.24.0
       react:
         specifier: 19.3.1
         version: 19.3.1
