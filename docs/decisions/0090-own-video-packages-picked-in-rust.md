@@ -2,7 +2,7 @@
 
 # ADR 0090: Own Video Packages, Picked in Rust and Offered by a Local Source
 
-Status: proposed on 2026-11-12 ([video-sources.md](../ideas/video-sources.md), sections 3 to 5). Amended by [ADR 0094](0094-video-routes-stored-as-ride-packages.md): a picked package is copied (or repacked) as `route.ride` and not unpacked.
+Status: proposed on 2026-11-12 ([video-sources.md](../ideas/video-sources.md), sections 3 to 5). Amended by [ADR 0094](0094-video-routes-stored-as-ride-packages.md): a picked package with a stored video is copied as `route.ride` and not unpacked; one with a deflated video is unpacked straight from the chosen file.
 
 ## Context
 
