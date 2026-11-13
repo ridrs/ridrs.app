@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Given, Then } from '@cucumber/cucumber';
 import { parseControl } from '@ridrs/ride';
-import { gpx } from '../support/simulated-downloads.ts';
+import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
+import { gpx, incyclistPackage } from '../support/simulated-downloads.ts';
+import { withStoredVideo } from '../support/simulated-file.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
 
@@ -117,3 +119,31 @@ Then(
     assert.equal(controlOf(key).title, title);
   },
 );
+
+Given(
+  'the media storage holds the own route folder {string} unpacked from an Incyclist package',
+  async function (this: RidrsWorld, id: string) {
+    const folder = folderOf(`video-source-local/${id}`);
+    const reader = new ZipReader(new Uint8ArrayReader(await incyclistPackage(null)));
+    for (const entry of await reader.getEntries()) {
+      if (entry.directory) continue;
+      mkdirSync(folder, { recursive: true });
+      writeFileSync(join(folder, entry.filename), await entry.getData(new Uint8ArrayWriter()));
+    }
+    await reader.close();
+  },
+);
+
+Given(
+  'the media storage holds the own route folder {string} with a package that keeps its video stored',
+  async function (this: RidrsWorld, id: string) {
+    const folder = folderOf(`video-source-local/${id}`);
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, 'route.ride'), await withStoredVideo(await incyclistPackage(null)));
+  },
+);
+
+Given('the media storage holds no index of own routes', function (this: RidrsWorld) {
+  const index = join(folderOf('video-source-local'), 'routes.json');
+  if (existsSync(index)) rmSync(index);
+});

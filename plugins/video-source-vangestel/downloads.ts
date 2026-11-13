@@ -174,8 +174,13 @@ export class VideoDownloads {
     await media.remove(ride);
   }
 
-  /** Cancels the download of a route on its way; it can be downloaded again. Nothing else changes. */
+  /**
+   * Cancels the download of a route on its way; it can be downloaded again. Nothing else changes.
+   * A downloaded package being unpacked (`importing`) is no longer on its way: it is done in
+   * seconds and goes on.
+   */
   cancel(id: string): void {
+    if (this.availability(id).state !== 'fetching') return;
     this.running.get(id)?.abort(new Error('The download was cancelled'));
   }
 

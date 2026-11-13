@@ -45,7 +45,7 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
 
 ```text
 <media>/videos/<source>/
-  routes.json            a cache of the facts from the tracks (local source only), rebuilt when missing
+  routes.json            a cache of the facts from the tracks (local source only); a folder it lacks is read at start and added
   <route>/
     route.ride           optional: the package, never changed after it is stored
     <path>               a file that replaces or adds the entry <path> of route.ride, or, without one, is an entry
@@ -62,7 +62,7 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
 - **Whether its video is stored** the source reads before it stores anything: a chosen file can be peeked into as a dragged one (`PickedFile.peek`, `media_pick_peek`), and each peeked entry says whether it is stored.
 - **A package with a stored video is copied**, as `route.ride` into a new folder: with `std::fs::copy` where the file and the folder lie on one volume, a clone on APFS (`fclonefileat`, no bytes written), otherwise in pieces with progress (ADR 0067's channel). Picked and dropped files keep their tokens (ADR 0090, 0093).
 - **A package with a deflated video is unpacked** into the new folder, every entry at its path in the package, straight from the chosen file (no copy of the ZIP first) with progress; no `route.ride` is kept. Nothing is renamed and no `route.json` is written: the folder is the Incyclist folder the package holds. A chosen or dropped file unpacks itself (`PickedFile.extractTo`, `media_pick_extract` on the token); `data.archive` stays for packages in the media storage, the downloads.
-- **A Van Gestel download** lands as `videos/<source>/<route>.zip` beside the route's folder, resumable as today (`.part`), and is then moved into the folder as `route.ride`. Where its video is stored (1 of 23 today) that is all; otherwise (22 of 23) it is unpacked beside it with `data.archive` and removed, and the offer says how far the unpacking is (`importing` with `progress`, as an own import). Peak space is the package twice while it is unpacked, as before. The package's control file keeps its own title; the catalog's title is the offer's.
+- **A Van Gestel download** lands as `videos/<source>/<route>.zip` beside the route's folder, resumable as today (`.part`), and is then moved into the folder as `route.ride`. Where its video is stored (1 of 23 today) that is all; otherwise (22 of 23) it is unpacked beside it with `data.archive` and removed, and the offer says how far the unpacking is (`importing` with `progress`, as an own import). It is no longer a download on its way: `route.cancel` leaves it to finish. Peak space is the package twice while it is unpacked, as before. The package's control file keeps its own title; the catalog's title is the offer's.
 - **The headless host and the tests** do the same in Node with zip.js (ADR 0065): `data-archive-node` provides the Node side, and the scenarios' media URLs resolve entries through it.
 
 ### The built-in catalog: an overlay over the packages

@@ -31,13 +31,16 @@ const FOLDER = `videos/${PLUGIN}`;
 /** The imported routes and what their tracks say, so that a start reads no track. */
 const INDEX = `${FOLDER}/routes.json`;
 
+/** A route's folder name: lower case letters and digits joined by `-`. */
+const ROUTE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 const indexSchema = z
   .object({
     version: z.literal(1),
     routes: z.array(
       z
         .object({
-          id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+          id: z.string().regex(ROUTE_ID),
           title: z.string().min(1),
           distance: z.number().nonnegative(),
           ascent: z.number().nonnegative(),
@@ -134,6 +137,27 @@ export class LocalVideos {
         }
       }
     }
+    // A route folder the index does not know, such as every one when the index is lost, is read
+    // from its entries and kept in the index again (ADR 0094: the index is a cache).
+    const known = new Set(this.routes.map((route) => route.id));
+    const folders = new Set(
+      (await media.entries(FOLDER).catch(() => []))
+        .map((entry) => entry.path.split('/'))
+        .filter((segments) => segments.length > 1)
+        .map(([id]) => id ?? ''),
+    );
+    let found = false;
+    for (const id of [...folders].sort()) {
+      if (known.has(id) || !ROUTE_ID.test(id)) continue;
+      const route = await this.importedOf(media, id, titleOf(id)).catch(() => undefined);
+      const offer = route && (await this.offerOf(media, route).catch(() => undefined));
+      if (route && offer) {
+        this.routes.push(route);
+        offers.push(offer);
+        found = true;
+      }
+    }
+    if (found) await this.save(media);
     for (const offer of offers) this.state.offer(offer.id, offer);
     if (services.pick || services.drop) this.state.importer(this.last);
   }

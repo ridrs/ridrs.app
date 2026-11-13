@@ -57,3 +57,14 @@ Feature: Routes on the device are folders with a control file
     And the route folder "video-source-vangestel/col-de-pennes" holds "route.ride"
     And the route offer "video-source-vangestel/col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml"
     And the media storage holds no downloaded package
+
+  Scenario: Own routes are offered from their folders when the index of them is lost
+    Given the media storage holds the own route folder "col-de-test" unpacked from an Incyclist package
+    And the media storage holds the own route folder "col-de-pennes" with a package that keeps its video stored
+    And the media storage holds no index of own routes
+    When the host has started
+    Then the route offer "video-source-local/col-de-test" is "ready"
+    And the route offer "video-source-local/col-de-test" is titled "Col de Test"
+    And the route offer "video-source-local/col-de-test" reads "0.3 km"
+    And the route offer "video-source-local/col-de-pennes" is "ready"
+

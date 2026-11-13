@@ -173,6 +173,33 @@ describe('VideoDownloads', () => {
     expect([...files]).toEqual(['videos/source/pass/route.ride']);
   });
 
+  it('lets a downloaded package be unpacked to the end: no cancel then', async () => {
+    const { downloads, services } = setup();
+    let unpacking: () => void = () => {};
+    const unpacked = new Promise<void>((done) => {
+      unpacking = done;
+    });
+    let goOn: () => void = () => {};
+    const archive = {
+      extract: async (pack: string, directory: string, onProgress?: (p: { received: number; size?: number }) => void) => {
+        onProgress?.({ received: 1, size: 2 });
+        unpacking();
+        await new Promise<void>((resume) => {
+          goOn = resume;
+        });
+        return services.archive.extract(pack, directory, onProgress);
+      },
+    };
+    await downloads.connect({ ...services, archive });
+    const download = downloads.fetch(ROUTE.id);
+    await unpacked;
+    expect(downloads.availability(ROUTE.id)).toEqual({ state: 'importing', progress: 0.5 });
+    downloads.cancel(ROUTE.id);
+    goOn();
+    await download;
+    expect(downloads.availability(ROUTE.id).state).toBe('ready');
+  });
+
   it('cancels a download on its way: the route can be fetched again', async () => {
     const { downloads, services, removed } = setup();
     let started: () => void = () => {};

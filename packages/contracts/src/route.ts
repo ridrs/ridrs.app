@@ -130,7 +130,8 @@ export const routeFetchService = defineService('route.fetch', {
 
 /**
  * Cancels the download of an offer on its way; the offer is `fetchable` again and what was fetched
- * so far stays for the next download. An offer that is not on its way stays as it is.
+ * so far stays for the next download. An offer that is not on its way stays as it is, also one
+ * whose downloaded package is being unpacked (`importing`, ADR 0094).
  */
 export const routeCancelService = defineService('route.cancel', {
   request: routeKeyRequest,
