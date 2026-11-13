@@ -20,14 +20,32 @@ export const PREVIEW_CSS = `
 .pv-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pv-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: var(--ridrs-gap, 16px); }
-.pv-cards[data-wide] { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-[data-breakpoint="compact"] .pv-cards[data-wide] { grid-template-columns: minmax(0, 1fr); }
 /* In a grid a picture card takes its 16:10 from its column's width. With the height of the row
    (height: 100%) a taller card in the row, such as Import video, would widen it over its neighbour. */
 .pv-cards > .pv-teaser[data-media] { width: 100%; height: auto; }
-/* In a wide grid (the routes of Ride) every card is 16:10, Import video too, so no card takes its
-   height from the row: WebKit keeps a stretched card at its first height when the window resizes. */
-.pv-cards[data-wide] > .pv-teaser { width: 100%; height: auto; min-height: 0; aspect-ratio: 16 / 10; }
+/* A wide grid (the routes of Ride) gives its rows the 16:10 of its columns and every card fills its
+   cell, Import video too. WebKit keeps a row at its height when the cards in it change their size
+   by their aspect ratio as the window resizes, so the rows are sized here, by the grid's width: as
+   many columns of at least 300 px as fit, as auto-fill would. */
+.pv-section:has(> .pv-cards[data-wide]) { container-type: inline-size; }
+.pv-cards[data-wide] > .pv-teaser { width: auto; height: auto; min-height: 0; aspect-ratio: auto; }
+.pv-cards[data-wide] { grid-template-columns: minmax(0, 1fr); grid-auto-rows: calc(100cqw * 10 / 16); }
+@container (min-width: 616px) { .pv-cards[data-wide] { grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: calc((100cqw - var(--ridrs-gap, 16px)) / 2 * 10 / 16); } }
+@container (min-width: 932px) { .pv-cards[data-wide] { grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: calc((100cqw - 2 * var(--ridrs-gap, 16px)) / 3 * 10 / 16); } }
+@container (min-width: 1248px) { .pv-cards[data-wide] { grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: calc((100cqw - 3 * var(--ridrs-gap, 16px)) / 4 * 10 / 16); } }
+@container (min-width: 1564px) { .pv-cards[data-wide] { grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: calc((100cqw - 4 * var(--ridrs-gap, 16px)) / 5 * 10 / 16); } }
+@container (min-width: 1880px) { .pv-cards[data-wide] { grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: calc((100cqw - 5 * var(--ridrs-gap, 16px)) / 6 * 10 / 16); } }
+@container (min-width: 2196px) { .pv-cards[data-wide] { grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: calc((100cqw - 6 * var(--ridrs-gap, 16px)) / 7 * 10 / 16); } }
+@container (min-width: 2512px) { .pv-cards[data-wide] { grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-auto-rows: calc((100cqw - 7 * var(--ridrs-gap, 16px)) / 8 * 10 / 16); } }
+[data-breakpoint="compact"] .pv-cards[data-wide] { grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: calc(100cqw * 10 / 16); }
 .pv-card { display: flex; flex-direction: column; gap: 8px; padding: 16px;
   border: 1px solid var(--ridrs-line, #24324d); border-radius: var(--ridrs-radius, 16px);
   background: var(--ridrs-surface, #131c2e); }
