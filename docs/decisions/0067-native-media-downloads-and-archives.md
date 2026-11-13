@@ -2,7 +2,7 @@
 
 # ADR 0067: Media, Downloads and Archives in the Native App
 
-Status: proposed on 2026-11-07 ([video-sources.md](../ideas/video-sources.md), step V2b).
+Status: proposed on 2026-11-07 ([video-sources.md](../ideas/video-sources.md), step V2b). Amended by [ADR 0094](0094-video-routes-stored-as-ride-packages.md): packages are no longer unpacked; `media_extract` gives way to reading entries of a stored `.ride`.
 
 ## Context
 

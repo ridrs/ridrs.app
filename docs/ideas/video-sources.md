@@ -108,6 +108,8 @@ A built-in world is always `ready`. A video source's offer is `fetchable` until 
 
 ## 4. The unified format: ridrs video route v1
 
+> Replaced by [ADR 0094](../decisions/0094-video-routes-stored-as-ride-packages.md): routes are stored as `.ride` packages and played from the ZIP. Sections 4 and 5 describe the format before it.
+
 ```text
 <media>/videos/<source>/<route>/
   route.json      the contract (zod schema in @ridrs/contracts, documented in docs/formats/)
