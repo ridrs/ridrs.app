@@ -175,6 +175,34 @@ describe('watchDrags', () => {
     expect(rust.calls.at(-1)).toEqual({ command: 'media_drop_remove', args: { token: '1' } });
   });
 
+  it('takes a drag that ended without being let go (Escape) out of the window', async () => {
+    const { drop } = watch();
+    document.body.dispatchEvent(drag('dragenter'));
+    inner.dispatchEvent(drag('dragenter'));
+    document.body.dispatchEvent(drag('dragleave'));
+    await settle();
+    // The system ended the drag: no dragleave reached the page, only the end of the session.
+    window.dispatchEvent(new Event('ridrs:drag-ended'));
+    await settle();
+    expect(events.map((event) => event.kind)).toEqual(['enter', 'leave']);
+    expect(rust.commands().at(-1)).toBe('media_drop_leave');
+    expect(drop.file('drop-1')).toBeUndefined();
+    // The same files dragged again are told of again.
+    document.body.dispatchEvent(drag('dragenter'));
+    await settle();
+    expect(events.map((event) => event.kind)).toEqual(['enter', 'leave', 'enter']);
+  });
+
+  it('keeps a drag that ended by being let go', async () => {
+    const { drop } = watch();
+    document.body.dispatchEvent(drag('dragenter'));
+    inner.dispatchEvent(drag('drop'));
+    window.dispatchEvent(new Event('ridrs:drag-ended'));
+    await settle();
+    expect(events.map((event) => event.kind)).toEqual(['enter', 'drop']);
+    expect(drop.file('drop-1')?.name).toBe('Col_de_Test.ride');
+  });
+
   it('stops watching', async () => {
     const watched = watch();
     watched.stop();

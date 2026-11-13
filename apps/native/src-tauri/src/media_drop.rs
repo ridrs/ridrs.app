@@ -190,6 +190,57 @@ pub fn honour_refused_drags(window: &tauri::WebviewWindow) -> tauri::Result<()> 
     })
 }
 
+/// The event the page hears when a drag session over the window ends, let go or not
+/// (`data-drop-tauri`). With the drag let go, the page had its `drop` before it.
+#[cfg(target_os = "macos")]
+const DRAG_ENDED: &str = "window.dispatchEvent(new Event('ridrs:drag-ended'))";
+
+/// Tells the page when a drag session over the window ends (ADR 0093). Escape cancels a drag in
+/// the system: the file slides back, but AppKit sends the web view no `draggingExited:`, so
+/// WebKit fires no `dragleave` and the page would think the files still hover. `draggingEnded:`
+/// comes at the end of every session; this adds it to wry's class of the web view, passes it on
+/// to WebKit where WebKit has it, and then tells the page.
+#[cfg(target_os = "macos")]
+pub fn tell_ended_drags(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
+    use objc2::{ClassType, msg_send, sel};
+    use objc2_foundation::NSString;
+    use objc2_web_kit::WKWebView;
+
+    unsafe extern "C-unwind" fn dragging_ended(this: &AnyObject, _cmd: Sel, info: *mut AnyObject) {
+        if WKWebView::class().instance_method(sel!(draggingEnded:)).is_some() {
+            // SAFETY: `this` is a WKWebView (wry's subclass of it), and WebKit has the method.
+            let () = unsafe { msg_send![super(this, WKWebView::class()), draggingEnded: info] };
+        }
+        // SAFETY: `this` is a WKWebView, on the main thread as AppKit's dragging calls are.
+        unsafe {
+            let view = &*(this as *const AnyObject as *const WKWebView);
+            view.evaluateJavaScript_completionHandler(&NSString::from_str(DRAG_ENDED), None);
+        }
+    }
+
+    window.with_webview(|webview| {
+        // SAFETY: `inner` is the window's web view, and the closure runs on the main thread.
+        let view: &AnyObject = unsafe { &*(webview.inner() as *const AnyObject) };
+        let class = view.class();
+        // Only on wry's own class, never on WebKit's.
+        if class == WKWebView::class() {
+            return;
+        }
+        type Ended = unsafe extern "C-unwind" fn(&AnyObject, Sel, *mut AnyObject);
+        // SAFETY: a method of the dragging destination protocol, `void (id, SEL, id)`; it is only
+        // added where wry's class has none of its own (an inherited one stays reachable as super).
+        unsafe {
+            objc2::ffi::class_addMethod(
+                class as *const AnyClass as *mut AnyClass,
+                sel!(draggingEnded:),
+                std::mem::transmute::<Ended, Imp>(dragging_ended),
+                c"v@:@".as_ptr(),
+            );
+        }
+    })
+}
+
 /// The files being dragged; the page calls it when a drag of files enters and, `dropped`, when
 /// it is let go.
 #[tauri::command]

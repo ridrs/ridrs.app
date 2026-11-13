@@ -29,6 +29,9 @@ interface Peeked {
   readonly readable: boolean;
 }
 
+/** Dispatched on the window by Rust when a drag session over it ends (ADR 0093). */
+const DRAG_ENDED = 'ridrs:drag-ended';
+
 const carriesFiles = (event: Event) => [...((event as DragEvent).dataTransfer?.types ?? [])].includes('Files');
 
 /**
@@ -36,8 +39,8 @@ const carriesFiles = (event: Event) => [...((event as DragEvent).dataTransfer?.t
  * learns nothing of a hovering file, so the files come from Rust whenever a drag enters an element
  * and again when it is let go (the same drag keeps its files, and is told of once);
  * `dragenter` and `dragleave` of the elements inside are counted, so the drag leaves once it left
- * the window. The app's own drags carry no
- * files and pass by. The calls to Rust run one after another, in the order of the events.
+ * the window, or once Rust tells that the drag session ended without a drop (Escape). The app's
+ * own drags carry no files and pass by. The calls to Rust run one after another, in the order of the events.
  */
 export function watchDrags(
   target: EventTarget,
@@ -105,16 +108,26 @@ export function watchDrags(
       emit({ kind: 'enter', files: entered });
     });
   };
-  const onLeave = (event: Event) => {
-    if (!carriesFiles(event) || depth === 0) return;
-    depth -= 1;
-    if (depth !== 0) return;
+  const leave = () => {
+    depth = 0;
     then(async () => {
       files = new Map();
       told = '';
       await invoke<void>('media_drop_leave');
       emit({ kind: 'leave' });
     });
+  };
+  const onLeave = (event: Event) => {
+    if (!carriesFiles(event) || depth === 0) return;
+    depth -= 1;
+    if (depth === 0) leave();
+  };
+  /**
+   * The drag session ended (Rust tells of it, `media_drop::tell_ended_drags`): one that was not
+   * let go and still counts as inside left without a `dragleave`, as Escape ends one on macOS.
+   */
+  const onEnded = () => {
+    if (depth > 0) leave();
   };
   const onDrop = (event: Event) => {
     if (!carriesFiles(event)) return;
@@ -129,6 +142,7 @@ export function watchDrags(
   target.addEventListener('dragenter', onEnter, true);
   target.addEventListener('dragleave', onLeave, true);
   target.addEventListener('drop', onDrop, true);
+  target.addEventListener(DRAG_ENDED, onEnded);
 
   return {
     drop: {
@@ -142,6 +156,7 @@ export function watchDrags(
       target.removeEventListener('dragenter', onEnter, true);
       target.removeEventListener('dragleave', onLeave, true);
       target.removeEventListener('drop', onDrop, true);
+      target.removeEventListener(DRAG_ENDED, onEnded);
       listeners.clear();
     },
   };

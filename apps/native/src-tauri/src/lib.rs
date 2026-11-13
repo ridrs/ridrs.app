@@ -67,6 +67,9 @@ pub fn run() {
                 // The pointer shows no plus over files the page does not take (ADR 0093).
                 #[cfg(target_os = "macos")]
                 media_drop::honour_refused_drags(&window)?;
+                // Escape over a drag is heard: the system ends it without a leave (ADR 0093).
+                #[cfg(target_os = "macos")]
+                media_drop::tell_ended_drags(&window)?;
             }
             Ok(())
         })
