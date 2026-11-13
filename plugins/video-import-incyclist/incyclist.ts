@@ -3,12 +3,19 @@
 import {
   type DataArchive,
   type MediaFiles,
-  VIDEO_ROUTE_FILE,
   type VideoImporter,
   type VideoRoute,
   videoRouteSchema,
 } from '@ridrs/contracts';
-import { decodeText, inspectPackage, parseControl, pictureOf } from '@ridrs/ride';
+import {
+  CONTROL_FILE,
+  controlFromRoute,
+  decodeText,
+  inspectPackage,
+  parseControl,
+  pictureOf,
+  writeControl,
+} from '@ridrs/ride';
 
 /** Incyclist's video package: a control file (`gpx-import`), the video and its GPX track. */
 export const INCYCLIST_FORMAT = 'incyclist-gpx-import';
@@ -24,7 +31,7 @@ export const inspectIncyclist = inspectPackage;
 /**
  * Turns an Incyclist ZIP into a ridrs video route: unpacked into the folder, the video, the track
  * and the picture renamed (`video.mp4`, `track.gpx`, `thumbnail.png` or `.jpg`), everything else
- * removed, `route.json` written.
+ * removed, the control file `route.xml` written for them (ADR 0094).
  */
 export function createIncyclistImporter(media: MediaFiles, archive: DataArchive): VideoImporter {
   return {
@@ -66,7 +73,8 @@ export function createIncyclistImporter(media: MediaFiles, archive: DataArchive)
         ...(thumbnail ? { thumbnail: { file: thumbnail } } : {}),
         imported: { by: 'video-import-incyclist', version: IMPORT_VERSION },
       } satisfies VideoRoute);
-      await media.write(`${directory}/${VIDEO_ROUTE_FILE}`, new TextEncoder().encode(`${JSON.stringify(route, null, 2)}\n`));
+      // The route's control file (ADR 0094): what Incyclist and the video world read.
+      await media.write(`${directory}/${CONTROL_FILE}`, new TextEncoder().encode(writeControl(controlFromRoute(route))));
       return route;
     },
   };

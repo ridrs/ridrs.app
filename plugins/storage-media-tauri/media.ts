@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { assertAppFilePath, type MediaFiles } from '@ridrs/contracts';
+import { assertAppFilePath, type MediaEntry, type MediaFiles } from '@ridrs/contracts';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 
 /** The app's scheme for media in the WebView (crates/ridrs-media/src/protocol.rs). */
@@ -29,5 +29,6 @@ export function createTauriMediaFiles(root: string): MediaFiles {
     },
     location,
     url: (path) => convertFileSrc(assertAppFilePath(path), SCHEME),
+    entries: (folder) => invoke<MediaEntry[]>('media_entries', { folder: assertAppFilePath(folder) }),
   };
 }

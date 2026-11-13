@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! The `ridrs-media://` scheme: the media storage's files for the WebView, by range (ADR 0067).
+//! The `ridrs-media://` scheme: the media storage's files for the WebView, by range (ADR 0067), and
+//! the entries of a video route's package `route.ride` as if they were files of its folder
+//! (ADR 0094): a stored entry by range straight from the package, a compressed one whole.
 //! The URL's path is the media path, percent-encoded (`convertFileSrc(path, 'ridrs-media')`), never
 //! a path of the device. Every answer allows any origin of the app's WebView, a 416 and the CORS
 //! preflight included, and a range answer is cut at `MAX_RANGE`: the reader asks for the rest.
@@ -12,6 +14,7 @@ use std::path::Path;
 use tauri::http::{header, Method, Request, Response, StatusCode};
 
 use crate::paths::resolve;
+use crate::ride::{self, Place, PACKAGE};
 
 /// The scheme's name, as registered by the app and named in the CSP.
 pub const SCHEME: &str = "ridrs-media";
@@ -62,15 +65,11 @@ pub fn respond(root: &Path, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
         Some(path) => path,
         None => return empty(StatusCode::BAD_REQUEST),
     };
-    let Ok(file_path) = resolve(root, &path) else {
-        return empty(StatusCode::FORBIDDEN);
+    let mut source = match source(root, &path) {
+        Ok(source) => source,
+        Err(status) => return empty(status),
     };
-    let Ok(mut file) = File::open(&file_path) else {
-        return empty(StatusCode::NOT_FOUND);
-    };
-    let Ok(len) = file.metadata().map(|m| m.len()) else {
-        return empty(StatusCode::INTERNAL_SERVER_ERROR);
-    };
+    let len = source.len();
     let range = request.headers().get(header::RANGE).and_then(|r| r.to_str().ok());
     let (status, start, length) = match range {
         Some(range) => match http_range::HttpRange::parse(range, len).ok().as_deref() {
@@ -94,11 +93,71 @@ pub fn respond(root: &Path, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     if request.method() == Method::HEAD {
         return builder.body(Vec::new()).expect("a valid response");
     }
-    let mut body = vec![0; length as usize];
-    if file.seek(SeekFrom::Start(start)).and_then(|_| file.read_exact(&mut body)).is_err() {
-        return empty(StatusCode::INTERNAL_SERVER_ERROR);
+    match source.read(start, length) {
+        Ok(body) => builder.body(body).expect("a valid response"),
+        Err(_) => empty(StatusCode::INTERNAL_SERVER_ERROR),
     }
-    builder.body(body).expect("a valid response")
+}
+
+/// Where the bytes of a media path lie: `len` bytes of a file from `base` (a file, or a stored
+/// entry of a route's package), or a compressed entry's bytes.
+enum Source {
+    File { file: File, base: u64, len: u64 },
+    Bytes(Vec<u8>),
+}
+
+impl Source {
+    fn len(&self) -> u64 {
+        match self {
+            Source::File { len, .. } => *len,
+            Source::Bytes(bytes) => bytes.len() as u64,
+        }
+    }
+
+    fn read(&mut self, start: u64, length: u64) -> std::io::Result<Vec<u8>> {
+        match self {
+            Source::File { file, base, .. } => {
+                let mut body = vec![0; length as usize];
+                file.seek(SeekFrom::Start(*base + start))?;
+                file.read_exact(&mut body)?;
+                Ok(body)
+            }
+            Source::Bytes(bytes) => Ok(bytes[start as usize..(start + length) as usize].to_vec()),
+        }
+    }
+}
+
+/// The file of `path`, or else the entry of the package in the nearest folder above it that has one.
+fn source(root: &Path, path: &str) -> Result<Source, StatusCode> {
+    let file_path = resolve(root, path).map_err(|_| StatusCode::FORBIDDEN)?;
+    if file_path.is_file() {
+        let file = File::open(&file_path).map_err(|_| StatusCode::NOT_FOUND)?;
+        let len = file.metadata().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.len();
+        return Ok(Source::File { file, base: 0, len });
+    }
+    let segments: Vec<&str> = path.split('/').collect();
+    for depth in (1..segments.len()).rev() {
+        let folder = segments[..depth].join("/");
+        let package = resolve(root, &format!("{folder}/{PACKAGE}")).map_err(|_| StatusCode::FORBIDDEN)?;
+        if !package.is_file() {
+            continue;
+        }
+        let name = segments[depth..].join("/");
+        let entry = ride::entry(root, &folder, &name)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+        let open = |file: &Path| File::open(file).map_err(|_| StatusCode::NOT_FOUND);
+        return match entry.place {
+            Place::File(file) => Ok(Source::File { file: open(&file)?, base: 0, len: entry.size }),
+            Place::Stored { offset } => Ok(Source::File { file: open(&package)?, base: offset, len: entry.size }),
+            // A compressed entry cannot be read by range: only small ones, whole.
+            Place::Packed { .. } if entry.size > MAX_WHOLE => Err(StatusCode::PAYLOAD_TOO_LARGE),
+            Place::Packed { .. } => ride::read(root, &folder, &name, MAX_WHOLE)
+                .map(Source::Bytes)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
+        };
+    }
+    Err(StatusCode::NOT_FOUND)
 }
 
 /// `%XX` escapes as bytes, the result as UTF-8; `None` for a broken escape or invalid UTF-8.
@@ -180,6 +239,43 @@ mod tests {
     fn sends_a_route_picture_as_an_image() {
         assert_eq!(content_type("videos/a/thumbnail.jpg"), "image/jpeg");
         assert_eq!(content_type("videos/a/thumbnail.png"), "image/png");
+    }
+
+    /// A route's folder `videos/r` with a package of a stored video and a compressed control file.
+    fn route() -> tempfile::TempDir {
+        use std::io::Write;
+        use zip::write::SimpleFileOptions;
+        let root = media();
+        std::fs::create_dir_all(root.path().join("videos/r")).unwrap();
+        let mut zip = zip::ZipWriter::new(File::create(root.path().join("videos/r/route.ride")).unwrap());
+        let deflated = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file("Col.xml", deflated).unwrap();
+        zip.write_all(b"<gpx-import/>").unwrap();
+        let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("Col.mp4", stored).unwrap();
+        zip.write_all(&(0..100u8).collect::<Vec<_>>()).unwrap();
+        zip.finish().unwrap();
+        root
+    }
+
+    #[test]
+    fn answers_a_range_of_a_stored_entry_of_a_route_package() {
+        let root = route();
+        let response = respond(root.path(), &request(Method::GET, "videos%2Fr%2FCol.mp4", Some("bytes=10-19")));
+        assert_eq!(response.status(), StatusCode::PARTIAL_CONTENT);
+        assert_eq!(response.headers()[header::CONTENT_RANGE], "bytes 10-19/100");
+        assert_eq!(response.headers()[header::CONTENT_TYPE], "video/mp4");
+        assert_eq!(response.body(), &(10..20u8).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn sends_a_compressed_entry_whole_and_a_file_beside_the_package_instead_of_its_entry() {
+        let root = route();
+        let get = |path: &str| respond(root.path(), &request(Method::GET, path, None));
+        assert_eq!(get("videos%2Fr%2FCol.xml").body(), b"<gpx-import/>");
+        std::fs::write(root.path().join("videos/r/col.xml"), "a better control file").unwrap();
+        assert_eq!(get("videos%2Fr%2FCol.xml").body(), b"a better control file");
+        assert_eq!(get("videos%2Fr%2FCol.gpx").status(), StatusCode::NOT_FOUND);
     }
 
     #[test]

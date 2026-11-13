@@ -4,12 +4,10 @@ import {
   type DataFetch,
   type MediaFiles,
   type RouteOffer,
-  VIDEO_ROUTE_FILE,
   type VideoImporter,
-  type VideoRoute,
   type VideoRouteFacts,
-  videoRouteSchema,
 } from '@ridrs/contracts';
+import { entryUrls, findControl, moveToControlFile } from '@ridrs/ride';
 
 export type Availability = RouteOffer['availability'];
 
@@ -61,13 +59,13 @@ export class VideoDownloads {
       return;
     }
     for (const route of this.routes) {
-      const file = `${folderOf(route.id)}/${VIDEO_ROUTE_FILE}`;
-      if (await media.exists(file)) {
-        // A route.json that does not parse is a broken route: it can be downloaded again.
-        const stored = videoRouteSchema.safeParse(JSON.parse(new TextDecoder().decode(await media.read(file))));
-        if (stored.success) {
-          this.set(route.id, this.ready(media, route.id, stored.data));
-        }
+      const folder = folderOf(route.id);
+      // A route downloaded before ADR 0094 gets its control file; one without is a broken route
+      // and can be downloaded again.
+      await moveToControlFile(media, folder).catch(() => false);
+      const ready = await this.ready(media, route.id).catch(() => undefined);
+      if (ready) {
+        this.set(route.id, ready);
       }
     }
   }
@@ -129,15 +127,19 @@ export class VideoDownloads {
       }
       const folder = folderOf(route.id);
       await media.remove(folder);
-      let imported: VideoRoute;
+      let ready: Availability | undefined;
       try {
-        imported = await importer.import(pack, folder, route.facts);
+        await importer.import(pack, folder, route.facts);
+        ready = await this.ready(media, id);
+        if (!ready) {
+          throw new Error('The imported route has no control file');
+        }
       } catch (error) {
         await media.remove(folder);
         throw error;
       }
       await media.remove(pack);
-      this.set(id, this.ready(media, id, imported));
+      this.set(id, ready);
     } catch (error) {
       if (controller.signal.aborted) {
         // Cancelled: as before the download; the part stays, a new download goes on from it.
@@ -167,14 +169,18 @@ export class VideoDownloads {
     this.changed(id);
   }
 
-  /** A route on the device, with the URL of each of its files as the media storage makes them. */
-  private ready(media: MediaFiles, id: string, route: VideoRoute): Availability {
-    const names = [VIDEO_ROUTE_FILE, route.video.file, route.track.file];
-    return {
-      state: 'ready',
-      files: Object.fromEntries(names.map((name) => [name, media.url(`${folderOf(id)}/${name}`)])),
-      removable: true,
-    };
+  /**
+   * A route on the device, with the URL of each of its entries as the media storage makes them
+   * (ADR 0094); none when its folder holds no control file naming a video and a track it holds.
+   */
+  private async ready(media: MediaFiles, id: string): Promise<Availability | undefined> {
+    const folder = folderOf(id);
+    const entries = await media.entries(folder);
+    const paths = entries.map((entry) => entry.path);
+    if (!(await findControl(paths, (path) => media.read(`${folder}/${path}`)))) {
+      return undefined;
+    }
+    return { state: 'ready', files: entryUrls(media, folder, entries), removable: true };
   }
 
   private set(id: string, availability: Availability): void {

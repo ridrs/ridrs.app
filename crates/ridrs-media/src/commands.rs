@@ -14,7 +14,7 @@ use serde::Serialize;
 use tauri::ipc::{Channel, Response};
 use tauri::{AppHandle, Manager, State};
 
-use crate::{archive, fetch, files, paths};
+use crate::{archive, fetch, files, paths, ride};
 
 /// The HTTP client of all downloads and the cancel flags of the running ones, by job id.
 #[derive(Default)]
@@ -80,6 +80,27 @@ pub fn media_move(app: AppHandle, from: String, to: String) -> Result<(), String
 #[tauri::command(async)]
 pub fn media_remove(app: AppHandle, path: String) -> Result<(), String> {
     files::remove(&root(&app)?, &path)
+}
+
+/// An entry of a video route's folder, as `MediaFiles.entries` names it.
+#[derive(Serialize)]
+pub struct MediaEntry {
+    path: String,
+    size: u64,
+}
+
+/// The entries of the video route in the media folder `folder` (`ride.rs`, ADR 0094); a missing
+/// folder has none.
+#[tauri::command(async)]
+pub fn media_entries(app: AppHandle, folder: String) -> Result<Vec<MediaEntry>, String> {
+    let root = root(&app)?;
+    if !paths::resolve(&root, &folder)?.is_dir() {
+        return Ok(Vec::new());
+    }
+    Ok(ride::entries(&root, &folder)?
+        .into_iter()
+        .map(|entry| MediaEntry { path: entry.path, size: entry.size })
+        .collect())
 }
 
 /// Fetches `url` into the media path `target`, resumable (`fetch.rs`); `job` names it for a cancel.

@@ -4,6 +4,7 @@ import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { assertAppFilePath, type MediaFiles } from '@ridrs/contracts';
+import { routeEntries } from './entries.ts';
 
 /** `storage.media` on a folder of the device: media paths below `root`, file URLs for the UI. */
 export function createNodeMediaFiles(root: string): MediaFiles {
@@ -33,5 +34,6 @@ export function createNodeMediaFiles(root: string): MediaFiles {
     },
     location,
     url: (path) => pathToFileURL(location(path)).href,
+    entries: (folder) => routeEntries(location(folder)),
   };
 }

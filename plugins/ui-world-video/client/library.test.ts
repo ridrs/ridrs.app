@@ -2,7 +2,7 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from 'vitest';
-import { loadDownloadedRoute, parseControlFile, parseGpx } from './library.ts';
+import { loadDownloadedRoute, parseGpx } from './library.ts';
 
 const CONTROL = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <gpx-import>
@@ -29,29 +29,6 @@ const GPX = `<?xml version="1.0" encoding="UTF-8"?>
   </trkseg></trk>
 </gpx>`;
 
-describe('parseControlFile', () => {
-  it('reads the title, the files in the folder, the frame rate and the start frame', () => {
-    expect(parseControlFile(CONTROL, 'FR Pennes', '/videos/')).toEqual({
-      id: 'FR Pennes',
-      title: 'Col de Pennes - Climb it twice!',
-      summary: 'Col de Pennes · Length: 46.2 km - Total ascent: 1,177 hm',
-      videoUrl: '/videos/FR%20Pennes/FR_Col_de_Pennes.mp4',
-      gpxUrl: '/videos/FR%20Pennes/FR_Col_de_Pennes.gpx',
-      framerate: 30,
-      startFrame: 31,
-    });
-  });
-
-  it('reads the HTML entities the control files use', () => {
-    const control = CONTROL.replace('<title>Col de Pennes', '<title>Walnu&szlig;plantagen &amp; Col de Pennes');
-    expect(parseControlFile(control, 'x').title).toBe('Walnußplantagen & Col de Pennes - Climb it twice!');
-  });
-
-  it('rejects a control file without a video', () => {
-    expect(() => parseControlFile('<gpx-import><title>x</title></gpx-import>', 'x')).toThrow(/no video/);
-  });
-});
-
 describe('parseGpx', () => {
   it('reads every point with its time since the first, leaving out points without an elevation', () => {
     expect(parseGpx(GPX)).toEqual([
@@ -67,48 +44,49 @@ describe('loadDownloadedRoute', () => {
   const asset = (path: string) => `asset://localhost/${encodeURIComponent(path)}`;
   const folder = '/Users/rider/Library/Application Support/org.ridrs.app/media/videos/source/pennes';
   const files = {
-    'route.json': asset(`${folder}/route.json`),
-    'video.mp4': asset(`${folder}/video.mp4`),
-    'track.gpx': asset(`${folder}/track.gpx`),
-  };
-  const route = {
-    format: 'ridrs-video-route',
-    version: 1,
-    title: 'Col de Pennes',
-    source: { name: 'Van Gestel', author: 'Fred Van Gestel', url: 'https://example.org/', license: 'CC BY-NC-SA 4.0' },
-    notes: [],
-    segments: [],
-    video: { file: 'video.mp4', framerate: 30, startFrame: 12 },
-    track: { file: 'track.gpx' },
-    imported: { by: 'video-import-incyclist', version: '1' },
+    'FR_Col_de_Pennes.xml': asset(`${folder}/FR_Col_de_Pennes.xml`),
+    'fr_col_de_pennes.MP4': asset(`${folder}/fr_col_de_pennes.MP4`),
+    'FR_Col_de_Pennes.gpx': asset(`${folder}/FR_Col_de_Pennes.gpx`),
+    'LIESMICH.txt': asset(`${folder}/LIESMICH.txt`),
   };
 
-  it('takes the URL of every file from the offer, never one built from another', async () => {
+  it('reads the control file among the offer\'s files and takes the URL of every file from the offer', async () => {
     const fetched: string[] = [];
     vi.stubGlobal('fetch', async (url: string) => {
       fetched.push(url);
-      return new Response(JSON.stringify(route));
+      return new Response(CONTROL);
     });
     try {
       expect(await loadDownloadedRoute('source/pennes', files)).toEqual({
         id: 'source/pennes',
-        title: 'Col de Pennes',
-        videoUrl: files['video.mp4'],
-        gpxUrl: files['track.gpx'],
+        title: 'Col de Pennes - Climb it twice!',
+        videoUrl: files['fr_col_de_pennes.MP4'],
+        gpxUrl: files['FR_Col_de_Pennes.gpx'],
         framerate: 30,
-        startFrame: 12,
+        startFrame: 31,
       });
-      expect(fetched).toEqual([files['route.json']]);
+      expect(fetched).toEqual([files['FR_Col_de_Pennes.xml']]);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('says which file the offer does not name', async () => {
-    vi.stubGlobal('fetch', async () => new Response(JSON.stringify(route)));
+  it('names the route by its name where the control file names no title', async () => {
+    vi.stubGlobal('fetch', async () => new Response(CONTROL.replace(/<title>.*<\/title>/, '')));
     try {
-      const { 'track.gpx': _, ...withoutTrack } = files;
-      await expect(loadDownloadedRoute('source/pennes', withoutTrack)).rejects.toThrow('has no file "track.gpx"');
+      expect((await loadDownloadedRoute('source/pennes', files)).title).toBe('Col de Pennes');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('says when no control file of the offer names a video and a track it holds', async () => {
+    vi.stubGlobal('fetch', async () => new Response(CONTROL));
+    try {
+      const { 'FR_Col_de_Pennes.gpx': _, ...withoutTrack } = files;
+      await expect(loadDownloadedRoute('source/pennes', withoutTrack)).rejects.toThrow(
+        'The downloaded route "source/pennes" has no control file',
+      );
     } finally {
       vi.unstubAllGlobals();
     }

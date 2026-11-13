@@ -828,6 +828,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@zip.js/zip.js':
+        specifier: 2.24.0
+        version: 2.24.0
       env-paths:
         specifier: 4.0.0
         version: 4.0.0
@@ -1564,6 +1567,9 @@ importers:
       '@ridrs/presentation':
         specifier: workspace:*
         version: link:../../packages/presentation
+      '@ridrs/ride':
+        specifier: workspace:*
+        version: link:../../packages/ride
       '@ridrs/ui-preview':
         specifier: workspace:*
         version: link:../../packages/ui-preview
@@ -1594,6 +1600,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ridrs/ride':
+        specifier: workspace:*
+        version: link:../../packages/ride
       fast-xml-parser:
         specifier: 5.11.2
         version: 5.11.2
@@ -1606,6 +1615,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ridrs/ride':
+        specifier: workspace:*
+        version: link:../../packages/ride
 
   plugins/workout-player:
     dependencies:

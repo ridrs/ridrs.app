@@ -57,6 +57,18 @@ export interface MediaFiles {
   location(path: string): string;
   /** A URL the UI can read the file from, by range for a video. */
   url(path: string): string;
+  /**
+   * The entries of the video route in the folder `folder` (ADR 0094): those of its package
+   * `route.ride` and the files beside it, which replace an entry of their path (letters compared
+   * without case) or add one. Hidden files are none; a missing folder has none.
+   */
+  entries(folder: string): Promise<readonly MediaEntry[]>;
+}
+
+/** An entry of a video route's folder: its path in the folder, `/`-separated, and its bytes. */
+export interface MediaEntry {
+  readonly path: string;
+  readonly size: number;
 }
 
 export const storageMediaCapability = defineCapability<MediaFiles, 'single', 'storage.media'>(

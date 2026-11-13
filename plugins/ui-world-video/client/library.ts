@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /*
- * Video routes: Incyclist control files (`gpx-import`) and GPX tracks, and downloaded routes in
- * the unified format (`route.json`).
+ * Video routes on the device: a folder with an Incyclist control file (`gpx-import`), the video
+ * and the GPX track it names (ADR 0094).
  */
 
-import { VIDEO_ROUTE_FILE, videoRouteSchema } from '@ridrs/contracts';
+import { besideControl, entryNamed, findControl } from '@ridrs/ride';
 
 /** A video route. */
 export interface VideoRoute {
   /** The folder: the route's id in a ride's world. */
   readonly id: string;
   readonly title: string;
-  /** The first of its notes: length, ascent and difficulty, by the route's authors. */
-  readonly summary?: string;
   readonly videoUrl: string;
   readonly gpxUrl: string;
   /** Video frames per second; with `startFrame`, where the track's time 0 lies in the video. */
@@ -54,27 +52,6 @@ export function xml(text: string): Document {
 const textOf = (parent: Document | Element, tag: string) =>
   parent.getElementsByTagName(tag)[0]?.textContent?.trim() ?? undefined;
 
-/** The route of a control file in `folder`, its files resolved against `base`. */
-export function parseControlFile(text: string, folder: string, base = ''): VideoRoute {
-  const control = xml(text);
-  const video = textOf(control, 'video-file-path');
-  const gpx = textOf(control, 'gpx-file-path');
-  if (!video || !gpx) {
-    throw new Error(`The control file of "${folder}" names no video or no GPX file`);
-  }
-  const at = (file: string) => `${base}${encodeURIComponent(folder)}/${encodeURIComponent(file)}`;
-  const summary = control.getElementsByTagName('information')[0]?.getAttribute('en') ?? undefined;
-  return {
-    id: folder,
-    title: textOf(control, 'title') ?? textOf(control, 'name') ?? folder,
-    summary: summary?.replaceAll('\\n', ' · '),
-    videoUrl: at(video),
-    gpxUrl: at(gpx),
-    framerate: Number(textOf(control, 'framerate') ?? 30) || 30,
-    startFrame: Number(textOf(control, 'start-frame') ?? 1) || 1,
-  };
-}
-
 /**
  * The points of a GPX track in order, each with its time since the first point: the time of the
  * video at that point. Points without a position, an elevation or a time are left out.
@@ -97,25 +74,26 @@ export function parseGpx(text: string): TrackPoint[] {
 }
 
 /**
- * A downloaded route in the unified format (`route.json`, docs/ideas/video-sources.md), from the
- * URLs of its files that its offer names. Never built from each other: the native app's asset
- * URLs hold the whole path as one encoded segment, so nothing lies "next to" another URL.
+ * A route on the device from the URLs of its files that its offer names (ADR 0094): its control
+ * file among them, and the video and the track that file names. Never built from each other: the
+ * native app's asset URLs hold the whole path as one encoded segment, so nothing lies "next to"
+ * another URL.
  */
 export async function loadDownloadedRoute(id: string, files: Readonly<Record<string, string>>): Promise<VideoRoute> {
-  const url = (name: string) => {
-    const found = files[name];
-    if (!found) {
-      throw new Error(`The downloaded route "${id}" has no file "${name}"`);
-    }
-    return found;
-  };
-  const route = videoRouteSchema.parse(await (await fetch(url(VIDEO_ROUTE_FILE))).json());
+  const paths = Object.keys(files);
+  const read = async (path: string) => new Uint8Array(await (await fetch(files[path] ?? '')).arrayBuffer());
+  const found = await findControl(paths, read);
+  if (!found) {
+    throw new Error(`The downloaded route "${id}" has no control file that names its video and track`);
+  }
+  const { control } = found;
+  const url = (relative: string) => files[entryNamed(paths, besideControl(found.path, relative)) ?? ''] ?? '';
   return {
     id,
-    title: route.title,
-    videoUrl: url(route.video.file),
-    gpxUrl: url(route.track.file),
-    framerate: route.video.framerate,
-    startFrame: route.video.startFrame,
+    title: control.title ?? control.name ?? id,
+    videoUrl: url(control.video),
+    gpxUrl: url(control.gpx),
+    framerate: control.framerate,
+    startFrame: control.startFrame,
   };
 }

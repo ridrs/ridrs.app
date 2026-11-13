@@ -15,27 +15,28 @@ const ROUTE: Downloadable = {
 
 function setup(options: { failFetch?: string; failImport?: string } = {}) {
   const files = new Set<string>();
-  const ROUTE_JSON = JSON.stringify({
-    format: 'ridrs-video-route',
-    version: 1,
-    title: 'Pass',
-    source: { name: 'S', author: 'A', url: 'https://example.org/', license: 'L' },
-    notes: [],
-    segments: [],
-    video: { file: 'video.mp4', framerate: 30, startFrame: 1 },
-    track: { file: 'track.gpx' },
-    imported: { by: 'test', version: '1' },
-  });
+  /** The control file every route on this fake device has (ADR 0094). */
+  const CONTROL =
+    '<gpx-import><title>Pass</title><video-file-path>video.mp4</video-file-path><gpx-file-path>track.gpx</gpx-file-path></gpx-import>';
   const removed: string[] = [];
   const media = {
     exists: async (path: string) => files.has(path),
-    read: async () => new TextEncoder().encode(ROUTE_JSON),
+    read: async () => new TextEncoder().encode(CONTROL),
+    write: async (path: string) => void files.add(path),
     remove: async (path: string) => {
       removed.push(path);
       for (const file of [...files]) if (file.startsWith(path)) files.delete(file);
     },
     url: (path: string) => `media:${path}`,
+    entries: async (folder: string) =>
+      [...files]
+        .filter((file) => file.startsWith(`${folder}/`))
+        .map((file) => ({ path: file.slice(folder.length + 1), size: 1 })),
   } as unknown as MediaFiles;
+  /** A route's folder as the importer leaves it. */
+  const route = (folder: string) => {
+    for (const name of ['route.xml', 'video.mp4', 'track.gpx']) files.add(`${folder}/${name}`);
+  };
   const fetches: unknown[] = [];
   const fetch: DataFetch = {
     fetch: async (job, onProgress) => {
@@ -51,8 +52,17 @@ function setup(options: { failFetch?: string; failImport?: string } = {}) {
     inspect: () => ({ ok: false, reason: 'Not inspected here' }),
     import: async (_pack, directory, facts) => {
       if (options.failImport) throw new Error(options.failImport);
-      files.add(`${directory}/route.json`);
-      return { ...JSON.parse(ROUTE_JSON), title: facts.title };
+      route(directory);
+      return {
+        format: 'ridrs-video-route',
+        version: 1,
+        title: facts.title ?? 'Pass',
+        notes: [],
+        segments: [],
+        video: { file: 'video.mp4', framerate: 30, startFrame: 1 },
+        track: { file: 'track.gpx' },
+        imported: { by: 'test', version: '1' },
+      };
     },
   };
   const states: Availability[] = [];
@@ -64,6 +74,7 @@ function setup(options: { failFetch?: string; failImport?: string } = {}) {
   return {
     downloads,
     files,
+    route,
     removed,
     fetches,
     states,
@@ -86,18 +97,22 @@ describe('VideoDownloads', () => {
     expect(downloads.availability(ROUTE.id)).toEqual({
       state: 'ready',
       files: {
-        'route.json': 'media:videos/source/pass/route.json',
+        'route.xml': 'media:videos/source/pass/route.xml',
         'video.mp4': 'media:videos/source/pass/video.mp4',
         'track.gpx': 'media:videos/source/pass/track.gpx',
       },
       removable: true,
     });
-    expect([...files]).toEqual(['videos/source/pass/route.json']);
+    expect([...files].sort()).toEqual([
+      'videos/source/pass/route.xml',
+      'videos/source/pass/track.gpx',
+      'videos/source/pass/video.mp4',
+    ]);
   });
 
   it('finds the routes already on the device', async () => {
-    const { downloads, files, changed, services } = setup();
-    files.add('videos/source/pass/route.json');
+    const { downloads, route, changed, services } = setup();
+    route('videos/source/pass');
     await downloads.connect(services);
     expect(downloads.availability(ROUTE.id).state).toBe('ready');
     expect(changed).toEqual([ROUTE.id]);

@@ -66,7 +66,7 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
 ### Migration
 
 - **A route in the unified format becomes an unpacked route in place:** its folder already holds the video and the track under the names `route.json` gives. Nothing is copied or renamed; the migration writes one control file (`route.xml`, `gpx-import`, UTF-8) from `route.json`: title, notes as `informations`, segments, frame rate, start frame, `video-file-path`, `gpx-file-path`, and `preview` where `route.json` names a picture; then it removes `route.json`. A plain rename cannot do it: the import deleted the package's own control file. The source and its license stay with the catalog that knows them.
-- It runs per source at start, before the source offers its routes, for every folder with a `route.json` and no control file; a folder it cannot migrate keeps its files and is offered as `failed` with the reason.
+- It runs per source at start, before the source offers its routes, for every folder with a `route.json` (`moveToControlFile` of `@ridrs/ride`). A `route.json` that does not parse stays, and its route is not offered as on the device: a Van Gestel route can be downloaded again, an own import is not listed, as for a broken route before.
 
 ## Consequences
 
@@ -78,7 +78,7 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
 - `docs/formats/ridrs-ride-v1.md` documents the format, the folder and its rules for writers (video2gpx).
 - Phases:
   1. `@ridrs/ride` (read and write the control file, picture, inspection) and the format document; the Rust module `ride` with its tests (entries of a package and of a folder, files over entries, whole entries, offsets of stored entries).
-  2. `ridrs-media://` serves entries; the video world reads the control file through `@ridrs/ride` and plays a route from `route.ride` or from its files.
-  3. Migration of routes in the unified format; `route.json` and `videoRouteSchema` are removed.
+  2. Together with the migration, so that no route on a device is ever unplayable: `storage.media` lists a route's entries (`entries`, Rust and Node); both sources move routes of the unified format to a control file at start, find their routes by it and name every entry in their offers; the import writes `route.xml` instead of `route.json`; the video world reads the control file through `@ridrs/ride`; `ridrs-media://` serves the entries of `route.ride`.
+  3. (In phase 2.) `route.json` and `videoRouteSchema` are removed once no importer returns a `VideoRoute` (phase 5).
   4. `video-source-local` copies a package with a stored video (clone first) or unpacks one with a deflated video into the route's folder; progress in one phase.
   5. `video-source-vangestel` renames or unpacks its downloads; `video.importer` is removed.

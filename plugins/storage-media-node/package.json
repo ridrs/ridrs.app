@@ -6,6 +6,7 @@
   "type": "module",
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
+    "@zip.js/zip.js": "2.24.0",
     "env-paths": "4.0.0"
   }
 }

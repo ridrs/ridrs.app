@@ -9,10 +9,10 @@ import {
   type RouteImport,
   type RouteImportPreview,
   type RouteOffer,
-  VIDEO_ROUTE_FILE,
   type VideoImporter,
   type VideoRoute,
 } from '@ridrs/contracts';
+import { entryUrls, findControl, moveToControlFile } from '@ridrs/ride';
 import { z } from 'zod';
 import { type TrackFacts, trackFacts } from './track-facts.ts';
 
@@ -115,14 +115,21 @@ export class LocalVideos {
     this.services = services;
     const { media } = services;
     if (!media) return;
+    const offers: RouteOffer[] = [];
     if (await media.exists(INDEX)) {
       const stored = indexSchema.safeParse(JSON.parse(new TextDecoder().decode(await media.read(INDEX))));
       for (const route of stored.success ? stored.data.routes : []) {
-        // A folder without its route.json is a broken import: it is not offered.
-        if (await media.exists(`${FOLDER}/${route.id}/${VIDEO_ROUTE_FILE}`)) this.routes.push(route);
+        // A route imported before ADR 0094 gets its control file; a folder without one is a
+        // broken import: it is not offered.
+        await moveToControlFile(media, `${FOLDER}/${route.id}`).catch(() => false);
+        const offer = await this.offerOf(media, route).catch(() => undefined);
+        if (offer) {
+          this.routes.push(route);
+          offers.push(offer);
+        }
       }
     }
-    for (const route of this.routes) this.state.offer(this.offerId(route.id), this.offerOf(media, route));
+    for (const offer of offers) this.state.offer(offer.id, offer);
     if (this.importer() && (services.pick || services.drop)) this.state.importer(this.last);
   }
 
@@ -264,7 +271,8 @@ export class LocalVideos {
       };
       this.routes.push(imported);
       await this.save(media);
-      offer = this.offerOf(media, imported, route);
+      offer = await this.offerOf(media, imported);
+      if (!offer) throw new Error('The imported route has no control file');
       next = { kind: 'video', state: 'idle' };
     } catch (error) {
       next = { kind: 'video', state: 'failed', file: chosen.name, reason: reasonOf(error) };
@@ -331,9 +339,15 @@ export class LocalVideos {
     };
   }
 
-  private offerOf(media: MediaFiles, route: Imported, stored?: VideoRoute): RouteOffer {
+  /**
+   * A route on the device, with the URL of each of its entries (ADR 0094); none when its folder
+   * holds no control file naming a video and a track it holds.
+   */
+  private async offerOf(media: MediaFiles, route: Imported): Promise<RouteOffer | undefined> {
     const folder = `${FOLDER}/${route.id}`;
-    const names = [VIDEO_ROUTE_FILE, stored?.video.file ?? 'video.mp4', stored?.track.file ?? 'track.gpx'];
+    const entries = await media.entries(folder);
+    const paths = entries.map((entry) => entry.path);
+    if (!(await findControl(paths, (path) => media.read(`${folder}/${path}`)))) return undefined;
     const id = this.offerId(route.id);
     return {
       id,
@@ -347,7 +361,7 @@ export class LocalVideos {
       tags: {},
       availability: {
         state: 'ready',
-        files: Object.fromEntries(names.map((name) => [name, media.url(`${folder}/${name}`)])),
+        files: entryUrls(media, folder, entries),
         removable: true,
       },
       world: { landscape: 'ui-world-video/landscape', route: id },

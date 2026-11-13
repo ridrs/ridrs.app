@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { DataDrop, DataPick, DroppedFile, MediaFiles, RouteImport, RouteOffer, VideoImporter } from '@ridrs/contracts';
+import { controlFromRoute, writeControl } from '@ridrs/ride';
 import { describe, expect, it } from 'vitest';
 import { LocalVideos, slugOf, titleOf } from './local.ts';
 
@@ -29,6 +30,10 @@ function memoryMedia(files = new Map<string, Uint8Array>()): MediaFiles & { file
     },
     location: (path) => `/media/${path}`,
     url: (path) => `media://${path}`,
+    entries: async (folder) =>
+      [...files]
+        .filter(([file]) => file.startsWith(`${folder}/`))
+        .map(([file, bytes]) => ({ path: file.slice(folder.length + 1), size: bytes.length })),
   };
 }
 
@@ -52,7 +57,7 @@ function importer(media: MediaFiles, failure?: string, title?: string, thumbnail
         ...(thumbnail ? { thumbnail: { file: thumbnail } } : {}),
         imported: { by: 'test', version: '1' },
       };
-      await media.write(`${directory}/route.json`, new TextEncoder().encode(JSON.stringify(route)));
+      await media.write(`${directory}/route.xml`, new TextEncoder().encode(writeControl(controlFromRoute(route))));
       return route;
     },
   };

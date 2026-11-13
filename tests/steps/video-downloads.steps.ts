@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Given, Then, When } from '@cucumber/cucumber';
 import { activityStartRequestedEvent, type RideWorld } from '@ridrs/contracts';
+import { parseControl } from '@ridrs/ride';
 import { waitFor, within } from '@testing-library/dom';
 import { SimulatedDownloads } from '../support/simulated-downloads.ts';
 import type { RidrsWorld } from '../support/world.ts';
@@ -88,9 +89,10 @@ Then(
   'the media storage holds the route {string} titled {string}',
   function (this: RidrsWorld, id: string, title: string) {
     const folder = routeFolder(id);
-    const route = JSON.parse(readFileSync(join(folder, 'route.json'), 'utf8'));
-    assert.equal(route.title, title);
-    assert.deepEqual(filesBelow(folder).sort(), ['route.json', 'track.gpx', 'video.mp4']);
+    // A route is a folder with a control file (ADR 0094): route.xml names its video and track.
+    const control = parseControl(readFileSync(join(folder, 'route.xml'), 'utf8'));
+    assert.equal(control.title, title);
+    assert.deepEqual(filesBelow(folder).sort(), ['route.xml', 'track.gpx', 'video.mp4']);
   },
 );
 

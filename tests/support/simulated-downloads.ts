@@ -13,7 +13,7 @@ const TEST_PATTERN = resolve(
 );
 
 /** A GPX track of a minute: 5 m/s northwards, 0.2 m up every second. */
-function gpx(): string {
+export function gpx(): string {
   const points = Array.from({ length: 61 }, (_, i) => {
     const time = new Date(Date.UTC(2022, 11, 28, 9, 0, i)).toISOString();
     return `<trkpt lat="${(44.66 + (i * 5) / 111_195).toFixed(6)}" lon="5.42"><ele>${(433 + i * 0.2).toFixed(1)}</ele><time>${time}</time></trkpt>`;

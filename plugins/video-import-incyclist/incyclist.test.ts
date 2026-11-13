@@ -50,7 +50,7 @@ describe('createIncyclistImporter', () => {
     expect(heard).toEqual([0.25]);
     expect(route).toMatchObject({ title: 'Col de Pennes', video: { file: 'video.mp4', startFrame: 12 }, track: { file: 'track.gpx' } });
     expect(route).not.toHaveProperty('thumbnail');
-    expect([...files.keys()].sort()).toEqual(['r/route.json', 'r/track.gpx', 'r/video.mp4']);
+    expect([...files.keys()].sort()).toEqual(['r/route.xml', 'r/track.gpx', 'r/video.mp4']);
   });
 
   it('titles the route as its control file does, not as its package is named', async () => {
@@ -97,6 +97,6 @@ describe('createIncyclistImporter', () => {
     const route = await createIncyclistImporter(media, archive).import('r.zip', 'r', { fallbackTitle: 'Col' });
     expect(route.thumbnail).toEqual({ file: 'thumbnail.png' });
     expect(new TextDecoder().decode(files.get('r/thumbnail.png'))).toBe('FR_Col_de_Pennes_preview.PNG');
-    expect([...files.keys()].sort()).toEqual(['r/route.json', 'r/thumbnail.png', 'r/track.gpx', 'r/video.mp4']);
+    expect([...files.keys()].sort()).toEqual(['r/route.xml', 'r/thumbnail.png', 'r/track.gpx', 'r/video.mp4']);
   });
 });

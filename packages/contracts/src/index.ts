@@ -441,6 +441,7 @@ export {
   type AppFileEntry,
   type AppFiles,
   assertAppFilePath,
+  type MediaEntry,
   type MediaFiles,
   type Secrets,
   storageAppFilesCapability,
