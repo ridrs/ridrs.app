@@ -174,7 +174,9 @@ Then('the picture shows no name or logo of the Tour de France', function (this: 
 When(
   'I read the route {string} of the Van Gestel catalog',
   function (this: RidrsWorld, id: string) {
-    scenario(this).route = JSON.parse(readFileSync(join(CATALOG, id, 'route.json'), 'utf8')).route;
+    // The catalog keeps a route's climbs in its index (ADR 0095: no route.json per route).
+    const index = JSON.parse(readFileSync(join(CATALOG, 'index.json'), 'utf8'));
+    scenario(this).route = index.routes.find((route: { id: string }) => route.id === id);
   },
 );
 

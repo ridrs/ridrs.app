@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Col_de_Pennes_Aucelon_Roanne</name>    
+    <id>0a8caf18-346e-4f9f-ab2e-f51c891ee500</id>
+    <country>FR</country>
+    <title>Rousset 1 - Col de Pennes</title>
+    <video-file-path>FR_Col_de_Pennes_Aucelon_Roanne.mp4</video-file-path>
+	<next-video>d32c2bea-71fa-448f-bfa5-ded6745cc9ed</next-video>
+    <gpx-file-path>FR_Col_de_Pennes_Aucelon_Roanne.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>173205</end-frame>    
+	<informations>
+		<information distance="20" de="Col de Pennes - Aucelon - Roanne\nL&auml;nge: 25,9 km - Gesamtanstieg: 594 hm\nSchwierigkeitsgrad: Mittel" en="Col de Pennes - Aucelon - Roanne\nLength: 25.9 km - Total ascent: 594 hm\nDifficulty: Moderate" />
+		<information distance="100" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>			
+    	<information distance="1740" de="Anstieg (10 Km, ca. 5,4%)" en="Climb (10 km, ca. 5.4%)" />
+		<information distance="4350" de="Jansac" en="Jansac" />		
+		<information distance="10240" de="1 Kilometer bis oben" en="1 kilometer to the top"/>
+		<information distance="11300" de="Col de Pennes (Alt. 1040M)" en="Col de Pennes (alt. 1040m)" />
+		<information distance="24630" de="La Roanne" en="La Roanne" />		
+		<information distance="25570" de="Vall&eacute;e de Roanne" en="Vall&eacute;e de Roanne" />		
+	</informations>
+</gpx-import>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Valdrome_Part_2</name>    
+    <id>3aefb91a-be3e-42c1-b7cb-47bc80bebce5</id>
+    <country>FR</country>
+    <title>Valdr&ocirc;me 2 - Col du Fays, Col de Rossas </title>
+    <video-file-path>FR_Valdrome_Part_2.mp4</video-file-path>
+	<next-video>b69e2524-e5d1-4945-97ac-7c6b80836ff3</next-video>
+    <gpx-file-path>FR_Valdrome_Part_2.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>106797</end-frame>    
+	<informations>
+		<information distance="120" de="Valdr&ocirc;me - Teil 2 - Col du Fays, Col de Rossas\nL&auml;nge: 17,1 km - Gesamtanstieg: 409 hm\nSchwierigkeitsgrad: Leicht" en="Valdr&ocirc;me - Part 2 - Col du Fays, Col de Rossas\nLength: 17.1 km - Total ascent: 409 hm\nDifficulty: Easy" />
+		<information distance="220" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>					
+	</informations>
+</gpx-import>
+

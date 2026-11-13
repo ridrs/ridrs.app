@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Col-de-Menee-Part-3</name>    
+    <id>8561e5bb-1735-4f1f-bbbb-333885bb66d6</id>
+    <country>FR</country>
+    <title>Men&eacute;e 3 - Vallon de Combeau</title>
+    <video-file-path>FR_Col-de-Menee-Part-3.mp4</video-file-path>	
+    <gpx-file-path>FR_Col-de-Menee-Part-3.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>205251</end-frame>    
+	<informations>
+		<information distance="120" de="Men&eacute;e - Teil 3 - Vallon de Combeau" en="Men&eacute;e - Part 3 - Vallon de Combeau" />
+		<information distance="220" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>			
+	</informations>
+</gpx-import>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Col_de_Pennes</name>    
+    <id>f109671f-cddd-4588-82a4-2def0173aa0a</id>
+    <country>FR</country>
+    <title>Col de Pennes - Climb it twice!</title>
+    <video-file-path>FR_Col_de_Pennes.mp4</video-file-path>
+    <gpx-file-path>FR_Col_de_Pennes.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>310636</end-frame>    
+	<informations>
+		<information distance="20" de="Col de Pennes\nL&auml;nge: 46,2 km - Gesamtanstieg: 1.177 hm\nSchwierigkeitsgrad: Schwer" en="Col de Pennes\nLength: 46.2 km - Total ascent: 1,177 hm\nDifficulty: Hard" />
+		<information distance="100" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>		
+		<information distance="700" de="Recoubeau" en="Recoubeau" />
+		<information distance="1740" de="Erster Anstieg (10 Km, ca. 5,4%)" en="First climb (10 km, ca. 5.4%)" />
+		<information distance="4280" de="Jansac" en="Jansac" />
+		<information distance="10210" de="1 Kilometer bis oben" en="1 kilometer to the top"/>
+		<information distance="11230" de="Col de Pennes (Alt. 1040M)" en="Col de Pennes (alt. 1040m)" />
+		<information distance="18150" de="Roanne-Tal" en="Roanne Valley" />
+		<information distance="18350" de="Zweiter Anstieg (13 Km, ca. 4,5%)" en="Second climb (13 km, ca. 4.5%)" />		
+		<information distance="19180" de="Die Roanne" en="Roanne river" />
+		<information distance="25550" de="Aucelon" en="Aucelon" />
+		<information distance="31510" de="1 Kilometer bis oben" en="1 kilometer to the top"/>
+		<information distance="32510" de="Col de Pennes (Alt. 1040M)" en="Col de Pennes (alt. 1040m)" />		
+		<information distance="39950" de="Barnave" en="Barnave" />		
+    </informations>
+	<segments>
+		<segment name="The whole route, both climbs (46.2 km)" start="0" end="46200" />
+		<segment name="First climb: approach via Jansac (11.2 km)" start="0" end="11230" />
+		<segment name="First descent via Pennes-le-Sec (6.9 km)" start="11240" end="18130" />
+		<segment name="First climb + descent (18.1 km)" start="0" end="18130" />
+		<segment name="Second climb: approach via Aucelon (14.4 km)" start="18130" end="32510" />
+		<segment name="Second descent via Barnave (13.7 km)" start="32510" end="46200" />
+		<segment name="Second climb + descent (28.1 km)" start="18130" end="46200" />
+	</segments>
+
+	
+	
+</gpx-import>

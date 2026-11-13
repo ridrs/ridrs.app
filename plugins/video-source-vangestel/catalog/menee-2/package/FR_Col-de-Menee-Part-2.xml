@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Col-de-Menee-Part-2</name>    
+    <id>55ff01ae-5262-4178-84c1-0977cb9d63b2</id>
+    <country>FR</country>
+    <title>Men&eacute;e 2 - Col de Men&eacute;e</title>
+    <video-file-path>FR_Col-de-Menee-Part-2.mp4</video-file-path>
+	<next-video>8561e5bb-1735-4f1f-bbbb-333885bb66d6</next-video>
+    <gpx-file-path>FR_Col-de-Menee-Part-2.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>171581</end-frame>    
+	<informations>
+		<information distance="120" de="Men&eacute;e - Teil 2 - Col de Men&eacute;e" en="Men&eacute;e - Part 2 - Col de Men&eacute;e" />
+		<information distance="220" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>			
+	</informations>
+</gpx-import>

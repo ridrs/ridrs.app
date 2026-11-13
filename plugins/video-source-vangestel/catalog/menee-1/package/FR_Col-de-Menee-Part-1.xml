@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Col-de-Menee-Part-1</name>    
+    <id>ab681dd6-a26b-491b-a35e-cb0625519068</id>
+    <country>FR</country>
+    <title>Men&eacute;e 1 - Ch&acirc;tillon, Men&eacute;e</title>
+    <video-file-path>FR_Col-de-Menee-Part-1.mp4</video-file-path>
+	<next-video>55ff01ae-5262-4178-84c1-0977cb9d63b2</next-video>
+    <gpx-file-path>FR_Col-de-Menee-Part-1.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>82702</end-frame>    
+	<informations>
+		<information distance="120" de="Men&eacute;e - Teil 1 - Ch&acirc;tillon, Men&eacute;e\nL&auml;nge: 17 km - Gesamtanstieg: 278 hm\nSchwierigkeitsgrad: Leicht" en="Men&eacute;e - Part 1 - Ch&acirc;tillon, Men&eacute;e\nLength: 17 km - Total ascent: 278 hm\nDifficulty: Easy" />
+		<information distance="220" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>			
+	</informations>
+</gpx-import>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Pontaix_Chamaloc</name>    
+    <id>4dab8128-7fe0-4b6f-989d-14f14bc4867b</id>
+    <country>FR</country>
+    <title>Rousset 3 - Pontaix, Chamaloc</title>
+    <video-file-path>FR_Pontaix_Chamaloc.mp4</video-file-path>
+	<next-video>601c7deb-fc82-4948-a254-6480c2eb15c0</next-video>
+    <gpx-file-path>FR_Pontaix_Chamaloc.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>79229</end-frame>    
+	<informations>
+		<information distance="20" de="Pontaix - Chamaloc\nL&auml;nge: 14,6 km - Gesamtanstieg: 238 hm\nSchwierigkeitsgrad: Leicht" en="Pontaix - Chamaloc\nLength: 14.6 km - Total ascent: 238 hm\nDifficulty: Easy" />
+		<information distance="100" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>				
+	</informations>
+</gpx-import>

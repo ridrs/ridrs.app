@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Le_boucle_de_Barnave</name>    
+    <id>9757185be7fe4bca9dcd7041d219c025</id>
+    <country>FR</country>
+    <title>Barnave</title>
+    <video-file-path>FR_Le_boucle_de_Barnave.mp4</video-file-path>
+    <gpx-file-path>FR_Le_boucle_de_Barnave.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>103246</end-frame>
+	<informations>
+       	<information distance="20" de="Le boucle de Barnave - L&auml;nge: 16,3 km - Anstieg: 368 hm\nSchwierigkeitsgrad: Mittelschwer" en="The Barnave loop\nLength: 16.3 km - Ascent: 368 hm\nDifficulty: Moderate" />        
+		<information distance="100" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>		
+		<information distance="2750" de="Traubenernte" en="Grape harvest" />        
+		<information distance="4730" de="Barnave" en="Barnave" />        
+    </informations>
+</gpx-import>

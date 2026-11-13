@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { routeOfferSchema } from '@ridrs/contracts';
+import { decodeText, parseControl } from '@ridrs/ride';
 import { describe, expect, it } from 'vitest';
 import catalog from './catalog/index.json' with { type: 'json' };
 import { catalogOffers } from './offers.ts';
@@ -43,6 +44,19 @@ describe('catalogOffers', () => {
     expect(offers.find((offer) => offer.id === 'video-source-vangestel/source-1')?.thumbnail).toBe(
       '/assets/source-1/overlay/FR_Source_Drome_Part_1.png',
     );
+  });
+
+  it('keeps every route as its package without video, nothing else of the old format (ADR 0095)', () => {
+    for (const route of catalog.routes) {
+      const folder = join(import.meta.dirname, 'catalog', route.id);
+      expect(existsSync(join(folder, 'route.json')), route.id).toBe(false);
+      const files = readdirSync(join(folder, 'package'));
+      const control = files.find((file) => file.toLowerCase().endsWith('.xml'));
+      expect(control, route.id).toBeDefined();
+      const read = parseControl(decodeText(readFileSync(join(folder, 'package', control ?? ''))));
+      expect(files, route.id).toContain(read.gpx);
+      expect(files, route.id).not.toContain(read.video);
+    }
   });
 
   it('lists every overlay file of the catalog with its hash', () => {

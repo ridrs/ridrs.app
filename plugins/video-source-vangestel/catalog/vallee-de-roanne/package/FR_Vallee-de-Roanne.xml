@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Vallee_de_Roanne</name>    
+    <id>d32c2bea-71fa-448f-bfa5-ded6745cc9ed</id>
+    <country>FR</country>
+    <title>Rousset 2 - Vall&eacute;e de Roanne</title>
+    <video-file-path>FR_Vallee_de_Roanne.mp4</video-file-path>
+	<next-video>4dab8128-7fe0-4b6f-989d-14f14bc4867b</next-video>
+    <gpx-file-path>FR_Vallee_de_Roanne.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>79454</end-frame>    
+	<informations>
+		<information distance="20" de="Vall&eacute;e de Roanne\nL&auml;nge: 20,3 km - Gesamtanstieg: 97 hm\nSchwierigkeitsgrad: Leicht" en="Vall&eacute;e de Roanne\nLength: 20.3 km - Total ascent: 97 hm\nDifficulty: Easy" />
+		<information distance="100" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>			
+		<information distance="12300" de="Pont d'Espenel\n(Br&uuml;cke &uuml;ber die Dr&ocirc;me)" en="Pont d'Espenel\n(bridge across the river Dr&ocirc;me)" />
+	</informations>
+</gpx-import>

@@ -4,19 +4,20 @@
 // source plugin: what the site lists for each video, the route from its Incyclist control file
 // and GPX track with its categorised climbs, a thumbnail and a picture of the elevation profile.
 // No video is downloaded: each ZIP's central directory and its small entries are read with HTTP
-// range requests, about 40 kB per route.
+// range requests: the control file, the track and any picture, about 1 MB per route.
 //
 //   pnpm fetch:video-catalog [--out <folder>] [--only <route id> …]
 //
 // The folder defaults to `plugins/video-source-vangestel/catalog`. It gets `index.json` (every
-// route, light enough for a list) and per route `<id>/route.json` (profile, path, notes,
-// segments, climbs with their summit names), `<id>/peaks.txt` (the names of the summits along the
-// route), `<id>/thumbnail.jpg` and `<id>/profile.svg` (ADR 0070). Running it again rewrites the
+// route, light enough for a list, its climbs with their summit names) and per route `<id>/package/`
+// (the package without its video, every other file byte for byte, ADR 0095), `<id>/peaks.txt`
+// (the names of the summits along the route), `<id>/thumbnail.jpg` and `<id>/profile.svg`
+// (ADR 0070). `<id>/overlay/` is made by hand; the tool lists its files in `index.json`. Running it again rewrites the
 // files; unchanged sources give the same files. A thumbnail or peaks file that is already there
 // stays: the routes get thumbnails and summit names of their own, the site's picture is only a start.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { configure, type Entry, HttpRangeReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 import { Window } from 'happy-dom';
 import { categoriseClimbs, nameClimbs } from '../plugins/video-source-vangestel/climbs.ts';
@@ -178,20 +179,35 @@ async function readArchive(url: string) {
   const reader = new ZipReader(new HttpRangeReader(url, options));
   try {
     const entries = (await reader.getEntries()).filter((entry): entry is Entry & { directory: false } => !entry.directory);
-    const read = async (extension: string) => {
+    const find = (extension: string) => {
       const entry = entries.find((e) => e.filename.toLowerCase().endsWith(extension));
       if (!entry) {
         throw new Error(`${url}: no ${extension} file`);
       }
-      return { name: entry.filename, text: decode(await entry.getData(new Uint8ArrayWriter())) };
+      return entry;
     };
+    const controlEntry = find('.xml');
+    const controlBytes = await controlEntry.getData(new Uint8ArrayWriter());
+    // Every file of the package but its video, byte for byte: the package without video (ADR 0095).
+    const video = parseControl(decode(controlBytes)).video.toLowerCase();
+    const kept: { name: string; bytes: Uint8Array }[] = [];
+    for (const entry of entries) {
+      if (entry.filename.split('/').at(-1)?.toLowerCase() === video) continue;
+      kept.push({
+        name: entry.filename,
+        bytes: entry === controlEntry ? controlBytes : await entry.getData(new Uint8ArrayWriter()),
+      });
+    }
+    const textOf = (entry: Entry) => decode(kept.find((file) => file.name === entry.filename)?.bytes ?? new Uint8Array());
+    const gpxEntry = find('.gpx');
     return {
       size: Number(head.headers.get('content-length') ?? 0),
       etag: head.headers.get('etag') ?? undefined,
       lastModified: head.headers.get('last-modified') ?? undefined,
       files: entries.map((entry) => ({ name: entry.filename, size: entry.uncompressedSize })),
-      control: await read('.xml'),
-      gpx: await read('.gpx'),
+      control: { name: controlEntry.filename, text: textOf(controlEntry) },
+      gpx: { name: gpxEntry.filename, text: textOf(gpxEntry) },
+      kept,
     };
   } finally {
     await reader.close();
@@ -361,19 +377,15 @@ async function build(listed: Listed, tours: readonly string[], out: string) {
       endFrame: extras.endFrame,
     },
   };
-  const route = {
-    ...summary,
-    heading: details.title,
-    highlight: details.highlight,
-    description: details.description,
-    bounds: track.bounds,
-    notes: extras.notes,
-    segments: extras.segments,
-    profile: track.profile,
-    path: track.path,
-    files: { control: archive.control.name, gpx: archive.gpx.name },
-  };
-  writeFileSync(join(folder, 'route.json'), `${JSON.stringify({ source: SOURCE, route }, null, 2)}\n`);
+  // The package without its video, as it is (ADR 0095); route.json of earlier tools goes.
+  const kept = join(folder, 'package');
+  rmSync(kept, { recursive: true, force: true });
+  for (const file of archive.kept) {
+    const path = join(kept, ...file.name.split('/'));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, file.bytes);
+  }
+  rmSync(join(folder, 'route.json'), { force: true });
   return summary;
 }
 

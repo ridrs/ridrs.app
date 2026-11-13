@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>FR_Valdrome_Part_3</name>    
+    <id>b69e2524-e5d1-4945-97ac-7c6b80836ff3</id>
+    <country>FR</country>
+    <title>Valdr&ocirc;me 3 - Les Claps de Luc</title>
+    <video-file-path>FR_Valdrome_Part_3.mp4</video-file-path>	
+    <gpx-file-path>FR_Valdrome_Part_3.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>112184</end-frame>    
+	<informations>
+		<information distance="120" de="Valdr&ocirc;me - Teil 3 - Les Claps de Luc\nL&auml;nge: 27,7 km - Gesamtanstieg: 136 hm\nSchwierigkeitsgrad: Leicht" en="Valdr&ocirc;me - Part 3 - Les Claps de Luc\nLength: 27.7 km - Total ascent: 136 hm\nDifficulty: Easy" />
+		<information distance="220" de="cycling.vangestel.online\nLizens: CC BY-NC-SA 4.0\n(Creative Commons - Namensnennung - Nicht-kommerziell)" en="cycling.vangestel.online\nLicense: CC BY-NC-SA 4.0\n(Creative Commons Attribution-NonCommercial-ShareAlike)"/>					
+	</informations>
+</gpx-import>
+
