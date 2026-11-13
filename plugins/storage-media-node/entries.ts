@@ -34,7 +34,7 @@ async function packageEntries(file: string): Promise<MediaEntry[]> {
         if (entry.filename.startsWith('/') || entry.filename.includes('\\') || segments.some((s) => s === '..' || s === '.' || s === '')) {
           throw new Error(`${PACKAGE}: unsafe name "${entry.filename}"`);
         }
-        return { path: entry.filename, size: entry.uncompressedSize };
+        return { path: entry.filename, size: entry.uncompressedSize, stored: entry.compressionMethod === 0 };
       });
   } finally {
     await reader.close();

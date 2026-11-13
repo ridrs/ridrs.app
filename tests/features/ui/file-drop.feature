@@ -11,7 +11,7 @@ Feature: Files dragged onto the window go to the library
   real plugins on app files and a media folder of the scenario.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-workout-chart, ui-route-profile, library-ridrs, profile-local, video-source-local, video-import-incyclist, data-archive-node, storage-media-node, file-drop, ui-file-drop" together with the simulated drop
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-workout-chart, ui-route-profile, library-ridrs, profile-local, video-source-local, data-archive-node, storage-media-node, file-drop, ui-file-drop" together with the simulated drop
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown

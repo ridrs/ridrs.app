@@ -72,6 +72,11 @@ export interface MediaFiles {
 export interface MediaEntry {
   readonly path: string;
   readonly size: number;
+  /**
+   * For an entry of the package: whether it is kept as it is, not compressed, so that it can be
+   * read by range from the package. None for a file of the folder.
+   */
+  readonly stored?: boolean;
 }
 
 export const storageMediaCapability = defineCapability<MediaFiles, 'single', 'storage.media'>(

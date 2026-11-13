@@ -147,7 +147,6 @@ import {
   uiPositionObservedEvent,
   uiRegistryChangedEvent,
   uiTerrainObservedEvent,
-  videoImporterCapability,
   workoutFinishedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
@@ -562,7 +561,6 @@ export class RidrsWorld extends World {
       dataArchiveCapability,
       dataDropCapability,
       dataPickCapability,
-      videoImporterCapability,
     ]) {
       this.capabilityContracts.set(contract.id, contract);
     }

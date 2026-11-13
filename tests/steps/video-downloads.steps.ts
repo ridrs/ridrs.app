@@ -65,6 +65,10 @@ Given(
   },
 );
 
+Given('the simulated downloads serve packages with a stored video', function (this: RidrsWorld) {
+  downloads(this).storedVideo = true;
+});
+
 Given('the simulated downloads stop halfway', function (this: RidrsWorld) {
   downloads(this).stopHalfway = true;
 });

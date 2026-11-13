@@ -34,17 +34,11 @@ const offerId = (route: { readonly id: string }) => `${PLUGIN}/${route.id}`;
 
 /** Every route of the catalog and what its download takes. */
 export function downloadables(catalog: Catalog): Downloadable[] {
-  const { source } = catalog;
   return catalog.routes.map((route) => ({
     id: offerId(route),
     url: route.download.url,
     size: route.download.size,
     etag: route.download.etag,
-    format: route.download.format,
-    facts: {
-      title: route.title,
-      source: { name: source.name, author: source.author, url: route.page, license: source.license.name },
-    },
   }));
 }
 

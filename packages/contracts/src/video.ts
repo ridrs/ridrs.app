@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
-import { defineCapability } from './capabilities.ts';
-import type { PeekedEntry } from './data.ts';
 
 /**
  * A video route in the unified format, `route.json` next to its files (docs/ideas/video-sources.md,
@@ -62,21 +60,12 @@ export const videoRouteSchema = z
 
 export type VideoRoute = z.infer<typeof videoRouteSchema>;
 
-/** The unified format's file in a route's folder. */
+/** The unified format's file in a route's folder, read only by the migration (ADR 0094). */
 export const VIDEO_ROUTE_FILE = 'route.json';
 
-/** What a source knows about a route that its package may not say. */
-export interface VideoRouteFacts {
-  /** The source's own title; it wins over the one the package names. */
-  readonly title?: string;
-  /** The title when neither the source nor the package names one, such as one from the file name. */
-  readonly fallbackTitle?: string;
-  readonly source?: VideoRoute['source'];
-}
-
 /**
- * A package an importer can read, the entry with its track, the title it names and the entry with
- * its picture; or why it cannot.
+ * A ride package (ADR 0094) as its entries tell before it is stored: the entries with its video,
+ * its track and its picture and the title it names; or why it is none.
  */
 export type VideoPackageInspection =
   | {
@@ -89,33 +78,3 @@ export type VideoPackageInspection =
       readonly thumbnail?: string;
     }
   | { readonly ok: false; readonly reason: string };
-
-/**
- * Turns a package of one format into a video route in the unified format (post-processing per
- * format, docs/ideas/video-sources.md, section 5). Paths are media paths (`storage.media`).
- */
-export interface VideoImporter {
-  /** The package format it reads, e.g. `incyclist-gpx-import`. */
-  readonly format: string;
-  /**
-   * Whether a package with these entries is of its format, before it is copied (ADR 0093): the
-   * entry with the route's GPX track, or why not. Entries other than the ones it needs are fine.
-   */
-  inspect(entries: readonly PeekedEntry[]): VideoPackageInspection;
-  /**
-   * Imports `pack` into the empty folder `directory`, writes `route.json` there and returns it.
-   * `onProgress` hears now and then how far it is, from 0 to 1.
-   */
-  import(
-    pack: string,
-    directory: string,
-    facts: VideoRouteFacts,
-    onProgress?: (progress: number) => void,
-  ): Promise<VideoRoute>;
-}
-
-export const videoImporterCapability = defineCapability<
-  VideoImporter,
-  'multiple',
-  'video.importer'
->('video.importer', { cardinality: 'multiple' });

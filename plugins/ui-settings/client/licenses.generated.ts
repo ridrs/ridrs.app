@@ -345,7 +345,7 @@ export const licenseData: LicenseData = {
       "name": "fast-xml-parser",
       "version": "5.11.2",
       "license": "MIT",
-      "purpose": "Reading Incyclist control files (video-import-incyclist, ADR 0066); its dependencies strnum, @nodable/entities, path-expression-matcher, fast-xml-builder, is-unsafe, xml-naming are MIT",
+      "purpose": "Reading and writing Incyclist control files (@ridrs/ride, ADR 0066, ADR 0094) and reading GPX tracks (video-source-local); its dependencies strnum, @nodable/entities, path-expression-matcher, fast-xml-builder, is-unsafe, xml-naming are MIT",
       "texts": [
         "d354addcc529"
       ]
@@ -354,7 +354,7 @@ export const licenseData: LicenseData = {
       "name": "entities",
       "version": "8.1.0",
       "license": "BSD-2-Clause",
-      "purpose": "HTML's named entities in Incyclist control files (video-import-incyclist, ADR 0066)",
+      "purpose": "HTML's named entities in Incyclist control files (@ridrs/ride, ADR 0066)",
       "texts": [
         "0e57eeaccc07"
       ]

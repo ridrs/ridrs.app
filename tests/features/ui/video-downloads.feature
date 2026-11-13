@@ -12,7 +12,7 @@ Feature: Downloading a video route
   and media storage are the real plugins on a media folder of the scenario.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-vangestel, video-import-incyclist, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-vangestel, data-archive-node, storage-media-node" together with the simulated downloads
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
@@ -25,7 +25,9 @@ Feature: Downloading a video route
     Then the route details read "Downloading: 50 %"
     When the simulated download goes on
     Then the route details offer a "Go" button
-    And the media storage holds the route "video-source-vangestel/col-de-pennes" titled "Col de Pennes - Climb it twice!"
+    # The package is kept as it came (ADR 0094): its control file names its own title; the
+    # catalog's is the offer's.
+    And the media storage holds the route "video-source-vangestel/col-de-pennes" titled "Test route"
     And the media storage holds no downloaded package
     When I press "Go"
     Then the "activity" screen is shown

@@ -552,11 +552,8 @@ export {
 } from './ui-capabilities.ts';
 export {
   VIDEO_ROUTE_FILE,
-  type VideoImporter,
   type VideoPackageInspection,
   type VideoRoute,
-  type VideoRouteFacts,
-  videoImporterCapability,
   videoRouteSchema,
 } from './video.ts';
 export {

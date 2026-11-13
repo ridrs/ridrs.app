@@ -126,7 +126,6 @@ import {
   trainingUploadState,
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
-  videoImporterCapability,
   workoutFinishedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
@@ -211,7 +210,6 @@ const CAPABILITIES = [
   dataArchiveCapability,
   dataDropCapability,
   dataPickCapability,
-  videoImporterCapability,
 ];
 
 /** Every app state topic the host knows (ADR 0068): owned and watched beside the bus. */

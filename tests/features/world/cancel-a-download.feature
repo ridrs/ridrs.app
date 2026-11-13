@@ -5,7 +5,7 @@ Feature: A video download can be cancelled
   call). A cancelled route can be downloaded again; what was fetched so far stays for it.
 
   Background:
-    Given the ridrs plugins "video-source-vangestel, video-import-incyclist, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "video-source-vangestel, data-archive-node, storage-media-node" together with the simulated downloads
     And the host has started
     And the simulated downloads stop halfway
 
@@ -24,7 +24,9 @@ Feature: A video download can be cancelled
     And the simulated download goes on
     When the UI bridge calls "route.fetch" with '{"key":"video-source-vangestel/col-de-pennes"}'
     Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the media storage holds the route "video-source-vangestel/col-de-pennes" titled "Col de Pennes - Climb it twice!"
+    # The package is kept as it came (ADR 0094): its control file names its own title; the
+    # catalog's is the offer's.
+    And the media storage holds the route "video-source-vangestel/col-de-pennes" titled "Test route"
 
   Scenario: Cancelling a route that is not on its way changes nothing
     When the UI bridge calls "route.cancel" with '{"key":"video-source-vangestel/col-de-pennes"}'

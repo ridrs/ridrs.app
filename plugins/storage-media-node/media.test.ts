@@ -33,7 +33,7 @@ describe('createNodeMediaFiles', () => {
     await media.write('videos/b/route/.DS_Store', new Uint8Array(1));
     expect(await media.entries('videos/b/route')).toEqual([
       { path: 'col.XML', size: 18 },
-      { path: 'Col.mp4', size: 5 },
+      { path: 'Col.mp4', size: 5, stored: true },
       { path: 'pictures/preview.jpg', size: 3 },
     ]);
     expect(await media.entries('videos/b/missing')).toEqual([]);

@@ -94,6 +94,9 @@ pub fn media_remove(app: AppHandle, path: String) -> Result<(), String> {
 pub struct MediaEntry {
     path: String,
     size: u64,
+    /// For an entry of the package: whether it is stored; none for a file of the folder.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stored: Option<bool>,
 }
 
 /// The entries of the video route in the media folder `folder` (`ride.rs`, ADR 0094); a missing
@@ -106,7 +109,14 @@ pub fn media_entries(app: AppHandle, folder: String) -> Result<Vec<MediaEntry>, 
     }
     Ok(ride::entries(&root, &folder)?
         .into_iter()
-        .map(|entry| MediaEntry { path: entry.path, size: entry.size })
+        .map(|entry| {
+            let stored = match entry.place {
+                ride::Place::File(_) => None,
+                ride::Place::Stored { .. } => Some(true),
+                ride::Place::Packed { .. } => Some(false),
+            };
+            MediaEntry { path: entry.path, size: entry.size, stored }
+        })
         .collect())
 }
 

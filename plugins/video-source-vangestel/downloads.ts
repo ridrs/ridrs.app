@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type { DataArchive, DataFetch, MediaFiles, RouteOffer } from '@ridrs/contracts';
 import {
-  type DataFetch,
-  type MediaFiles,
-  type RouteOffer,
-  type VideoImporter,
-  type VideoRouteFacts,
-} from '@ridrs/contracts';
-import { entryUrls, findControl, moveToControlFile } from '@ridrs/ride';
+  besideControl,
+  entryNamed,
+  entryUrls,
+  findControl,
+  moveToControlFile,
+  RIDE_PACKAGE,
+} from '@ridrs/ride';
 
 export type Availability = RouteOffer['availability'];
 
@@ -18,16 +19,14 @@ export interface Downloadable {
   readonly url: string;
   readonly size: number;
   readonly etag?: string;
-  /** The package format, which chooses the importer. */
-  readonly format: string;
-  readonly facts: VideoRouteFacts;
 }
 
 /** What downloading takes; a missing part makes every download fail with a reason. */
 export interface DownloadServices {
   readonly media?: MediaFiles;
   readonly fetch?: DataFetch;
-  readonly importers: () => readonly VideoImporter[];
+  /** Unpacks a package whose video is compressed. */
+  readonly archive?: DataArchive;
 }
 
 const folderOf = (id: string) => `videos/${id}`;
@@ -36,15 +35,16 @@ const reasonOf = (error: unknown) => (error instanceof Error ? error.message : S
 /**
  * The downloads of a video source: which route is on the device, which is on its way and which
  * failed. A route needs its download first (docs/ideas/video-sources.md): `data.fetch` brings the
- * package into the media storage, the importer of its format makes a ridrs video route of it in
- * `videos/<offer id>/`, and the package goes. `changed` is called with the route's id after every
- * change of its state (ADR 0068: one offer at a time).
+ * package into the media storage, and it becomes the route's folder `videos/<offer id>/` (ADR
+ * 0094): kept as `route.ride` where its video is stored, unpacked there otherwise. Nothing is
+ * renamed. `changed` is called with the route's id after every change of its state (ADR 0068: one
+ * offer at a time).
  */
 export class VideoDownloads {
   private readonly states = new Map<string, Availability>();
   /** The downloads on their way, to cancel them. */
   private readonly running = new Map<string, AbortController>();
-  private services: DownloadServices = { importers: () => [] };
+  private services: DownloadServices = {};
 
   constructor(
     private readonly routes: readonly Downloadable[],
@@ -85,9 +85,6 @@ export class VideoDownloads {
     if (!media || !fetch) {
       return 'This app cannot download routes yet';
     }
-    if (!this.services.importers().some((candidate) => candidate.format === route.format)) {
-      return `No importer reads the format "${route.format}"`;
-    }
     return undefined;
   }
 
@@ -95,7 +92,7 @@ export class VideoDownloads {
   async fetch(id: string): Promise<void> {
     const route = this.routes.find((candidate) => candidate.id === id);
     const state = this.availability(id).state;
-    if (!route || state === 'ready' || state === 'fetching') {
+    if (!route || state === 'ready' || state === 'fetching' || state === 'importing') {
       return;
     }
     this.set(id, { state: 'fetching', received: 0, size: route.size });
@@ -105,10 +102,6 @@ export class VideoDownloads {
       const { media, fetch } = this.services;
       if (!media || !fetch) {
         throw new Error('This app cannot download routes yet');
-      }
-      const importer = this.services.importers().find((candidate) => candidate.format === route.format);
-      if (!importer) {
-        throw new Error(`No importer reads the format "${route.format}"`);
       }
       const pack = `${folderOf(route.id)}.zip`;
       let percent = 0;
@@ -129,16 +122,16 @@ export class VideoDownloads {
       await media.remove(folder);
       let ready: Availability | undefined;
       try {
-        await importer.import(pack, folder, route.facts);
+        await this.store(media, id, pack);
         ready = await this.ready(media, id);
         if (!ready) {
-          throw new Error('The imported route has no control file');
+          throw new Error('The downloaded package has no control file that names its video and track');
         }
       } catch (error) {
         await media.remove(folder);
+        await media.remove(pack);
         throw error;
       }
-      await media.remove(pack);
       this.set(id, ready);
     } catch (error) {
       if (controller.signal.aborted) {
@@ -151,6 +144,34 @@ export class VideoDownloads {
     } finally {
       this.running.delete(id);
     }
+  }
+
+  /**
+   * Makes the downloaded package `pack` the route's folder: moved in as `route.ride`, and where its
+   * video is not stored, unpacked beside it and removed, its progress the offer's (ADR 0094).
+   */
+  private async store(media: MediaFiles, id: string, pack: string): Promise<void> {
+    const folder = folderOf(id);
+    const ride = `${folder}/${RIDE_PACKAGE}`;
+    await media.move(pack, ride);
+    const entries = await media.entries(folder);
+    const paths = entries.map((entry) => entry.path);
+    const found = await findControl(paths, (path) => media.read(`${folder}/${path}`));
+    if (!found) return;
+    const video = entryNamed(paths, besideControl(found.path, found.control.video));
+    if (entries.find((entry) => entry.path === video)?.stored !== false) return;
+    const { archive } = this.services;
+    if (!archive) throw new Error('This app cannot unpack the package: its video is compressed');
+    let percent = -1;
+    this.set(id, { state: 'importing' });
+    await archive.extract(ride, folder, ({ received, size }) => {
+      const now = size ? Math.floor((received / size) * 100) : 0;
+      if (now > percent) {
+        percent = now;
+        this.set(id, { state: 'importing', progress: Math.min(now, 100) / 100 });
+      }
+    });
+    await media.remove(ride);
   }
 
   /** Cancels the download of a route on its way; it can be downloaded again. Nothing else changes. */

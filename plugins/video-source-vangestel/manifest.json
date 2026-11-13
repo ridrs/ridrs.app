@@ -10,7 +10,7 @@
   "optionalRequires": [
     "storage.media",
     "data.fetch",
-    "video.importer"
+    "data.archive"
   ],
   "entry": "index.ts",
   "state": {

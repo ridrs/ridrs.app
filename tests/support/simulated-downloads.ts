@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { DataFetch, DataFetchJob } from '@ridrs/contracts';
 import { configure, Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
+import { withStoredVideo } from './simulated-file.ts';
 
 configure({ useWebWorkers: false });
 
@@ -68,6 +69,8 @@ export async function incyclistPackage(title: string | null = 'Test route'): Pro
 export class SimulatedDownloads {
   failure: string | undefined;
   stopHalfway = false;
+  /** Whether the packages hold their video stored, not compressed, as video2gpx writes them. */
+  storedVideo = false;
   readonly requested: string[] = [];
   private release: (() => void) | undefined;
 
@@ -79,7 +82,9 @@ export class SimulatedDownloads {
       if (this.failure) {
         throw new Error(this.failure);
       }
-      const bytes = await incyclistPackage();
+      const bytes = this.storedVideo
+        ? await withStoredVideo(await incyclistPackage())
+        : await incyclistPackage();
       if (this.stopHalfway) {
         onProgress?.({ received: Math.round(bytes.length / 2), size: bytes.length });
         await new Promise<void>((done, fail) => {

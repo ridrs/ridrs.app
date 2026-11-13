@@ -8,7 +8,7 @@ import {
   routeOfferState,
   routeRemoveService,
   storageMediaCapability,
-  videoImporterCapability,
+  dataArchiveCapability,
 } from '@ridrs/contracts';
 import catalog from './catalog/index.json' with { type: 'json' };
 import { VideoDownloads } from './downloads.ts';
@@ -57,7 +57,7 @@ export default definePlugin({
       .connect({
         media: ctx.capabilities.find(storageMediaCapability),
         fetch: ctx.capabilities.find(dataFetchCapability),
-        importers: () => ctx.capabilities.getAll(videoImporterCapability),
+        archive: ctx.capabilities.find(dataArchiveCapability),
       })
       .catch(failed);
   },
