@@ -11,6 +11,7 @@ import {
   type RideWorkout,
   recordingRideState,
   storageAppFilesCapability,
+  trainingHistoryRemoveService,
   trainingHistoryState,
 } from '@ridrs/contracts';
 import {
@@ -61,19 +62,22 @@ function localDateOf(startedAt: number, offsetMinutes: number): string {
  * entry per sealed recording, read from its header and footer. Rides are indoor rides, named
  * after their workout, else "Ride"; a ride of a planned workout names its planned entry, so the
  * calendar can match it with its plan. It reconciles like the FIT export (ADR 0069): at start every recording in the app
- * files is read once, and a ride saved or deleted later changes the list at once.
+ * files is read once, and a ride saved or deleted later changes the list at once. A ride removed
+ * (`training.history.remove`) is deleted with its recording.
  */
 export default definePlugin({
   async start(ctx) {
     const storage = ctx.capabilities.get(storageAppFilesCapability);
     const rides = new Map<string, CompletedWorkout>();
+    // The recording each ride was read from, by its session.
+    const files = new Map<string, string>();
 
     const publish = () =>
       ctx.state.set(trainingHistoryState, DEFAULT_PROVIDER, {
         provider: DEFAULT_PROVIDER,
         label: 'ridrs (this device)',
         status: 'ready',
-        writable: false,
+        writable: true,
         fetchedAt: ctx.clock.now(),
         data: { workouts: [...rides.values()].sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0)) },
       });
@@ -82,6 +86,7 @@ export default definePlugin({
       const recording = await readRecording(await storage.read(file));
       const { header, footer } = recording;
       const workout = workoutOf(recording);
+      files.set(header.sessionId, file);
       rides.set(header.sessionId, {
         id: header.sessionId,
         date: localDateOf(header.startedAt, header.timeZoneOffsetMinutes),
@@ -97,6 +102,17 @@ export default definePlugin({
     const warn = (file: string, error: unknown) =>
       ctx.logger.warn({ error, file }, 'history-ridrs: a recording could not be read');
 
+    ctx.services.provide(trainingHistoryRemoveService, async ({ id }) => {
+      const file = files.get(id);
+      if (file === undefined) {
+        throw new Error(`No ride "${id}" is saved on this device`);
+      }
+      await storage.remove(file);
+      files.delete(id);
+      rides.delete(id);
+      publish();
+      return { ok: true };
+    });
     publish();
     for (const { path } of await storage.list(RECORDINGS_DIRECTORY)) {
       if (ctx.signal.aborted) {

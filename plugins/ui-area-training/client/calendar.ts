@@ -181,6 +181,39 @@ const sameRide = (a: CompletedWorkout, b: CompletedWorkout): boolean =>
     b.startedAt !== undefined &&
     Math.abs(a.startedAt - b.startedAt) < SAME_RIDE_MS);
 
+/** The rides of one provider of `training.history`, and whether it deletes them. */
+export interface RideSource {
+  readonly provider: string;
+  readonly writable: boolean;
+  readonly rides: readonly CompletedWorkout[];
+}
+
+/**
+ * What deleting the listed ride `ride` (one of `mergeCompleted`) takes: its id at each provider
+ * that has it. None when a provider that has it cannot delete it: the ride would stay listed.
+ */
+export function rideRemovals(
+  ride: CompletedWorkout,
+  sources: readonly RideSource[],
+): { readonly provider: string; readonly id: string }[] | undefined {
+  const removals: { provider: string; id: string }[] = [];
+  for (const source of sources) {
+    const known = source.rides.filter((other) => other.id === ride.id || sameRide(other, ride));
+    if (known.length === 0) continue;
+    if (!source.writable) return undefined;
+    removals.push(...known.map((other) => ({ provider: source.provider, id: other.id })));
+  }
+  return removals.length > 0 ? removals : undefined;
+}
+
+/**
+ * Where an entry of the calendar can be dragged: one of today or a day ahead moves to another
+ * such day, as does a workout of a day that has passed that was not ridden (a skipped one). A
+ * rest day, a note or an outdoor ride of a day that has passed keeps its day: it only goes into
+ * the bin, as does a ride done.
+ */
+export const onlyIntoBin = (kind: EntryKind, past: boolean): boolean => past && kind !== 'workout';
+
 /**
  * The rides of every provider as one list, oldest first (ADR 0076). A ride two providers know
  * is listed once, with what the richer of the two (the one with a training load) has, and the

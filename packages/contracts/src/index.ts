@@ -510,6 +510,7 @@ export {
   trainingCalendarType,
   trainingConnectService,
   trainingDisconnectService,
+  trainingHistoryRemoveService,
   trainingHistoryState,
   trainingHistoryType,
   trainingLibraryLoadService,

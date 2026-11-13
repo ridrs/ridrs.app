@@ -23,7 +23,7 @@ import { type DetailsRequest, focusBack, focusKeyProps, OpenDetails, WorkoutDeta
 import { WorkoutEditorView } from './editor.tsx';
 import { messages } from './i18n/index.ts';
 import { catalogueMessages } from './i18n/catalogue.ts';
-import { MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
+import { Bin, MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
 import { CHART_SLOT_CSS, type ChartAthlete, chartWorkout, useChartAthlete, WorkoutChartSlot } from './workout-chart.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
@@ -208,10 +208,10 @@ function Library({
 }
 
 /**
- * The rider's workouts and the library below the calendar, as one place a planned workout is
- * dropped onto to become one of the rider's workouts (a copy, with its steps). While an entry of
- * the calendar is dragged, they say whether it can, and why not; a drop they do not take is
- * refused outright, as is every workout of a library, which is in a library already.
+ * The box of the rider's workouts' tiles, where a planned workout is dropped to become one of the
+ * rider's workouts (a copy, with its steps). While an entry of the calendar is dragged, the box
+ * says over its tiles whether it takes it, and why not; a drop it does not take is refused
+ * outright, as is every workout of a library, which is in a library already.
  */
 function WorkoutsDrop({ ctx, week, children }: { readonly ctx: UiContext; readonly week: Week; readonly children: ReactNode }) {
   const text = useMessages(ctx, messages);
@@ -224,8 +224,11 @@ function WorkoutsDrop({ ctx, week, children }: { readonly ctx: UiContext; readon
   const takes = keeping !== undefined && 'workout' in keeping;
   return (
     <div
-      className="tr-workouts-drop"
+      className="pv-cards tr-workouts-drop"
+      data-testid="own-workouts"
       data-workouts-drop
+      data-dragging={keeping ? true : undefined}
+      data-refused={(keeping && !takes) || undefined}
       data-over={(over && takes) || undefined}
       onDragOver={(event) => {
         if (drag === undefined) return;
@@ -244,16 +247,12 @@ function WorkoutsDrop({ ctx, week, children }: { readonly ctx: UiContext; readon
         setDrag(undefined);
       }}
     >
+      {children}
       {keeping ? (
         <p className="tr-workouts-drop-hint" data-workouts-drop-hint data-refused={!takes || undefined} role="status">
           {'workout' in keeping ? text.dropToKeep(keeping.name) : keeping.why}
         </p>
-      ) : week.kept ? (
-        <p className="tw-note" role="status">
-          {week.kept}
-        </p>
       ) : null}
-      {children}
     </div>
   );
 }
@@ -306,6 +305,8 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
   );
   // The workouts of this device are the section "Workouts"; the placeholders stand in until it has its own.
   const own = sources.find((source) => source.provider === DEFAULT_PROVIDER);
+  // The box of the rider's workouts is there while the library of ridrs is, also empty: the first one is dropped into it.
+  const hasOwn = libraries.has(DEFAULT_PROVIDER);
   const others = sources.filter((source) => source.provider !== DEFAULT_PROVIDER);
   const filtering = filter.focus !== undefined || filter.duration !== undefined || filter.provider !== undefined;
   const choose = (field: keyof CatalogueFilter) => (value: string | undefined) =>
@@ -393,6 +394,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         <CreateWorkout.Provider value={createWorkout}>
 <OpenDetails.Provider value={open}>
           <MonthCalendar ctx={ctx} week={week} />
+          <Bin ctx={ctx} week={week} />
         </OpenDetails.Provider>
 </CreateWorkout.Provider>
       </div>
@@ -438,22 +440,25 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         </section>
       ) : null}
 
-      <WorkoutsDrop ctx={ctx} week={week}>
-      {own ? (
+      {hasOwn ? (
         <section className="pv-section">
           <h2>{text.workouts}</h2>
-          <div className="pv-cards" data-testid="own-workouts">
-            {own.workouts
-              .filter((workout) => passes({ provider: own.provider, workout }, filter))
+          {week.kept ? (
+            <p className="tw-note" role="status">
+              {week.kept}
+            </p>
+          ) : null}
+          <WorkoutsDrop ctx={ctx} week={week}>
+            {(own?.workouts ?? [])
+              .filter((workout) => passes({ provider: DEFAULT_PROVIDER, workout }, filter))
               .map((workout) => (
-                <LibraryCard key={workout.id} ctx={ctx} week={week} provider={own.provider} workout={workout} athlete={athlete} favourable />
+                <LibraryCard key={workout.id} ctx={ctx} week={week} provider={DEFAULT_PROVIDER} workout={workout} athlete={athlete} favourable />
               ))}
-          </div>
+          </WorkoutsDrop>
         </section>
       ) : null}
 
       <Library ctx={ctx} week={week} providers={others} filter={filter} athlete={athlete} />
-      </WorkoutsDrop>
 
       <section className="pv-section">
         <h2>{text.plans}</h2>
@@ -475,6 +480,7 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
           <span className="pv-muted">{text.suggestionLater}</span>
         </article>
       </section>
+      <Bin ctx={ctx} week={week} />
     </AreaPage>
     </OpenDetails.Provider>
 </CreateWorkout.Provider>

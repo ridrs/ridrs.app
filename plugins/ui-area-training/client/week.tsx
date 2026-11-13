@@ -11,6 +11,7 @@ import {
   trainingCalendarPlanService,
   trainingCalendarRemoveService,
   trainingCalendarState,
+  trainingHistoryRemoveService,
   trainingHistoryState,
   trainingLibrarySaveService,
   trainingLibraryState,
@@ -34,10 +35,13 @@ import {
   monthDays,
   moveEntry,
   newWorkoutId,
+  onlyIntoBin,
   type Pending,
   type PlannedItem,
   plannedWorkouts,
   removeEntry,
+  type RideSource,
+  rideRemovals,
   WEEKDAYS,
   type Weekday,
   weekDate,
@@ -58,13 +62,20 @@ const TRASH = new URL('./assets/icons/trash-2.svg', import.meta.url).href;
 /** What the rider changed in this area, kept at once (ADR 0059). */
 export const useTraining = userDocument(TRAINING_DOCUMENT, INITIAL_TRAINING);
 
-/** What is being dragged: an entry of the week, or a workout of a library. */
+/** What is being dragged: an entry of the calendar, a ride done, or a workout of a library. */
 export type Drag =
   | {
       readonly kind: 'entry';
       readonly id: string;
-      /** An entry of a day that has passed keeps its day: it can only be dropped into the bin. */
-      readonly past?: boolean;
+      /** A rest day, a note or an outdoor ride of a day that has passed keeps its day: only the bin takes it. */
+      readonly onlyIntoBin?: boolean;
+    }
+  | {
+      /** A ride done keeps its day: only the bin takes it, which deletes it from every provider that has it. */
+      readonly kind: 'ride';
+      readonly id: string;
+      readonly name: string;
+      readonly removals: readonly { readonly provider: string; readonly id: string }[];
     }
   | { readonly kind: 'library'; readonly provider: string; readonly workoutId: string; readonly name: string };
 
@@ -115,6 +126,8 @@ export function useWeek(ctx: UiContext) {
   const [kept, setKept] = useState<string>();
   // Entries dropped into the bin that the provider has not answered for: hidden at once, shown again on a refusal.
   const [removing, setRemoving] = useState<readonly string[]>([]);
+  // The same for rides done, by the id they are listed with.
+  const [deleting, setDeleting] = useState<readonly string[]>([]);
   const monday = addDays(weekDate('Monday', today), offset * 7);
   const dateOf = (day: Weekday) => addDays(monday, WEEKDAYS.indexOf(day));
 
@@ -201,9 +214,15 @@ export function useWeek(ctx: UiContext) {
     return withPending(entries, date, shownPending, claims.current);
   };
 
-  const completed = mergeCompleted(
-    [...useStateEntries(ctx, trainingHistoryState).values()].map((source) => source.data?.workouts ?? []),
-  );
+  const histories = useStateEntries(ctx, trainingHistoryState);
+  const rideSources: RideSource[] = [...histories.values()].map((source) => ({
+    provider: source.provider,
+    writable: source.writable,
+    rides: source.data?.workouts ?? [],
+  }));
+  const completed = mergeCompleted(rideSources.map((source) => source.rides)).filter((ride) => !deleting.includes(ride.id));
+  /** What deleting a ride done takes, at every provider that has it; none when it cannot be deleted. */
+  const removalsOf = (ride: CompletedWorkout) => rideRemovals(ride, rideSources);
   /**
    * What a day lists: the plans not yet ridden, and the rides, each with the plan it did. A plan
    * that was ridden is listed once, as its ride.
@@ -216,10 +235,13 @@ export function useWeek(ctx: UiContext) {
 
   /**
    * Only today and the days after it take a workout; the calendar of ridrs only this week's. A
-   * workout of a day that has passed keeps its day.
+   * ride done, and a rest day, a note or an outdoor ride of a day that has passed, keep their day.
    */
   const droppable = (date: string) =>
-    !(drag?.kind === 'entry' && drag.past) && date >= today && (!ownEntriesOnly || thisWeeksDay(date) !== undefined);
+    drag?.kind !== 'ride' &&
+    !(drag?.kind === 'entry' && drag.onlyIntoBin) &&
+    date >= today &&
+    (!ownEntriesOnly || thisWeeksDay(date) !== undefined);
 
   /** Waits for the provider's answer to a change that is shown meanwhile; a refusal takes it back. */
   const written = (change: Omit<Pending, 'key'>, answer: Promise<DataWriteResult>) => {
@@ -246,7 +268,7 @@ export function useWeek(ctx: UiContext) {
     );
   };
   const drop = (date: string) => {
-    if (drag === undefined || !droppable(date)) return;
+    if (drag === undefined || drag.kind === 'ride' || !droppable(date)) return;
     const day = thisWeeksDay(date) ?? 'Monday';
     setRefusal(undefined);
     if (drag.kind === 'entry') {
@@ -273,8 +295,40 @@ export function useWeek(ctx: UiContext) {
     }
   };
 
-  /** Removes the dragged entry from the calendar: at once in the calendar of ridrs, else by its provider. */
+  /** Deletes the dragged ride from every provider that has it; it is gone at once, and back with the reason on a refusal. */
+  const deleteRide = (ride: Extract<Drag, { kind: 'ride' }>) => {
+    setRefusal(undefined);
+    setDeleting((all) => [...all, ride.id]);
+    const shownAgain = () => setDeleting((all) => all.filter((other) => other !== ride.id));
+    const labelOf = (provider: string) => histories.get(provider)?.label ?? provider;
+    Promise.all(
+      ride.removals.map(({ provider, id }) =>
+        ctx.call(trainingHistoryRemoveService, { key: provider, id }).then(
+          (result) => (result.ok ? undefined : text.removeRefused(labelOf(provider), result.reason)),
+          (error: unknown) => {
+            ctx.logger.warn(`Could not delete the ride: ${String(error)}`);
+            return text.writeFailed(labelOf(provider));
+          },
+        ),
+      ),
+    ).then((refusals) => {
+      const refused = refusals.find((why) => why !== undefined);
+      if (refused === undefined) {
+        // Should a provider's rides not follow, the ride does not stay hidden for good.
+        setTimeout(shownAgain, 4000);
+      } else {
+        shownAgain();
+        setRefusal(refused);
+      }
+    });
+  };
+
+  /** Removes the dragged entry from the calendar: at once in the calendar of ridrs, else by its provider. A ride done is deleted. */
   const remove = () => {
+    if (drag?.kind === 'ride') {
+      deleteRide(drag);
+      return;
+    }
     if (drag?.kind !== 'entry') return;
     const { id } = drag;
     setRefusal(undefined);
@@ -364,6 +418,7 @@ export function useWeek(ctx: UiContext) {
     droppable,
     drop,
     remove,
+    removalsOf,
     keepable,
     keep,
     kept,
@@ -418,7 +473,7 @@ export const WEEK_CSS = `
 .tw-entry[data-state="planned"]::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
   background: var(--ridrs-info, #00f0ff); box-shadow: 0 0 12px rgb(0 240 255 / .7); }
 .tw-entry[draggable="true"] { cursor: grab; }
-.tw-entry[draggable="true"]:hover { background: rgb(0 240 255 / .2); }
+.tw-entry[data-state="planned"][draggable="true"]:hover { background: rgb(0 240 255 / .2); }
 .tw-entry[data-kind="rest"], .tw-entry[data-kind="note"] { background: rgb(255 255 255 / .05); }
 .tw-entry[data-kind="rest"]::before, .tw-entry[data-kind="note"]::before { background: var(--ridrs-text-muted, #8b9bb4); box-shadow: none; }
 .tw-entry[data-kind="outdoor"] { background: rgb(61 220 132 / .12); }
@@ -443,29 +498,29 @@ export const WEEK_CSS = `
   text-decoration: underline; text-underline-offset: 3px; cursor: pointer; vertical-align: middle; }
 .tw-current:hover { color: var(--ridrs-text, #f1f5f9); }
 .tw-current:focus-visible { outline: 3px solid var(--ridrs-focus, #00f0ff); outline-offset: 2px; }
-/* The bin: right below the calendar while an entry of it is dragged, over what follows, so nothing moves. */
-.tw { position: relative; }
-.tw-bin { position: absolute; inset: calc(100% + 10px) 0 auto; z-index: 50; display: flex; align-items: center;
-  justify-content: center; gap: 12px; min-height: 64px; padding: 12px 20px;
+/* The bin: at the bottom of the window while an entry or a ride of the calendar is dragged, over the page, so nothing moves. */
+.tw-bin { position: fixed; bottom: 24px; left: 0; right: 0; z-index: 1000; display: flex; align-items: center;
+  justify-content: center; gap: 12px; width: min(560px, calc(100vw - 32px)); min-height: 64px; margin: 0 auto; padding: 12px 20px;
   border: 2px dashed rgb(255 77 109 / .7); border-radius: 14px;
   background: rgb(13 18 28 / .94); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
   box-shadow: 0 12px 40px rgb(0 0 0 / .5); backdrop-filter: blur(8px);
   transition: background .15s, border-color .15s; animation: tw-bin-in .15s ease-out; }
 .tw-bin .pv-glyph { width: 22px; height: 22px; color: var(--ridrs-danger, #ff4d6d); }
 .tw-bin[data-over] { border-style: solid; border-color: var(--ridrs-danger, #ff4d6d); background: rgb(70 18 30 / .96); }
-@keyframes tw-bin-in { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes tw-bin-in { from { opacity: 0; transform: translateY(12px); } }
 @media (prefers-reduced-motion: reduce) { .tw-bin { animation: none; transition: none; } }
-/* The rider's workouts and the library: where a planned workout is dropped to become one of the workouts. */
-.tr-workouts-drop { display: flex; flex-direction: column; gap: inherit; border-radius: 16px;
-  transition: background .15s, box-shadow .15s; }
-.tr-workouts-drop[data-over] { background: rgb(0 240 255 / .06); box-shadow: 0 0 0 2px var(--ridrs-info, #00f0ff); }
-.tr-workouts-drop-hint { position: sticky; top: 12px; z-index: 40; display: flex; align-items: center;
-  justify-content: center; min-height: 56px; margin: 0; padding: 12px 20px;
-  border: 2px dashed rgb(0 240 255 / .7); border-radius: 14px;
-  background: rgb(13 18 28 / .94); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
-  text-align: center; box-shadow: 0 12px 40px rgb(0 0 0 / .5); backdrop-filter: blur(8px); }
-.tr-workouts-drop[data-over] .tr-workouts-drop-hint { border-style: solid; border-color: var(--ridrs-info, #00f0ff); }
-.tr-workouts-drop-hint[data-refused] { border-color: rgb(139 155 180 / .6); color: var(--ridrs-text-muted, #8b9bb4); }
+/* The box of the rider's workouts' tiles: where a planned workout is dropped to become one of the workouts. */
+.tr-workouts-drop { position: relative; min-height: 96px; border-radius: 16px; transition: box-shadow .15s; }
+.tr-workouts-drop[data-dragging] { box-shadow: 0 0 0 2px rgb(0 240 255 / .5); }
+.tr-workouts-drop[data-dragging][data-refused] { box-shadow: 0 0 0 2px rgb(139 155 180 / .4); }
+.tr-workouts-drop[data-over] { box-shadow: 0 0 0 3px var(--ridrs-info, #00f0ff); }
+/* While a planned workout is dragged, the box says over its tiles whether it takes it. */
+.tr-workouts-drop-hint { position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-start;
+  justify-content: center; margin: 0; padding: 24px 20px; border-radius: 16px;
+  background: rgb(13 18 28 / .82); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
+  text-align: center; backdrop-filter: blur(4px); pointer-events: none; }
+.tr-workouts-drop[data-over] .tr-workouts-drop-hint { background: rgb(0 40 48 / .86); }
+.tr-workouts-drop-hint[data-refused] { color: var(--ridrs-text-muted, #8b9bb4); }
 /* The month: whole weeks, each day a cell with its number and what it lists. */
 .tm .tw-bar-range { font-size: 30px; }
 .tm-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden;
@@ -530,6 +585,7 @@ function Day({
   const { today, drag, setDrag } = week;
   const past = date < today;
   const { open, done } = week.day(date);
+  const endDrag = () => setDrag(undefined);
   const athlete = useChartAthlete(ctx);
   const openDetails = useContext(OpenDetails);
   return (
@@ -568,8 +624,11 @@ function Day({
             data-kind={entry.kind}
             data-pending={entry.pending || undefined}
             draggable={!entry.pending}
-            onDragStart={startDrag({ kind: 'entry', id: entry.id, ...(past ? { past } : {}) }, setDrag)}
-            onDragEnd={() => setDrag(undefined)}
+            onDragStart={startDrag(
+              { kind: 'entry', id: entry.id, ...(onlyIntoBin(entry.kind, past) ? { onlyIntoBin: true } : {}) },
+              setDrag,
+            )}
+            onDragEnd={endDrag}
           >
             {subject ? (
               <button
@@ -592,7 +651,9 @@ function Day({
           </li>
           );
         })}
-        {done.map(({ ride, plan }) => (
+        {done.map(({ ride, plan }) => {
+          const removals = week.removalsOf(ride);
+          return (
           <li
             key={ride.id}
             className="tw-entry"
@@ -600,6 +661,9 @@ function Day({
             data-done
             data-as-planned={plan ? true : undefined}
             title={plan ? text.ridAsPlanned(plan.title) : undefined}
+            draggable={removals !== undefined}
+            onDragStart={removals ? startDrag({ kind: 'ride', id: ride.id, name: ride.name, removals }, setDrag) : undefined}
+            onDragEnd={removals ? endDrag : undefined}
           >
             <span className="tw-entry-name">
               <span className="pv-glyph" aria-hidden="true" style={iconStyle(CHECK)} />
@@ -611,21 +675,25 @@ function Day({
               </span>
             ) : null}
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );
 }
 
-/** The bin an entry of the calendar is dragged into to remove it: there only while one is dragged. */
-function Bin({ ctx, week }: { readonly ctx: UiContext; readonly week: Week }) {
+/**
+ * The bin an entry or a ride of the calendar is dragged into to remove it: at the bottom of the
+ * window, there only while one is dragged.
+ */
+export function Bin({ ctx, week }: { readonly ctx: UiContext; readonly week: Week }) {
   const text = useMessages(ctx, messages);
   const [over, setOver] = useState(false);
   const { drag, setDrag } = week;
   useEffect(() => {
     if (drag === undefined) setOver(false);
   }, [drag]);
-  if (drag?.kind !== 'entry') return null;
+  if (drag?.kind !== 'entry' && drag?.kind !== 'ride') return null;
   return (
     <div
       className="tw-bin"
@@ -645,7 +713,7 @@ function Bin({ ctx, week }: { readonly ctx: UiContext; readonly week: Week }) {
       }}
     >
       <span className="pv-glyph" aria-hidden="true" style={iconStyle(TRASH)} />
-      {text.dropToRemove}
+      {drag.kind === 'ride' ? text.dropToDeleteRide : text.dropToRemove}
     </div>
   );
 }
@@ -762,7 +830,6 @@ export function WeekCalendar({
           );
         })}
       </div>
-      <Bin ctx={ctx} week={week} />
     </div>
   );
 }
@@ -813,7 +880,6 @@ export function MonthCalendar({ ctx, week }: { readonly ctx: UiContext; readonly
           />
         ))}
       </div>
-      <Bin ctx={ctx} week={week} />
     </div>
   );
 }

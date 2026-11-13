@@ -18,6 +18,7 @@ export type Purpose =
   | 'library'
   | 'profile-write'
   | 'calendar-write'
+  | 'history-write'
   | 'upload'
   | 'auth';
 

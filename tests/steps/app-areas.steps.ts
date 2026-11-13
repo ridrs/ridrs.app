@@ -326,21 +326,43 @@ When('I end the drag', async function (this: RidrsWorld) {
   await this.settle();
 });
 
+/** Drags `source` into the bin, once the drag has shown it. */
+async function dragIntoBin(world: RidrsWorld, source: HTMLElement): Promise<void> {
+  await startDragging(world, source);
+  const target = await waitFor(() => {
+    const element = bin(world);
+    assert.ok(element, 'No bin is shown');
+    return element;
+  });
+  fireEvent.dragOver(target);
+  await world.settle();
+  fireEvent.drop(target);
+  fireEvent.dragEnd(source);
+  await world.settle();
+}
+
+/** A ride done, as the calendar lists it: draggable, but only into the bin. */
+const RIDE = 'li[data-done][draggable="true"]';
+
 When(
   'I drag the planned workout {string} into the bin',
   async function (this: RidrsWorld, name: string) {
-    const source = await draggable(this, 'li[draggable="true"]', name);
-    await startDragging(this, source);
-    const target = await waitFor(() => {
-      const element = bin(this);
-      assert.ok(element, 'No bin is shown');
-      return element;
-    });
-    fireEvent.dragOver(target);
-    await this.settle();
-    fireEvent.drop(target);
-    fireEvent.dragEnd(source);
-    await this.settle();
+    await dragIntoBin(this, await draggable(this, 'li[draggable="true"]', name));
+  },
+);
+
+When('I start dragging the ride {string}', async function (this: RidrsWorld, name: string) {
+  await startDragging(this, await draggable(this, RIDE, name));
+});
+
+When('I drag the ride {string} into the bin', async function (this: RidrsWorld, name: string) {
+  await dragIntoBin(this, await draggable(this, RIDE, name));
+});
+
+When(
+  'I drag the ride {string} onto {string}',
+  async function (this: RidrsWorld, name: string, day: string) {
+    await dragOnto(this, await draggable(this, RIDE, name), day);
   },
 );
 
@@ -349,15 +371,25 @@ Then('the page shows the bin {string}', async function (this: RidrsWorld, label:
 });
 
 Then('the page shows no bin', async function (this: RidrsWorld) {
-  await waitFor(() => assert.equal(bin(this), null));
+  await waitFor(() => assert.ok(!bin(this), 'A bin is shown'));
 });
 
-Then('the bin is part of the calendar', async function (this: RidrsWorld) {
-  await waitFor(() =>
-    assert.ok(
-      bin(this)?.closest('[data-week-start], [data-month]'),
-      'The bin is not beside the calendar',
-    ),
+Then('the bin is at the bottom of the window', async function (this: RidrsWorld) {
+  const element = await waitFor(() => {
+    const shown = bin(this);
+    assert.ok(shown, 'No bin is shown');
+    return shown;
+  });
+  assert.ok(!element.closest('[data-week-start], [data-month]'), 'The bin is inside the calendar');
+  // The headless DOM has no layout, and its `getComputedStyle` takes gigabytes over the app's
+  // style sheets: the rule of the bin says where the window shows it.
+  const rules = [...document.querySelectorAll('style')]
+    .map((sheet) => sheet.textContent ?? '')
+    .flatMap((css) => [...css.matchAll(/\.tw-bin\s*\{([^}]*)\}/g)].map((rule) => rule[1] ?? ''));
+  assert.ok(element.classList.contains('tw-bin'), 'The bin has no rule of its own');
+  assert.ok(
+    rules.some((rule) => /position:\s*fixed/.test(rule) && /bottom:/.test(rule)),
+    'The bin is not fixed to the bottom of the window',
   );
 });
 
@@ -532,6 +564,17 @@ Then('the workouts took the drop as a copy', function (this: RidrsWorld) {
 Then('the workouts refused the drop', function (this: RidrsWorld) {
   assert.equal(dropEffects.get(this), 'none');
 });
+
+Then(
+  "the workouts to drop onto are the box of the workouts' tiles",
+  async function (this: RidrsWorld) {
+    const zone = await workoutsDrop(this);
+    assert.ok(
+      zone.matches('[data-testid="own-workouts"]'),
+      'The drop area is not the box of the tiles',
+    );
+  },
+);
 
 Then('the workouts say {string}', async function (this: RidrsWorld, text: string) {
   const zone = await workoutsDrop(this);

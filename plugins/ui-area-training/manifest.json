@@ -61,6 +61,7 @@
       "training.calendar.plan",
       "training.calendar.move",
       "training.calendar.remove",
+      "training.history.remove",
       "training.library.load",
       "training.library.save",
       "training.range.load"

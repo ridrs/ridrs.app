@@ -50,6 +50,7 @@ export const en = {
       ? `${source} cannot be changed here: nothing was removed.`
       : `${source} could not be reached: nothing was removed.`,
   dropToRemove: 'Drop here to remove',
+  dropToDeleteRide: 'Drop here to delete the ride',
   dropToKeep: (name: string) => `Drop here to add “${name}” to your workouts`,
   noSteps: (name: string) => `“${name}” has no steps: only a structured workout can become one of your workouts.`,
   kindNoSteps: {

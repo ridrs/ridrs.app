@@ -37,6 +37,7 @@
       "training.calendar.move",
       "training.calendar.remove",
       "training.connect",
+      "training.history.remove",
       "training.disconnect",
       "training.library.load",
       "training.range.load",

@@ -30,6 +30,7 @@ import {
   trainingCalendarMoveService,
   trainingCalendarPlanService,
   trainingCalendarRemoveService,
+  trainingHistoryRemoveService,
   trainingCalendarSchema,
   trainingCalendarState,
   trainingConnectService,
@@ -499,6 +500,7 @@ export default definePlugin({
     ctx.services.provide(trainingCalendarRemoveService, ({ key: _key, ...remove }) =>
       writeCalendar(env, { remove }),
     );
+    ctx.services.provide(trainingHistoryRemoveService, ({ id }) => removeActivity(env, id));
 
     // The refresh button: the athlete and the plan, at most once a minute.
     ctx.services.provide(trainingRefreshService, () => {
@@ -970,6 +972,22 @@ async function writeCalendar(env: Env, change: CalendarChange): Promise<DataWrit
 }
 
 /**
+ * Deletes a ride done (`DELETE /api/v1/activity/{id}`). The rides shown follow an accepted
+ * deletion at once; a refused one leaves them as they are.
+ */
+async function removeActivity(env: Env, id: string): Promise<DataWriteResult> {
+  const sent = await send(env, 'history-write', 'DELETE', `/api/v1/activity/${encodeURIComponent(id)}`);
+  if (!sent.ok) {
+    return sent;
+  }
+  const loaded = env.held.cache;
+  if (loaded?.history) {
+    await keep(env, { ...loaded, history: loaded.history.filter((ride) => ride.id !== id) });
+  }
+  return { ok: true };
+}
+
+/**
  * Both data types of this provider, with the data when there is any. `unavailable` has none: a
  * disconnected or rejected account is not served from the cache. The library is `loading` until
  * the first time it was asked for, and `unavailable` where the token lacks its scope.
@@ -997,13 +1015,13 @@ function setSources(
     ...common,
     ...(loaded ? { data: { workouts: loaded.workouts } } : {}),
   });
-  // The rides done are read only too (ADR 0076).
+  // The rides done (ADR 0076): a ride is deleted, never changed.
   ctx.state.set(
     trainingHistoryState,
     SERVICE,
     loaded && !loaded.history
       ? { provider: SERVICE, label: LABEL, status: 'unavailable', writable: false, remote: true }
-      : { ...common, writable: false, ...(loaded?.history ? { data: { workouts: loaded.history } } : {}) },
+      : { ...common, ...(loaded?.history ? { data: { workouts: loaded.history } } : {}) },
   );
   // The library is read only.
   const library = loaded?.library;

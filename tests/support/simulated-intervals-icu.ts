@@ -244,6 +244,10 @@ export class SimulatedIntervalsIcu {
       if (request.method === 'POST' && url.pathname === '/api/v1/athlete/0/activities') {
         return this.upload(request, url);
       }
+      const activity = /^\/api\/v1\/activity\/([^/]+)$/.exec(url.pathname);
+      if (request.method === 'DELETE' && activity) {
+        return this.deleteActivity(decodeURIComponent(activity[1] ?? ''));
+      }
       if (request.method === 'DELETE' && url.pathname === '/api/v1/disconnect-app') {
         this.validToken = undefined;
         return json(200, {});
@@ -325,6 +329,21 @@ export class SimulatedIntervalsIcu {
     }
     Object.assign(existing, body);
     return json(200, existing);
+  }
+
+  /** `DELETE /api/v1/activity/{id}`: the ride is gone from the activities. */
+  private deleteActivity(id: string): HttpResponse {
+    if (!this.writesReachable) {
+      throw new Error('connect ETIMEDOUT intervals.icu');
+    }
+    if (this.writeStatus !== 200) {
+      return json(this.writeStatus, { error: 'Forbidden' });
+    }
+    const before = this.activities.length;
+    this.activities = this.activities.filter((activity) => String(activity.id) !== id);
+    return this.activities.length < before
+      ? json(200, {})
+      : json(404, { error: 'No such activity' });
   }
 
   /** Multipart with the activity in `file`, as the API takes it; a token without the scope gets 403. */

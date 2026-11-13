@@ -1,7 +1,7 @@
 @ui @training
 Feature: A planned workout is added to the rider's own workouts by dragging it onto them
   A planned workout of the calendar can be kept as one of the rider's own workouts: while it is
-  dragged, the workouts below the calendar say that it can be dropped there, and a drop copies it
+  dragged, the box of the workouts' tiles below the calendar says that it can be dropped there, and a drop copies it
   with its steps into the library of ridrs on this device (`training.library.save`, provider
   `ridrs`). The pointer shows a copy there. What has no steps cannot become a workout: a rest
   day, a note, an outdoor ride, a planned workout its calendar keeps without steps. Such an entry
@@ -74,6 +74,17 @@ Feature: A planned workout is added to the rider's own workouts by dragging it o
     And I drag the planned workout "Gentle Waves" over the workouts
     Then the workouts refused the drop
     And the workouts say "“Gentle Waves” is one of your workouts already."
+
+  Scenario: The drop area is the box around the workouts' tiles
+    Given intervals.icu plans "Over-Unders" on "2026-11-05" with the steps:
+      | step     | duration | power  |
+      | warmup   | 10m      | 50-75% |
+      | cooldown | 5m       | 60-40% |
+    And the secret store holds a token for intervals.icu
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Training"
+    Then the workouts to drop onto are the box of the workouts' tiles
 
   Scenario: A workout of a library is not taken by the workouts
     Given the host has started

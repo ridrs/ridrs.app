@@ -214,16 +214,19 @@ export type CompletedWorkout = z.infer<typeof completedWorkoutSchema>;
 /**
  * The rides a provider has done, newest last: the data type `training.history`. Unlike the
  * calendar it is not one chosen source: every provider that offers it adds to what the area
- * shows (ADR 0076).
+ * shows (ADR 0076). `remove` deletes a ride the provider has (its `id` there): a ride known by
+ * several providers is removed from each.
  */
 export const trainingHistoryType = defineDataType(
   'training.history',
   z.object({ workouts: z.array(completedWorkoutSchema) }).strict(),
-  {},
+  { remove: z.object({ id: z.string().min(1) }).strict() },
 );
 
 /** Topic `training.history`, keyed by provider. */
 export const trainingHistoryState = trainingHistoryType.topic;
+
+export const trainingHistoryRemoveService = trainingHistoryType.writes.remove;
 
 /** Calls for an account: `key` is the service, routed to the plugin that owns its account. */
 const accountRequest = z.object({ key: z.string().min(1) }).strict();

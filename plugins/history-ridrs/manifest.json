@@ -17,5 +17,10 @@
     "watches": [
       "recording.ride"
     ]
+  },
+  "services": {
+    "provides": [
+      "training.history.remove"
+    ]
   }
 }

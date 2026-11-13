@@ -13,8 +13,10 @@ import {
   withPending,
   moveEntry,
   newWorkoutId,
+  onlyIntoBin,
   plannedWorkouts,
   removeEntry,
+  rideRemovals,
   UNDO_DEPTH,
   undo,
   weekdayOf,
@@ -291,5 +293,53 @@ describe('the id of a planned workout added to the library of ridrs', () => {
     expect(newWorkoutId('Over-Unders 3×(4+2)', new Set())).toBe('over-unders-3-4-2');
     expect(newWorkoutId('Süß Spot', new Set(['suss-spot', 'suss-spot-2']))).toBe('suss-spot-3');
     expect(newWorkoutId('!!!', new Set())).toBe('workout');
+  });
+});
+
+describe('onlyIntoBin', () => {
+  it('lets a workout of today, ahead or skipped move, and keeps the rest of a past day there', () => {
+    expect(onlyIntoBin('workout', false)).toBe(false);
+    expect(onlyIntoBin('workout', true)).toBe(false);
+    expect(onlyIntoBin('outdoor', false)).toBe(false);
+    expect(onlyIntoBin('outdoor', true)).toBe(true);
+    expect(onlyIntoBin('rest', true)).toBe(true);
+    expect(onlyIntoBin('note', true)).toBe(true);
+  });
+});
+
+describe('rideRemovals', () => {
+  const local = { id: 'session-1', date: '2026-11-04', startedAt: 1_000, name: 'Ride', sport: 'virtual-ride', externalId: 'link-1' } as const;
+  const remote = { ...local, id: 'i70001', name: 'Evening spin', trainingLoad: 40 } as const;
+  const other = { id: 'i70002', date: '2026-11-02', startedAt: 9_000_000, name: 'Monday Spin', sport: 'ride' } as const;
+
+  it('deletes a ride from every provider that has it', () => {
+    const [ride] = mergeCompleted([[local], [remote]]);
+    expect(
+      rideRemovals(ride as never, [
+        { provider: 'ridrs', writable: true, rides: [local] },
+        { provider: 'intervals', writable: true, rides: [remote, other] },
+      ]),
+    ).toEqual([
+      { provider: 'ridrs', id: 'session-1' },
+      { provider: 'intervals', id: 'i70001' },
+    ]);
+  });
+
+  it('deletes nothing when a provider that has the ride cannot delete it', () => {
+    expect(
+      rideRemovals(local, [
+        { provider: 'ridrs', writable: true, rides: [local] },
+        { provider: 'intervals', writable: false, rides: [remote] },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it('leaves out providers that do not have the ride', () => {
+    expect(
+      rideRemovals(other, [
+        { provider: 'ridrs', writable: false, rides: [local] },
+        { provider: 'intervals', writable: true, rides: [other] },
+      ]),
+    ).toEqual([{ provider: 'intervals', id: 'i70002' }]);
   });
 });

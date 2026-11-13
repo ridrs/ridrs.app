@@ -5,7 +5,8 @@ Feature: The Training area shows the workouts that were done
   source is chosen. The rides saved on this device and the activities of intervals.icu are listed
   together, and a ride that both know, a ride of ridrs uploaded to intervals.icu, is listed once.
   A planned workout that was ridden on its day is listed once too, as done and as planned: the done
-  ride matches the plan by its name, or by its duration and load.
+  ride matches the plan by its name, or by its duration and load. A ride done is deleted by
+  dragging it into the bin: from every provider that has it (`training.history.remove`).
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
   2026.
@@ -104,3 +105,41 @@ Feature: The Training area shows the workouts that were done
     When I press "Training"
     Then the calendar day "Wednesday" shows 1 done ride
     And the calendar day "Wednesday" lists 1 planned workout
+
+  Scenario: A ride saved on this device is deleted in the bin and stays deleted
+    Given the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Start ride"
+    And I press "Finish ride"
+    And I press "Save"
+    Then the "main" screen is shown
+    When I press "Training"
+    Then the calendar day "Wednesday" shows 1 done ride
+    When I drag the ride "Ride" into the bin
+    Then the calendar day "Wednesday" shows 0 done rides
+    When ridrs restarted
+    And I reload the UI
+    And I press "Training"
+    Then the calendar day "Wednesday" shows 0 done rides
+
+  Scenario: A ride on this device and in intervals.icu is deleted from both
+    Given the secret store holds a token for intervals.icu
+    And the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Start ride"
+    And I press "Finish ride"
+    And the debriefing shows "Save uploads the ride to intervals.icu"
+    And I press "Save"
+    Then intervals.icu received the ride's FIT file as an activity with the session as its external id
+    And the "main" screen is shown
+    When intervals.icu has the uploaded ride as an activity named "Evening spin"
+    And I open the next workout
+    And I press "Refresh"
+    And I press Back
+    And I press "Training"
+    And the simulated intervals.icu forgets the requests so far
+    And I drag the ride "Evening spin" into the bin
+    Then intervals.icu received 1 requests "DELETE /api/v1/activity/*"
+    And the calendar day "Wednesday" shows 0 done rides

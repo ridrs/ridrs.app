@@ -49,6 +49,7 @@ export const de: Messages = {
       ? `${source} kann hier nicht geändert werden: Es wurde nichts entfernt.`
       : `${source} war nicht erreichbar: Es wurde nichts entfernt.`,
   dropToRemove: 'Zum Entfernen hier ablegen',
+  dropToDeleteRide: 'Zum Löschen der Fahrt hier ablegen',
   dropToKeep: (name: string) => `Hier ablegen, um „${name}“ zu deinen Workouts hinzuzufügen`,
   noSteps: (name: string) => `„${name}“ hat keine Schritte: Nur ein strukturiertes Workout kann eines deiner Workouts werden.`,
   kindNoSteps: {
