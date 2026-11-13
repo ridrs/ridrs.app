@@ -12,7 +12,7 @@
     "watches": ["training.library", "route.import"]
   },
   "services": {
-    "provides": ["file.drop.import"],
+    "provides": ["file.drop.import", "file.drop.cancel"],
     "calls": ["route.import-preview", "route.import", "training.library.save"]
   }
 }

@@ -79,11 +79,15 @@ export function watchDrags(
     peek: () => peek(token),
     copyTo: (path, onProgress) =>
       invoke<void>('media_pick_copy', { token, target: assertAppFilePath(path), onProgress: channel(onProgress) }),
+    removeOriginal: () => invoke<void>('media_drop_remove', { token }),
   });
 
-  /** The files of the drag from Rust; a file it named before stays the same object. */
-  const sync = async (): Promise<DroppedFile[]> => {
-    const dragged = await invoke<Dragged[]>('media_drop_files');
+  /**
+   * The files of the drag from Rust; a file it named before stays the same object. `dropped`: they
+   * were let go, and Rust keeps where they lie for their removal after a move.
+   */
+  const sync = async (dropped = false): Promise<DroppedFile[]> => {
+    const dragged = await invoke<Dragged[]>('media_drop_files', { dropped });
     files = new Map(dragged.map((file) => [`drop-${file.token}`, files.get(`drop-${file.token}`) ?? fileOf(file)]));
     return [...files.values()];
   };
@@ -116,7 +120,7 @@ export function watchDrags(
     if (!carriesFiles(event)) return;
     depth = 0;
     then(async () => {
-      const dropped = await sync();
+      const dropped = await sync(true);
       told = '';
       if (dropped.length > 0) emit({ kind: 'drop', files: dropped });
     });

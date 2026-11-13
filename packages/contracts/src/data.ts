@@ -131,6 +131,11 @@ export interface DroppedFile extends PickedFile {
   /** Unique while the app runs. */
   readonly id: string;
   peek(): Promise<FilePeek>;
+  /**
+   * Removes the file from where it lies on the device: the rider moved it into ridrs instead of
+   * copying it. Called once what it holds is in ridrs, also after its drag is over.
+   */
+  removeOriginal(): Promise<void>;
 }
 
 /** Files dragged over the window, let go on it, or taken out of it again. */

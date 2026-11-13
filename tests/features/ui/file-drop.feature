@@ -72,3 +72,37 @@ Feature: Files dragged onto the window go to the library
     When the rider drags it out of the window again
     Then the drop layer is not shown
     And the library "ridrs" holds 16 workouts
+
+  Scenario: The move key turns adding into moving
+    Given the rider drags the workout file "threshold-2x10.erg" onto the window
+    When the rider holds the move key
+    Then the drop layer says "Let go to move 1 workout to your workouts"
+    And the pointer shows that letting go moves them
+
+  Scenario: Letting go with the move key moves a workout
+    Given the rider drags the workout file "threshold-2x10.erg" onto the window
+    When the rider lets go of it holding the move key
+    Then the drop layer says "Moved 1 workout to your workouts"
+    And the library "ridrs" holds 17 workouts
+    And the dragged file "threshold-2x10.erg" is removed from where it lay
+
+  Scenario: Letting go without the move key leaves the file where it lay
+    Given the rider drags the workout file "threshold-2x10.erg" onto the window
+    When the rider lets go of it
+    Then the library "ridrs" holds 17 workouts
+    And the dragged file "threshold-2x10.erg" is still where it lay
+
+  Scenario: A moved video route leaves its package once it is imported
+    Given the rider drags the Incyclist package "Col_de_Test.ride" onto the window
+    When the rider lets go of it holding the move key
+    Then the route offer "video-source-local/col-de-test" is "ready"
+    And the dragged file "Col_de_Test.ride" is removed from where it lay
+
+  Scenario: Escape takes the layer away and letting go adds nothing
+    Given the rider drags the workout file "threshold-2x10.erg" onto the window
+    And the drop layer shows the tile "Threshold 2x10"
+    When the rider presses Escape
+    Then the drop layer is not shown
+    When the rider lets go of it
+    Then the drop layer is not shown
+    And the library "ridrs" holds 16 workouts

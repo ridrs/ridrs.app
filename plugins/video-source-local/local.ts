@@ -131,7 +131,7 @@ export class LocalVideos {
    * cancelled. With `file`, imports that file dragged onto the window instead (ADR 0093). Refuses
    * while an import is on its way, or when this app cannot import.
    */
-  async import(file?: string): Promise<boolean> {
+  async import(file?: string, move = false): Promise<boolean> {
     const { media, pick } = this.services;
     const importer = this.importer();
     if (!media || !importer || (file === undefined && !pick)) throw new Error('This app cannot import videos');
@@ -152,7 +152,13 @@ export class LocalVideos {
     const listed = this.importingOffer(id, title, previewed?.ok ? previewed.preview : undefined);
     this.state.offer(listed.id, listed);
     // A host that stopped meanwhile takes no more state: the import ends without a word.
-    this.running = this.run(media, importer, chosen, id, title, this.progressOf(listed)).catch(() => undefined);
+    // Moved onto the window, the package leaves where it lay once its route is imported.
+    const moved = move && file !== undefined ? (chosen as DroppedFile) : undefined;
+    this.running = this.run(media, importer, chosen, id, title, this.progressOf(listed))
+      .then(async (imported) => {
+        if (imported && moved) await moved.removeOriginal();
+      })
+      .catch(() => undefined);
     return true;
   }
 
@@ -223,7 +229,7 @@ export class LocalVideos {
     id: string,
     title: string,
     tell: (share: number) => void,
-  ): Promise<void> {
+  ): Promise<boolean> {
     // A late word of the copy or the unpacking changes no route that is ready or gone.
     let open = true;
     const progress = (share: number) => {
@@ -270,6 +276,7 @@ export class LocalVideos {
     // The route listed while it was imported is ready now, or gone with the failure.
     this.state.offer(this.offerId(id), offer);
     this.set(next);
+    return offer !== undefined;
   }
 
   /**

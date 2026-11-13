@@ -30,7 +30,8 @@ export interface DropServices {
   /** The workouts of the ridrs library. */
   knownWorkouts(): readonly KnownWorkout[];
   preview(provider: string, file: string): Promise<RouteImportPreview>;
-  importRoute(provider: string, file: string): Promise<void>;
+  /** With `move`, the provider removes the dragged file once its route is imported. */
+  importRoute(provider: string, file: string, move: boolean): Promise<void>;
   /** Saves a workout with its original; `false` when the library refused it. */
   saveWorkout(workout: Workout, original: { readonly fileName: string; readonly data: string }): Promise<boolean>;
   /** When the file is read, as an ISO time: the workouts' `importedAt`. */
@@ -124,6 +125,12 @@ export class FileDrops {
     this.show();
   }
 
+  /** Escape over the layer: the drag is forgotten, as if it had left the window. */
+  cancel(): void {
+    if (this.importing || this.outcome) return;
+    this.leave();
+  }
+
   leave(): void {
     this.drag += 1;
     this.files = undefined;
@@ -134,9 +141,11 @@ export class FileDrops {
 
   /**
    * Adds the files of the drag: the workouts the library has not got to the ridrs library, the
-   * video routes through their provider. Once is enough: the same drag is not added twice.
+   * video routes through their provider. Once is enough: the same drag is not added twice. With
+   * `move`, a file of workouts is removed from where it lay once each of its workouts is saved or
+   * in the library; a video route's provider removes its file once the route is imported.
    */
-  async import(): Promise<void> {
+  async import(move = false): Promise<void> {
     const drag = this.drag;
     if (!this.files || this.importing || this.outcome) return;
     this.importing = true;
@@ -154,13 +163,14 @@ export class FileDrops {
       const { verdict } = entry;
       if (verdict.kind === 'route') {
         try {
-          await this.services.importRoute(verdict.provider, entry.file.id);
+          await this.services.importRoute(verdict.provider, entry.file.id, move);
           routes += 1;
         } catch (error) {
           this.services.warn?.(`${entry.file.name}: ${String(error)}`);
           failed += 1;
         }
       } else if (verdict.kind === 'workouts') {
+        const failedBefore = failed;
         for (const found of entry.found) {
           const signature = `${found.hash}|${found.workout.name}`;
           if (seen.has(signature)) {
@@ -180,11 +190,17 @@ export class FileDrops {
           if (ok) saved += 1;
           else failed += 1;
         }
+        // Everything the file holds is in the library now: moved, it leaves where it lay.
+        if (move && failed === failedBefore) {
+          await entry.file.removeOriginal().catch((error: unknown) => {
+            this.services.warn?.(`${entry.file.name} could not be removed: ${String(error)}`);
+          });
+        }
       }
     }
     if (drag !== this.drag) return;
     this.importing = false;
-    this.outcome = { phase: 'done', files: this.snapshot(), saved, skipped, routes, failed };
+    this.outcome = { phase: 'done', files: this.snapshot(), saved, skipped, routes, failed, moved: move };
     this.show();
   }
 

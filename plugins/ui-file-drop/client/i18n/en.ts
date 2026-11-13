@@ -9,14 +9,18 @@ export const en = {
   letGoWorkouts: (n: number) => `${workouts(n)} to your workouts`,
   letGoRoutes: (n: number) => `${routes(n)} to your routes`,
   letGo: (parts: readonly string[]) => `Let go to add ${parts.join(' and ')}`,
+  letGoMove: (parts: readonly string[]) => `Let go to move ${parts.join(' and ')}`,
+  caption: 'Drop Incyclist video routes and workouts here',
+  moveHint: (key: string) => `Hold ${key} to move the files instead of copying them`,
+  moving: 'Moving…',
+  moved: (n: number) => `Moved ${workouts(n)} to your workouts`,
   alreadyThere: 'Already in your workouts',
   adding: 'Adding…',
   added: (n: number) => `Added ${workouts(n)} to your workouts`,
   importingRoutes: (n: number) => `Importing ${routes(n)}: see Ride › Real video`,
   failed: (n: number) => `${n} could not be added`,
   more: (n: number) => `+ ${n} more`,
-  workout: 'Workout',
-  videoRoute: 'Video route',
+  video: 'Video',
 };
 
 export type Messages = typeof en;

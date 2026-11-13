@@ -28,7 +28,7 @@ export default definePlugin({
       importer: (state) =>
         state ? ctx.state.set(routeImportState, PLUGIN, state) : ctx.state.remove(routeImportState, PLUGIN),
     });
-    ctx.services.provide(routeImportService, async ({ file }) => ({ started: await videos.import(file) }));
+    ctx.services.provide(routeImportService, async ({ file, move }) => ({ started: await videos.import(file, move === true) }));
     ctx.services.provide(routeImportPreviewService, ({ file }) => videos.preview(file));
     ctx.services.provide(routeRemoveService, async ({ key }) => {
       await videos.remove(key);

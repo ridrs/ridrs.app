@@ -83,3 +83,21 @@ Feature: A video route dragged onto the window is previewed and imported
     And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1"}'
     Then the call was rejected with "service-failed" and the message "The dragged file \"drop-1\" is gone"
     And the media storage holds no route "video-source-local/col-de-test"
+
+  Scenario: A moved package is removed from where it lay once its route is imported
+    Given the rider drags the Incyclist package "Col_de_Test.ride" onto the window
+    And copying the dropped file waits
+    When the rider lets go of it
+    And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1","move":true}'
+    Then the route offer "video-source-local/col-de-test" is "importing"
+    And the dragged file "Col_de_Test.ride" is still where it lay
+    When copying the dropped file goes on
+    Then the route offer "video-source-local/col-de-test" is "ready"
+    And the dragged file "Col_de_Test.ride" is removed from where it lay
+
+  Scenario: A moved package whose import fails stays where it lay
+    Given the rider drags a ZIP "Holiday.zip" without a control file onto the window
+    When the rider lets go of it
+    And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1","move":true}'
+    Then the route import "video-source-local" failed
+    And the dragged file "Holiday.zip" is still where it lay

@@ -149,6 +149,7 @@ describe('LocalVideos', () => {
       name: 'Col.zip',
       size: picture.length,
       copyTo: async () => undefined,
+      removeOriginal: async () => undefined,
       peek: async () => ({
         entries: [
           { name: 'Col.gpx', size: track.length, bytes: track },

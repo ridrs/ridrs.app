@@ -4,6 +4,7 @@ import {
   dataDropCapability,
   definePlugin,
   FILE_DROP_KEY,
+  fileDropCancelService,
   fileDropImportService,
   fileDropState,
   routeImportPreviewService,
@@ -36,8 +37,8 @@ export default definePlugin({
             ...(entry.workout?.source.originalHash ? { originalHash: entry.workout.source.originalHash } : {}),
           })),
         preview: (key, file) => ctx.services.call(routeImportPreviewService, { key, file }),
-        importRoute: async (key, file) => {
-          await ctx.services.call(routeImportService, { key, file });
+        importRoute: async (key, file, move) => {
+          await ctx.services.call(routeImportService, { key, file, ...(move ? { move } : {}) });
         },
         saveWorkout: async (workout, original) => {
           const answer = await ctx.services.call(trainingLibrarySaveService, { key: LIBRARY, workout, original });
@@ -49,8 +50,12 @@ export default definePlugin({
       },
       (state) => (state ? ctx.state.set(fileDropState, FILE_DROP_KEY, state) : ctx.state.remove(fileDropState, FILE_DROP_KEY)),
     );
-    ctx.services.provide(fileDropImportService, async () => {
-      await drops.import();
+    ctx.services.provide(fileDropImportService, async ({ move }) => {
+      await drops.import(move === true);
+      return {};
+    });
+    ctx.services.provide(fileDropCancelService, () => {
+      drops.cancel();
       return {};
     });
     disconnect = drops.connect();

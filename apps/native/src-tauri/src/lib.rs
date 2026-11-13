@@ -114,6 +114,7 @@ pub fn run() {
             media_drop::media_drop_leave,
             media_drop::media_drop_peek,
             media_drop::media_drop_read,
+            media_drop::media_drop_remove,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,7 +7,11 @@
 //! tokens of `data.pick` (media_pick.rs): the WebView gets names, sizes and what a preview needs
 //! (`ridrs_media::peek`), never a place on the device. A token is good for one copy
 //! (`media_pick_copy`) and lasts until the next drag or until the drag leaves the window.
+//! A file that was let go can be removed from where it lay (`media_drop_remove`) once ridrs has
+//! what it holds: the rider moved it with the platform's move key. That lasts beyond its drag, as
+//! a route's import can outlive it.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -33,6 +37,8 @@ type Files = Vec<(Dragged, PathBuf)>;
 #[derive(Default)]
 pub struct DropState {
     drag: Mutex<Option<(isize, Files)>>,
+    /// The files let go, by their token at the drop, until they are removed.
+    dropped: Mutex<HashMap<String, PathBuf>>,
 }
 
 fn tokens(files: &[(Dragged, PathBuf)]) -> Vec<String> {
@@ -74,6 +80,27 @@ impl DropState {
         let dragged = files.iter().map(|(file, _)| file.clone()).collect();
         *drag = Some((count, files));
         Ok(dragged)
+    }
+
+    /// The files of the drag were let go: they can be removed from where they lie.
+    fn let_go(&self) -> Result<(), String> {
+        let drag = self.drag.lock().map_err(|e| e.to_string())?;
+        let mut dropped = self.dropped.lock().map_err(|e| e.to_string())?;
+        for (file, path) in drag.iter().flat_map(|(_, files)| files) {
+            dropped.insert(file.token.clone(), path.clone());
+        }
+        Ok(())
+    }
+
+    /// Removes the file let go with `token` from where it lies; only a file that was let go.
+    fn remove(&self, token: &str) -> Result<(), String> {
+        let path = self
+            .dropped
+            .lock()
+            .map_err(|e| e.to_string())?
+            .remove(token)
+            .ok_or_else(|| format!("no dropped file \"{token}\""))?;
+        std::fs::remove_file(&path).map_err(|e| e.to_string())
     }
 
     /// The drag left the window: its files are forgotten.
@@ -163,11 +190,26 @@ pub fn honour_refused_drags(window: &tauri::WebviewWindow) -> tauri::Result<()> 
     })
 }
 
-/// The files being dragged; the page calls it when a drag of files enters and when it is let go.
+/// The files being dragged; the page calls it when a drag of files enters and, `dropped`, when
+/// it is let go.
 #[tauri::command]
-pub fn media_drop_files(pick: State<'_, PickState>, drop: State<'_, DropState>) -> Result<Vec<Dragged>, String> {
+pub fn media_drop_files(
+    pick: State<'_, PickState>,
+    drop: State<'_, DropState>,
+    dropped: Option<bool>,
+) -> Result<Vec<Dragged>, String> {
     let (count, paths) = dragged_paths();
-    drop.files(&pick, count, paths)
+    let files = drop.files(&pick, count, paths)?;
+    if dropped == Some(true) {
+        drop.let_go()?;
+    }
+    Ok(files)
+}
+
+/// Removes a file that was let go from where it lies: the rider moved it into ridrs.
+#[tauri::command]
+pub async fn media_drop_remove(drop: State<'_, DropState>, token: String) -> Result<(), String> {
+    drop.remove(&token)
 }
 
 /// The drag left the window without being let go.
@@ -266,6 +308,24 @@ mod tests {
         assert_ne!(again[0].token, entered[0].token);
         assert!(pick.path(&again[0].token).is_ok());
         assert!(drop.holds(&again[0].token).unwrap());
+    }
+
+    #[test]
+    fn removes_only_a_file_that_was_let_go_also_after_the_next_drag() {
+        let dir = tempfile::tempdir().unwrap();
+        let (pick, drop) = (PickState::default(), DropState::default());
+        let hovering = drop.files(&pick, 1, files_in(dir.path(), &["a.zwo"])).unwrap();
+        // Not let go: nothing is removed.
+        assert!(drop.remove(&hovering[0].token).is_err());
+        assert!(dir.path().join("a.zwo").exists());
+
+        drop.let_go().unwrap();
+        drop.files(&pick, 2, files_in(dir.path(), &["b.zwo"])).unwrap();
+        drop.remove(&hovering[0].token).unwrap();
+        assert!(!dir.path().join("a.zwo").exists());
+        assert!(dir.path().join("b.zwo").exists());
+        // Once.
+        assert!(drop.remove(&hovering[0].token).is_err());
     }
 
     #[test]

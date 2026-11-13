@@ -2,7 +2,9 @@
   "id": "ui-file-drop",
   "name": "Drop Layer",
   "version": "0.1.0",
-  "types": ["ui"],
+  "types": [
+    "ui"
+  ],
   "provides": [],
   "requires": [],
   "entry": "index.ts",
@@ -19,8 +21,19 @@
       "subscribe": [],
       "publish": []
     },
-    "state": ["app.language", "file.drop"],
-    "calls": ["file.drop.import"],
-    "uses": ["ui.workout-chart", "ui.route-profile"]
+    "state": [
+      "app.language",
+      "file.drop",
+      "athlete.profile",
+      "data.source"
+    ],
+    "calls": [
+      "file.drop.import",
+      "file.drop.cancel"
+    ],
+    "uses": [
+      "ui.workout-chart",
+      "ui.route-profile"
+    ]
   }
 }

@@ -180,11 +180,19 @@ const droppedFileId = z.string().min(1);
 /**
  * Imports a route from a package the rider chooses in the system's open dialog: answered once the
  * dialog closed, `started: false` when the rider cancelled. With `file`, from that file dragged
- * onto the window instead, without a dialog (ADR 0093). The import's progress and a failure are
- * the provider's key of `route.import`; the route is then a key of `route.offer`.
+ * onto the window instead, without a dialog (ADR 0093); with `move` as well, the dragged file is
+ * removed from where it lay once its route is imported, and stays there when the import fails.
+ * The import's progress and a failure are the provider's key of `route.import`; the route is then
+ * a key of `route.offer`.
  */
 export const routeImportService = defineService('route.import', {
-  request: z.object({ key: z.string().min(1), file: droppedFileId.optional() }).strict(),
+  request: z
+    .object({
+      key: z.string().min(1),
+      file: droppedFileId.optional(),
+      move: z.boolean().optional(),
+    })
+    .strict(),
   response: z.object({ started: z.boolean() }).strict(),
   keyedBy: routeImportState,
 });

@@ -109,6 +109,8 @@ export class SimulatedDrop {
   private readonly listeners = new Set<(event: DropEvent) => void>();
   private files = new Map<string, DroppedFile>();
   private next = 0;
+  /** The names of the dragged files removed from where they lay: moved into ridrs. */
+  readonly removed = new Set<string>();
 
   /** While set, a copy waits until `goOn` is called: the import stays on its way. */
   private held: { promise: Promise<void>; release: () => void } | undefined;
@@ -149,6 +151,9 @@ export class SimulatedDrop {
         const path = join(this.mediaRoot, ...target.split('/'));
         await mkdir(dirname(path), { recursive: true });
         await writeFile(path, bytes);
+      },
+      removeOriginal: async () => {
+        this.removed.add(name);
       },
     };
     this.files = new Map([[file.id, file]]);

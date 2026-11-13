@@ -10,7 +10,7 @@ const FILES = resolve(import.meta.dirname, '../../tests/fixtures/workout-import/
 const fixture = (name: string) => new Uint8Array(readFileSync(resolve(FILES, name)));
 
 function dropped(id: string, name: string, peek: FilePeek): DroppedFile {
-  return { id, name, size: 1, peek: async () => peek, copyTo: async () => {} };
+  return { id, name, size: 1, peek: async () => peek, copyTo: async () => {}, removeOriginal: async () => {} };
 }
 
 const ROUTE: RouteImportPreview = {

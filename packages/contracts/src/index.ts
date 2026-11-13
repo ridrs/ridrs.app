@@ -239,6 +239,7 @@ export {
   droppedWorkoutSchema,
   FILE_DROP_KEY,
   type FileDrop,
+  fileDropCancelService,
   fileDropImportService,
   fileDropSchema,
   fileDropState,

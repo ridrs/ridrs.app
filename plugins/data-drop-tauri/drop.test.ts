@@ -162,6 +162,19 @@ describe('watchDrags', () => {
     expect(heard).toEqual([{ received: 5, size: 10 }]);
   });
 
+  it('tells Rust which files were let go, and removes one of them through its token', async () => {
+    const { drop } = watch();
+    document.body.dispatchEvent(drag('dragenter'));
+    inner.dispatchEvent(drag('drop'));
+    await settle();
+    expect(rust.calls.map(({ command, args }) => [command, args?.dropped])).toEqual([
+      ['media_drop_files', false],
+      ['media_drop_files', true],
+    ]);
+    await drop.file('drop-1')?.removeOriginal();
+    expect(rust.calls.at(-1)).toEqual({ command: 'media_drop_remove', args: { token: '1' } });
+  });
+
   it('stops watching', async () => {
     const watched = watch();
     watched.stop();

@@ -62,6 +62,8 @@ export const fileDropSchema = z.discriminatedUnion('phase', [
       skipped: z.number().int().nonnegative(),
       routes: z.number().int().nonnegative(),
       failed: z.number().int().nonnegative(),
+      /** The files were moved: each leaves where it lay once what it holds is in ridrs. */
+      moved: z.boolean(),
     })
     .strict(),
 ]);
@@ -77,8 +79,20 @@ export const fileDropState = defineState('file.drop', fileDropSchema);
  * Adds what is being dragged to the library, once it is let go over the layer that shows it (ADR
  * 0093): answered when the workouts are saved and the imports of video routes started; the outcome
  * is the state `done`. A drag that left the window, or one with nothing to import, adds nothing.
+ * With `move` (the platform's move key held while letting go), each file is removed from where it
+ * lay once what it holds is in ridrs: workouts once saved or found in the library, a video route
+ * once imported. A file whose import failed stays where it lay.
  */
 export const fileDropImportService = defineService('file.drop.import', {
+  request: z.object({ move: z.boolean().optional() }).strict(),
+  response: z.object({}).strict(),
+});
+
+/**
+ * Forgets the drag as if it had left the window (Escape over the layer): `file.drop` is gone, and
+ * letting go of the same drag afterwards adds nothing.
+ */
+export const fileDropCancelService = defineService('file.drop.cancel', {
   request: z.object({}).strict(),
   response: z.object({}).strict(),
 });

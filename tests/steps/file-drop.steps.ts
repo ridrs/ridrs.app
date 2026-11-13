@@ -106,13 +106,16 @@ Given(
   },
 );
 
-/** Waits until `file-drop` has read every dragged file: no verdict is `reading` any more. */
+/**
+ * Waits until `file-drop` has read every dragged file: no verdict is `reading` any more. A drag
+ * that was cancelled (Escape) is gone with its files: nothing is left to read.
+ */
 async function filesRead(world: RidrsWorld): Promise<void> {
   await world.waitForIo(() => {
     const drag = world.ensureHost().getState('file.drop').get('window') as
       | { files: { verdict: { kind: string } }[] }
       | undefined;
-    return drag?.files.every((file) => file.verdict.kind !== 'reading') === true;
+    return drag === undefined || drag.files.every((file) => file.verdict.kind !== 'reading');
   }, 'the dragged files to be read');
 }
 
@@ -120,39 +123,89 @@ When('the dragged files are read', async function (this: RidrsWorld) {
   await filesRead(this);
 });
 
-When('the rider lets go of it', async function (this: RidrsWorld) {
-  drop(this).drop();
+/** A drag event as WebKit gives it while files hover; with the move key, ⌘ and Shift are held. */
+function dragEvent(type: string, transfer: object, move: boolean): Event {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: transfer });
+  for (const key of ['metaKey', 'shiftKey']) Object.defineProperty(event, key, { value: move });
+  return event;
+}
+
+async function letGo(world: RidrsWorld, move: boolean): Promise<void> {
+  drop(world).drop();
   // Where the UI is shown, the files are let go over the layer that shows them, if it shows them.
-  if (this.uiViews[0]) {
-    await filesRead(this);
+  if (world.uiViews[0]) {
+    await filesRead(world);
     // Files ridrs cannot import have no layer; anything else is shown on it.
-    const drag = this.ensureHost().getState('file.drop').get('window') as
+    const drag = world.ensureHost().getState('file.drop').get('window') as
       | { files: { verdict: { kind: string } }[] }
       | undefined;
     if (
       !drag?.files.some((file) => file.verdict.kind === 'workouts' || file.verdict.kind === 'route')
     ) {
-      await this.settle();
+      await world.settle();
       return;
     }
-    const target = await shownLayer(this);
-    const event = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(event, 'dataTransfer', {
-      value: { types: ['Files'], dropEffect: 'copy' },
-    });
+    const target = await shownLayer(world);
     const takes = target.dataset.takes !== undefined;
-    target.dispatchEvent(event);
+    target.dispatchEvent(
+      dragEvent('drop', { types: ['Files'], dropEffect: move ? 'move' : 'copy' }, move),
+    );
     // What the layer takes is added once its import is done; the layer then says what it did.
     if (takes) {
       await waitFor(
-        () => assert.ok(layer(this)?.dataset.phase === 'done', 'The files are still being added'),
+        () => assert.ok(layer(world)?.dataset.phase === 'done', 'The files are still being added'),
         {
           timeout: 5000,
         },
       );
     }
   }
+  await world.settle();
+}
+
+When('the rider lets go of it', async function (this: RidrsWorld) {
+  await letGo(this, false);
+});
+
+When('the rider lets go of it holding the move key', async function (this: RidrsWorld) {
+  await letGo(this, true);
+});
+
+When('the rider holds the move key', async function (this: RidrsWorld) {
+  await pointerOver(this, true);
+});
+
+When('the rider presses Escape', async function (this: RidrsWorld) {
+  const shown = await shownLayer(this);
+  shown.ownerDocument.body.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+  );
   await this.settle();
+});
+
+Then(
+  'the dragged file {string} is removed from where it lay',
+  async function (this: RidrsWorld, name: string) {
+    await this.waitForIo(() => drop(this).removed.has(name), `"${name}" to be removed`);
+  },
+);
+
+Then(
+  'the dragged file {string} is still where it lay',
+  async function (this: RidrsWorld, name: string) {
+    await this.settle();
+    assert.ok(!drop(this).removed.has(name), `"${name}" was removed from where it lay`);
+  },
+);
+
+Then('the route import {string} failed', async function (this: RidrsWorld, key: string) {
+  await this.waitForIo(
+    () =>
+      (this.ensureHost().getState('route.import').get(key) as { state?: string } | undefined)
+        ?.state === 'failed',
+    `the import of "${key}" to fail`,
+  );
 });
 
 When('the rider drags it out of the window again', function (this: RidrsWorld) {
@@ -287,18 +340,20 @@ Then(
   },
 );
 
-/** What the layer tells the pointer while the files hover over it: `copy` (a plus) or `none`. */
-async function pointerOver(world: RidrsWorld): Promise<string> {
+/** What the layer tells the pointer while the files hover over it: `copy` (a plus), `move` or `none`. */
+async function pointerOver(world: RidrsWorld, move = false): Promise<string> {
   const target = await shownLayer(world);
   const transfer = { types: ['Files'], dropEffect: 'none' };
-  const event = new Event('dragover', { bubbles: true, cancelable: true });
-  Object.defineProperty(event, 'dataTransfer', { value: transfer });
-  target.dispatchEvent(event);
+  target.dispatchEvent(dragEvent('dragover', transfer, move));
   return transfer.dropEffect;
 }
 
 Then('the pointer shows that letting go adds them', async function (this: RidrsWorld) {
   await waitFor(async () => assert.equal(await pointerOver(this), 'copy'));
+});
+
+Then('the pointer shows that letting go moves them', async function (this: RidrsWorld) {
+  await waitFor(async () => assert.equal(await pointerOver(this, true), 'move'));
 });
 
 Then('the pointer shows that letting go adds nothing', async function (this: RidrsWorld) {
