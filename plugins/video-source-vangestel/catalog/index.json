@@ -698,6 +698,13 @@
         "size": 2040000000
       },
       "thumbnail": "source-3/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "FR_Source_Drome_Part_3.png",
+          "size": 8610352,
+          "sha256": "c1b0ae589c16208f5e82c3b24102150ddfeadf4bc05ef274e98b5b470c64598b"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Source_Drome_Part_3-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Source_Drome_Part_3.zip",
@@ -1417,6 +1424,13 @@
         "size": 2410000000
       },
       "thumbnail": "source-2/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "FR_Source_Drome_Part_2.png",
+          "size": 8288804,
+          "sha256": "fc93fdbf5f5fff829a6af569210d619d5995573c7d46664a242f6184d2ecdda7"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Source_Drome_Part_2-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Source_Drome_Part_2.zip",
@@ -2137,6 +2151,13 @@
         "size": 1840000000
       },
       "thumbnail": "source-1/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "FR_Source_Drome_Part_1.png",
+          "size": 8892430,
+          "sha256": "29ecaa488121791001320e8195d80d24d3e5773135b6046bf8a432888d7bdffb"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Valdrome-Part-1-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Source_Drome_Part_1.zip",
@@ -2863,6 +2884,13 @@
         "size": 1320000000
       },
       "thumbnail": "rimberg-kronenberg/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2466968,
+          "sha256": "686e97f655cf6db0ae12eb63cdecca8b90f2e45e4ba71c8fe7f44d32bce9ed70"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/DE_Rimberg-Kronenberg-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/DE_Rimberg_Kronenberg.zip",
@@ -3564,6 +3592,13 @@
         "size": 1050000000
       },
       "thumbnail": "marburg-lahntal/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 1707662,
+          "sha256": "4cbd036a177930e030b1b1fac0bad086331157f1c6262d66873467fcea4db6e6"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/DE_Marburg_Lahntal-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/DE_Marburg_Lahntal.zip",
@@ -4280,6 +4315,13 @@
         "size": 7970000000
       },
       "thumbnail": "menee-3/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 1857549,
+          "sha256": "9306e92f8e040c9ce0001e04fb037a2547918d4da84210a3c09c677a4cd93dae"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Menee-Part-3-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Menee_Part_3.zip",
@@ -4995,6 +5037,13 @@
         "size": 7210000000
       },
       "thumbnail": "menee-2/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2023088,
+          "sha256": "d1f850841cf1e95df18c5fb005844c431f24cb9bb066e9108a2a7ac72128b664"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Menee-Part-2-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Menee_Part_2.zip",
@@ -5711,6 +5760,13 @@
         "size": 3240000000
       },
       "thumbnail": "menee-1/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2313529,
+          "sha256": "dea3c99459be2d35c40404dc478a9afe889aa4561b2aa7a00f4660b4d2ddf8b9"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Menee-Part-1-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Menee_Part_1.zip",
@@ -6432,6 +6488,13 @@
         "size": 11210000000
       },
       "thumbnail": "col-de-pennes/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2310573,
+          "sha256": "12813a50934bb536249c3fff8d5a284b4c7ccdd2a3432558c6e0ab15ddd9c239"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Col_de_Pennes-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Col_de_Pennes.zip",
@@ -7137,6 +7200,13 @@
         "size": 2240000000
       },
       "thumbnail": "valdrome-3/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2447008,
+          "sha256": "f10f40e8997092ae2c93a658fe9482fb783e226a6fc6c7fbf2b6a56db0bb7f6c"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Valdrome-Part-3-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Valdrome_Part_3.zip",
@@ -7852,6 +7922,13 @@
         "size": 1720000000
       },
       "thumbnail": "valdrome-2/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2100486,
+          "sha256": "ed00471348e2fb898d190cb45d5a9e2ea952bac1ec59706265d80f3c80966444"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Valdrome-Part-2-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Valdrome_Part_2.zip",
@@ -8568,6 +8645,13 @@
         "size": 2020000000
       },
       "thumbnail": "valdrome-1/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 1927803,
+          "sha256": "489f5e773a7a893f60f0a043fe7608ee5084ad0f4d7a6ae09bc861da49a962a6"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Valdrome-Part-1-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Valdrome_Part_1.zip",
@@ -9275,6 +9359,13 @@
         "size": 1780000000
       },
       "thumbnail": "col-de-grimone-3/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2107989,
+          "sha256": "45420f7d680b45cc2af2ae1be24f855bc8b8e12a2463a080189fec9df14e6e09"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Col_de_Grimone_Part_3-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Col_de_Grimone_Part_3.zip",
@@ -9990,6 +10081,13 @@
         "size": 920000000
       },
       "thumbnail": "col-de-grimone-2/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2319232,
+          "sha256": "9a0406ae379e0b1784accd08fc4e7feefd52881a78753eafd0e8d3cfe65e2a11"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Col_de_Grimone_Part_2-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Col_de_Grimone_Part_2.zip",
@@ -10716,6 +10814,13 @@
         "size": 1700000000
       },
       "thumbnail": "col-de-grimone-1/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2151868,
+          "sha256": "32ba0f6ec7289847d155351c0fa6badefb24092b0cfb4e90d7ef01618fef553e"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Col_de_Grimone_Part_1-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Col_de_Grimone_Part_1.zip",
@@ -11432,6 +11537,13 @@
         "size": 3800000000
       },
       "thumbnail": "col-de-rousset/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 522943,
+          "sha256": "bb679acd75c10ff68bca2e543fc5bb3e73c624e20bcd096c8e1ead8728937767"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Col_de_Rousset-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Rousset_Part_4.zip",
@@ -12147,6 +12259,13 @@
         "size": 1220000000
       },
       "thumbnail": "pontaix-chamaloc/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2037229,
+          "sha256": "b8ce023f0c985a5fe30d04c795dca2f8097c2a1c7258417c582c6f12b2729c6d"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Pontaix-Chamaloc-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Rousset_Part_3.zip",
@@ -12853,6 +12972,13 @@
         "size": 1730000000
       },
       "thumbnail": "vallee-de-roanne/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 1957186,
+          "sha256": "d2c83b6accfdfba357dd7c538259cd216a1b7c2fcc757f70c5aedf2e3996aa4f"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Vallee_de_Roanne-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Rousset_Part_2.zip",
@@ -13569,6 +13695,13 @@
         "size": 3540000000
       },
       "thumbnail": "cdp-aucelon-roanne/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2142887,
+          "sha256": "5c2b9c7a835d3bc11fe8dd80931789cfe3bda09e3894cb72af7853571b71af5d"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_CDP-Aucelon-Roanne-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Rousset_Part_1.zip",
@@ -14272,6 +14405,13 @@
         "size": 1240000000
       },
       "thumbnail": "lahntal-marburg/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 1934593,
+          "sha256": "f75f59a2700f65b2ee4f627e583e3a4fc65fe3609d93e656d5d6e1361731ba1a"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/DE_Lahntal_Marburg-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/DE_Lahntal_Marburg.zip",
@@ -14975,6 +15115,13 @@
         "size": 770000000
       },
       "thumbnail": "le-petit-menglonnais/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2211920,
+          "sha256": "38f411e165fa22664aa05b1110f65eb79ae2d91b1a7d607b91131147a5d90c97"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Le_petit_Menglonnais-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Le_petit_Menglonnais.zip",
@@ -15686,6 +15833,13 @@
         "size": 1570000000
       },
       "thumbnail": "le-boucle-de-barnave/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 2497032,
+          "sha256": "ac44dfbd84056635608c183d661cc6aab59baeb4c53d9cc06789a5fab0cac093"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/FR_Le_boucle_de_Barnave-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/FR_Le_boucle_de_Barnave.zip",
@@ -16406,6 +16560,13 @@
         "size": 3970000000
       },
       "thumbnail": "wetterhoehe-katzenbach/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 1900062,
+          "sha256": "005fed0813bfdc8dc8c9c70abee42365462e605cd5eca8c0b53b9b0685f23496"
+        }
+      ],
       "trailer": "https://cycling.vangestel.online/rlv/trailers/DE_Wetterhoehe-Katzenbach-Trailer.mp4",
       "download": {
         "url": "https://cycling.vangestel.online/rlv/DE_Wetterhoehe_Katzenbach.zip",

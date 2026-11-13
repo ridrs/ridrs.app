@@ -9,14 +9,17 @@ import {
   routeRemoveService,
   storageMediaCapability,
   dataArchiveCapability,
+  dataPictureCapability,
 } from '@ridrs/contracts';
 import catalog from './catalog/index.json' with { type: 'json' };
 import { VideoDownloads } from './downloads.ts';
-import { catalogOffers, downloadables } from './offers.ts';
+import { type CatalogFiles, catalogOffers, downloadables } from './offers.ts';
 
-const thumbnail = (id: string) =>
-  // A fixed shape, so that the bundler finds and ships every thumbnail.
-  new URL(`./catalog/${id}/thumbnail.jpg`, import.meta.url).href;
+const files: CatalogFiles = {
+  // Fixed shapes, so that the bundler finds and ships every picture and overlay file.
+  tile: (id) => new URL(`./catalog/${id}/thumbnail.jpg`, import.meta.url).href,
+  overlay: (id, path) => new URL(`./catalog/${id}/overlay/${path}`, import.meta.url).href,
+};
 
 // The video rides of cycling.vangestel.online, offered to the ride page from the catalog that
 // ships with the plugin (`catalog/`, built by `pnpm fetch:video-catalog`): one key of the app
@@ -26,11 +29,12 @@ const thumbnail = (id: string) =>
 // `route.cancel` stops it.
 export default definePlugin({
   start(ctx) {
-    const offers = new Map(catalogOffers(catalog, thumbnail).map((offer) => [offer.id, offer]));
-    const downloads = new VideoDownloads(downloadables(catalog), (id) => {
+    const offers = new Map(catalogOffers(catalog, files).map((offer) => [offer.id, offer]));
+    const downloads = new VideoDownloads(downloadables(catalog, files), (id) => {
       const offer = offers.get(id);
       if (offer) {
-        ctx.state.set(routeOfferState, id, { ...offer, availability: downloads.availability(id) });
+        // A route on the device shows the pictures of its folder: its overlay and its small one.
+        ctx.state.set(routeOfferState, id, { ...offer, ...downloads.picturesOf(id), availability: downloads.availability(id) });
       }
     });
     for (const offer of offers.values()) {
@@ -58,6 +62,7 @@ export default definePlugin({
         media: ctx.capabilities.find(storageMediaCapability),
         fetch: ctx.capabilities.find(dataFetchCapability),
         archive: ctx.capabilities.find(dataArchiveCapability),
+        picture: ctx.capabilities.find(dataPictureCapability),
       })
       .catch(failed);
   },

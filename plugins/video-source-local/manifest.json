@@ -10,7 +10,8 @@
   "optionalRequires": [
     "storage.media",
     "data.pick",
-    "data.drop"
+    "data.drop",
+    "data.picture"
   ],
   "entry": "index.ts",
   "state": {

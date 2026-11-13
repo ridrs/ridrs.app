@@ -79,6 +79,22 @@ pub fn media_write(app: AppHandle, path: String, bytes: Vec<u8>) -> Result<(), S
     files::write(&root(&app)?, &path, &bytes)
 }
 
+/// Writes the raw body of the request to the media path in its `x-media-path` header
+/// (percent-encoded): a large file without a JSON array of its bytes.
+#[tauri::command(async)]
+pub fn media_write_raw(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("media_write_raw takes the file's bytes as its body".into());
+    };
+    let header = request
+        .headers()
+        .get("x-media-path")
+        .and_then(|value| value.to_str().ok())
+        .ok_or("media_write_raw needs the header x-media-path")?;
+    let path = crate::protocol::percent_decode(header).ok_or("x-media-path is not percent-encoded UTF-8")?;
+    files::write(&root(&app)?, &path, bytes)
+}
+
 #[tauri::command(async)]
 pub fn media_move(app: AppHandle, from: String, to: String) -> Result<(), String> {
     files::rename(&root(&app)?, &from, &to)

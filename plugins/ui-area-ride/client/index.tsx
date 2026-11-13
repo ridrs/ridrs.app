@@ -335,7 +335,8 @@ function RouteCard({
       icon={offer.kind === 'video' ? VIDEO : MOUNTAIN}
       title={offer.title}
       details={facts(offer, text)}
-      image={offer.thumbnail}
+      // A card loads the small picture: it decodes quicker than the full one of the details.
+      image={offer.tile ?? offer.thumbnail}
       backdrop={<RouteProfileSlot ctx={ctx} offer={offer} variant="card" />}
       tools={
         <>
@@ -629,7 +630,7 @@ function RideAgainView({ ctx }: { readonly ctx: UiContext }) {
       icon={BIKE}
       title={offer.title}
       details={facts(offer, text)}
-      image={offer.thumbnail}
+      image={offer.tile ?? offer.thumbnail}
       backdrop={offer.thumbnail ? undefined : <RouteProfileSlot ctx={ctx} offer={offer} variant="card" />}
       onHide={() => change((s) => ({ ...s, showOnToday: false }))}
     >

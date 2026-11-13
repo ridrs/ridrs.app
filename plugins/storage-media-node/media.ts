@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { existsSync } from 'node:fs';
-import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertAppFilePath, type MediaFiles } from '@ridrs/contracts';
 import { readPackageEntry, routeEntries } from './entries.ts';
 
@@ -42,5 +42,16 @@ export function createNodeMediaFiles(root: string): MediaFiles {
     location,
     url: (path) => pathToFileURL(location(path)).href,
     entries: (folder) => routeEntries(location(folder)),
+    async writeFrom(url, path) {
+      const target = location(path);
+      await mkdir(dirname(target), { recursive: true });
+      if (url.startsWith('file:')) {
+        await copyFile(fileURLToPath(url), target);
+        return;
+      }
+      const answer = await fetch(url);
+      if (!answer.ok) throw new Error(`${url}: ${answer.status}`);
+      await writeFile(target, new Uint8Array(await answer.arrayBuffer()));
+    },
   };
 }

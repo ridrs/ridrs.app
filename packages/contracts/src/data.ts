@@ -169,3 +169,20 @@ export interface DataDrop {
 export const dataDropCapability = defineCapability<DataDrop, 'single', 'data.drop'>('data.drop', {
   cardinality: 'single',
 });
+
+/**
+ * Pictures made smaller on the platform (ADR 0094): the small picture of a route's card from its
+ * full one. A WebView draws it on a canvas; a host without one has no provider.
+ */
+export interface DataPicture {
+  /**
+   * A JPEG of the picture `bytes` (a JPEG or a PNG) at most `width` px wide, its proportions kept;
+   * a smaller picture keeps its size.
+   */
+  shrink(bytes: Uint8Array, width: number): Promise<Uint8Array>;
+}
+
+export const dataPictureCapability = defineCapability<DataPicture, 'single', 'data.picture'>(
+  'data.picture',
+  { cardinality: 'single' },
+);

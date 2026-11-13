@@ -30,5 +30,13 @@ export function createTauriMediaFiles(root: string): MediaFiles {
     location,
     url: (path) => convertFileSrc(assertAppFilePath(path), SCHEME),
     entries: (folder) => invoke<MediaEntry[]>('media_entries', { folder: assertAppFilePath(folder) }),
+    async writeFrom(url, path) {
+      // An asset of the app's bundle, as the WebView loads it; its bytes travel raw, not as JSON.
+      const answer = await fetch(url);
+      if (!answer.ok) throw new Error(`${url}: ${answer.status}`);
+      await invoke('media_write_raw', new Uint8Array(await answer.arrayBuffer()), {
+        headers: { 'x-media-path': encodeURIComponent(assertAppFilePath(path)) },
+      });
+    },
   };
 }

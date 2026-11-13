@@ -10,7 +10,8 @@
   "optionalRequires": [
     "storage.media",
     "data.fetch",
-    "data.archive"
+    "data.archive",
+    "data.picture"
   ],
   "entry": "index.ts",
   "state": {

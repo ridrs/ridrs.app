@@ -26,6 +26,7 @@ import {
   dataDropCapability,
   dataFetchCapability,
   dataPickCapability,
+  dataPictureCapability,
   dataSelectService,
   dataSourceState,
   deviceConnectionChangedEvent,
@@ -147,6 +148,8 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   'data-pick-tauri',
   // Files dragged onto the window (ADR 0093); the headless app has no window.
   'data-drop-tauri',
+  // Pictures made smaller on a canvas of the WebView (ADR 0094); the headless app has none.
+  'data-picture-webview',
   'net-http-tauri',
   'auth-sign-in-tauri',
   'storage-secrets-tauri',
@@ -173,6 +176,7 @@ const CAPABILITIES: readonly CapabilityContract[] = [
   storageMediaCapability,
   dataFetchCapability,
   dataArchiveCapability,
+  dataPictureCapability,
   dataDropCapability,
   dataPickCapability,
 ];

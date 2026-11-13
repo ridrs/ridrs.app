@@ -14,13 +14,15 @@
 // route), `<id>/thumbnail.jpg` and `<id>/profile.svg` (ADR 0070). Running it again rewrites the
 // files; unchanged sources give the same files. A thumbnail or peaks file that is already there
 // stays: the routes get thumbnails and summit names of their own, the site's picture is only a start.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { configure, type Entry, HttpRangeReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 import { Window } from 'happy-dom';
 import { categoriseClimbs, nameClimbs } from '../plugins/video-source-vangestel/climbs.ts';
 import { drawProfile } from '../plugins/video-source-vangestel/profile-picture.ts';
-import { parseControlFile, parseGpx, xml } from '../plugins/ui-world-video/client/library.ts';
+import { parseControl } from '@ridrs/ride';
+import { parseGpx, xml } from '../plugins/ui-world-video/client/library.ts';
 import { plausibleTrack } from '../plugins/ui-world-video/client/plausible-track.ts';
 import { placeAt, type Track } from '../plugins/ui-world-video/client/track.ts';
 
@@ -168,7 +170,12 @@ function decode(bytes: Uint8Array): string {
 async function readArchive(url: string) {
   await pause();
   const head = await fetch(url, { method: 'HEAD', headers: HEADERS });
-  const reader = new ZipReader(new HttpRangeReader(url, { headers: Object.entries(HEADERS), forceRangeRequests: true }));
+  // zip.js reads `forceRangeRequests` (the server answers ranges without `Accept-Ranges`, ADR 0065)
+  // but its types leave it out.
+  const options = { headers: Object.entries(HEADERS), forceRangeRequests: true } as ConstructorParameters<
+    typeof HttpRangeReader
+  >[1];
+  const reader = new ZipReader(new HttpRangeReader(url, options));
   try {
     const entries = (await reader.getEntries()).filter((entry): entry is Entry & { directory: false } => !entry.directory);
     const read = async (extension: string) => {
@@ -191,7 +198,7 @@ async function readArchive(url: string) {
   }
 }
 
-/** The control file's notes along the route and its segments, which `parseControlFile` leaves out. */
+/** The control file's ids, its video and its end frame, as the catalog keeps them. */
 function routeExtras(control: string) {
   const document = xml(control);
   const numberOf = (element: Element, name: string) => Number(element.getAttribute(name));
@@ -262,6 +269,22 @@ function describeTrack(gpx: string) {
   };
 }
 
+/**
+ * The files of a route's overlay (ADR 0094), made by hand, which the tool never writes: named as
+ * the package's entries they improve, each with its size and the SHA-256 of its bytes, by which a
+ * downloaded route finds out at start that the catalog has a newer one.
+ */
+function overlayOf(folder: string) {
+  if (!existsSync(folder)) return [];
+  return readdirSync(folder)
+    .filter((name) => !name.startsWith('.'))
+    .sort()
+    .map((path) => {
+      const bytes = readFileSync(join(folder, path));
+      return { path, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+    });
+}
+
 /** The tour a video belongs to and its part, from titles such as `Rousset - 4 - Col de Rousset, Die`. */
 function tourOf(title: string, tours: readonly string[]) {
   const name = tours.find((tour) => title.startsWith(`${tour} - `));
@@ -272,7 +295,7 @@ function tourOf(title: string, tours: readonly string[]) {
 async function build(listed: Listed, tours: readonly string[], out: string) {
   const details = await readDetails(listed.page);
   const archive = await readArchive(details.download);
-  const control = parseControlFile(archive.control.text, listed.id, '');
+  const control = parseControl(archive.control.text);
   const extras = routeExtras(archive.control.text);
   const track = describeTrack(archive.gpx.text);
   const folder = join(out, listed.id);
@@ -296,6 +319,7 @@ async function build(listed: Listed, tours: readonly string[], out: string) {
     writeFileSync(picture, new Uint8Array(await (await get(details.thumbnail)).arrayBuffer()));
   }
   const thumbnail = existsSync(picture) ? `${listed.id}/thumbnail.jpg` : undefined;
+  const overlay = overlayOf(join(folder, 'overlay'));
   writeFileSync(join(folder, 'profile.svg'), drawProfile(track.profile, climbs));
   const video = archive.files.find((file) => file.name.split('/').at(-1) === extras.videoFile);
   const summary = {
@@ -317,6 +341,7 @@ async function build(listed: Listed, tours: readonly string[], out: string) {
     climbs,
     stated: listed.stated,
     thumbnail,
+    overlay,
     trailer: details.trailer,
     download: {
       url: details.download,

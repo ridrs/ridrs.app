@@ -7,7 +7,9 @@ import { Given, Then } from '@cucumber/cucumber';
 import { parseControl } from '@ridrs/ride';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 import { gpx, incyclistPackage } from '../support/simulated-downloads.ts';
+import { PICTURE_BYTES } from '../support/simulated-drop.ts';
 import { withStoredVideo } from '../support/simulated-file.ts';
+import { smallPicture } from '../support/simulated-picture.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
 
@@ -45,12 +47,15 @@ function offerFiles(world: RidrsWorld, key: string): string[] {
   return Object.keys(offer?.availability?.files ?? {}).sort();
 }
 
+/** The files of a route's folder; hidden ones (`.tile.jpg`, `.overlay.json`) are the app's own, no entries. */
 function filesBelow(directory: string, prefix = ''): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory()
-      ? filesBelow(join(directory, entry.name), `${prefix}${entry.name}/`)
-      : [`${prefix}${entry.name}`],
-  );
+  return readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => !entry.name.startsWith('.'))
+    .flatMap((entry) =>
+      entry.isDirectory()
+        ? filesBelow(join(directory, entry.name), `${prefix}${entry.name}/`)
+        : [`${prefix}${entry.name}`],
+    );
 }
 
 Given(
@@ -147,3 +152,91 @@ Given('the media storage holds no index of own routes', function (this: RidrsWor
   const index = join(folderOf('video-source-local'), 'routes.json');
   if (existsSync(index)) rmSync(index);
 });
+
+/** The catalog the Van Gestel source ships. */
+const CATALOG = join(import.meta.dirname, '../../plugins/video-source-vangestel/catalog');
+
+/** Unpacks the small Incyclist package into the route folder of `key`, with `preview.jpg` where `picture`. */
+async function unpackedRoute(key: string, picture = false): Promise<void> {
+  const folder = folderOf(key);
+  mkdirSync(folder, { recursive: true });
+  const reader = new ZipReader(new Uint8ArrayReader(await incyclistPackage(null)));
+  for (const entry of await reader.getEntries()) {
+    if (!entry.directory)
+      writeFileSync(join(folder, entry.filename), await entry.getData(new Uint8ArrayWriter()));
+  }
+  await reader.close();
+  if (picture) writeFileSync(join(folder, 'preview.jpg'), PICTURE_BYTES);
+}
+
+Given(
+  'the media storage holds the own route folder {string} unpacked from an Incyclist package with a picture',
+  async function (this: RidrsWorld, id: string) {
+    await unpackedRoute(`video-source-local/${id}`, true);
+  },
+);
+
+Given(
+  'the media storage holds the Van Gestel route {string} with the overlay of an older catalog',
+  async function (this: RidrsWorld, id: string) {
+    const key = `video-source-vangestel/${id}`;
+    await unpackedRoute(key);
+    writeFileSync(join(folderOf(key), 'preview.jpg'), new TextEncoder().encode('an older picture'));
+    writeFileSync(
+      join(folderOf(key), '.overlay.json'),
+      `${JSON.stringify({ 'preview.jpg': 'an older hash' })}\n`,
+    );
+  },
+);
+
+Then(
+  "the route folder {string} holds the catalog's {string} of {string}",
+  async function (this: RidrsWorld, key: string, file: string, id: string) {
+    const wanted = readFileSync(join(CATALOG, id, 'overlay', file));
+    await this.waitForIo(() => {
+      const path = join(folderOf(key), file);
+      return existsSync(path) && readFileSync(path).equals(wanted);
+    }, `"${key}" to hold the catalog's ${file}`);
+  },
+);
+
+Then(
+  'the small picture of {string} is made from its {string}',
+  async function (this: RidrsWorld, key: string, file: string) {
+    await this.waitForIo(() => {
+      const tile = join(folderOf(key), '.tile.jpg');
+      const picture = join(folderOf(key), file);
+      return (
+        existsSync(tile) &&
+        existsSync(picture) &&
+        readFileSync(tile).equals(
+          Buffer.from(smallPicture(new Uint8Array(readFileSync(picture)), 800)),
+        )
+      );
+    }, `the small picture of "${key}" made from ${file}`);
+  },
+);
+
+Then(
+  'the route offer {string} shows the tile picture {string}',
+  async function (this: RidrsWorld, key: string, ending: string) {
+    await this.waitForIo(() => {
+      const offer = this.ensureHost().getState('route.offer').get(key) as
+        | { tile?: string }
+        | undefined;
+      return offer?.tile?.endsWith(ending) === true;
+    }, `"${key}" to show the tile picture ${ending}`);
+  },
+);
+
+Then(
+  'the route offer {string} shows the full picture {string}',
+  async function (this: RidrsWorld, key: string, ending: string) {
+    await this.waitForIo(() => {
+      const offer = this.ensureHost().getState('route.offer').get(key) as
+        | { thumbnail?: string }
+        | undefined;
+      return offer?.thumbnail?.endsWith(ending) === true;
+    }, `"${key}" to show the full picture ${ending}`);
+  },
+);

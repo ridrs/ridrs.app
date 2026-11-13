@@ -1,0 +1,9 @@
+{
+  "id": "data-picture-webview",
+  "name": "Smaller Pictures (WebView)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["data.picture"],
+  "requires": [],
+  "entry": "index.ts"
+}

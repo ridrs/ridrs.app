@@ -2,6 +2,7 @@
 
 import {
   dataDropCapability,
+  dataPictureCapability,
   dataPickCapability,
   definePlugin,
   routeImportPreviewService,
@@ -38,6 +39,7 @@ export default definePlugin({
         media: ctx.capabilities.find(storageMediaCapability),
         pick: ctx.capabilities.find(dataPickCapability),
         drop: ctx.capabilities.find(dataDropCapability),
+        picture: ctx.capabilities.find(dataPictureCapability),
       })
       .catch(failed);
   },

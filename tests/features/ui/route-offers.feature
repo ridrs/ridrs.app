@@ -62,7 +62,7 @@ Feature: The ride page lists the routes that plugins offer
   Scenario: A route's details open on its picture with Back
     When I press "Ride"
     And I press "Col de Pennes - Climb it twice!"
-    Then the route details show the picture "col-de-pennes/thumbnail.jpg" across the top
+    Then the route details show the picture "col-de-pennes/overlay/preview.jpg" across the top
     And the route details offer a "Back" button
     And the route details offer no "All routes" button
     When I press "Back"

@@ -27,6 +27,9 @@ function memoryMedia(files = new Map<string, Uint8Array>()): MediaFiles & { file
     remove: async (path) => {
       for (const file of [...files.keys()]) if (file === path || file.startsWith(`${path}/`)) files.delete(file);
     },
+    writeFrom: async () => {
+      throw new Error('No files the app ships in this test');
+    },
     location: (path) => `/media/${path}`,
     url: (path) => `media://${path}`,
     entries: async (folder) =>

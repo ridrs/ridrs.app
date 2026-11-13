@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { DataArchive, DataFetch, MediaFiles, RouteOffer } from '@ridrs/contracts';
+import type { DataArchive, DataFetch, DataPicture, MediaFiles, RouteOffer } from '@ridrs/contracts';
 import {
   besideControl,
   entryNamed,
   entryUrls,
   findControl,
+  makeTile,
   moveToControlFile,
   RIDE_PACKAGE,
+  routePicture,
+  TILE_FILE,
 } from '@ridrs/ride';
 
 export type Availability = RouteOffer['availability'];
@@ -19,7 +22,21 @@ export interface Downloadable {
   readonly url: string;
   readonly size: number;
   readonly etag?: string;
+  /**
+   * The catalog's files that improve the route's package (ADR 0094), by their paths in its folder:
+   * their hashes, and the URLs the app ships them at.
+   */
+  readonly overlay?: readonly { readonly path: string; readonly sha256: string; readonly url: string }[];
 }
+
+/** A route's pictures on the device: its picture and its small one for a card, as URLs. */
+export interface RoutePictures {
+  readonly thumbnail?: string;
+  readonly tile?: string;
+}
+
+/** The hashes of the overlay files copied into a route's folder, by their paths: hidden, no entry. */
+const OVERLAY_FILE = '.overlay.json';
 
 /** What downloading takes; a missing part makes every download fail with a reason. */
 export interface DownloadServices {
@@ -27,6 +44,8 @@ export interface DownloadServices {
   readonly fetch?: DataFetch;
   /** Unpacks a package whose video is compressed. */
   readonly archive?: DataArchive;
+  /** Makes a route's small picture; without it a card shows the full one. */
+  readonly picture?: DataPicture;
 }
 
 const folderOf = (id: string) => `videos/${id}`;
@@ -42,6 +61,8 @@ const reasonOf = (error: unknown) => (error instanceof Error ? error.message : S
  */
 export class VideoDownloads {
   private readonly states = new Map<string, Availability>();
+  /** The pictures of the routes on the device. */
+  private readonly pictures = new Map<string, RoutePictures>();
   /** The downloads on their way, to cancel them. */
   private readonly running = new Map<string, AbortController>();
   private services: DownloadServices = {};
@@ -63,11 +84,20 @@ export class VideoDownloads {
       // A route downloaded before ADR 0094 gets its control file; one without is a broken route
       // and can be downloaded again.
       await moveToControlFile(media, folder).catch(() => false);
+      if (!(await this.ready(media, route.id).catch(() => undefined))) continue;
+      // A route downloaded before the catalog changed gets its current overlay; its offer then
+      // names the overlay's files too.
+      await this.improve(media, route).catch(() => undefined);
       const ready = await this.ready(media, route.id).catch(() => undefined);
       if (ready) {
         this.set(route.id, ready);
       }
     }
+  }
+
+  /** The pictures of a route on the device, where it has them; none for one to download. */
+  picturesOf(id: string): RoutePictures {
+    return this.pictures.get(id) ?? {};
   }
 
   availability(id: string): Availability {
@@ -123,6 +153,8 @@ export class VideoDownloads {
       let ready: Availability | undefined;
       try {
         await this.store(media, id, pack);
+        // The catalog's overlay and the small picture improve the route; without them it still plays.
+        await this.improve(media, route).catch(() => undefined);
         ready = await this.ready(media, id);
         if (!ready) {
           throw new Error('The downloaded package has no control file that names its video and track');
@@ -192,6 +224,7 @@ export class VideoDownloads {
     }
     await media.remove(folderOf(id));
     this.states.delete(id);
+    this.pictures.delete(id);
     this.changed(id);
   }
 
@@ -199,6 +232,47 @@ export class VideoDownloads {
    * A route on the device, with the URL of each of its entries as the media storage makes them
    * (ADR 0094); none when its folder holds no control file naming a video and a track it holds.
    */
+  /**
+   * Copies the catalog's overlay files the route's folder lacks or has older (by their hashes) and
+   * removes those the catalog dropped; then finds the route's picture and makes its small one
+   * where it has none, or anew after its overlay changed (ADR 0094).
+   */
+  private async improve(media: MediaFiles, route: Downloadable): Promise<void> {
+    const folder = folderOf(route.id);
+    let copied: Record<string, string> = {};
+    try {
+      copied = JSON.parse(new TextDecoder().decode(await media.read(`${folder}/${OVERLAY_FILE}`)));
+    } catch {
+      // No overlay copied yet.
+    }
+    const overlay = route.overlay ?? [];
+    let changed = false;
+    for (const file of overlay) {
+      if (copied[file.path] === file.sha256) continue;
+      await media.writeFrom(file.url, `${folder}/${file.path}`);
+      changed = true;
+    }
+    for (const path of Object.keys(copied)) {
+      if (overlay.some((file) => file.path === path)) continue;
+      await media.remove(`${folder}/${path}`);
+      changed = true;
+    }
+    if (changed || Object.keys(copied).length !== overlay.length) {
+      const hashes = Object.fromEntries(overlay.map((file) => [file.path, file.sha256]));
+      await media.write(`${folder}/${OVERLAY_FILE}`, new TextEncoder().encode(`${JSON.stringify(hashes)}\n`));
+    }
+    const picture = await routePicture(media, folder);
+    if (!picture) {
+      this.pictures.delete(route.id);
+      return;
+    }
+    const tile = await makeTile(media, this.services.picture, folder, picture, changed).catch(() => false);
+    this.pictures.set(route.id, {
+      thumbnail: media.url(`${folder}/${picture}`),
+      ...(tile ? { tile: media.url(`${folder}/${TILE_FILE}`) } : {}),
+    });
+  }
+
   private async ready(media: MediaFiles, id: string): Promise<Availability | undefined> {
     const folder = folderOf(id);
     const entries = await media.entries(folder);

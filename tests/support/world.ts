@@ -40,6 +40,7 @@ import {
   dataDropCapability,
   dataFetchCapability,
   dataPickCapability,
+  dataPictureCapability,
   dataSelectService,
   dataSourceState,
   defineCapability,
@@ -559,6 +560,7 @@ export class RidrsWorld extends World {
       storageMediaCapability,
       dataFetchCapability,
       dataArchiveCapability,
+      dataPictureCapability,
       dataDropCapability,
       dataPickCapability,
     ]) {

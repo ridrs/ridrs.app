@@ -18,6 +18,7 @@ Feature: A video route dragged onto the window is previewed and imported
 
   Background:
     Given the ridrs plugins "video-source-local, storage-media-node" together with the simulated drop
+    And pictures are made smaller by the simulated picture provider
     And the host has started
 
   Scenario: A dragged .ride package is previewed from its track
@@ -60,6 +61,8 @@ Feature: A video route dragged onto the window is previewed and imported
     And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1"}'
     Then the route offer "video-source-local/col-de-test" is "ready"
     And the route offer "video-source-local/col-de-test" shows the picture "preview.jpg"
+    And the route offer "video-source-local/col-de-test" shows the tile picture "video-source-local/col-de-test/.tile.jpg"
+    And the small picture of "video-source-local/col-de-test" is made from its "preview.jpg"
 
   Scenario: A ZIP without a control file is no route
     Given the rider drags a ZIP "Holiday.zip" without a control file onto the window

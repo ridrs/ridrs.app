@@ -106,6 +106,7 @@ pub fn run() {
             media::media_exists,
             media::media_read,
             media::media_write,
+            media::media_write_raw,
             media::media_move,
             media::media_remove,
             media::media_entries,

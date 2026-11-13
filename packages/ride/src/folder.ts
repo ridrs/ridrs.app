@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type DataPicture,
   type MediaEntry,
   type MediaFiles,
   VIDEO_ROUTE_FILE,
@@ -13,6 +14,7 @@ import {
   parseControl,
   writeControl,
 } from './control.ts';
+import { pictureOf } from './package.ts';
 
 /** The control file the migration writes into a route's folder. */
 export const CONTROL_FILE = 'route.xml';
@@ -88,5 +90,42 @@ export async function moveToControlFile(media: MediaFiles, folder: string): Prom
     new TextEncoder().encode(writeControl(controlFromRoute(stored.data))),
   );
   await media.remove(file);
+  return true;
+}
+
+/**
+ * A route's small picture for its card (ADR 0094), made from its picture: hidden, so it is no
+ * entry and Incyclist never sees it.
+ */
+export const TILE_FILE = '.tile.jpg';
+
+/** The width of a card's picture, twice that of the widest card, for sharp pictures on Retina. */
+export const TILE_WIDTH = 800;
+
+/** The picture of the route in `folder` among its entries; none where it has no control file or no picture. */
+export async function routePicture(media: MediaFiles, folder: string): Promise<string | undefined> {
+  const paths = (await media.entries(folder)).map((entry) => entry.path);
+  const found = await findControl(paths, (path) => media.read(`${folder}/${path}`));
+  if (!found) return undefined;
+  const video =
+    entryNamed(paths, besideControl(found.path, found.control.video)) ?? found.control.video;
+  return pictureOf(found.control, paths, video);
+}
+
+/**
+ * Makes the small picture of the route in `folder` from its picture `entry`, where `picture` can
+ * draw one: once, or `again` after its picture changed. Resolves to whether the route has one.
+ */
+export async function makeTile(
+  media: MediaFiles,
+  picture: DataPicture | undefined,
+  folder: string,
+  entry: string,
+  again = false,
+): Promise<boolean> {
+  const tile = `${folder}/${TILE_FILE}`;
+  if (!again && (await media.exists(tile))) return true;
+  if (!picture) return false;
+  await media.write(tile, await picture.shrink(await media.read(`${folder}/${entry}`), TILE_WIDTH));
   return true;
 }

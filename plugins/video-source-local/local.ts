@@ -2,6 +2,7 @@
 
 import {
   type DataDrop,
+  type DataPicture,
   type DataPick,
   type DroppedFile,
   type MediaFiles,
@@ -17,9 +18,11 @@ import {
   entryUrls,
   findControl,
   inspectPackage,
+  makeTile,
   moveToControlFile,
   pictureOf,
   RIDE_PACKAGE,
+  TILE_FILE,
 } from '@ridrs/ride';
 import { z } from 'zod';
 import { type TrackFacts, trackFacts } from './track-facts.ts';
@@ -62,6 +65,8 @@ export interface ImportServices {
   readonly pick?: DataPick;
   /** Files dragged onto the window (ADR 0093). */
   readonly drop?: DataDrop;
+  /** Makes a route's small picture for its card; without it a card shows the full one. */
+  readonly picture?: DataPicture;
 }
 
 /** Where the routes and the import go: the app state `route.offer` and `route.import` (ADR 0068). */
@@ -385,6 +390,10 @@ export class LocalVideos {
     const paths = entries.map((entry) => entry.path);
     if (!(await findControl(paths, (path) => media.read(`${folder}/${path}`)))) return undefined;
     const id = this.offerId(route.id);
+    // The card's small picture, made once from the route's picture where the platform can.
+    const tile =
+      route.thumbnail !== undefined &&
+      (await makeTile(media, this.services.picture, folder, route.thumbnail).catch(() => false));
     return {
       id,
       kind: 'video',
@@ -394,6 +403,7 @@ export class LocalVideos {
       ...(route.duration ? { duration: route.duration } : {}),
       sparkline: [...route.sparkline],
       ...(route.thumbnail ? { thumbnail: media.url(`${folder}/${route.thumbnail}`) } : {}),
+      ...(tile ? { tile: media.url(`${folder}/${TILE_FILE}`) } : {}),
       tags: {},
       availability: {
         state: 'ready',

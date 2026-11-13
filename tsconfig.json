@@ -34,6 +34,7 @@
     "plugins/**/*.ts",
     "plugins/**/*.tsx",
     "scripts/check-video-routes.ts",
+    "scripts/fetch-video-catalog.ts",
     "tests/**/*.ts",
     "vitest.config.ts"
   ],

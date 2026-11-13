@@ -33,6 +33,7 @@ import {
   dataDropCapability,
   dataFetchCapability,
   dataPickCapability,
+  dataPictureCapability,
   dataSelectService,
   dataSourceState,
   deviceConnectionChangedEvent,
@@ -208,6 +209,7 @@ const CAPABILITIES = [
   storageMediaCapability,
   dataFetchCapability,
   dataArchiveCapability,
+  dataPictureCapability,
   dataDropCapability,
   dataPickCapability,
 ];

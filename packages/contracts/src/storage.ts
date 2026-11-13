@@ -61,6 +61,11 @@ export interface MediaFiles {
   /** A URL the UI can read the file from, by range for a video. */
   url(path: string): string;
   /**
+   * Copies a file the app ships, at `url` (a plugin's own, `new URL(…, import.meta.url)`), to the
+   * media path `path`, creating its directories; replaces a file there.
+   */
+  writeFrom(url: string, path: string): Promise<void>;
+  /**
    * The entries of the video route in the folder `folder` (ADR 0094): those of its package
    * `route.ride` and the files beside it, which replace an entry of their path (letters compared
    * without case) or add one. Hidden files are none; a missing folder has none.

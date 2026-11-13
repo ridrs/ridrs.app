@@ -25,6 +25,11 @@ export const routeOfferSchema = z
     /** A picture of the route, as a URL the UI may load. */
     thumbnail: z.string().min(1).optional(),
     /**
+     * The same picture small, about 800 px wide, for a card: it loads and decodes quicker than
+     * `thumbnail`, which a card shows where there is none.
+     */
+    tile: z.string().min(1).optional(),
+    /**
      * The route's categorised climbs, in their order along it (ADR 0070): from the foot to the
      * summit in m along the route, m climbed, the average gradient in % and the summit's altitude;
      * the name of the summit or the climb where the provider knows it.

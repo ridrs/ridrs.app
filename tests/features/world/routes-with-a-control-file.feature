@@ -4,7 +4,8 @@ Feature: Routes on the device are folders with a control file
   one. A source finds its routes by their control files and names every file of a route in its
   offer, so the video world reads the control file and plays the video it names. A downloaded
   package is kept as `route.ride` where its video is stored, not compressed, and unpacked into
-  the route's folder otherwise; nothing is renamed and the download goes.
+  the route's folder otherwise; nothing is renamed and the download goes. A Van Gestel route also
+  gets the catalog's overlay, its picture as `preview.jpg`, at start and on download.
 
   A route stored before, in the unified format (`route.json`), moves at start: its source writes
   the control file `route.xml` from `route.json` and removes `route.json`. Video, track and
@@ -20,8 +21,8 @@ Feature: Routes on the device are folders with a control file
     Given the media storage holds the Van Gestel route "col-de-pennes" in the unified format
     When the host has started
     Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "route.xml, track.gpx, video.mp4"
-    And the route offer "video-source-vangestel/col-de-pennes" names the files "route.xml, track.gpx, video.mp4"
+    And the route folder "video-source-vangestel/col-de-pennes" holds "preview.jpg, route.xml, track.gpx, video.mp4"
+    And the route offer "video-source-vangestel/col-de-pennes" names the files "preview.jpg, route.xml, track.gpx, video.mp4"
     And the control file of "video-source-vangestel/col-de-pennes" names the video "video.mp4" at 30 frames per second from frame 12
 
   Scenario: An imported route in the unified format keeps its picture through its control file
@@ -39,14 +40,14 @@ Feature: Routes on the device are folders with a control file
     And the route offer "video-source-vangestel/col-de-pennes" is "ready"
     When ridrs restarted
     Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "route.xml, track.gpx, video.mp4"
+    And the route folder "video-source-vangestel/col-de-pennes" holds "preview.jpg, route.xml, track.gpx, video.mp4"
 
   Scenario: A downloaded package with a compressed video is unpacked into its route's folder
     Given the host has started
     When the UI bridge calls "route.fetch" with '{"key":"video-source-vangestel/col-de-pennes"}'
     Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "FR_Test.gpx, FR_Test.mp4, FR_Test.xml"
-    And the route offer "video-source-vangestel/col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml"
+    And the route folder "video-source-vangestel/col-de-pennes" holds "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
+    And the route offer "video-source-vangestel/col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
     And the media storage holds no downloaded package
 
   Scenario: A downloaded package with a stored video is kept as it is and played from the ZIP
@@ -54,8 +55,8 @@ Feature: Routes on the device are folders with a control file
     And the host has started
     When the UI bridge calls "route.fetch" with '{"key":"video-source-vangestel/col-de-pennes"}'
     Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "route.ride"
-    And the route offer "video-source-vangestel/col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml"
+    And the route folder "video-source-vangestel/col-de-pennes" holds "preview.jpg, route.ride"
+    And the route offer "video-source-vangestel/col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
     And the media storage holds no downloaded package
 
   Scenario: Own routes are offered from their folders when the index of them is lost

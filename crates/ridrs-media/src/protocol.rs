@@ -155,7 +155,7 @@ fn source(root: &Path, path: &str) -> Result<Source, StatusCode> {
 }
 
 /// `%XX` escapes as bytes, the result as UTF-8; `None` for a broken escape or invalid UTF-8.
-fn percent_decode(text: &str) -> Option<String> {
+pub fn percent_decode(text: &str) -> Option<String> {
     let bytes = text.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;

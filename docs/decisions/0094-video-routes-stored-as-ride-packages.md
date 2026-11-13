@@ -76,11 +76,20 @@ catalog/<id>/overlay/
 ```
 
 - **On download** the source copies the route's overlay into its folder, beside `route.ride` or the unpacked files; by the rule above these files win. The folder alone is then the improved route: the video world, `ridrs-media://` and an export to Incyclist need no knowledge of the catalog.
-- **On start** the source compares each downloaded route's overlay files with the catalog's (by a hash of their bytes, kept with the route's state) and copies those that changed: a new catalog reaches routes downloaded before it. Overlay files the catalog no longer has are removed; files the rider or another tool put there are left.
+- **On start** the source compares each downloaded route's overlay files with the catalog's by the SHA-256 that `index.json` lists for each (`overlay`: path, size, hash), against the hashes it noted on the last copy in the hidden `.overlay.json` of the route's folder, copies those that changed and removes those the catalog dropped: a new catalog reaches routes downloaded before it, routes migrated from the unified format included. The plugin reads the catalog's files through `MediaFiles.writeFrom(url, path)`, which copies a file the app ships into the media storage (Node: the file; the native app: `fetch` and `media_write_raw`, the bytes as the request's body).
 - **Names:** an overlay file has the path of the entry it replaces; the catalog tool takes it from the package's control file (`<gpx-file-path>`, `<preview>`). A picture of a package without `<preview>` is `preview.jpg`, Incyclist's first name.
 - **The track stays the video's:** a smoothed track may move positions and elevations, never the times that map it onto the video.
 - **Not an overlay:** download URL, size and ETag, author and license, country, level, tour, climbs and the profile stay the source's facts in `index.json`. The catalog tool derives profile, climbs, distance and ascent from the overlay track where there is one.
 - Overlay tracks are derived from the source's GPX and shared under its license (LICENSING.md, section 6a), as the profiles are.
+- **The pictures today** are the route pictures made for the catalog, in full size (2752 × 1536, JPEG q85): `preview.jpg`, and for the three packages whose control file names a PNG (`Source de la Drôme 1–3`) a PNG of that name. No overlay track exists yet.
+
+### Small pictures for cards
+
+A card shows a route's picture small; the full one is for its details. `RouteOffer.tile` is the small picture's URL (the UI shows `thumbnail` where there is none).
+
+- **The catalog** ships one per route, `catalog/<id>/thumbnail.jpg`, 800 px wide: the tile of a route to download. The details show the overlay's picture.
+- **A route on the device** gets its own, made from its picture (the overlay's or the package's) on download, on import and at start where it has none, or anew after its overlay changed: 800 px wide, JPEG, the hidden `.tile.jpg` of its folder (no entry; Incyclist never sees it).
+- **`data.picture`** (`shrink(bytes, width)`) makes it. In the native app the plugin `data-picture-webview` draws it on the WebView's `OffscreenCanvas`: no library, the WebView decodes JPEG and PNG and encodes JPEG. The headless host has no provider; there a card shows the full picture.
 
 ### Migration
 
@@ -101,4 +110,4 @@ catalog/<id>/overlay/
   3. (In phase 2.) `route.json` and `videoRouteSchema` are removed once no importer returns a `VideoRoute` (phase 5).
   4. `video-source-local` copies a package with a stored video (clone first) or unpacks one with a deflated video into the route's folder; progress in one phase. It no longer uses `video.importer`; `storage.media` reads entries of `route.ride` like files (`read`).
   5. `video-source-vangestel` moves its downloads in as `route.ride` and unpacks those with a compressed video; `video.importer`, `VideoRouteFacts` and the plugin `video-import-incyclist` are removed. `storage.media` says of each entry of a package whether it is stored. `route.json`, `VIDEO_ROUTE_FILE` and `videoRouteSchema` stay for the migration only.
-  6. The catalog's overlays: `catalog/<id>/overlay/` from the catalog tool, copied on download and kept current at start.
+  6. The catalog's overlays: `catalog/<id>/overlay/` with the route pictures in full size, listed with their hashes in `index.json` by the catalog tool, copied on download and kept current at start; small pictures for cards (`RouteOffer.tile`, `data.picture`, `.tile.jpg`). Open: overlay tracks, and the catalog tool deriving their names from the control files and the route's facts from them, once there are some.
