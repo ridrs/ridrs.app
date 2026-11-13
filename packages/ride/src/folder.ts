@@ -17,6 +17,9 @@ import {
 /** The control file the migration writes into a route's folder. */
 export const CONTROL_FILE = 'route.xml';
 
+/** A route's package in its folder, kept as it came where its video is stored (ADR 0094). */
+export const RIDE_PACKAGE = 'route.ride';
+
 /** A route's control file: its path among the route's entries and what it says. */
 export interface RouteControl {
   readonly path: string;

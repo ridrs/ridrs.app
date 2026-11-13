@@ -43,7 +43,10 @@ export const storageAppFilesCapability = defineCapability<AppFiles, 'single', 's
 export interface MediaFiles {
   /** Whether a file is there. */
   exists(path: string): Promise<boolean>;
-  /** A small file, whole: never a video. */
+  /**
+   * A small file, whole: never a video. Below a video route's folder also an entry of its package
+   * `route.ride`, as {@link MediaFiles.entries} lists it (ADR 0094).
+   */
   read(path: string): Promise<Uint8Array>;
   write(path: string, bytes: Uint8Array): Promise<void>;
   /** Moves a file, creating the target's directories; replaces a file there. */

@@ -59,6 +59,19 @@ pub fn entry(root: &Path, folder: &str, path: &str) -> Result<Option<Entry>, Str
     Ok(entries(root, folder)?.into_iter().find(|entry| entry.path.eq_ignore_ascii_case(path)))
 }
 
+/// The route folder and the entry a media path names where no file lies there: the nearest folder
+/// above it with a package, and the rest of the path. `None` where no folder above has one.
+pub fn package_entry(root: &Path, path: &str) -> Result<Option<(String, String)>, String> {
+    let segments: Vec<&str> = path.split('/').collect();
+    for depth in (1..segments.len()).rev() {
+        let folder = segments[..depth].join("/");
+        if resolve(root, &format!("{folder}/{PACKAGE}"))?.is_file() {
+            return Ok(Some((folder, segments[depth..].join("/"))));
+        }
+    }
+    Ok(None)
+}
+
 /// The bytes of the entry `path`, whole; refused when it is larger than `limit`.
 pub fn read(root: &Path, folder: &str, path: &str, limit: u64) -> Result<Vec<u8>, String> {
     let entry = entry(root, folder, path)?.ok_or_else(|| format!("{folder}: no entry \"{path}\""))?;
@@ -210,6 +223,16 @@ mod tests {
         let entries = entries(root.path(), "route").unwrap();
         assert_eq!(paths(&entries), ["route.xml", "sub/track.gpx", "video.mp4"]);
         assert_eq!(read(root.path(), "route", "sub/track.gpx", 1024).unwrap(), b"track");
+    }
+
+    #[test]
+    fn names_the_route_and_the_entry_of_a_path_below_a_package() {
+        let root = route(&[("pack/Col.mp4", "video", true)]);
+        assert_eq!(
+            package_entry(root.path(), "route/pack/Col.mp4").unwrap(),
+            Some(("route".into(), "pack/Col.mp4".into()))
+        );
+        assert_eq!(package_entry(root.path(), "other/Col.mp4").unwrap(), None);
     }
 
     #[test]

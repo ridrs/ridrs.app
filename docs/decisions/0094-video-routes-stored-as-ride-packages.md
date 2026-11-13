@@ -58,8 +58,9 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
 
 ### Storing a package
 
-- **A package with a stored video is copied**, as `route.ride` into a new folder: on macOS with `clonefile` first (no bytes on the same volume), otherwise in pieces with progress (ADR 0067's channel). Picked and dropped files keep their tokens (ADR 0090, 0093).
-- **A package with a deflated video is unpacked** into the new folder, every entry at its path in the package, straight from the chosen file (no copy of the ZIP first) with progress; no `route.ride` is kept. Nothing is renamed and no `route.json` is written: the folder is the Incyclist folder the package holds. `data.archive` stays for this, and unpacks from a picked or dropped file's token as well as from a media path.
+- **Whether its video is stored** the source reads before it stores anything: a chosen file can be peeked into as a dragged one (`PickedFile.peek`, `media_pick_peek`), and each peeked entry says whether it is stored.
+- **A package with a stored video is copied**, as `route.ride` into a new folder: with `std::fs::copy` where the file and the folder lie on one volume, a clone on APFS (`fclonefileat`, no bytes written), otherwise in pieces with progress (ADR 0067's channel). Picked and dropped files keep their tokens (ADR 0090, 0093).
+- **A package with a deflated video is unpacked** into the new folder, every entry at its path in the package, straight from the chosen file (no copy of the ZIP first) with progress; no `route.ride` is kept. Nothing is renamed and no `route.json` is written: the folder is the Incyclist folder the package holds. A chosen or dropped file unpacks itself (`PickedFile.extractTo`, `media_pick_extract` on the token); `data.archive` stays for packages in the media storage, the downloads.
 - **A Van Gestel download** lands as `<route>/download.zip.part`, resumable as today. A download with a stored video is renamed to `route.ride`; one with a deflated video (22 of 23 today) is unpacked into its folder and deleted. Peak space is the package twice while it is unpacked, as today.
 - **The headless host and the tests** do the same in Node with zip.js (ADR 0065): `data-archive-node` provides the Node side, and the scenarios' media URLs resolve entries through it.
 
@@ -80,5 +81,5 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
   1. `@ridrs/ride` (read and write the control file, picture, inspection) and the format document; the Rust module `ride` with its tests (entries of a package and of a folder, files over entries, whole entries, offsets of stored entries).
   2. Together with the migration, so that no route on a device is ever unplayable: `storage.media` lists a route's entries (`entries`, Rust and Node); both sources move routes of the unified format to a control file at start, find their routes by it and name every entry in their offers; the import writes `route.xml` instead of `route.json`; the video world reads the control file through `@ridrs/ride`; `ridrs-media://` serves the entries of `route.ride`.
   3. (In phase 2.) `route.json` and `videoRouteSchema` are removed once no importer returns a `VideoRoute` (phase 5).
-  4. `video-source-local` copies a package with a stored video (clone first) or unpacks one with a deflated video into the route's folder; progress in one phase.
+  4. `video-source-local` copies a package with a stored video (clone first) or unpacks one with a deflated video into the route's folder; progress in one phase. It no longer uses `video.importer`; `storage.media` reads entries of `route.ride` like files (`read`).
   5. `video-source-vangestel` renames or unpacks its downloads; `video.importer` is removed.

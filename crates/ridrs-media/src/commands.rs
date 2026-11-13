@@ -61,10 +61,17 @@ pub fn media_exists(app: AppHandle, path: String) -> Result<bool, String> {
     files::exists(&root(&app)?, &path)
 }
 
-/// Raw bytes, not a JSON array of numbers.
+/// Raw bytes, not a JSON array of numbers. Below a route's folder also an entry of its package
+/// (`ride.rs`, ADR 0094), whole up to `MAX_WHOLE`.
 #[tauri::command(async)]
 pub fn media_read(app: AppHandle, path: String) -> Result<Response, String> {
-    files::read(&root(&app)?, &path).map(Response::new)
+    let root = root(&app)?;
+    if !paths::resolve(&root, &path)?.is_file() {
+        if let Some((folder, name)) = ride::package_entry(&root, &path)? {
+            return ride::read(&root, &folder, &name, crate::protocol::MAX_WHOLE).map(Response::new);
+        }
+    }
+    files::read(&root, &path).map(Response::new)
 }
 
 #[tauri::command(async)]

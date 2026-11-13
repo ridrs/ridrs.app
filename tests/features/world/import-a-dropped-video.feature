@@ -10,12 +10,14 @@ Feature: A video route dragged onto the window is previewed and imported
   without one, the route has none.
   Letting go imports it through `route.import` with the dropped file instead of the open dialog;
   progress and failure are the source's key of `route.import`, as for a chosen file (ADR 0090).
+  The route's folder holds the package as `route.ride` where its video is stored, not compressed,
+  else the files it holds, unpacked from the dropped file; nothing is renamed (ADR 0094).
 
-  Here the drag is simulated (`data.drop`); the import, unpacking and media storage are the real
-  plugins on a media folder of the scenario.
+  Here the drag is simulated (`data.drop`); its copying and unpacking can wait. The source and the
+  media storage are the real plugins on a media folder of the scenario.
 
   Background:
-    Given the ridrs plugins "video-source-local, video-import-incyclist, data-archive-node, storage-media-node" together with the simulated drop
+    Given the ridrs plugins "video-source-local, storage-media-node" together with the simulated drop
     And the host has started
 
   Scenario: A dragged .ride package is previewed from its track
@@ -57,7 +59,7 @@ Feature: A video route dragged onto the window is previewed and imported
     When the rider lets go of it
     And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1"}'
     Then the route offer "video-source-local/col-de-test" is "ready"
-    And the route offer "video-source-local/col-de-test" shows the picture "thumbnail.jpg"
+    And the route offer "video-source-local/col-de-test" shows the picture "preview.jpg"
 
   Scenario: A ZIP without a control file is no route
     Given the rider drags a ZIP "Holiday.zip" without a control file onto the window
@@ -66,16 +68,26 @@ Feature: A video route dragged onto the window is previewed and imported
 
   Scenario: Letting go imports the package without the open dialog
     Given the rider drags the Incyclist package "Col_de_Test.ride" onto the window
-    And copying the dropped file waits
+    And storing the dropped file waits
     When the rider lets go of it
     And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1"}'
     Then the call resolved with '{"started":true}'
     And the route offer "video-source-local/col-de-test" is "importing"
     And the route offer "video-source-local/col-de-test" reads "0.3 km"
-    When copying the dropped file goes on
+    When storing the dropped file goes on
     Then the route offer "video-source-local/col-de-test" is "ready"
     And the media storage holds the route "video-source-local/col-de-test" titled "Col de Test"
+    And the route folder "video-source-local/col-de-test" holds "FR_Test.gpx, FR_Test.mp4, FR_Test.xml"
     And the media storage holds no downloaded package
+
+  Scenario: A dropped package with a stored video is kept as it is
+    Given the rider drags the Incyclist package "Col_de_Test.ride" with a stored video onto the window
+    When the rider lets go of it
+    And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1"}'
+    Then the route offer "video-source-local/col-de-test" is "ready"
+    And the route folder "video-source-local/col-de-test" holds "route.ride"
+    And the route offer "video-source-local/col-de-test" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml"
+    And the media storage holds the route "video-source-local/col-de-test" titled "Col de Test"
 
   Scenario: A file dragged out of the window again cannot be imported
     Given the rider drags the Incyclist package "Col_de_Test.ride" onto the window
@@ -86,12 +98,12 @@ Feature: A video route dragged onto the window is previewed and imported
 
   Scenario: A moved package is removed from where it lay once its route is imported
     Given the rider drags the Incyclist package "Col_de_Test.ride" onto the window
-    And copying the dropped file waits
+    And storing the dropped file waits
     When the rider lets go of it
     And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1","move":true}'
     Then the route offer "video-source-local/col-de-test" is "importing"
     And the dragged file "Col_de_Test.ride" is still where it lay
-    When copying the dropped file goes on
+    When storing the dropped file goes on
     Then the route offer "video-source-local/col-de-test" is "ready"
     And the dragged file "Col_de_Test.ride" is removed from where it lay
 

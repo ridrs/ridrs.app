@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Given, Then, When } from '@cucumber/cucumber';
 import { activityStartRequestedEvent, type RideWorld } from '@ridrs/contracts';
-import { parseControl } from '@ridrs/ride';
+import { findControl } from '@ridrs/ride';
 import { waitFor, within } from '@testing-library/dom';
+import { createNodeMediaFiles } from '../../plugins/storage-media-node/media.ts';
 import { SimulatedDownloads } from '../support/simulated-downloads.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv, useRealPlugins } from './devices-and-metrics.steps.ts';
@@ -87,12 +88,14 @@ Then('the route details offer a {string} button', async function (this: RidrsWor
 
 Then(
   'the media storage holds the route {string} titled {string}',
-  function (this: RidrsWorld, id: string, title: string) {
-    const folder = routeFolder(id);
-    // A route is a folder with a control file (ADR 0094): route.xml names its video and track.
-    const control = parseControl(readFileSync(join(folder, 'route.xml'), 'utf8'));
-    assert.equal(control.title, title);
-    assert.deepEqual(filesBelow(folder).sort(), ['route.xml', 'track.gpx', 'video.mp4']);
+  async function (this: RidrsWorld, id: string, title: string) {
+    // A route is a folder whose entries hold a control file (ADR 0094), unpacked or in route.ride.
+    const media = createNodeMediaFiles(process.env[MEDIA_DIR_ENV] ?? '');
+    const folder = `videos/${id}`;
+    const paths = (await media.entries(folder)).map((entry) => entry.path);
+    const found = await findControl(paths, (path) => media.read(`${folder}/${path}`));
+    assert.ok(found, `"${id}" holds no control file among ${paths.join(', ')}`);
+    assert.equal(found.control.title ?? found.control.name, title);
   },
 );
 

@@ -24,6 +24,8 @@ pub struct PeekedEntry {
     pub size: u64,
     /// Whether [`read`] gives its bytes.
     pub readable: bool,
+    /// Whether it is kept as it is, not compressed: it can be read by range from the ZIP (ADR 0094).
+    pub stored: bool,
 }
 
 /// What a peek finds: a ZIP's file entries, or whether the file itself can be read.
@@ -58,7 +60,8 @@ pub fn peek(path: &Path) -> Result<Peeked, String> {
         }
         let name = entry.name().map(|n| n.into_owned()).unwrap_or_default();
         let size = entry.size();
-        entries.push(PeekedEntry { readable: peekable(&name) && size <= PEEK_LIMIT, name, size });
+        let stored = entry.compression() == zip::CompressionMethod::Stored;
+        entries.push(PeekedEntry { readable: peekable(&name) && size <= PEEK_LIMIT, name, size, stored });
     }
     Ok(Peeked { entries: Some(entries), readable: false })
 }
@@ -113,9 +116,9 @@ mod tests {
         assert_eq!(
             peeked.entries.unwrap(),
             vec![
-                PeekedEntry { name: "pack/Col.xml".into(), size: 13, readable: true },
-                PeekedEntry { name: "pack/Col.GPX".into(), size: 6, readable: true },
-                PeekedEntry { name: "pack/Col.mp4".into(), size: 1000, readable: false },
+                PeekedEntry { name: "pack/Col.xml".into(), size: 13, readable: true, stored: false },
+                PeekedEntry { name: "pack/Col.GPX".into(), size: 6, readable: true, stored: false },
+                PeekedEntry { name: "pack/Col.mp4".into(), size: 1000, readable: false, stored: false },
             ]
         );
         assert_eq!(read(&pack, Some("pack/Col.GPX")).unwrap(), b"<gpx/>");

@@ -4,7 +4,7 @@ import { existsSync, openAsBlob } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { MediaEntry } from '@ridrs/contracts';
-import { BlobReader, configure, ZipReader } from '@zip.js/zip.js';
+import { BlobReader, configure, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 
 configure({ useWebWorkers: false });
 
@@ -57,4 +57,28 @@ export async function routeEntries(dir: string): Promise<MediaEntry[]> {
     else entries.push(file);
   }
   return entries;
+}
+
+/**
+ * The bytes of the entry a media path names below a route's folder where no file lies there: the
+ * entry of the package in the nearest folder above it that has one (ADR 0094). `undefined` where
+ * no folder above has a package or it has no such entry.
+ */
+export async function readPackageEntry(root: string, path: string): Promise<Uint8Array | undefined> {
+  const segments = path.split('/');
+  for (let depth = segments.length - 1; depth >= 1; depth -= 1) {
+    const pack = join(root, ...segments.slice(0, depth), PACKAGE);
+    if (!existsSync(pack)) continue;
+    const name = segments.slice(depth).join('/').toLowerCase();
+    const reader = new ZipReader(new BlobReader(await openAsBlob(pack)));
+    try {
+      const entry = (await reader.getEntries()).find(
+        (candidate) => !candidate.directory && candidate.filename.toLowerCase() === name,
+      );
+      return entry && !entry.directory ? await entry.getData(new Uint8ArrayWriter()) : undefined;
+    } finally {
+      await reader.close();
+    }
+  }
+  return undefined;
 }

@@ -25,7 +25,14 @@ interface Dragged {
 
 /** What `media_drop_peek` finds; `media_drop_read` gives the bytes of what is readable. */
 interface Peeked {
-  readonly entries: readonly { readonly name: string; readonly size: number; readonly readable: boolean }[] | null;
+  readonly entries:
+    | readonly {
+        readonly name: string;
+        readonly size: number;
+        readonly readable: boolean;
+        readonly stored: boolean;
+      }[]
+    | null;
   readonly readable: boolean;
 }
 
@@ -67,8 +74,8 @@ export function watchDrags(
     const peeked = await invoke<Peeked>('media_drop_peek', { token });
     if (peeked.entries) {
       const entries: PeekedEntry[] = [];
-      for (const { name, size, readable } of peeked.entries) {
-        entries.push(readable ? { name, size, bytes: await read(token, name) } : { name, size });
+      for (const { name, size, readable, stored } of peeked.entries) {
+        entries.push(readable ? { name, size, stored, bytes: await read(token, name) } : { name, size, stored });
       }
       return { entries };
     }
@@ -82,6 +89,12 @@ export function watchDrags(
     peek: () => peek(token),
     copyTo: (path, onProgress) =>
       invoke<void>('media_pick_copy', { token, target: assertAppFilePath(path), onProgress: channel(onProgress) }),
+    extractTo: (directory, onProgress) =>
+      invoke<void>('media_pick_extract', {
+        token,
+        directory: assertAppFilePath(directory),
+        onProgress: channel(onProgress),
+      }),
     removeOriginal: () => invoke<void>('media_drop_remove', { token }),
   });
 

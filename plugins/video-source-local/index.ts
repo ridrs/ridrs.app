@@ -10,7 +10,6 @@ import {
   routeOfferState,
   routeRemoveService,
   storageMediaCapability,
-  videoImporterCapability,
 } from '@ridrs/contracts';
 import { LocalVideos, PLUGIN } from './local.ts';
 
@@ -39,7 +38,6 @@ export default definePlugin({
         media: ctx.capabilities.find(storageMediaCapability),
         pick: ctx.capabilities.find(dataPickCapability),
         drop: ctx.capabilities.find(dataDropCapability),
-        importers: () => ctx.capabilities.getAll(videoImporterCapability),
       })
       .catch(failed);
   },

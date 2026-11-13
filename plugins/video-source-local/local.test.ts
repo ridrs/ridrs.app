@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { DataDrop, DataPick, DroppedFile, MediaFiles, RouteImport, RouteOffer, VideoImporter } from '@ridrs/contracts';
-import { controlFromRoute, writeControl } from '@ridrs/ride';
+import type { DataDrop, DataPick, DroppedFile, MediaFiles, PickedFile, RouteImport, RouteOffer } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
 import { LocalVideos, slugOf, titleOf } from './local.ts';
 
@@ -37,59 +36,80 @@ function memoryMedia(files = new Map<string, Uint8Array>()): MediaFiles & { file
   };
 }
 
-/** An importer that writes the route's files, or fails with `failure`. */
-function importer(media: MediaFiles, failure?: string, title?: string, thumbnail?: string): VideoImporter {
+/** What a chosen package holds and how; `failure` leaves out its control file. */
+interface PackageOptions {
+  readonly failure?: string;
+  readonly title?: string;
+  readonly thumbnail?: string;
+  readonly stored?: boolean;
+}
+
+/** The files of an Incyclist package by their names. */
+function packageFiles(options: PackageOptions): Map<string, Uint8Array> {
+  const text = (value: string) => new TextEncoder().encode(value);
+  const files = new Map<string, Uint8Array>([
+    ['Col.mp4', new Uint8Array(1)],
+    ['Col.gpx', text(GPX)],
+  ]);
+  if (!options.failure) {
+    const title = options.title ? `<title>${options.title}</title>` : '';
+    files.set('Col.xml', text(`<gpx-import>${title}<video-file-path>Col.mp4</video-file-path><gpx-file-path>Col.gpx</gpx-file-path></gpx-import>`));
+  }
+  if (options.thumbnail) files.set(options.thumbnail, new Uint8Array(3));
+  return files;
+}
+
+/**
+ * A package the rider chose: peeked into, then copied as `route.ride` or unpacked into a folder
+ * of the media storage in memory. A copy lays its files out beside it too, as the media storage
+ * would read them from the package.
+ */
+function chosenFile(name: string, options: PackageOptions, stored: string[] = []): PickedFile {
+  const files = packageFiles(options);
+  const unpack = (folder: string) => {
+    for (const [path, bytes] of files) media.files.set(`${folder}/${path}`, bytes);
+  };
   return {
-    format: 'incyclist-gpx-import',
-    inspect: () => ({ ok: false, reason: 'Not inspected here' }),
-    async import(_pack, directory, facts) {
-      if (failure) throw new Error(failure);
-      await media.write(`${directory}/track.gpx`, new TextEncoder().encode(GPX));
-      await media.write(`${directory}/video.mp4`, new Uint8Array(1));
-      const route = {
-        format: 'ridrs-video-route' as const,
-        version: 1 as const,
-        title: title ?? facts.title ?? facts.fallbackTitle ?? 'Video',
-        notes: [],
-        segments: [],
-        video: { file: 'video.mp4', framerate: 30, startFrame: 1 },
-        track: { file: 'track.gpx' },
-        ...(thumbnail ? { thumbnail: { file: thumbnail } } : {}),
-        imported: { by: 'test', version: '1' },
-      };
-      await media.write(`${directory}/route.xml`, new TextEncoder().encode(writeControl(controlFromRoute(route))));
-      return route;
+    name,
+    size: 3,
+    peek: async () => ({
+      entries: [...files].map(([path, bytes]) => ({
+        name: path,
+        size: bytes.length,
+        stored: options.stored === true && path.endsWith('.mp4'),
+        ...(path.endsWith('.mp4') ? {} : { bytes }),
+      })),
+    }),
+    copyTo: async (target) => {
+      stored.push(target);
+      unpack(target.slice(0, target.lastIndexOf('/')));
     },
+    extractTo: async (folder) => unpack(folder),
   };
 }
 
-function dialog(name: string | undefined): DataPick {
-  return {
-    pick: async () =>
-      name === undefined ? undefined : { name, size: 3, copyTo: async (target) => void media.files.set(target, new Uint8Array(3)) },
-  };
+function dialog(name: string | undefined, options: PackageOptions = {}, stored: string[] = []): DataPick {
+  return { pick: async () => (name === undefined ? undefined : chosenFile(name, options, stored)) };
 }
 
 let media = memoryMedia();
 
 function setup(
-  options: {
+  options: PackageOptions & {
     readonly chosen?: string;
-    readonly failure?: string;
-    readonly title?: string;
-    readonly thumbnail?: string;
     readonly files?: Map<string, Uint8Array>;
   } = {},
 ) {
   media = memoryMedia(options.files);
   const offers = new Map<string, RouteOffer>();
   const imports: (RouteImport | undefined)[] = [];
+  const stored: string[] = [];
   const videos = new LocalVideos({
     offer: (id, offer) => (offer ? offers.set(id, offer) : offers.delete(id)),
     importer: (state) => imports.push(state),
   });
-  const services = { media, pick: dialog(options.chosen), importers: () => [importer(media, options.failure, options.title, options.thumbnail)] };
-  return { videos, offers, imports, services };
+  const services = { media, pick: dialog(options.chosen, options, stored) };
+  return { videos, offers, imports, services, stored };
 }
 
 describe('titleOf and slugOf', () => {
@@ -102,7 +122,7 @@ describe('titleOf and slugOf', () => {
 });
 
 describe('LocalVideos', () => {
-  it('offers the import only when it can pick, store and import', async () => {
+  it('offers the import only when it can pick and store', async () => {
     const { videos, imports, services } = setup();
     await videos.connect({ ...services, pick: undefined });
     expect(imports).toEqual([]);
@@ -110,17 +130,26 @@ describe('LocalVideos', () => {
     expect(imports).toEqual([{ kind: 'video', state: 'idle' }]);
   });
 
-  it('imports a chosen package as a ready, removable offer and keeps no package', async () => {
+  it('unpacks a chosen package with a compressed video into a ready, removable route', async () => {
     const { videos, offers, imports, services } = setup({ chosen: 'Col de Test.zip' });
     await videos.connect(services);
     expect(await videos.import()).toBe(true);
     await videos.settled();
     const offer = offers.get('video-source-local/col-de-test');
     expect(offer).toMatchObject({ title: 'Col de Test', distance: 200, ascent: 20, availability: { state: 'ready', removable: true } });
-    expect(offer?.availability).toMatchObject({ files: { 'video.mp4': 'media://videos/video-source-local/col-de-test/video.mp4' } });
+    expect(offer?.availability).toMatchObject({ files: { 'Col.mp4': 'media://videos/video-source-local/col-de-test/Col.mp4' } });
     expect(imports.at(-2)).toEqual({ kind: 'video', state: 'importing', file: 'Col de Test.zip' });
     expect(imports.at(-1)).toEqual({ kind: 'video', state: 'idle' });
     expect([...media.files.keys()].filter((file) => file.endsWith('.zip'))).toEqual([]);
+  });
+
+  it('keeps a package with a stored video as it is: route.ride in the folder', async () => {
+    const { videos, offers, services, stored } = setup({ chosen: 'Col de Test.zip', stored: true });
+    await videos.connect(services);
+    await videos.import();
+    await videos.settled();
+    expect(stored).toEqual(['videos/video-source-local/col-de-test/route.ride']);
+    expect(offers.get('video-source-local/col-de-test')?.availability.state).toBe('ready');
   });
 
   it('lists the route under the title its package names', async () => {
@@ -135,11 +164,11 @@ describe('LocalVideos', () => {
   });
 
   it("offers the package's picture as the route's thumbnail, after a restart too", async () => {
-    const { videos, offers, services } = setup({ chosen: 'Col.zip', thumbnail: 'thumbnail.jpg' });
+    const { videos, offers, services } = setup({ chosen: 'Col.zip', thumbnail: 'Col_preview.jpg' });
     await videos.connect(services);
     await videos.import();
     await videos.settled();
-    const url = 'media://videos/video-source-local/col/thumbnail.jpg';
+    const url = 'media://videos/video-source-local/col/Col_preview.jpg';
     expect(offers.get('video-source-local/col')).toMatchObject({ thumbnail: url });
     const again = setup({ files: media.files });
     await again.videos.connect(again.services);
@@ -154,18 +183,20 @@ describe('LocalVideos', () => {
       name: 'Col.zip',
       size: picture.length,
       copyTo: async () => undefined,
+      extractTo: async () => undefined,
       removeOriginal: async () => undefined,
       peek: async () => ({
         entries: [
+          { name: 'Col.xml', size: 1, bytes: packageFiles({}).get('Col.xml') },
+          { name: 'Col.mp4', size: 1 },
           { name: 'Col.gpx', size: track.length, bytes: track },
           { name: 'preview.jpg', size: picture.length, bytes: picture },
         ],
       }),
     } as DroppedFile;
     const { videos, services } = setup();
-    const inspecting: VideoImporter = { ...importer(media), inspect: () => ({ ok: true, track: 'Col.gpx', thumbnail: 'preview.jpg' }) };
     const drop = { file: () => dropped } as unknown as DataDrop;
-    await videos.connect({ ...services, drop, importers: () => [inspecting] });
+    await videos.connect({ ...services, drop });
     const answer = await videos.preview('drop-1');
     const url = answer.ok ? (answer.preview.thumbnail ?? '') : '';
     expect(url.startsWith('data:image/jpeg;base64,')).toBe(true);
@@ -173,45 +204,34 @@ describe('LocalVideos', () => {
     expect(Buffer.from(url.split(',')[1] ?? '', 'base64').equals(picture)).toBe(true);
   });
 
-  it('says how far an import is: copying is its first half, unpacking its second', async () => {
+  it('says how far an import is, once per whole percent', async () => {
     media = memoryMedia();
     const shown: RouteOffer['availability'][] = [];
     const videos = new LocalVideos({
       offer: (_id, offer) => offer && shown.push(offer.availability),
       importer: () => {},
     });
-    const unpacking = importer(media);
+    const chosen = chosenFile('Col de Test.zip', {});
     await videos.connect({
       media,
       pick: {
         pick: async () => ({
-          name: 'Col de Test.zip',
-          size: 4,
-          copyTo: async (target, onProgress) => {
+          ...chosen,
+          extractTo: async (folder, onProgress) => {
             onProgress?.({ received: 1, size: 4 });
             onProgress?.({ received: 1.01, size: 4 });
-            onProgress?.({ received: 4, size: 4 });
-            media.files.set(target, new Uint8Array(4));
+            onProgress?.({ received: 3, size: 4 });
+            await chosen.extractTo(folder);
           },
         }),
       },
-      importers: () => [
-        {
-          ...unpacking,
-          import: async (pack, directory, facts, onProgress) => {
-            onProgress?.(0.5);
-            return unpacking.import(pack, directory, facts);
-          },
-        },
-      ],
     });
     await videos.import();
     await videos.settled();
-    // Once per whole percent: a copy that moved less than one says nothing new.
+    // A step of less than a percent says nothing new.
     expect(shown.map((availability) => availability.state === 'importing' && availability.progress)).toEqual([
       undefined,
-      0.12,
-      0.5,
+      0.25,
       0.75,
       false,
     ]);

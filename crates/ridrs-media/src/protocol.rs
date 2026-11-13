@@ -135,29 +135,23 @@ fn source(root: &Path, path: &str) -> Result<Source, StatusCode> {
         let len = file.metadata().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.len();
         return Ok(Source::File { file, base: 0, len });
     }
-    let segments: Vec<&str> = path.split('/').collect();
-    for depth in (1..segments.len()).rev() {
-        let folder = segments[..depth].join("/");
-        let package = resolve(root, &format!("{folder}/{PACKAGE}")).map_err(|_| StatusCode::FORBIDDEN)?;
-        if !package.is_file() {
-            continue;
-        }
-        let name = segments[depth..].join("/");
-        let entry = ride::entry(root, &folder, &name)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .ok_or(StatusCode::NOT_FOUND)?;
-        let open = |file: &Path| File::open(file).map_err(|_| StatusCode::NOT_FOUND);
-        return match entry.place {
-            Place::File(file) => Ok(Source::File { file: open(&file)?, base: 0, len: entry.size }),
-            Place::Stored { offset } => Ok(Source::File { file: open(&package)?, base: offset, len: entry.size }),
-            // A compressed entry cannot be read by range: only small ones, whole.
-            Place::Packed { .. } if entry.size > MAX_WHOLE => Err(StatusCode::PAYLOAD_TOO_LARGE),
-            Place::Packed { .. } => ride::read(root, &folder, &name, MAX_WHOLE)
-                .map(Source::Bytes)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
-        };
+    let Some((folder, name)) = ride::package_entry(root, path).map_err(|_| StatusCode::FORBIDDEN)? else {
+        return Err(StatusCode::NOT_FOUND);
+    };
+    let package = resolve(root, &format!("{folder}/{PACKAGE}")).map_err(|_| StatusCode::FORBIDDEN)?;
+    let entry = ride::entry(root, &folder, &name)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let open = |file: &Path| File::open(file).map_err(|_| StatusCode::NOT_FOUND);
+    match entry.place {
+        Place::File(file) => Ok(Source::File { file: open(&file)?, base: 0, len: entry.size }),
+        Place::Stored { offset } => Ok(Source::File { file: open(&package)?, base: offset, len: entry.size }),
+        // A compressed entry cannot be read by range: only small ones, whole.
+        Place::Packed { .. } if entry.size > MAX_WHOLE => Err(StatusCode::PAYLOAD_TOO_LARGE),
+        Place::Packed { .. } => ride::read(root, &folder, &name, MAX_WHOLE)
+            .map(Source::Bytes)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
     }
-    Err(StatusCode::NOT_FOUND)
 }
 
 /// `%XX` escapes as bytes, the result as UTF-8; `None` for a broken escape or invalid UTF-8.

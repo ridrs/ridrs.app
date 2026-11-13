@@ -37,6 +37,10 @@ describe('createNodeMediaFiles', () => {
       { path: 'pictures/preview.jpg', size: 3 },
     ]);
     expect(await media.entries('videos/b/missing')).toEqual([]);
+    // Read like files: an entry of the package, and a file beside it before its entry.
+    expect(await media.read('videos/b/route/Col.mp4')).toEqual(new Uint8Array(5));
+    expect(new TextDecoder().decode(await media.read('videos/b/route/Col.xml'))).toBe('a new control file');
+    await expect(media.read('videos/b/route/Col.gpx')).rejects.toThrow();
   });
 
   it('lists a folder without a package as its files', async () => {

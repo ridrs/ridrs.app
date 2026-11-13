@@ -60,6 +60,7 @@ export function inspectPackage(entries: readonly PeekedEntry[]): VideoPackageIns
     );
     return {
       ok: true,
+      video,
       track: named(control.gpx)?.name ?? control.gpx,
       ...(control.title || control.name ? { title: control.title ?? control.name } : {}),
       ...(thumbnail ? { thumbnail } : {}),

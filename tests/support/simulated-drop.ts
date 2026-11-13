@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import {
-  type DataDrop,
-  type DropEvent,
-  type DroppedFile,
-  type FilePeek,
-  PEEK_EXTENSIONS,
-  PEEK_LIMIT,
-  type PeekedEntry,
-} from '@ridrs/contracts';
+import type { DataDrop, DropEvent, DroppedFile } from '@ridrs/contracts';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
 import { incyclistPackage } from './simulated-downloads.ts';
+import { Holding, simulatedFile, withStoredVideo } from './simulated-file.ts';
 
 /** The files a package can be made of in the scenarios. */
-export type SimulatedPackage = 'incyclist' | 'video2gpx' | 'pictured' | 'no-control-file';
+export type SimulatedPackage =
+  | 'incyclist'
+  | 'incyclist-stored'
+  | 'video2gpx'
+  | 'pictured'
+  | 'no-control-file';
 
 /** A small JPEG's first bytes: enough to be a picture by its name and its start. */
 export const PICTURE_BYTES = new Uint8Array([
@@ -70,40 +66,15 @@ async function holidayPackage(): Promise<Uint8Array> {
 const PACKAGES: Record<SimulatedPackage, () => Promise<Uint8Array>> = {
   // A plain Incyclist package names no title: the route is named after the file.
   incyclist: () => incyclistPackage(null),
+  'incyclist-stored': async () => withStoredVideo(await incyclistPackage(null)),
   video2gpx: video2gpxPackage,
   pictured: picturedPackage,
   'no-control-file': holidayPackage,
 };
 
-const extensionOf = (name: string) => name.slice(name.lastIndexOf('.') + 1).toLowerCase();
-const peekable = (name: string) =>
-  (PEEK_EXTENSIONS as readonly string[]).includes(extensionOf(name));
-
-/** What the native provider reads of a file: a ZIP's entries, or a small file's bytes. */
-async function peekInto(bytes: Uint8Array): Promise<FilePeek> {
-  const reader = new ZipReader(new Uint8ArrayReader(bytes));
-  try {
-    const entries: PeekedEntry[] = [];
-    for (const entry of await reader.getEntries()) {
-      if (entry.directory) continue;
-      const read = peekable(entry.filename) && entry.uncompressedSize <= PEEK_LIMIT;
-      entries.push({
-        name: entry.filename,
-        size: entry.uncompressedSize,
-        ...(read ? { bytes: await entry.getData(new Uint8ArrayWriter()) } : {}),
-      });
-    }
-    return { entries };
-  } catch {
-    return bytes.length <= PEEK_LIMIT ? { bytes } : {};
-  } finally {
-    await reader.close();
-  }
-}
-
 /**
  * `data.drop` for the scenarios: the rider drags a file over the window, lets go of it or takes it
- * out again. A dropped file is copied into the media folder of the scenario.
+ * out again. A dropped file is copied or unpacked into the media folder of the scenario.
  */
 export class SimulatedDrop {
   private readonly listeners = new Set<(event: DropEvent) => void>();
@@ -112,24 +83,10 @@ export class SimulatedDrop {
   /** The names of the dragged files removed from where they lay: moved into ridrs. */
   readonly removed = new Set<string>();
 
-  /** While set, a copy waits until `goOn` is called: the import stays on its way. */
-  private held: { promise: Promise<void>; release: () => void } | undefined;
+  /** Copying and unpacking a dropped file wait while held: the import stays on its way. */
+  readonly holding = new Holding();
 
   constructor(private readonly mediaRoot: string) {}
-
-  /** Copies wait from now until `goOn`. */
-  holdCopies(): void {
-    let release = () => {};
-    const promise = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    this.held = { promise, release };
-  }
-
-  goOn(): void {
-    this.held?.release();
-    this.held = undefined;
-  }
 
   async drag(name: string, kind: SimulatedPackage): Promise<DroppedFile> {
     return this.dragBytes(name, await PACKAGES[kind]());
@@ -138,20 +95,9 @@ export class SimulatedDrop {
   /** Drags a file with these bytes: a workout, a ZIP of workouts, a picture. */
   dragBytes(name: string, bytes: Uint8Array): DroppedFile {
     this.next += 1;
-    let copied = false;
     const file: DroppedFile = {
       id: `drop-${this.next}`,
-      name,
-      size: bytes.length,
-      peek: () => peekInto(bytes),
-      copyTo: async (target) => {
-        if (copied) throw new Error(`"${name}" was copied already`);
-        copied = true;
-        await this.held?.promise;
-        const path = join(this.mediaRoot, ...target.split('/'));
-        await mkdir(dirname(path), { recursive: true });
-        await writeFile(path, bytes);
-      },
+      ...simulatedFile(name, bytes, this.mediaRoot, this.holding),
       removeOriginal: async () => {
         this.removed.add(name);
       },

@@ -81,6 +81,7 @@ describe('inspectPackage', () => {
     const extra = { name: 'LIESMICH.txt', size: 10, bytes: new TextEncoder().encode('Hallo') };
     expect(inspectPackage([video, track, control, extra])).toEqual({
       ok: true,
+      video: video.name,
       track: 'pack/FR_Col_de_Pennes.gpx',
       title: 'Col de Pennes',
     });
@@ -94,6 +95,7 @@ describe('inspectPackage', () => {
     };
     expect(inspectPackage([video, track, control, picture])).toEqual({
       ok: true,
+      video: video.name,
       track: track.name,
       title: 'Col de Pennes',
       thumbnail: picture.name,
@@ -108,6 +110,7 @@ describe('inspectPackage', () => {
     const titled = { ...control, bytes: new TextEncoder().encode(text) };
     expect(inspectPackage([video, track, titled])).toEqual({
       ok: true,
+      video: video.name,
       track: track.name,
       title: 'Col de Pennes',
     });

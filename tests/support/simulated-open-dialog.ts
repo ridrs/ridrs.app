@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import type { DataArchive, DataPick, MediaFiles } from '@ridrs/contracts';
+import type { DataPick } from '@ridrs/contracts';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
-import { createNodeArchive } from '../../plugins/data-archive-node/archive.ts';
 import { incyclistPackage } from './simulated-downloads.ts';
+import { Holding, simulatedFile, withStoredVideo } from './simulated-file.ts';
 
 /** A ZIP of a holiday video alone: no control file, no track. */
 async function holidayPackage(): Promise<Uint8Array> {
@@ -16,39 +14,23 @@ async function holidayPackage(): Promise<Uint8Array> {
 
 /**
  * `data.pick` for the import scenarios: the system's open dialog, in which the rider chooses a
- * file or cancels. The chosen file is copied into the media folder of the scenario.
+ * file or cancels. The chosen file is copied or unpacked into the media folder of the scenario.
  */
 export class SimulatedOpenDialog {
   private choice: { readonly name: string; readonly bytes: () => Promise<Uint8Array> } | undefined;
   readonly filters: { readonly name: string; readonly extensions: readonly string[] }[] = [];
-
-  /**
-   * While set, a copy waits until `goOn` is called: the import stays on its way. A copy held
-   * halfway says it copied half of the file first.
-   */
-  private held: { promise: Promise<void>; release: () => void; halfway: boolean } | undefined;
+  /** Copying and unpacking the chosen file wait while held: the import stays on its way. */
+  readonly holding = new Holding();
 
   constructor(private readonly mediaRoot: string) {}
 
-  /** Copies wait from now until `goOn`, before they start or, `halfway`, with half of the file copied. */
-  holdCopies(halfway = false): void {
-    let release = () => {};
-    const promise = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    this.held = { promise, release, halfway };
-  }
-
-  goOn(): void {
-    this.held?.release();
-    this.held = undefined;
-  }
-
-  choose(name: string, kind: 'incyclist' | 'no-control-file'): void {
-    this.choice = {
-      name,
-      bytes: kind === 'incyclist' ? () => incyclistPackage(null) : holidayPackage,
+  choose(name: string, kind: 'incyclist' | 'incyclist-stored' | 'no-control-file'): void {
+    const packages = {
+      incyclist: () => incyclistPackage(null),
+      'incyclist-stored': async () => withStoredVideo(await incyclistPackage(null)),
+      'no-control-file': holidayPackage,
     };
+    this.choice = { name, bytes: packages[kind] };
   }
 
   cancel(): void {
@@ -60,49 +42,7 @@ export class SimulatedOpenDialog {
       this.filters.push(filter);
       const choice = this.choice;
       if (!choice) return undefined;
-      const bytes = await choice.bytes();
-      return {
-        name: choice.name,
-        size: bytes.length,
-        copyTo: async (target, onProgress) => {
-          if (this.held?.halfway)
-            onProgress?.({ received: Math.floor(bytes.length / 2), size: bytes.length });
-          await this.held?.promise;
-          const file = join(this.mediaRoot, ...target.split('/'));
-          await mkdir(dirname(file), { recursive: true });
-          await writeFile(file, bytes);
-        },
-      };
-    },
-  };
-
-  /** While set, unpacking says it unpacked half of the package and waits until `goOnUnpacking`. */
-  private heldUnpacking: { promise: Promise<void>; release: () => void } | undefined;
-
-  holdUnpackingHalfway(): void {
-    let release = () => {};
-    const promise = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    this.heldUnpacking = { promise, release };
-  }
-
-  goOnUnpacking(): void {
-    this.heldUnpacking?.release();
-    this.heldUnpacking = undefined;
-  }
-
-  /** `data.archive`: the real unpacking in Node (`data-archive-node`), which a scenario can hold halfway. */
-  readonly archive: DataArchive = {
-    extract: async (archive, directory, onProgress) => {
-      if (this.heldUnpacking) {
-        onProgress?.({ received: 1, size: 2 });
-        await this.heldUnpacking.promise;
-      }
-      const media = {
-        location: (path: string) => join(this.mediaRoot, ...path.split('/')),
-      } as MediaFiles;
-      return createNodeArchive(media).extract(archive, directory, onProgress);
+      return simulatedFile(choice.name, await choice.bytes(), this.mediaRoot, this.holding);
     },
   };
 }

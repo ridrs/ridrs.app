@@ -65,11 +65,20 @@ export interface PickedFile {
   readonly name: string;
   /** Bytes. */
   readonly size: number;
+  /** What a preview or an import may read of it before it is stored (ADR 0093, 0094). */
+  peek(): Promise<FilePeek>;
   /**
-   * Copies it to the media path `target`, creating its directories; once. `onProgress` hears of
-   * the bytes copied now and then.
+   * Copies it to the media path `target`, creating its directories; once, or `extractTo`.
+   * `onProgress` hears of the bytes copied now and then. On the same volume of a Mac it is a
+   * clone: no bytes are written.
    */
   copyTo(target: string, onProgress?: (progress: DataFetchProgress) => void): Promise<void>;
+  /**
+   * Unpacks every file of it, a ZIP, into the media folder `directory` at its path in the ZIP,
+   * straight from where it lies; once, or `copyTo`. A name that would leave the folder refuses
+   * the whole ZIP. `onProgress` hears of the bytes unpacked now and then.
+   */
+  extractTo(directory: string, onProgress?: (progress: DataFetchProgress) => void): Promise<void>;
 }
 
 /**
@@ -108,7 +117,7 @@ export const PEEK_EXTENSIONS = [
   'jpg',
 ] as const;
 
-/** One entry of a dropped ZIP. */
+/** One entry of a chosen or dropped ZIP. */
 export interface PeekedEntry {
   /** Its path inside the ZIP, e.g. `FR_Test.gpx`. */
   readonly name: string;
@@ -116,9 +125,11 @@ export interface PeekedEntry {
   readonly size: number;
   /** Its bytes, for an entry of {@link PEEK_EXTENSIONS} up to {@link PEEK_LIMIT}. */
   readonly bytes?: Uint8Array;
+  /** Whether it is kept as it is, not compressed (method 0): it can be read by range from the ZIP. */
+  readonly stored?: boolean;
 }
 
-/** What a preview may read of a dropped file before it is copied (ADR 0093). */
+/** What a preview or an import may read of a chosen or dropped file before it is stored. */
 export interface FilePeek {
   /** The file's bytes, when it is no ZIP and at most {@link PEEK_LIMIT}. */
   readonly bytes?: Uint8Array;
@@ -126,11 +137,10 @@ export interface FilePeek {
   readonly entries?: readonly PeekedEntry[];
 }
 
-/** A file dragged onto the window: a {@link PickedFile} that a preview can peek into. */
+/** A file dragged onto the window: a {@link PickedFile} of a drag. */
 export interface DroppedFile extends PickedFile {
   /** Unique while the app runs. */
   readonly id: string;
-  peek(): Promise<FilePeek>;
   /**
    * Removes the file from where it lies on the device: the rider moved it into ridrs instead of
    * copying it. Called once what it holds is in ridrs, also after its drag is over.

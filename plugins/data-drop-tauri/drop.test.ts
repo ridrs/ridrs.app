@@ -22,8 +22,8 @@ class FakeRust {
       case 'media_drop_peek':
         return {
           entries: [
-            { name: 'Col.xml', size: 3, readable: true },
-            { name: 'Col.mp4', size: 15_000_000_000, readable: false },
+            { name: 'Col.xml', size: 3, readable: true, stored: false },
+            { name: 'Col.mp4', size: 15_000_000_000, readable: false, stored: true },
           ],
           readable: false,
         } as T;
@@ -147,8 +147,8 @@ describe('watchDrags', () => {
     const file = drop.file('drop-1');
     expect(await file?.peek()).toEqual({
       entries: [
-        { name: 'Col.xml', size: 3, bytes: new TextEncoder().encode('bytes of Col.xml') },
-        { name: 'Col.mp4', size: 15_000_000_000 },
+        { name: 'Col.xml', size: 3, stored: false, bytes: new TextEncoder().encode('bytes of Col.xml') },
+        { name: 'Col.mp4', size: 15_000_000_000, stored: true },
       ],
     });
     const heard: unknown[] = [];
@@ -160,6 +160,17 @@ describe('watchDrags', () => {
     // What Rust sends over the channel reaches the copy's listener.
     (rust.calls.at(-1)?.args as { onProgress: (progress: unknown) => void }).onProgress({ received: 5, size: 10 });
     expect(heard).toEqual([{ received: 5, size: 10 }]);
+  });
+
+  it('unpacks a dropped package through its token, straight into a media folder', async () => {
+    const { drop } = watch();
+    document.body.dispatchEvent(drag('dragenter'));
+    await settle();
+    await drop.file('drop-1')?.extractTo('videos/video-source-local/col');
+    expect(rust.calls.at(-1)).toEqual({
+      command: 'media_pick_extract',
+      args: { token: '1', directory: 'videos/video-source-local/col', onProgress: expect.any(Function) },
+    });
   });
 
   it('tells Rust which files were let go, and removes one of them through its token', async () => {

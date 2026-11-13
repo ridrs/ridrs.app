@@ -15,9 +15,21 @@ pub fn extract(
     root: &Path,
     archive: &str,
     directory: &str,
+    progress: impl FnMut(u64, u64),
+) -> Result<Vec<String>, String> {
+    extract_from(root, &resolve(root, archive)?, directory, progress)
+}
+
+/// Unpacks the ZIP `file`, wherever it lies (one the rider chose or dragged, ADR 0094), into the
+/// media folder `directory`; returns the files' media paths.
+pub fn extract_from(
+    root: &Path,
+    file: &Path,
+    directory: &str,
     mut progress: impl FnMut(u64, u64),
 ) -> Result<Vec<String>, String> {
-    let file = fs::File::open(resolve(root, archive)?).map_err(|e| format!("{archive}: {e}"))?;
+    let archive = file.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+    let file = fs::File::open(file).map_err(|e| format!("{archive}: {e}"))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("{archive}: {e}"))?;
     let mut size = 0;
     for index in 0..zip.len() {

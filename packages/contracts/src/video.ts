@@ -81,6 +81,8 @@ export interface VideoRouteFacts {
 export type VideoPackageInspection =
   | {
       readonly ok: true;
+      /** The entry of its video. */
+      readonly video: string;
       readonly track: string;
       /** Its `<title>`, else its `<name>`, as Incyclist names a route. */
       readonly title?: string;

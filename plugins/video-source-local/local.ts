@@ -9,17 +9,22 @@ import {
   type RouteImport,
   type RouteImportPreview,
   type RouteOffer,
-  type VideoImporter,
-  type VideoRoute,
 } from '@ridrs/contracts';
-import { entryUrls, findControl, moveToControlFile } from '@ridrs/ride';
+import {
+  besideControl,
+  decodeText,
+  entryNamed,
+  entryUrls,
+  findControl,
+  inspectPackage,
+  moveToControlFile,
+  pictureOf,
+  RIDE_PACKAGE,
+} from '@ridrs/ride';
 import { z } from 'zod';
 import { type TrackFacts, trackFacts } from './track-facts.ts';
 
 export const PLUGIN = 'video-source-local';
-
-/** The packages a rider brings: Incyclist's ZIP of control file, video and GPX track. */
-export const FORMAT = 'incyclist-gpx-import';
 
 /** Every imported route lies in `videos/<plugin>/<route>/`, as a downloaded one of a source does. */
 const FOLDER = `videos/${PLUGIN}`;
@@ -54,7 +59,6 @@ export interface ImportServices {
   readonly pick?: DataPick;
   /** Files dragged onto the window (ADR 0093). */
   readonly drop?: DataDrop;
-  readonly importers: () => readonly VideoImporter[];
 }
 
 /** Where the routes and the import go: the app state `route.offer` and `route.import` (ADR 0068). */
@@ -98,13 +102,14 @@ const reasonOf = (error: unknown) => (error instanceof Error ? error.message : S
 
 /**
  * The routes a rider imported from packages of their own (ADR 0090). `import` asks for a package
- * in the system's open dialog and answers once it closed; the package is then copied into the
- * media storage, the importer of its format makes a ridrs video route of it in its folder, and the
- * package goes. An imported route is on this device and can be removed; nothing else changes it.
+ * in the system's open dialog and answers once it closed; the package is then stored as the
+ * route's folder (ADR 0094): copied as `route.ride` where its video is stored, else unpacked from
+ * where it lies. Nothing is renamed or written beside it. An imported route is on this device and
+ * can be removed; nothing else changes it.
  */
 export class LocalVideos {
   private routes: Imported[] = [];
-  private services: ImportServices = { importers: () => [] };
+  private services: ImportServices = {};
   private running: Promise<void> | undefined;
   private last: RouteImport = { kind: 'video', state: 'idle' };
 
@@ -130,7 +135,7 @@ export class LocalVideos {
       }
     }
     for (const offer of offers) this.state.offer(offer.id, offer);
-    if (this.importer() && (services.pick || services.drop)) this.state.importer(this.last);
+    if (services.pick || services.drop) this.state.importer(this.last);
   }
 
   /**
@@ -140,8 +145,7 @@ export class LocalVideos {
    */
   async import(file?: string, move = false): Promise<boolean> {
     const { media, pick } = this.services;
-    const importer = this.importer();
-    if (!media || !importer || (file === undefined && !pick)) throw new Error('This app cannot import videos');
+    if (!media || (file === undefined && !pick)) throw new Error('This app cannot import videos');
     if (this.running) throw new Error('An import is on its way');
     // A dragged package was previewed: its route is listed with its track's facts at once.
     const previewed = file === undefined ? undefined : await this.preview(file).catch(() => undefined);
@@ -161,7 +165,7 @@ export class LocalVideos {
     // A host that stopped meanwhile takes no more state: the import ends without a word.
     // Moved onto the window, the package leaves where it lay once its route is imported.
     const moved = move && file !== undefined ? (chosen as DroppedFile) : undefined;
-    this.running = this.run(media, importer, chosen, id, title, this.progressOf(listed))
+    this.running = this.run(media, chosen, id, title, this.progressOf(listed))
       .then(async (imported) => {
         if (imported && moved) await moved.removeOriginal();
       })
@@ -174,12 +178,10 @@ export class LocalVideos {
    * without copying it; or why it cannot be imported (ADR 0093).
    */
   async preview(file: string): Promise<RouteImportPreview> {
-    const importer = this.importer();
-    if (!importer) throw new Error('This app cannot import videos');
     const dropped = this.dropped(file);
     const { entries } = await dropped.peek();
     if (!entries) return { ok: false, reason: 'The file is no ZIP package' };
-    const inspection = importer.inspect(entries);
+    const inspection = inspectPackage(entries);
     if (!inspection.ok) return inspection;
     const track = entries.find((entry) => entry.name === inspection.track)?.bytes;
     if (!track) return { ok: false, reason: 'The track is too large for a preview' };
@@ -231,10 +233,9 @@ export class LocalVideos {
 
   private async run(
     media: MediaFiles,
-    importer: VideoImporter,
-    chosen: Pick<PickedFile, 'name' | 'copyTo'>,
+    chosen: Pick<PickedFile, 'name' | 'peek' | 'copyTo' | 'extractTo'>,
     id: string,
-    title: string,
+    fallbackTitle: string,
     tell: (share: number) => void,
   ): Promise<boolean> {
     // A late word of the copy or the unpacking changes no route that is ready or gone.
@@ -243,32 +244,30 @@ export class LocalVideos {
       if (open) tell(share);
     };
     const folder = `${FOLDER}/${id}`;
-    const pack = `${folder}.zip`;
     let next: RouteImport;
     let offer: RouteOffer | undefined;
     try {
-      // Copying the package is the first half of the import, unpacking it the second.
-      await chosen.copyTo(pack, ({ received, size }) => {
-        if (size) progress(Math.min(received / size, 1) / 2);
-      });
-      progress(0.5);
+      // What the package holds, read in place: its control file, and whether its video is stored.
+      const { entries } = await chosen.peek();
+      if (!entries) throw new Error('The file is no ZIP package');
+      const inspection = inspectPackage(entries);
+      if (!inspection.ok) throw new Error(inspection.reason);
+      const stored = entries.find((entry) => entry.name === inspection.video)?.stored === true;
+      const share = ({ received, size }: { received: number; size?: number }) => {
+        if (size) progress(Math.min(received / size, 1));
+      };
       await media.remove(folder);
-      let route: VideoRoute;
-      let facts: TrackFacts;
+      let imported: Imported;
       try {
-        route = await importer.import(pack, folder, { fallbackTitle: title }, (share) => progress(0.5 + share / 2));
-        facts = trackFacts(new TextDecoder().decode(await media.read(`${folder}/${route.track.file}`)));
+        // A stored video plays from the ZIP: the package is kept as it is, a clone where it can
+        // be. Any other is unpacked from where it lies, every file at its path (ADR 0094).
+        if (stored) await chosen.copyTo(`${folder}/${RIDE_PACKAGE}`, share);
+        else await chosen.extractTo(folder, share);
+        imported = await this.importedOf(media, id, fallbackTitle);
       } catch (error) {
         await media.remove(folder);
         throw error;
       }
-      const imported: Imported = {
-        id,
-        title: route.title,
-        ...facts,
-        sparkline: [...facts.sparkline],
-        ...(route.thumbnail ? { thumbnail: route.thumbnail.file } : {}),
-      };
       this.routes.push(imported);
       await this.save(media);
       offer = await this.offerOf(media, imported);
@@ -277,14 +276,31 @@ export class LocalVideos {
     } catch (error) {
       next = { kind: 'video', state: 'failed', file: chosen.name, reason: reasonOf(error) };
     }
-    // The package goes before the import says it is done: a done import leaves nothing behind.
-    await media.remove(pack).catch(() => undefined);
     this.running = undefined;
     open = false;
     // The route listed while it was imported is ready now, or gone with the failure.
     this.state.offer(this.offerId(id), offer);
     this.set(next);
     return offer !== undefined;
+  }
+
+  /** A route stored in its folder: its title, its track's facts and its picture, from its entries. */
+  private async importedOf(media: MediaFiles, id: string, fallbackTitle: string): Promise<Imported> {
+    const folder = `${FOLDER}/${id}`;
+    const paths = (await media.entries(folder)).map((entry) => entry.path);
+    const found = await findControl(paths, (path) => media.read(`${folder}/${path}`));
+    if (!found) throw new Error('The package has no control file that names its video and track');
+    const { control } = found;
+    const entry = (relative: string) => entryNamed(paths, besideControl(found.path, relative)) ?? relative;
+    const facts = trackFacts(decodeText(await media.read(`${folder}/${entry(control.gpx)}`)));
+    const picture = pictureOf(control, paths, entry(control.video));
+    return {
+      id,
+      title: control.title ?? control.name ?? fallbackTitle,
+      ...facts,
+      sparkline: [...facts.sparkline],
+      ...(picture ? { thumbnail: picture } : {}),
+    };
   }
 
   /**
@@ -299,10 +315,6 @@ export class LocalVideos {
       shown = percent;
       this.state.offer(listed.id, { ...listed, availability: { state: 'importing', progress: percent / 100 } });
     };
-  }
-
-  private importer(): VideoImporter | undefined {
-    return this.services.importers().find((candidate) => candidate.format === FORMAT);
   }
 
   /** `id`, or `id-2`, `id-3`, … when a route has it already. */

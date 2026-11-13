@@ -72,6 +72,13 @@ Given(
 );
 
 Given(
+  'the rider drags the Incyclist package {string} with a stored video onto the window',
+  async function (this: RidrsWorld, name: string) {
+    await drop(this).drag(name, 'incyclist-stored');
+  },
+);
+
+Given(
   'the rider drags the Incyclist package {string} with a preview picture onto the window',
   async function (this: RidrsWorld, name: string) {
     await drop(this).drag(name, 'pictured');
@@ -306,12 +313,12 @@ Then('the drop layer is not shown', async function (this: RidrsWorld) {
   hidden();
 });
 
-Given('copying the dropped file waits', function (this: RidrsWorld) {
-  drop(this).holdCopies();
+Given('storing the dropped file waits', function (this: RidrsWorld) {
+  drop(this).holding.hold();
 });
 
-When('copying the dropped file goes on', function (this: RidrsWorld) {
-  drop(this).goOn();
+When('storing the dropped file goes on', function (this: RidrsWorld) {
+  drop(this).holding.goOn();
 });
 
 Then(
