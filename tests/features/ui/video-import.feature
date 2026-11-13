@@ -13,11 +13,11 @@ Feature: Importing an own video route from an Incyclist package
   the app state `route.import` (ADR 0068).
 
   Here the open dialog is simulated: it chooses a small Incyclist package with its control file in
-  UTF-16, or the rider cancels it. Unpacking, import and media storage are the real plugins on a
-  media folder of the scenario.
+  UTF-16, or the rider cancels it. Import and media storage are the real plugins on a media folder
+  of the scenario; unpacking is the real one in Node behind a stand-in that can wait halfway.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-local, video-import-incyclist, data-archive-node, storage-media-node" together with the simulated open dialog
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-local, video-import-incyclist, storage-media-node" together with the simulated open dialog
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
@@ -69,6 +69,15 @@ Feature: Importing an own video route from an Incyclist package
     Then the route details read "Importing: 25 %"
     When copying the chosen package goes on
     Then the route details offer a "Go" button
+
+  Scenario: Unpacking is the second half of the import
+    Given the rider chooses the Incyclist package "Col de Test.zip"
+    And unpacking the chosen package waits halfway
+    When I press "Ride"
+    And I press "Import video"
+    Then the route "Col de Test" reads "75 %"
+    When unpacking the chosen package goes on
+    Then the route "Col de Test" shows the status "On this device"
 
   Scenario: A package that fails to import is listed no more
     Given the rider chooses a ZIP "Holiday.zip" without a control file

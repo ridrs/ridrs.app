@@ -2,8 +2,9 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { DataPick } from '@ridrs/contracts';
+import type { DataArchive, DataPick, MediaFiles } from '@ridrs/contracts';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
+import { createNodeArchive } from '../../plugins/data-archive-node/archive.ts';
 import { incyclistPackage } from './simulated-downloads.ts';
 
 /** A ZIP of a holiday video alone: no control file, no track. */
@@ -72,6 +73,36 @@ export class SimulatedOpenDialog {
           await writeFile(file, bytes);
         },
       };
+    },
+  };
+
+  /** While set, unpacking says it unpacked half of the package and waits until `goOnUnpacking`. */
+  private heldUnpacking: { promise: Promise<void>; release: () => void } | undefined;
+
+  holdUnpackingHalfway(): void {
+    let release = () => {};
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.heldUnpacking = { promise, release };
+  }
+
+  goOnUnpacking(): void {
+    this.heldUnpacking?.release();
+    this.heldUnpacking = undefined;
+  }
+
+  /** `data.archive`: the real unpacking in Node (`data-archive-node`), which a scenario can hold halfway. */
+  readonly archive: DataArchive = {
+    extract: async (archive, directory, onProgress) => {
+      if (this.heldUnpacking) {
+        onProgress?.({ received: 1, size: 2 });
+        await this.heldUnpacking.promise;
+      }
+      const media = {
+        location: (path: string) => join(this.mediaRoot, ...path.split('/')),
+      } as MediaFiles;
+      return createNodeArchive(media).extract(archive, directory, onProgress);
     },
   };
 }

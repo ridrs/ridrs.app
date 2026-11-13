@@ -14,11 +14,11 @@ export default definePlugin({
     ctx.capabilities.provide(videoImporterCapability, {
       format: INCYCLIST_FORMAT,
       inspect: inspectIncyclist,
-      import: (pack, directory, facts) =>
+      import: (pack, directory, facts, onProgress) =>
         createIncyclistImporter(
           ctx.capabilities.get(storageMediaCapability),
           ctx.capabilities.get(dataArchiveCapability),
-        ).import(pack, directory, facts),
+        ).import(pack, directory, facts, onProgress),
     });
   },
 });

@@ -39,11 +39,16 @@ Given(
       'data.pick',
       simulation.pick,
     );
+    // The unpacking is the real one in Node, behind a stand-in that a scenario can hold.
+    this.getBehavior('simulated-open-dialog').providedImplementations.set(
+      'data.archive',
+      simulation.archive,
+    );
     await this.writeProbePluginFolder({
       folder: 'simulated-open-dialog',
       id: 'simulated-open-dialog',
       types: ['test'],
-      provides: ['data.pick'],
+      provides: ['data.pick', 'data.archive'],
     });
     this.useMemoryStorage();
   },
@@ -94,6 +99,14 @@ Given('copying the chosen package waits', function (this: RidrsWorld) {
 
 Given('copying the chosen package waits halfway', function (this: RidrsWorld) {
   dialog(this).holdCopies(true);
+});
+
+Given('unpacking the chosen package waits halfway', function (this: RidrsWorld) {
+  dialog(this).holdUnpackingHalfway();
+});
+
+When('unpacking the chosen package goes on', function (this: RidrsWorld) {
+  dialog(this).goOnUnpacking();
 });
 
 When('copying the chosen package goes on', function (this: RidrsWorld) {
