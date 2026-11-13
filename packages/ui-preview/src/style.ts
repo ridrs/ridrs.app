@@ -22,6 +22,9 @@ export const PREVIEW_CSS = `
   gap: var(--ridrs-gap, 16px); }
 .pv-cards[data-wide] { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 [data-breakpoint="compact"] .pv-cards[data-wide] { grid-template-columns: minmax(0, 1fr); }
+/* In a grid a picture card takes its 16:10 from its column's width. With the height of the row
+   (height: 100%) a taller card in the row, such as Import video, would widen it over its neighbour. */
+.pv-cards > .pv-teaser[data-media] { width: 100%; height: auto; }
 .pv-card { display: flex; flex-direction: column; gap: 8px; padding: 16px;
   border: 1px solid var(--ridrs-line, #24324d); border-radius: var(--ridrs-radius, 16px);
   background: var(--ridrs-surface, #131c2e); }
