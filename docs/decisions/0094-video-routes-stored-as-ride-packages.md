@@ -2,7 +2,7 @@
 
 # ADR 0094: Video Routes Stored as `.ride` Packages, Played from the ZIP
 
-Status: proposed on 2026-11-13; amended the same day: a package with a deflated video is unpacked, not repacked, and a folder of unpacked files is a route as well; the title is `<title>`, else `<name>`, and the picture is only ever Incyclist's. Replaces the unified format of [video-sources.md](../ideas/video-sources.md), section 4 (`route.json`, `video.mp4`, `track.gpx`, `thumbnail.*`), and, for packages with a stored video, the unpacking of ADR 0067 and ADR 0090.
+Status: proposed on 2026-11-13; amended on 2026-11-13 again: unpacked files always win over the package, and the built-in catalog is an overlay over the packages; amended the same day: a package with a deflated video is unpacked, not repacked, and a folder of unpacked files is a route as well; the title is `<title>`, else `<name>`, and the picture is only ever Incyclist's. Replaces the unified format of [video-sources.md](../ideas/video-sources.md), section 4 (`route.json`, `video.mp4`, `track.gpx`, `thumbnail.*`), and, for packages with a stored video, the unpacking of ADR 0067 and ADR 0090.
 
 ## Context
 
@@ -51,6 +51,7 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
     <path>               a file that replaces or adds the entry <path> of route.ride, or, without one, is an entry
 ```
 
+- **Unpacked files always win over the package.** This is the one rule of precedence, wherever a file comes from (an unpacked package, the catalog, video2gpx, the rider): a file in the folder is always read before the entry of `route.ride` of its path, by the video world, by `storage.media` and by `ridrs-media://`. The package is never changed to improve a route.
 - **A route is the entries of its folder:** the entries of `route.ride` where there is one, and the files beside it, which count as entries. A file whose path, relative to the folder, equals an entry's path (letters compared without case) replaces that entry; any other adds one. A folder without `route.ride` is a route of its files alone: an unpacked Incyclist folder. A route can get a picture, a corrected track or a better control file without its package changing. `route.ride` and `routes.json` are never entries.
 - **One Rust module `ride` in `crates/ridrs-media`** knows this: the entries of a route, an entry's bytes (whole, for the control file, the track and the picture: at most `MAX_WHOLE`) and the place of a stored entry's data in `route.ride`.
 - **`ridrs-media://` serves entries:** the media path `videos/<source>/<route>/<entry>` is a file where one lies there, else the entry of `route.ride`: a stored entry by range from its offset (the player keeps `httpRangeReader` and ADR 0061), a deflated one whole up to `MAX_WHOLE`, anything else refused. The offer names its entries' URLs by name as before (`availability.files`); the player builds none.
@@ -63,6 +64,23 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
 - **A package with a deflated video is unpacked** into the new folder, every entry at its path in the package, straight from the chosen file (no copy of the ZIP first) with progress; no `route.ride` is kept. Nothing is renamed and no `route.json` is written: the folder is the Incyclist folder the package holds. A chosen or dropped file unpacks itself (`PickedFile.extractTo`, `media_pick_extract` on the token); `data.archive` stays for packages in the media storage, the downloads.
 - **A Van Gestel download** lands as `<route>/download.zip.part`, resumable as today. A download with a stored video is renamed to `route.ride`; one with a deflated video (22 of 23 today) is unpacked into its folder and deleted. Peak space is the package twice while it is unpacked, as today.
 - **The headless host and the tests** do the same in Node with zip.js (ADR 0065): `data-archive-node` provides the Node side, and the scenarios' media URLs resolve entries through it.
+
+### The built-in catalog: an overlay over the packages
+
+The catalog a source ships (`plugins/video-source-vangestel/catalog/`) keeps what belongs to the source and adds, per route, files that improve its package, laid out as the package's own:
+
+```text
+catalog/<id>/overlay/
+  FR_Col_de_Pennes.gpx      replaces the package's track: smoothed, its times still the video's
+  preview.jpg               the route's picture, by Incyclist's name or the name its <preview> gives
+```
+
+- **On download** the source copies the route's overlay into its folder, beside `route.ride` or the unpacked files; by the rule above these files win. The folder alone is then the improved route: the video world, `ridrs-media://` and an export to Incyclist need no knowledge of the catalog.
+- **On start** the source compares each downloaded route's overlay files with the catalog's (by a hash of their bytes, kept with the route's state) and copies those that changed: a new catalog reaches routes downloaded before it. Overlay files the catalog no longer has are removed; files the rider or another tool put there are left.
+- **Names:** an overlay file has the path of the entry it replaces; the catalog tool takes it from the package's control file (`<gpx-file-path>`, `<preview>`). A picture of a package without `<preview>` is `preview.jpg`, Incyclist's first name.
+- **The track stays the video's:** a smoothed track may move positions and elevations, never the times that map it onto the video.
+- **Not an overlay:** download URL, size and ETag, author and license, country, level, tour, climbs and the profile stay the source's facts in `index.json`. The catalog tool derives profile, climbs, distance and ascent from the overlay track where there is one.
+- Overlay tracks are derived from the source's GPX and shared under its license (LICENSING.md, section 6a), as the profiles are.
 
 ### Migration
 
@@ -83,3 +101,4 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
   3. (In phase 2.) `route.json` and `videoRouteSchema` are removed once no importer returns a `VideoRoute` (phase 5).
   4. `video-source-local` copies a package with a stored video (clone first) or unpacks one with a deflated video into the route's folder; progress in one phase. It no longer uses `video.importer`; `storage.media` reads entries of `route.ride` like files (`read`).
   5. `video-source-vangestel` renames or unpacks its downloads; `video.importer` is removed.
+  6. The catalog's overlays: `catalog/<id>/overlay/` from the catalog tool, copied on download and kept current at start.
