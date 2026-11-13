@@ -45,6 +45,9 @@ importers:
       '@ridrs/replay':
         specifier: workspace:*
         version: link:packages/replay
+      '@ridrs/ride':
+        specifier: workspace:*
+        version: link:packages/ride
       '@ridrs/testing':
         specifier: workspace:*
         version: link:packages/testing
@@ -335,6 +338,18 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/ride:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      entities:
+        specifier: 8.1.0
+        version: 8.1.0
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
 
   packages/spatial:
     dependencies:
@@ -1570,12 +1585,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      entities:
-        specifier: 8.1.0
-        version: 8.1.0
-      fast-xml-parser:
-        specifier: 5.11.2
-        version: 5.11.2
+      '@ridrs/ride':
+        specifier: workspace:*
+        version: link:../../packages/ride
 
   plugins/video-source-local:
     dependencies:

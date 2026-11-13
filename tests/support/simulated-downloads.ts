@@ -35,7 +35,7 @@ function utf16be(text: string): Uint8Array {
 /** The control file, titled `title`, or without a title when it is `null`. */
 const control = (title: string | null) => `<?xml version="1.0" encoding="utf-16" standalone="yes"?>
 <gpx-import>
-  <name>FR_Test</name>
+  <name>FR_Col_de_Test</name>
 ${title === null ? '' : `  <title>${title}</title>\n`}  <video-file-path>FR_Test.mp4</video-file-path>
   <gpx-file-path>FR_Test.gpx</gpx-file-path>
   <framerate>25.0</framerate>

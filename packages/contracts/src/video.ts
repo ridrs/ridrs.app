@@ -82,6 +82,7 @@ export type VideoPackageInspection =
   | {
       readonly ok: true;
       readonly track: string;
+      /** Its `<title>`, else its `<name>`, as Incyclist names a route. */
       readonly title?: string;
       readonly thumbnail?: string;
     }

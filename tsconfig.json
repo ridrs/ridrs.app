@@ -13,6 +13,7 @@
       "@ridrs/metric-source": ["./packages/metric-source/src/index.ts"],
       "@ridrs/presentation": ["./packages/presentation/src/index.ts"],
       "@ridrs/replay": ["./packages/replay/src/index.ts"],
+      "@ridrs/ride": ["./packages/ride/src/index.ts"],
       "@ridrs/recording": ["./packages/recording/src/index.ts"],
       "@ridrs/temporal": ["./packages/temporal/src/index.ts"],
       "@ridrs/testing": ["./packages/testing/src/index.ts"],

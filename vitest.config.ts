@@ -19,6 +19,7 @@ export default defineConfig({
       '@ridrs/presentation': resolve(import.meta.dirname, 'packages/presentation/src/index.ts'),
       '@ridrs/recording': resolve(import.meta.dirname, 'packages/recording/src/index.ts'),
       '@ridrs/replay': resolve(import.meta.dirname, 'packages/replay/src/index.ts'),
+      '@ridrs/ride': resolve(import.meta.dirname, 'packages/ride/src/index.ts'),
       '@ridrs/temporal': resolve(import.meta.dirname, 'packages/temporal/src/index.ts'),
       '@ridrs/ui-sdk/react': resolve(import.meta.dirname, 'packages/ui-sdk/src/react.ts'),
       '@ridrs/ui-sdk': resolve(import.meta.dirname, 'packages/ui-sdk/src/index.ts'),

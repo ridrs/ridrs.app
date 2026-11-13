@@ -6,7 +6,6 @@
   "type": "module",
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
-    "entities": "8.1.0",
-    "fast-xml-parser": "5.11.2"
+    "@ridrs/ride": "workspace:*"
   }
 }

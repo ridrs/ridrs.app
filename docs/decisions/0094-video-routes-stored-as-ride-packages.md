@@ -2,7 +2,7 @@
 
 # ADR 0094: Video Routes Stored as `.ride` Packages, Played from the ZIP
 
-Status: proposed on 2026-11-13; amended the same day: a package with a deflated video is unpacked, not repacked, and a folder of unpacked files is a route as well. Replaces the unified format of [video-sources.md](../ideas/video-sources.md), section 4 (`route.json`, `video.mp4`, `track.gpx`, `thumbnail.*`), and, for packages with a stored video, the unpacking of ADR 0067 and ADR 0090.
+Status: proposed on 2026-11-13; amended the same day: a package with a deflated video is unpacked, not repacked, and a folder of unpacked files is a route as well; the title is `<title>`, else `<name>`, and the picture is only ever Incyclist's. Replaces the unified format of [video-sources.md](../ideas/video-sources.md), section 4 (`route.json`, `video.mp4`, `track.gpx`, `thumbnail.*`), and, for packages with a stored video, the unpacking of ADR 0067 and ADR 0090.
 
 ## Context
 
@@ -36,7 +36,9 @@ A `.ride` file is a ZIP (ZIP64 where needed) whose files, unpacked into a folder
 
 - **Required:** one `gpx-import` control file (`*.xml`, UTF-8 or UTF-16 with a byte order mark, as Incyclist reads it), the video it names in `<video-file-path>`, the track it names in `<gpx-file-path>`. Paths are relative to the control file.
 - **The video entry is stored** (compression method 0) where ridrs is to play it from the ZIP. Other entries may be stored or deflated.
-- **Read by ridrs:** everything ridrs reads today (`video-file-path`, `gpx-file-path`, `framerate`, `start-frame`, `informations`, `segments`, `title`), and in addition Incyclist's `name` as the title where there is no `title`, `title` per language, and `preview`. The picture is `<preview>`, or the first of Incyclist's names next to the video. ridrs' own names `thumbnail.png` and `thumbnail.jpg` go: video2gpx writes `preview.jpg` and `<preview>`.
+- **Read by ridrs:** everything ridrs reads today (`video-file-path`, `gpx-file-path`, `framerate`, `start-frame`, `informations`, `segments`, `title`), and in addition `title` per language, `name` and `preview`.
+- **The title** is `<title>` (its first language where it has one per language), else `<name>` without the country of its first two letters and with `_` as spaces, else the file's name. Incyclist does the same but keeps the `_`. In Incyclist `<name>` is the technical name (also the country where `<country>` is missing) and `<title>` the title it shows; every `gpx-import` file of Incyclist's tests has both, the Van Gestel packages included.
+- **The picture** is the one `<preview>` names, else the first of Incyclist's names next to the video. ridrs' own names `thumbnail.png` and `thumbnail.jpg` go, as a writer or a reader: Incyclist shows neither, so a package that relies on them looks different in the two apps, and `<preview>` names a picture of any name. Van Gestel names its picture so (`<preview>FR_Source_Drome_Part_1.png</preview>`); video2gpx writes `preview.jpg` and `<preview>`.
 - **Extensions over Incyclist's format: none in v1.** Everything ridrs plays and shows is either in Incyclist's format already (title, picture, notes, segments, frame rate, start and end frame, the next part of a tour) or follows from the track (distance, ascent, duration, profile, climbs, bounds) or the video (codec, length). What remains belongs to a source, not to a package: the catalog's website facts and download data stay in the catalog. Author and license of third-party content are the one candidate; they become an element (`<credits author="" url="" license="" license-url=""/>`, which Incyclist ignores) once a `.ride` with third-party content is passed on outside a source that knows them (rule 3).
 
 ### Storage: a folder per route

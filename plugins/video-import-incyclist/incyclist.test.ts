@@ -2,7 +2,7 @@
 
 import type { DataArchive, MediaFiles } from '@ridrs/contracts';
 import { describe, expect, it } from 'vitest';
-import { createIncyclistImporter, decodeText, inspectIncyclist, parseControl, thumbnailOf } from './incyclist.ts';
+import { createIncyclistImporter } from './incyclist.ts';
 
 const CONTROL = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <gpx-import>
@@ -19,95 +19,6 @@ const CONTROL = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 		<segment name="First climb: approach via Jansac (11.2 km)" start="0" end="11230" />
 	</segments>
 </gpx-import>`;
-
-describe('decodeText', () => {
-  it('reads UTF-16 by its byte order mark and UTF-8 without one', () => {
-    expect(decodeText(new Uint8Array([0xfe, 0xff, 0, 0x41, 0, 0xe4]))).toBe('Aä');
-    expect(decodeText(new Uint8Array([0xff, 0xfe, 0x41, 0]))).toBe('A');
-    expect(decodeText(new TextEncoder().encode('Ä'))).toBe('Ä');
-  });
-});
-
-describe('parseControl', () => {
-  it('takes the files, the timing, the notes with HTML entities and the segments', () => {
-    expect(parseControl(CONTROL)).toEqual({
-      video: 'FR_Col_de_Pennes.mp4',
-      gpx: 'FR_Col_de_Pennes.gpx',
-      framerate: 30,
-      startFrame: 12,
-      notes: [
-        { distance: 20, text: { de: 'Col de Pennes\nLänge: 46,2 km', en: 'Col de Pennes\nLength: 46.2 km' } },
-        { distance: 700, text: { de: 'Recoubeau', en: 'Recoubeau' } },
-      ],
-      segments: [{ name: 'First climb: approach via Jansac (11.2 km)', start: 0, end: 11230 }],
-    });
-  });
-
-  it('takes the title the control file names', () => {
-    const titled = CONTROL.replace('<video-file-path>', '<title>Col de Pennes &amp; Jansac</title>\n    <video-file-path>');
-    expect(parseControl(titled).title).toBe('Col de Pennes & Jansac');
-    expect(parseControl(CONTROL)).not.toHaveProperty('title');
-  });
-
-  it('refuses a control file without video or track', () => {
-    expect(() => parseControl('<gpx-import><name>x</name></gpx-import>')).toThrow('names no video');
-  });
-});
-
-describe('inspectIncyclist', () => {
-  const control = { name: 'pack/FR_Col_de_Pennes.xml', size: CONTROL.length, bytes: new TextEncoder().encode(CONTROL) };
-  const video = { name: 'pack/FR_Col_de_Pennes.mp4', size: 15_000_000_000 };
-  const track = { name: 'pack/FR_Col_de_Pennes.gpx', size: 1000, bytes: new Uint8Array(1000) };
-
-  it('finds the track of a package, whatever else it holds', () => {
-    const extra = { name: 'LIESMICH.txt', size: 10, bytes: new TextEncoder().encode('Hallo') };
-    expect(inspectIncyclist([video, track, control, extra])).toEqual({ ok: true, track: 'pack/FR_Col_de_Pennes.gpx' });
-  });
-
-  it('names the picture next to the video for the preview', () => {
-    const picture = { name: 'pack/FR_Col_de_Pennes_preview.jpg', size: 3, bytes: new Uint8Array(3) };
-    expect(inspectIncyclist([video, track, control, picture])).toEqual({
-      ok: true,
-      track: track.name,
-      thumbnail: picture.name,
-    });
-  });
-
-  it('names the title of the control file for the preview', () => {
-    const text = CONTROL.replace('<video-file-path>', '<title>Col de Pennes</title><video-file-path>');
-    const titled = { ...control, bytes: new TextEncoder().encode(text) };
-    expect(inspectIncyclist([video, track, titled])).toEqual({ ok: true, track: track.name, title: 'Col de Pennes' });
-  });
-
-  it('says why a ZIP is no package', () => {
-    expect(inspectIncyclist([video])).toEqual({ ok: false, reason: 'The package has no control file' });
-    expect(inspectIncyclist([control, video])).toEqual({
-      ok: false,
-      reason: 'The package has no file "FR_Col_de_Pennes.gpx"',
-    });
-    const empty = { name: 'x.xml', size: 5, bytes: new TextEncoder().encode('<a/>') };
-    expect(inspectIncyclist([empty])).toEqual({ ok: false, reason: 'The control file names no video or no GPX track' });
-  });
-});
-
-describe('thumbnailOf', () => {
-  it("takes the picture Incyclist looks for next to the video, in Incyclist's order", () => {
-    const video = 'pack/FR_Col.mp4';
-    expect(thumbnailOf(['pack/FR_Col_preview.jpg', 'pack/preview.JPG', video], video)).toBe('pack/preview.JPG');
-    expect(thumbnailOf(['pack/FR_Col_preview.jpg', 'pack/FR_Col_preview.png'], video)).toBe('pack/FR_Col_preview.png');
-  });
-
-  it('takes thumbnail.png or .jpg after the names Incyclist looks for', () => {
-    const video = 'pack/FR_Col.mp4';
-    expect(thumbnailOf(['pack/thumbnail.jpg', video], video)).toBe('pack/thumbnail.jpg');
-    expect(thumbnailOf(['pack/Thumbnail.PNG', 'pack/thumbnail.jpg'], video)).toBe('pack/Thumbnail.PNG');
-    expect(thumbnailOf(['pack/thumbnail.jpg', 'pack/FR_Col_preview.jpg'], video)).toBe('pack/FR_Col_preview.jpg');
-  });
-
-  it('ignores other pictures and pictures in another folder', () => {
-    expect(thumbnailOf(['pack/FR_Col.png', 'preview.png', 'pack/profile.jpg'], 'pack/FR_Col.mp4')).toBeUndefined();
-  });
-});
 
 describe('createIncyclistImporter', () => {
   it('makes a ridrs video route of the package and keeps nothing else', async () => {

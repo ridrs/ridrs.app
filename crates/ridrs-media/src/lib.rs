@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Large media for the native app (docs/ideas/video-sources.md): `storage.media`, `data.fetch`
-//! and `data.archive` below `media` in the app data directory, and the `ridrs-media://` scheme
-//! that serves it to the WebView.
+//! and `data.archive` below `media` in the app data directory, the entries of a video route's
+//! folder and its `.ride` package (`ride`, ADR 0094), and the `ridrs-media://` scheme that serves
+//! it to the WebView.
 
 pub mod archive;
 pub mod commands;
@@ -11,3 +12,4 @@ pub mod files;
 pub mod paths;
 pub mod peek;
 pub mod protocol;
+pub mod ride;

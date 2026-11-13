@@ -3,9 +3,10 @@ Feature: A video route dragged onto the window is previewed and imported
   `.ride`, the name ridrs gives these packages (ADR 0093). While it hovers, the local video source
   previews it from the package's GPX track, without copying it: `route.import-preview` answers
   with the route's title, distance, climb and profile, or with why it cannot import the package.
-  The title is the one the control file names (`<title>`); without one, the file's name. The
-  picture is the one Incyclist shows next to the video (`preview.png`, `preview.jpg`,
-  `<video>_preview.png`, `<video>_preview.jpg`), else ridrs' own `thumbnail.png` or `thumbnail.jpg`;
+  The title is the one the control file names (`<title>`); without one, its `<name>` without the
+  country and with `_` as spaces, as Incyclist names a route; without both, the file's name (ADR
+  0094). The picture is the one the control file names (`<preview>`), else the one Incyclist shows
+  next to the video (`preview.png`, `preview.jpg`, `<video>_preview.png`, `<video>_preview.jpg`);
   without one, the route has none.
   Letting go imports it through `route.import` with the dropped file instead of the open dialog;
   progress and failure are the source's key of `route.import`, as for a chosen file (ADR 0090).
@@ -37,6 +38,16 @@ Feature: A video route dragged onto the window is previewed and imported
     And the route offer "video-source-local/it-driving-the-amalfi-coast" is titled "Driving the Amalfi Coast"
     And the route offer "video-source-local/it-driving-the-amalfi-coast" is "ready"
     And the media storage holds the route "video-source-local/it-driving-the-amalfi-coast" titled "Driving the Amalfi Coast"
+
+  Scenario: A package without a title is named as its control file names it, not as its file
+    Given the rider drags the Incyclist package "Download (3).ride" onto the window
+    When the UI bridge calls "route.import-preview" with '{"key":"video-source-local","file":"drop-1"}'
+    Then the call resolved with the preview "Col de Test: video, 0.3 km, 12 m"
+    When the rider lets go of it
+    And the UI bridge calls "route.import" with '{"key":"video-source-local","file":"drop-1"}'
+    Then the route offer "video-source-local/download-3" is "ready"
+    And the route offer "video-source-local/download-3" is titled "Col de Test"
+    And the media storage holds the route "video-source-local/download-3" titled "Col de Test"
 
   Scenario: A package's preview picture is the route's picture, before and after the import
     Given the rider drags the Incyclist package "Col_de_Test.ride" with a preview picture onto the window
