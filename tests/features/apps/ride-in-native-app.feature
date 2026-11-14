@@ -9,6 +9,7 @@ Feature: Start a ride and see power and cadence
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
     And I start a free ride in the briefing
@@ -26,6 +27,7 @@ Feature: Start a ride and see power and cadence
     Given the plugin directories "plugins"
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
     And I start a free ride in the briefing
@@ -38,6 +40,7 @@ Feature: Start a ride and see power and cadence
     Given the plugin directories "plugins"
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     When I start the ridrs app with these options
     Then the app lets the screen sleep
     When I press "Start ride"
@@ -50,6 +53,7 @@ Feature: Start a ride and see power and cadence
     Given the plugin directories "plugins"
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     When I start the ridrs app with these options
     And I open the device setup from the main screen
     And I press the platform's back button

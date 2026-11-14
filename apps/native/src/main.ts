@@ -8,8 +8,18 @@ import { startRidrsApp } from './compose.ts';
 import { androidBackButton, createKeepAwake, ensureBluetoothPermission } from './platform.ts';
 import { enableOverlayTitleBar } from './title-bar.ts';
 
-/** Plugins that are bundled but not started in the app (the console output is for headless use). */
-const DISABLED_IN_APP = ['output-console'];
+/**
+ * Plugins that are bundled but not started in the app: the console output is for headless use;
+ * the gauge HUD (`ui-hud-gauges`) takes the place of the plain HUD and shows power, heart rate and
+ * cadence itself, so the plain HUD and those three widgets would only repeat it.
+ */
+const DISABLED_IN_APP = [
+  'output-console',
+  'ui-hud',
+  'ui-widget-power',
+  'ui-widget-heart-rate',
+  'ui-widget-cadence',
+];
 
 async function main(): Promise<void> {
   const logger = createConsoleLogger({ app: 'ridrs-native' });

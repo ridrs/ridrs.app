@@ -9,6 +9,7 @@ Feature: Continue an interrupted ride in the app
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     And the app stores its files in a fresh temporary data directory
     And I start the ridrs app with these options
     And I press "Start ride"

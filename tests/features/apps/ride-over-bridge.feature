@@ -9,6 +9,7 @@ Feature: Ride with the trainer connected to a companion
     Given the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
 
   Scenario: Pair, then ride
     Given the plugin directories "plugins, tests/fixtures/plugins/simulated-companion"

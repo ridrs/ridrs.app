@@ -8,6 +8,7 @@ Feature: Ride, save, export and replay
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     And the app stores its files in a fresh temporary data directory
     When I start the ridrs app with these options
     And I press "Start ride"

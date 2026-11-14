@@ -1,0 +1,40 @@
+{
+  "id": "ui-hud-gauges",
+  "name": "Gauge HUD",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "hud",
+        "extensionPoint": "activity/hud",
+        "export": "GaugeHud",
+        "order": 0,
+        "extensionPoints": [
+          "hud/widget"
+        ]
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "metric.power",
+        "metric.heart-rate",
+        "metric.cadence",
+        "activity.state-changed",
+        "activity.athlete"
+      ],
+      "publish": []
+    },
+    "state": [
+      "app.language",
+      "athlete.profile",
+      "data.source"
+    ]
+  }
+}

@@ -8,6 +8,7 @@ Feature: Pedal and see the virtual speed
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
     And I start a free ride in the briefing
@@ -27,6 +28,7 @@ Feature: Pedal and see the virtual speed
     Given the plugin directories "plugins"
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
     And I start a free ride in the briefing
@@ -41,6 +43,7 @@ Feature: Pedal and see the virtual speed
     And the plugin "bridge-connector-tauri" is disabled
     And the plugin "transport-ble-tauri" is disabled
     And the plugin "transport-ble-noble" is disabled
+    And the plugin "ui-hud-gauges" is disabled
     When I start the ridrs app with these options
     And I press "Start ride"
     And I start a free ride in the briefing
