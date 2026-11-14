@@ -33,10 +33,10 @@ const PAGE = 'trash';
  */
 const ENTRY_CSS = `
 /* A large icon with its label under it, centred: the drop target is easy to hit. */
-.mm-nav [data-recycle-bin] { position: relative; flex-direction: column; justify-content: center; gap: 6px;
-  padding: 14px 12px; text-align: center; }
-.mm-nav [data-recycle-bin] [data-menu-icon] { width: 32px; height: 32px; }
-[data-recycle-bin] [data-bin-count] { position: absolute; top: 8px; left: calc(50% + 10px); min-width: 22px; padding: 1px 7px; border-radius: 999px;
+.mm-nav [data-recycle-bin] { position: relative; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 8px 12px; font-size: 12px; text-align: center; }
+.mm-nav [data-recycle-bin] [data-menu-icon] { width: 26px; height: 26px; }
+[data-recycle-bin] [data-bin-count] { position: absolute; top: 2px; left: calc(50% + 8px); min-width: 22px; padding: 1px 7px; border-radius: 999px;
   background: var(--ridrs-surface-2, #1c2840); color: var(--ridrs-text, #f2f5fa); font: 600 12px system-ui, sans-serif;
   text-align: center; }
 [data-breakpoint="compact"] .mm-nav [data-recycle-bin] { padding: 8px 12px; gap: 4px; }
