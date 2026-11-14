@@ -52,7 +52,7 @@ Feature: A planned workout or a ride done is removed by dragging it into the bin
     Then the calendar day "Thursday" lists no "Threshold 20"
     And the bin in the menu takes nothing
     And intervals.icu received 0 requests "DELETE /api/v1/athlete/0/events/*"
-    When I press "Bin"
+    When I press "Trash"
     And I delete "Threshold 20" permanently from the bin
     Then intervals.icu received 1 requests "DELETE /api/v1/athlete/0/events/*"
 
@@ -68,7 +68,7 @@ Feature: A planned workout or a ride done is removed by dragging it into the bin
     When I end the drag
     And I drag the planned workout "Recovery 45" into the bin
     Then the calendar date "2026-11-03" lists no "Recovery 45"
-    When I press "Bin"
+    When I press "Trash"
     And the simulated intervals.icu forgets the requests so far
     And I delete "Recovery 45" permanently from the bin
     Then intervals.icu received 1 requests "DELETE /api/v1/athlete/0/events/*"
@@ -80,7 +80,7 @@ Feature: A planned workout or a ride done is removed by dragging it into the bin
     And intervals.icu cannot be reached for writes
     When I press "Training"
     And I drag the planned workout "Threshold 20" into the bin
-    And I press "Bin"
+    And I press "Trash"
     And I delete "Threshold 20" permanently from the bin
     Then the page says "intervals.icu could not be reached: nothing was removed."
     And the bin lists "Threshold 20"
@@ -91,7 +91,7 @@ Feature: A planned workout or a ride done is removed by dragging it into the bin
     When I press "Training"
     And I drag the planned workout "VO2 Max 5×4" into the bin
     Then the calendar day "Thursday" lists no "VO2 Max 5×4"
-    When I press "Bin"
+    When I press "Trash"
     And I delete "VO2 Max 5×4" permanently from the bin
     Then the bin is empty
     When ridrs restarted
@@ -105,7 +105,7 @@ Feature: A planned workout or a ride done is removed by dragging it into the bin
     And the ridrs UI is shown
     When I press "Training"
     And I drag the planned workout "VO2 Max 5×4" into the bin
-    And I press "Bin"
+    And I press "Trash"
     And I press "Restore VO2 Max 5×4"
     And I press "Training"
     Then the calendar day "Thursday" lists "VO2 Max 5×4"
@@ -131,7 +131,7 @@ Feature: A planned workout or a ride done is removed by dragging it into the bin
     When I end the drag
     And I drag the ride "Monday Spin" into the bin
     Then the calendar day "Monday" lists no "Monday Spin"
-    When I press "Bin"
+    When I press "Trash"
     And the simulated intervals.icu forgets the requests so far
     And I delete "Monday Spin" permanently from the bin
     Then intervals.icu received 1 requests "DELETE /api/v1/activity/*"

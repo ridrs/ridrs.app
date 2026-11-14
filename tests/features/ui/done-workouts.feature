@@ -118,7 +118,7 @@ Feature: The Training area shows the workouts that were done
     Then the calendar day "Wednesday" shows 1 done ride
     When I drag the ride "Ride" into the bin
     Then the calendar day "Wednesday" shows 0 done rides
-    When I press "Bin"
+    When I press "Trash"
     And I delete "Ride" permanently from the bin
     And ridrs restarted
     And I reload the UI
@@ -144,7 +144,7 @@ Feature: The Training area shows the workouts that were done
     And the simulated intervals.icu forgets the requests so far
     And I drag the ride "Evening spin" into the bin
     Then the calendar day "Wednesday" shows 0 done rides
-    When I press "Bin"
+    When I press "Trash"
     And I delete "Evening spin" permanently from the bin
     Then intervals.icu received 1 requests "DELETE /api/v1/activity/*"
     And the bin is empty

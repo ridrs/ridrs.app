@@ -38,6 +38,8 @@ const CSS = `
 .ms-root[data-breakpoint="compact"] { grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "main" "menu"; }
 .ms-menu { grid-area: menu; border-right: 1px solid var(--ridrs-line); }
+/* The menu fills its place, so what it keeps at its bottom (the bin, ADR 0096) is at the window's. */
+.ms-menu > [data-contribution] { height: 100%; }
 .ms-root[data-breakpoint="compact"] .ms-menu { border-right: 0; border-top: 1px solid var(--ridrs-line); }
 .ms-column { grid-area: main; display: flex; flex-direction: column; min-width: 0; min-height: 0;
   overflow: auto; }

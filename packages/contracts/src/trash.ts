@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { defineState } from './app-state.ts';
 import type { DataSource } from './data-sources.ts';
-import { type Removable, removableSchema } from './drag.ts';
+import { removableSchema } from './drag.ts';
 import { defineService } from './services.ts';
 
 /**
@@ -12,7 +12,7 @@ import { defineService } from './services.ts';
  */
 export const trashItemSchema = z
   .object({
-    item: removableSchema,
+    item: z.discriminatedUnion('kind', [removableSchema.options[0], removableSchema.options[1]]),
     /** When it went into the bin, epoch ms. */
     binnedAt: z.number(),
   })
@@ -20,12 +20,15 @@ export const trashItemSchema = z
 
 export type TrashItem = z.infer<typeof trashItemSchema>;
 
+/** An item the bin keeps: a planned entry or a ride done. */
+export type BinnedItem = TrashItem['item'];
+
 /** What the bin holds, by `keyOfRemovable`; owner `ui-recycle-bin`. */
 export const trashItemState = defineState('trash.item', trashItemSchema);
 
 /** Puts an item into the bin; one that is there already stays as it is. Answers its key. */
 export const trashPutService = defineService('trash.put', {
-  request: z.object({ item: removableSchema }).strict(),
+  request: z.object({ item: trashItemSchema.shape.item }).strict(),
   response: z.object({ key: z.string().min(1) }).strict(),
 });
 
@@ -61,7 +64,7 @@ export const trashPurgeService = defineService('trash.purge', {
 });
 
 /** The key of an item in the bin: `calendar-entry:<provider>:<id>`, `done-ride:<provider>:<id>`. */
-export function keyOfRemovable(item: Removable): string {
+export function keyOfRemovable(item: BinnedItem): string {
   if (item.kind === 'calendar-entry') return `calendar-entry:${item.provider}:${item.id}`;
   const [first] = item.removals;
   return `done-ride:${first?.provider}:${first?.id}`;

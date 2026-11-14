@@ -3,7 +3,7 @@ Feature: The recycle bin at the bottom of the menu
   The bin is the last entry of the main menu (ADR 0096). A planned workout or a ride done dragged
   onto it is not deleted: it goes into the bin and is hidden everywhere, and the bin counts it. The
   bin's page lists what it holds: Restore gives an item back, Delete permanently deletes it at
-  every provider that has it, after asking, and Empty bin does so for all. The bin is kept across a
+  every provider that has it, after asking, and Empty trash does so for all. The bin is kept across a
   restart.
 
   Here intervals.icu, the browser and the secret store are simulated. It is Wednesday 4 November
@@ -27,12 +27,13 @@ Feature: The recycle bin at the bottom of the menu
     And the ridrs UI is shown
 
   Scenario: The bin is the last entry of the menu and is empty at first
-    Then the last entry of the menu is "Bin"
+    Then the last entry of the menu is "Trash"
+    And the bin is at the bottom of the menu
     And the bin in the menu counts 0 items
-    When I press "Bin"
+    When I press "Trash"
     Then the "trash" screen is shown
     And the bin is empty
-    And the button "Empty bin" is disabled
+    And the button "Empty trash" is disabled
 
   Scenario: A planned workout dropped into the bin is hidden, not deleted
     Given the simulated intervals.icu forgets the requests so far
@@ -41,13 +42,13 @@ Feature: The recycle bin at the bottom of the menu
     Then the calendar day "Thursday" lists no "Threshold 20"
     And intervals.icu received 0 requests "DELETE /api/v1/athlete/0/events/*"
     And the bin in the menu counts 1 item
-    When I press "Bin"
+    When I press "Trash"
     Then the bin lists "Threshold 20"
 
   Scenario: Restore gives the workout back
     When I press "Training"
     And I drag the planned workout "Threshold 20" into the bin
-    And I press "Bin"
+    And I press "Trash"
     And I press "Restore Threshold 20"
     Then the bin is empty
     When I press "Training"
@@ -56,7 +57,7 @@ Feature: The recycle bin at the bottom of the menu
   Scenario: Delete permanently asks first, then deletes at intervals.icu
     When I press "Training"
     And I drag the planned workout "Threshold 20" into the bin
-    And I press "Bin"
+    And I press "Trash"
     And the simulated intervals.icu forgets the requests so far
     And I press "Delete permanently: Threshold 20"
     Then the bin asks "Delete “Threshold 20” from intervals.icu? This cannot be undone."
@@ -71,20 +72,20 @@ Feature: The recycle bin at the bottom of the menu
     When I press "Training"
     And I drag the planned workout "Threshold 20" into the bin
     And intervals.icu cannot be reached for writes
-    And I press "Bin"
+    And I press "Trash"
     And I delete "Threshold 20" permanently from the bin
     Then the bin lists "Threshold 20"
     And the page says "intervals.icu could not be reached: nothing was removed."
 
-  Scenario: Empty bin deletes everything in it
+  Scenario: Empty trash deletes everything in it
     When I press "Training"
     And I drag the planned workout "Threshold 20" into the bin
     And I drag the planned workout "Easy 60" into the bin
     Then the bin in the menu counts 2 items
-    When I press "Bin"
+    When I press "Trash"
     Then the bin lists "Easy 60"
     When the simulated intervals.icu forgets the requests so far
-    And I press "Empty bin"
+    And I press "Empty trash"
     And I press "Delete permanently"
     Then intervals.icu received 2 requests "DELETE /api/v1/athlete/0/events/*"
     And the bin is empty

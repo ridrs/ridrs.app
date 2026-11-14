@@ -553,6 +553,7 @@ export {
   trainingUploadState,
 } from './training.ts';
 export {
+  type BinnedItem,
   isEntryBinned,
   isRideBinned,
   keyOfRemovable,

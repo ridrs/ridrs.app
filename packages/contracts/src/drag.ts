@@ -56,7 +56,9 @@ export type DraggedRoute = z.infer<typeof draggedRouteSchema>;
 
 /**
  * What the bin takes (ADR 0096): a planned entry of a provider's calendar, or a ride done with
- * every provider that has it. A title and a date to list it by.
+ * every provider that has it, each with a title and a date to list it by. Or something its source
+ * takes away itself (`dismissed`, a part of the next ride): the bin takes the drop as a move and
+ * keeps nothing, and the source sees the move in `dropEffect` on `dragend`.
  */
 export const removableSchema = z.discriminatedUnion('kind', [
   z
@@ -78,6 +80,7 @@ export const removableSchema = z.discriminatedUnion('kind', [
       date: localDateSchema,
     })
     .strict(),
+  z.object({ kind: z.literal('dismissed'), title: z.string() }).strict(),
 ]);
 
 export type Removable = z.infer<typeof removableSchema>;

@@ -2,13 +2,14 @@
 Feature: The next ride is prepared in the menu
   Under the entries of the main menu the rider prepares the next ride (ADR 0096): a workout dragged
   from the Training area and a route dragged from the Ride page are dropped onto it, and it is kept
-  across a restart. "Start next ride" opens the briefing with both fixed. A ride that finishes
-  with everything the next ride holds clears it; another ride leaves it.
+  across a restart. A part of it dragged onto the bin is taken out, and the bin keeps nothing of
+  it. The whole next ride is one control: pressing it opens the briefing with both fixed. A ride
+  that finishes with everything the next ride holds clears it; another ride leaves it.
 
   Here the routes are fixtures. It is Wednesday 4 November 2026.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-briefing, ui-route-profile, ui-workout-chart, ui-area-ride, ui-landscape-demo, ui-area-training, library-ridrs, profile-local, ui-settings, ui-next-ride" together with a test device plugin "test-device"
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-briefing, ui-route-profile, ui-workout-chart, ui-area-ride, ui-landscape-demo, ui-area-training, library-ridrs, profile-local, ui-settings, ui-next-ride, ui-recycle-bin" together with a test device plugin "test-device"
     And the briefing fixture routes are installed
     And the local time is "2026-11-04 08:00"
     And the athlete profile on this device holds an FTP of 250 W and a weight of 72 kg
@@ -19,7 +20,7 @@ Feature: The next ride is prepared in the menu
   Scenario: The next ride is empty at first and cannot be started
     Then the next ride holds no workout
     And the next ride holds no route
-    And the button "Start next ride" is disabled
+    And the next ride cannot be started yet
 
   Scenario: A workout and a route dropped onto the next ride are kept across a restart
     When I press "Training"
@@ -44,11 +45,17 @@ Feature: The next ride is prepared in the menu
     And I drag the workout "Gentle Waves" onto the next ride
     Then the next ride holds the workout "Gentle Waves"
 
-  Scenario: A workout is taken out of the next ride
+  Scenario: A part dragged onto the bin is taken out of the next ride
     When I press "Training"
     And I drag the workout "Sweet Spot 3×12" onto the next ride
-    And I press "Remove the workout from the next ride"
+    And I press "Ride"
+    And I drag the route "Short loop" onto the next ride
+    Then the next ride holds the workout "Sweet Spot 3×12"
+    And the next ride holds the route "Short loop"
+    When I drag the workout of the next ride onto the bin
     Then the next ride holds no workout
+    And the next ride holds the route "Short loop"
+    And the bin in the menu counts 0 items
 
   Scenario: Start next ride opens the briefing with both fixed, and the finished ride clears it
     When I press "Training"

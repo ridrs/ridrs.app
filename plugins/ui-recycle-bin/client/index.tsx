@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type BinnedItem,
   carries,
   DRAG_REMOVABLE,
   type Removable,
@@ -101,6 +102,8 @@ function BinEntryView({ ctx }: { readonly ctx: UiContext }) {
         if (!item) return;
         event.preventDefault();
         setOver(false);
+        // Its source takes it away itself, seeing the move on `dragend`; the bin keeps nothing.
+        if (item.kind === 'dismissed') return;
         ctx
           .call(trashPutService, { item })
           .catch((error: unknown) => ctx.logger.warn(`Could not put into the bin: ${String(error)}`));
@@ -168,9 +171,9 @@ function BinPageView({ ctx }: { readonly ctx: UiContext }) {
 
   const labelOf = (provider: string) =>
     calendars.get(provider)?.label ?? histories.get(provider)?.label ?? provider;
-  const providersOf = (item: Removable) =>
+  const providersOf = (item: BinnedItem) =>
     item.kind === 'calendar-entry' ? [item.provider] : item.removals.map((each) => each.provider);
-  const titleOf = (item: Removable) => item.title || item.date;
+  const titleOf = (item: BinnedItem) => item.title || item.date;
   const day = new Intl.DateTimeFormat(text.dateLocale, { weekday: 'short', day: 'numeric', month: 'short' });
   const dateOf = (date: string) => {
     const [year, month, dayOfMonth] = date.split('-').map(Number);

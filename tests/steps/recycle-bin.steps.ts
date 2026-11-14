@@ -32,6 +32,39 @@ Then('the last entry of the menu is {string}', async function (this: RidrsWorld,
   });
 });
 
+/** The rules of every style sheet of the page with `selector`, as one text each. */
+const rulesOf = (selector: RegExp): string[] =>
+  [...document.querySelectorAll('style')]
+    .map((sheet) => sheet.textContent ?? '')
+    .flatMap((css) =>
+      [...css.matchAll(new RegExp(`${selector.source}\\s*\\{([^}]*)\\}`, 'g'))].map(
+        (rule) => rule[1] ?? '',
+      ),
+    );
+
+Then('the bin is at the bottom of the menu', async function (this: RidrsWorld) {
+  const entry = await waitFor(() => {
+    const element = ui(this).querySelector<HTMLElement>('[data-recycle-bin]');
+    assert.ok(element, 'The menu has no bin');
+    return element;
+  });
+  assert.ok(entry.closest('.mm-footer'), "The bin is not in the menu's footer");
+  // The headless DOM has no layout: the rules say where the window shows it. The menu fills the
+  // height of its place, and the footer takes the space left above it.
+  assert.ok(
+    rulesOf(/\.ms-menu > \[data-contribution\]/).some((rule) => /height:\s*100%/.test(rule)),
+    'The menu does not fill the height of its place',
+  );
+  assert.ok(
+    rulesOf(/\.mm-nav/).some((rule) => /height:\s*100%/.test(rule)),
+    'The menu does not fill its contribution',
+  );
+  assert.ok(
+    rulesOf(/\.mm-footer/).some((rule) => /margin-top:\s*auto/.test(rule)),
+    'The footer is not pushed to the bottom',
+  );
+});
+
 Then('the bin in the menu counts {int} item(s)', async function (this: RidrsWorld, count: number) {
   await waitFor(() => {
     const entry = ui(this).querySelector<HTMLElement>('[data-recycle-bin]');

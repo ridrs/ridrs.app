@@ -445,7 +445,8 @@ Then('the next ride holds no {word}', async function (this: RidrsWorld, slot: st
   await waitFor(() => {
     const zone = nextRide(this).querySelector(`[data-next-ride-${slot}]`);
     assert.ok(zone, `The next ride has no place for a ${slot}`);
-    assert.equal(zone.querySelector('[data-next-ride-name]'), null, zone.textContent ?? '');
+    // A boolean, not the element: a failure must not print the whole headless DOM.
+    assert.ok(zone.querySelector('[data-next-ride-name]') === null, `It holds ${zone.textContent}`);
   });
 });
 
@@ -453,6 +454,28 @@ Then('the next ride reads {string}', async function (this: RidrsWorld, text: str
   await waitFor(() =>
     assert.ok(nextRide(this).textContent?.includes(text), nextRide(this).textContent ?? ''),
   );
+});
+
+When(
+  'I drag the {word} of the next ride onto the bin',
+  async function (this: RidrsWorld, slot: string) {
+    const part = await waitFor(() => {
+      const element = nextRide(this).querySelector<HTMLElement>(
+        `[data-next-ride-${slot}][draggable="true"]`,
+      );
+      assert.ok(element, `The next ride has no ${slot} to drag`);
+      return element;
+    });
+    await dragIntoBin(this, part);
+  },
+);
+
+Then('the next ride cannot be started yet', async function (this: RidrsWorld) {
+  await waitFor(() => {
+    const start =
+      within(nextRide(this)).queryByRole('button', { name: 'Start next ride' }) ?? nextRide(this);
+    assert.equal(start.getAttribute('aria-disabled'), 'true', 'The next ride can be started');
+  });
 });
 
 Then('the menu shows no next ride', async function (this: RidrsWorld) {

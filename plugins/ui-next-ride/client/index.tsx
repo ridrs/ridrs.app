@@ -2,6 +2,7 @@
 
 import {
   carries,
+  DRAG_REMOVABLE,
   DRAG_ROUTE,
   DRAG_WORKOUT,
   type DragData,
@@ -14,60 +15,82 @@ import {
   type RideBriefing,
   readDragged,
   routeOfferState,
+  setDragged,
   trainingCalendarState,
   trainingLibraryState,
 } from '@ridrs/contracts';
 import { iconStyle, reactComponent } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { useEffect, useState } from 'react';
+import { type DragEvent, useEffect, useId, useRef, useState } from 'react';
 import { openBriefing } from './briefing.ts';
 import { type Messages, messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
 const WORKOUT = new URL('./assets/icons/dumbbell.svg', import.meta.url).href;
 const ROUTE = new URL('./assets/icons/route.svg', import.meta.url).href;
-const REMOVE = new URL('./assets/icons/x.svg', import.meta.url).href;
 const PLAY = new URL('./assets/icons/play.svg', import.meta.url).href;
 
 /**
- * Under the menu's entries (ADR 0096): two places to drop a workout and a route onto, and the
- * button that starts the ride through the briefing. Narrow (medium) the places are icons; on the
- * bottom bar (compact) the next ride is not shown.
+ * Under the menu's entries (ADR 0096), without a frame of its own: a head with the play arrow and
+ * two places to drop a workout and a route onto. The whole of it is one control that starts the
+ * ride through the briefing. A filled place is dragged onto the bin to take it out. Narrow
+ * (medium) the places are icons; on the bottom bar (compact) the next ride is not shown.
  */
 const CSS = `
-.nr { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--ridrs-line, #24324d);
-  border-radius: 14px; background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa);
-  font: 14px system-ui, sans-serif; }
-.nr[data-armed] { border: 2px dashed var(--ridrs-info, #2aa8ff); padding: 11px; }
-.nr[data-over] { border-style: solid; background: rgb(18 48 78 / .96); }
-.nr-title { margin: 0; color: var(--ridrs-muted, #9aa8bf); font: 600 12px system-ui, sans-serif;
-  letter-spacing: .08em; text-transform: uppercase; }
-.nr-slot { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 8px; border-radius: 10px;
-  background: var(--ridrs-surface-2, #1c2840); }
-.nr-slot[data-empty] { border: 1px dashed var(--ridrs-line, #24324d); background: transparent;
-  color: var(--ridrs-muted, #9aa8bf); }
-.nr-glyph { flex: none; width: 18px; height: 18px; background: currentColor;
+.nr { --nr-cyan: var(--ridrs-info, #00f0ff); --nr-volt: var(--ridrs-accent, #ccff00);
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: 14px; cursor: pointer;
+  color: var(--ridrs-text, #f1f5f9); font: 14px system-ui, sans-serif; outline: none;
+  transition: background .15s; }
+.nr:hover:not([aria-disabled="true"]) { background: var(--ridrs-surface, #0d121c); }
+.nr:focus-visible { box-shadow: 0 0 0 3px var(--ridrs-focus, #00f0ff); }
+.nr[aria-disabled="true"] { cursor: default; }
+.nr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px; }
+.nr-title { margin: 0; color: var(--ridrs-text-muted, #8b9bb4); font: 700 11px system-ui, sans-serif;
+  letter-spacing: .14em; text-transform: uppercase; }
+.nr-play { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--nr-cyan), var(--nr-volt)); color: var(--ridrs-accent-text, #07090e);
+  box-shadow: 0 0 14px rgb(204 255 0 / .35); transition: transform .15s, box-shadow .15s; }
+.nr:hover:not([aria-disabled="true"]) .nr-play { transform: scale(1.08); box-shadow: 0 0 20px rgb(204 255 0 / .55); }
+.nr[aria-disabled="true"] .nr-play { background: var(--ridrs-surface-raised, #131b2a);
+  color: var(--ridrs-text-muted, #8b9bb4); box-shadow: none; }
+.nr-glyph { flex: none; width: 16px; height: 16px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
-.nr-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.nr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.nr-fact { color: var(--ridrs-muted, #9aa8bf); font-size: 12px; }
-.nr-fact[data-gone] { color: var(--ridrs-warn, #ffb020); }
-.nr-remove { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0;
-  border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
-.nr-remove:hover { background: var(--ridrs-surface, #131c2e); }
-.nr-start { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 12px;
-  border: 0; border-radius: 10px; background: var(--ridrs-volt, #c8ff2e); color: #0b1220;
-  font: 600 14px system-ui, sans-serif; cursor: pointer; }
-.nr-start:disabled { background: var(--ridrs-surface-2, #1c2840); color: var(--ridrs-muted, #9aa8bf); cursor: default; }
-.nr button:focus-visible { outline: 3px solid var(--ridrs-focus, #fff); outline-offset: 2px; }
-.nr-hidden, [data-breakpoint="medium"] .nr-title, [data-breakpoint="medium"] .nr-text,
-[data-breakpoint="medium"] .nr-start-label { position: absolute; width: 1px; height: 1px; overflow: hidden;
-  clip-path: inset(50%); white-space: nowrap; }
+.nr-play .nr-glyph { width: 14px; height: 14px; margin-left: 2px; }
+
+.nr-slot { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 10px;
+  border-radius: 12px; overflow: hidden; }
+.nr-badge { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
+.nr-text { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
+.nr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.nr-fact { color: var(--ridrs-text-muted, #8b9bb4); font-size: 12px; }
+.nr-fact[data-gone] { color: var(--ridrs-warn, #ffb62e); }
+
+/* An empty place: a dashed outline over faint stripes, its icon in a ring. */
+.nr-slot[data-empty] { color: var(--ridrs-text-muted, #8b9bb4); font-size: 12px;
+  background: repeating-linear-gradient(135deg, rgb(255 255 255 / .025) 0 6px, transparent 6px 12px);
+  outline: 1.5px dashed var(--ridrs-line, #1b2a3c); outline-offset: -1.5px; }
+.nr-slot[data-empty] .nr-badge { border: 1.5px solid currentColor; opacity: .7; }
+
+/* A filled place: a raised card with the gradient along its edge, its icon on the gradient. */
+.nr-slot:not([data-empty]) { background: var(--ridrs-surface-raised, #131b2a); cursor: grab; }
+.nr-slot:not([data-empty])::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: linear-gradient(180deg, var(--nr-cyan), var(--nr-volt)); }
+.nr-slot:not([data-empty]) .nr-badge { background: linear-gradient(135deg, rgb(0 240 255 / .18), rgb(204 255 0 / .18));
+  color: var(--nr-volt); }
+
+/* While a workout or a route is dragged: the places glow and their outline runs. */
+.nr[data-armed] .nr-slot { outline: 1.5px dashed var(--nr-cyan); outline-offset: -1.5px;
+  box-shadow: 0 0 0 1px rgb(0 240 255 / .15), 0 0 18px rgb(0 240 255 / .18); animation: nr-pulse 1.2s ease-in-out infinite; }
+.nr[data-over] .nr-slot { outline: 2px solid var(--nr-volt); box-shadow: 0 0 22px rgb(204 255 0 / .35); animation: none; }
+@keyframes nr-pulse { 50% { box-shadow: 0 0 0 1px rgb(0 240 255 / .3), 0 0 26px rgb(0 240 255 / .3); } }
+@media (prefers-reduced-motion: reduce) { .nr, .nr-play { transition: none; } .nr[data-armed] .nr-slot { animation: none; } }
+
 [data-breakpoint="medium"] .nr { align-items: center; padding: 8px 4px; }
-[data-breakpoint="medium"] .nr-slot { justify-content: center; width: 44px; padding: 6px 0; }
-[data-breakpoint="medium"] .nr-remove { display: none; }
-[data-breakpoint="medium"] .nr-start { width: 44px; padding: 8px 0; }
+[data-breakpoint="medium"] .nr-head { justify-content: center; }
+[data-breakpoint="medium"] .nr-title, [data-breakpoint="medium"] .nr-text { position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+[data-breakpoint="medium"] .nr-slot { justify-content: center; width: 48px; padding: 8px 0; }
 [data-breakpoint="compact"] [data-next-ride] { display: none; }
 `;
 
@@ -82,7 +105,7 @@ function dropped(current: NextRide, data: DragData | null): NextRide | undefined
 /** Whether a drag carries something the next ride takes: all a target sees while it hovers. */
 const takes = (data: DragData | null) => carries(data, DRAG_WORKOUT) || carries(data, DRAG_ROUTE);
 
-/** What "Start next ride" fixes in the briefing: the workout the briefing finds, and the route. */
+/** What starting the next ride fixes in the briefing: the workout the briefing finds, and the route. */
 function fixedOf(next: NextRide): RideBriefing {
   const { workout, route } = next;
   return {
@@ -96,39 +119,59 @@ function fixedOf(next: NextRide): RideBriefing {
 }
 
 function Slot({
+  id,
   icon,
   name,
   fact,
   gone,
   empty,
-  removeLabel,
-  onRemove,
   text,
   attribute,
+  onTakenOut,
 }: {
+  readonly id: string;
   readonly icon: string;
   readonly name: string | undefined;
   readonly fact: string | undefined;
   readonly gone: boolean;
   readonly empty: string;
-  readonly removeLabel: string;
-  readonly onRemove: () => void;
   readonly text: Messages;
   readonly attribute: string;
+  readonly onTakenOut: () => void;
 }) {
   const marker = { [attribute]: '' };
   if (name === undefined) {
     return (
-      <div className="nr-slot" data-empty {...marker}>
-        <span className="nr-glyph" aria-hidden="true" style={iconStyle(icon)} />
-        <span className="nr-text">{empty}</span>
-      </div>
+      <span className="nr-slot" data-empty {...marker}>
+        <span className="nr-badge">
+          <span className="nr-glyph" aria-hidden="true" style={iconStyle(icon)} />
+        </span>
+        <span className="nr-text" id={id}>
+          {empty}
+        </span>
+      </span>
     );
   }
   return (
-    <div className="nr-slot" {...marker} title={name}>
-      <span className="nr-glyph" aria-hidden="true" style={iconStyle(icon)} />
-      <span className="nr-text">
+    <span
+      className="nr-slot"
+      {...marker}
+      title={`${name} · ${text.dragToBin}`}
+      draggable
+      onDragStart={(event: DragEvent<HTMLElement>) => {
+        // The bin takes it as a move and keeps nothing: this place takes it out on `dragend`.
+        event.dataTransfer?.setData('text/plain', name);
+        setDragged(event.dataTransfer, DRAG_REMOVABLE, { kind: 'dismissed', title: name });
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragEnd={(event: DragEvent<HTMLElement>) => {
+        if (event.dataTransfer?.dropEffect === 'move') onTakenOut();
+      }}
+    >
+      <span className="nr-badge">
+        <span className="nr-glyph" aria-hidden="true" style={iconStyle(icon)} />
+      </span>
+      <span className="nr-text" id={id}>
         <span className="nr-name" data-next-ride-name>
           {name}
         </span>
@@ -140,16 +183,17 @@ function Slot({
           <span className="nr-fact">{fact}</span>
         ) : null}
       </span>
-      <button type="button" className="nr-remove" aria-label={removeLabel} onClick={onRemove}>
-        <span className="nr-glyph" aria-hidden="true" style={iconStyle(REMOVE)} />
-      </button>
-    </div>
+    </span>
   );
 }
 
 function NextRideView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
+  const ids = useId();
   const next = useStateEntries(ctx, nextRideState).get(NEXT_RIDE_KEY) ?? {};
+  // A drag outlives the render it started in: taking a part out goes by the next ride of now.
+  const latest = useRef(next);
+  latest.current = next;
   const libraries = useStateEntries(ctx, trainingLibraryState);
   const calendars = useStateEntries(ctx, trainingCalendarState);
   const offers = useStateEntries(ctx, routeOfferState);
@@ -157,7 +201,7 @@ function NextRideView({ ctx }: { readonly ctx: UiContext }) {
   const [armed, setArmed] = useState(false);
   const [over, setOver] = useState(false);
   useEffect(() => {
-    const start = (event: DragEvent) => setArmed(takes(event.dataTransfer));
+    const start = (event: globalThis.DragEvent) => setArmed(takes(event.dataTransfer));
     const end = () => {
       setArmed(false);
       setOver(false);
@@ -195,14 +239,28 @@ function NextRideView({ ctx }: { readonly ctx: UiContext }) {
   const km = offer
     ? new Intl.NumberFormat(text.numberLocale, { maximumFractionDigits: 1 }).format(offer.distance / 1000)
     : undefined;
+  const startable = workout !== undefined || route !== undefined;
+  const start = () => {
+    if (startable) openBriefing(ctx, fixedOf(next));
+  };
 
   return (
-    <section
+    <div
       className="nr"
+      role="button"
+      tabIndex={0}
       data-next-ride
-      aria-label={text.nextRide}
+      aria-label={text.start}
+      aria-describedby={`${ids}-workout ${ids}-route`}
+      aria-disabled={!startable}
       data-armed={armed || undefined}
       data-over={(armed && over) || undefined}
+      onClick={start}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        start();
+      }}
       onDragOver={(event) => {
         if (!takes(event.dataTransfer)) return;
         event.preventDefault();
@@ -219,41 +277,41 @@ function NextRideView({ ctx }: { readonly ctx: UiContext }) {
       }}
     >
       <style>{CSS}</style>
-      <h2 className="nr-title">{text.nextRide}</h2>
+      <span className="nr-head">
+        <span className="nr-title">{text.nextRide}</span>
+        <span className="nr-play" aria-hidden="true">
+          <span className="nr-glyph" style={iconStyle(PLAY)} />
+        </span>
+      </span>
       <Slot
+        id={`${ids}-workout`}
         icon={WORKOUT}
         name={workout?.name}
         fact={seconds === undefined ? undefined : text.minutes(Math.round(seconds / 60))}
         gone={workoutGone}
         empty={text.dropWorkout}
-        removeLabel={text.removeWorkout}
-        onRemove={() => set({ ...(route ? { route } : {}) })}
         text={text}
         attribute="data-next-ride-workout"
+        onTakenOut={() => {
+          const { route: now } = latest.current;
+          set(now ? { route: now } : {});
+        }}
       />
       <Slot
+        id={`${ids}-route`}
         icon={ROUTE}
         name={route?.title}
         fact={km === undefined ? undefined : text.kilometres(km)}
         gone={routeGone}
         empty={text.dropRoute}
-        removeLabel={text.removeRoute}
-        onRemove={() => set({ ...(workout ? { workout } : {}) })}
         text={text}
         attribute="data-next-ride-route"
+        onTakenOut={() => {
+          const { workout: now } = latest.current;
+          set(now ? { workout: now } : {});
+        }}
       />
-      <button
-        type="button"
-        className="nr-start"
-        data-next-ride-start
-        aria-label={text.start}
-        disabled={!workout && !route}
-        onClick={() => openBriefing(ctx, fixedOf(next))}
-      >
-        <span className="nr-glyph" aria-hidden="true" style={iconStyle(PLAY)} />
-        <span className="nr-start-label">{text.start}</span>
-      </button>
-    </section>
+    </div>
   );
 }
 
