@@ -1,0 +1,57 @@
+{
+  "id": "ui-recycle-bin",
+  "name": "Recycle Bin",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "state": {
+    "owns": [
+      "trash.item"
+    ]
+  },
+  "services": {
+    "provides": [
+      "trash.put",
+      "trash.restore",
+      "trash.purge"
+    ],
+    "calls": [
+      "training.calendar.remove",
+      "training.history.remove"
+    ]
+  },
+  "ui": {
+    "client": "client/index.tsx",
+    "screens": [
+      {
+        "id": "trash",
+        "export": "BinPage"
+      }
+    ],
+    "contributions": [
+      {
+        "id": "bin",
+        "extensionPoint": "menu/footer",
+        "export": "BinEntry"
+      }
+    ],
+    "state": [
+      "app.language",
+      "trash.item",
+      "training.calendar",
+      "training.history"
+    ],
+    "calls": [
+      "trash.put",
+      "trash.restore",
+      "trash.purge"
+    ]
+  }
+}

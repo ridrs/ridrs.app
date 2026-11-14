@@ -6,6 +6,7 @@ import { useLanguage } from '@ridrs/ui-sdk/react';
 import {
   type CSSProperties,
   createContext,
+  type DragEvent,
   type ReactNode,
   useContext,
   useEffect,
@@ -264,6 +265,8 @@ export interface CardProps {
   readonly testId?: string;
   /** Below the details: a progress bar, buttons. */
   readonly children?: ReactNode;
+  /** Makes the card draggable: it puts what it stands for into the drag (ADR 0096). */
+  readonly onDragStart?: (event: DragEvent<HTMLElement>) => void;
 }
 
 /**
@@ -282,6 +285,7 @@ export function Card({
   label,
   testId,
   children,
+  onDragStart,
 }: CardProps) {
   const facts = details.filter(
     (detail): detail is string | CardFact => detail !== undefined && detail !== '',
@@ -316,6 +320,8 @@ export function Card({
       aria-label={label ?? classifier}
       data-testid={testId}
       data-media={image === undefined && backdrop === undefined ? undefined : ''}
+      draggable={onDragStart ? true : undefined}
+      onDragStart={onDragStart}
     >
       <style>{PREVIEW_CSS}</style>
       {image ? <img className="pv-teaser-image" src={image} alt="" decoding="async" /> : null}

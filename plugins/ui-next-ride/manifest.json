@@ -1,0 +1,45 @@
+{
+  "id": "ui-next-ride",
+  "name": "Next Ride",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "persistence": [
+    "user"
+  ],
+  "state": {
+    "owns": [
+      "ride.next"
+    ]
+  },
+  "services": {
+    "provides": [
+      "ride.next-set"
+    ]
+  },
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "next-ride",
+        "extensionPoint": "menu/section",
+        "export": "NextRideSection"
+      }
+    ],
+    "state": [
+      "app.language",
+      "ride.next",
+      "route.offer",
+      "training.calendar",
+      "training.library"
+    ],
+    "calls": [
+      "ride.next-set",
+      "ride.briefing-set"
+    ]
+  }
+}

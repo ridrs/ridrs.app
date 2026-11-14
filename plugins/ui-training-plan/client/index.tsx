@@ -16,6 +16,9 @@ import {
   trainingConnectService,
   trainingDisconnectService,
   trainingRefreshService,
+  type TrashItem,
+  trashItemState,
+  withoutBinned,
 } from '@ridrs/contracts';
 import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
@@ -69,8 +72,11 @@ function useTraining(ctx: UiContext): {
   const [calendars, setCalendars] = useState<ReadonlyMap<string, DataSource<TrainingCalendar>>>(new Map());
   const [profiles, setProfiles] = useState<ReadonlyMap<string, DataSource<AthleteProfile>>>(new Map());
   const [chosen, setChosen] = useState<string>();
+  // A planned workout in the bin (ADR 0096) is not the next one.
+  const [bin, setBin] = useState<ReadonlyMap<string, TrashItem>>(new Map());
   useLayoutEffect(() => {
     const subscriptions = [
+      ctx.state.watch(trashItemState, ({ entries }) => setBin(new Map(entries))),
       ctx.state.watch(trainingAccountState, ({ entries }) => setAccount(entries.get(SERVICE))),
       ctx.state.watch(trainingCalendarState, ({ entries }) => setCalendars(new Map(entries))),
       ctx.state.watch(athleteProfileState, ({ entries }) => setProfiles(new Map(entries))),
@@ -82,7 +88,7 @@ function useTraining(ctx: UiContext): {
   }, [ctx]);
   // The chosen source; where it offers no calendar at all, the service this plugin is for.
   const source = chosen !== undefined && calendars.has(chosen) ? chosen : SERVICE;
-  const calendar = calendars.get(source);
+  const calendar = withoutBinned(calendars, bin).get(source);
   const profile = profiles.get(source);
   const plan = calendar?.data
     ? {

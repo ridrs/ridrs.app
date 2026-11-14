@@ -23,7 +23,7 @@ import { type DetailsRequest, focusBack, focusKeyProps, OpenDetails, WorkoutDeta
 import { WorkoutEditorView } from './editor.tsx';
 import { messages } from './i18n/index.ts';
 import { catalogueMessages } from './i18n/catalogue.ts';
-import { Bin, MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
+import { MonthCalendar, startDrag, WEEK_CSS, type Week, WeekCalendar, useWeek } from './week.tsx';
 import { CHART_SLOT_CSS, type ChartAthlete, chartWorkout, useChartAthlete, WorkoutChartSlot } from './workout-chart.tsx';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour. */
@@ -74,7 +74,9 @@ function LibraryCard({
       className="pv-card tr-draggable tr-library-card"
       draggable
       data-library-workout={workout.id}
-      onDragStart={startDrag({ kind: 'library', provider, workoutId: workout.id, name: workout.name }, setDrag)}
+      onDragStart={startDrag({ kind: 'library', provider, workoutId: workout.id, name: workout.name }, setDrag, {
+        workout: { kind: 'library', from: provider, workoutId: workout.id, name: workout.name },
+      })}
       onDragEnd={() => setDrag(undefined)}
     >
       {/* The card is one focus target: Enter opens the details (nothing opens without their plugin). */}
@@ -394,7 +396,6 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
         <CreateWorkout.Provider value={createWorkout}>
 <OpenDetails.Provider value={open}>
           <MonthCalendar ctx={ctx} week={week} />
-          <Bin ctx={ctx} week={week} />
         </OpenDetails.Provider>
 </CreateWorkout.Provider>
       </div>
@@ -480,7 +481,6 @@ function TrainingAreaView({ ctx }: { readonly ctx: UiContext }) {
           <span className="pv-muted">{text.suggestionLater}</span>
         </article>
       </section>
-      <Bin ctx={ctx} week={week} />
     </AreaPage>
     </OpenDetails.Provider>
 </CreateWorkout.Provider>

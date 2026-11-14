@@ -5,9 +5,15 @@ import type { UiContext } from '@ridrs/ui-sdk';
 import { useCallback, useSyncExternalStore } from 'react';
 
 /** Reads the value and changes it; every change is kept at once, without a Save. */
-export type UseUserDocument<T> = (
+export type UseUserDocument<T> = ((
   ctx: UiContext,
-) => readonly [T, (change: (current: T) => T) => void];
+) => readonly [T, (change: (current: T) => T) => void]) & {
+  /**
+   * Reads the document again, for a change the plugin's host side made to it (ADR 0096); the
+   * value read replaces the one shown.
+   */
+  reload(ctx: UiContext): Promise<void>;
+};
 
 interface Store<T> {
   value: T;
@@ -64,22 +70,30 @@ export function userDocument<T>(document: SettingsDocument<T>, initial: T): UseU
     for (const listener of [...store.listeners]) listener();
   };
 
-  return (ctx) => {
+  const reload = async (ctx: UiContext) => {
     const store = storeOf(ctx);
-    const current = useSyncExternalStore(store.subscribe, () => store.value);
-    const change = useCallback(
-      (update: (current: T) => T) => {
-        store.changed = true;
-        const next = update(store.value);
-        set(store, next);
-        store.settings
-          .write(next)
-          .catch((error: unknown) =>
-            ctx.logger.warn(`Could not keep "${document.name}": ${String(error)}`),
-          );
-      },
-      [ctx, store],
-    );
-    return [current, change] as const;
+    const stored = await store.settings.read();
+    if (stored !== undefined) set(store, stored);
   };
+  return Object.assign(
+    (ctx: UiContext) => {
+      const store = storeOf(ctx);
+      const current = useSyncExternalStore(store.subscribe, () => store.value);
+      const change = useCallback(
+        (update: (current: T) => T) => {
+          store.changed = true;
+          const next = update(store.value);
+          set(store, next);
+          store.settings
+            .write(next)
+            .catch((error: unknown) =>
+              ctx.logger.warn(`Could not keep "${document.name}": ${String(error)}`),
+            );
+        },
+        [ctx, store],
+      );
+      return [current, change] as const;
+    },
+    { reload },
+  );
 }

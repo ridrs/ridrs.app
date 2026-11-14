@@ -16,7 +16,9 @@
         "extensionPoint": "main/menu",
         "export": "MainMenu",
         "extensionPoints": [
-          "menu/item"
+          "menu/item",
+          "menu/section",
+          "menu/footer"
         ]
       }
     ],

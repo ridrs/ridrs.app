@@ -179,6 +179,21 @@ export {
   type RidrsErrorCode,
 } from './diagnostics.ts';
 export {
+  carries,
+  DRAG_REMOVABLE,
+  DRAG_ROUTE,
+  DRAG_WORKOUT,
+  type DragData,
+  type DraggedRoute,
+  type DraggedWorkout,
+  draggedRouteSchema,
+  draggedWorkoutSchema,
+  type Removable,
+  readDragged,
+  removableSchema,
+  setDragged,
+} from './drag.ts';
+export {
   type ActivityEquipmentPayload,
   activityEquipmentEvent,
   type Bicycle,
@@ -314,6 +329,14 @@ export {
   type WebSocketConnection,
   type WebSocketListener,
 } from './net.ts';
+export {
+  NEXT_RIDE_KEY,
+  type NextRide,
+  nextRideSchema,
+  nextRideSetService,
+  nextRideState,
+  rodeNextRide,
+} from './next-ride.ts';
 export {
   type BicycleCapability,
   type BicycleParameters,
@@ -529,6 +552,20 @@ export {
   trainingUploadService,
   trainingUploadState,
 } from './training.ts';
+export {
+  isEntryBinned,
+  isRideBinned,
+  keyOfRemovable,
+  TRASH_PURGE_REASONS,
+  type TrashItem,
+  trashItemSchema,
+  trashItemState,
+  trashPurgeFailureSchema,
+  trashPurgeService,
+  trashPutService,
+  trashRestoreService,
+  withoutBinned,
+} from './trash.ts';
 export {
   type UiManifestSection,
   type UiRegistry,

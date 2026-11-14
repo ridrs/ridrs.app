@@ -40,7 +40,8 @@
       "training.account",
       "athlete.profile",
       "data.source",
-      "training.calendar"
+      "training.calendar",
+      "trash.item"
     ],
     "calls": [
       "training.connect",

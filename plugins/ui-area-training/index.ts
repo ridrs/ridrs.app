@@ -10,13 +10,15 @@ import {
   trainingCalendarState,
   trainingLibraryState,
 } from '@ridrs/contracts';
-import { localToday, plannedWorkouts } from './client/calendar.ts';
+import { localToday, plannedWorkouts, removeEntry } from './client/calendar.ts';
 import { INITIAL_TRAINING, TRAINING_DOCUMENT } from './document.ts';
 
 // Most of this plugin lives in its client module (see `ui` in the manifest). The host side is
 // the provider `ridrs` of the data type `training.calendar` (ADR 0075): the workouts of the
 // area's calendar, read from its document at start and handed over by the client after every
-// change. Only the area edits the calendar, so the provider is read only for everyone else.
+// change. Only the area edits the calendar, so the provider is read only for everyone else, with
+// one exception: the bin (ADR 0096) deletes an entry the rider put into it through
+// `training.calendar.remove`; the area reads its document again once the entry left the bin.
 export default definePlugin({
   async start(ctx) {
     const publish = (workouts: PlannedWorkout[]) =>
@@ -53,7 +55,13 @@ export default definePlugin({
     const refuse = () => ({ ok: false as const, reason: 'read-only' as const });
     ctx.services.provide(trainingCalendarPlanService, refuse);
     ctx.services.provide(trainingCalendarMoveService, refuse);
-    ctx.services.provide(trainingCalendarRemoveService, refuse);
+    ctx.services.provide(trainingCalendarRemoveService, async ({ id }) => {
+      const document = ctx.settings.user(TRAINING_DOCUMENT);
+      const kept = (await document.read()) ?? INITIAL_TRAINING;
+      await document.write({ ...kept, calendar: removeEntry(kept.calendar, id) as typeof kept.calendar });
+      await publishDocument();
+      return { ok: true as const };
+    });
     ctx.services.provide(trainingCalendarHandOverService, ({ workouts }) => {
       publish(workouts);
       return {};

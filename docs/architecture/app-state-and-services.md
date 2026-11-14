@@ -71,6 +71,8 @@ The recorder observes the bus ([recording-and-replay.md](recording-and-replay.md
 | `export-fit` | `export.fit` (session); watches `recording.ride` | — | `ui-debriefing`, `ui-tile-ride-start` |
 | device plugins (`@ridrs/ble-peripheral`) | `device.status` (`<plugin id>/<kind>/<n>`) | `device.connect`, `device.forget`, `device.discover` (`device.status`) | `ui-devices` |
 | `transport-ble-bridge` | `bridge.state`, `bridge.companions`, `bridge.pairing` (plugin id) | `bridge.pair`, `bridge.connect`, `bridge.disconnect`, `bridge.forget` | `ui-devices`, `ui-bridge-pairing` |
+| `ui-next-ride` | `ride.next` (`next`, ADR 0096); kept as the user document `next-ride`, cleared by a finished ride that rode it | `ride.next-set` (`ride.next`) | `ui-next-ride` |
+| `ui-recycle-bin` | `trash.item` (`calendar-entry:<provider>:<id>`, `done-ride:<provider>:<id>`, ADR 0096); kept as the user document `recycle-bin` | `trash.put`, `trash.restore`, `trash.purge` (calls `training.calendar.remove`, `training.history.remove`) | `ui-area-training`, `ui-training-plan`, `ui-briefing` (hide what it holds) |
 
 ## Data sources (ADR 0075)
 

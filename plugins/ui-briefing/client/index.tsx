@@ -26,9 +26,11 @@ import {
   type UiCapabilityInput,
   type Workout,
   workoutChartCapability,
+  trashItemState,
+  withoutBinned,
 } from '@ridrs/contracts';
 import { localizeNumber, type UiCapabilityHandle, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
-import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
+import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { defaultPowerZones, type WorkoutAthlete, type WorkoutMetrics, workoutMetrics } from '@ridrs/workout';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -314,7 +316,12 @@ function Loaded({
   const workoutMissing = found.state === 'missing' && !loadingWorkout;
   const routeOpen = answers.world === undefined || routeMissing || editing === 'route';
   const workoutOpen = answers.workout === undefined || workoutMissing || editing === 'workout';
-  const options = useMemo(() => workoutOptions(libraries, calendars, localDate(Date.now())), [libraries, calendars]);
+  // What is in the bin (ADR 0096) is not offered; a pick of it is still found.
+  const bin = useStateEntries(ctx, trashItemState);
+  const options = useMemo(
+    () => workoutOptions(libraries, withoutBinned(calendars, bin), localDate(Date.now())),
+    [libraries, calendars, bin],
+  );
   const sortedOffers = useMemo(() => [...offers].sort((a, b) => a.title.localeCompare(b.title)), [offers]);
 
   const metrics = useMemo(

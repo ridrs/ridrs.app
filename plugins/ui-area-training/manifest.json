@@ -54,14 +54,13 @@
       "data.source",
       "training.calendar",
       "training.history",
-      "training.library"
+      "training.library",
+      "trash.item"
     ],
     "calls": [
       "training.calendar.hand-over",
       "training.calendar.plan",
       "training.calendar.move",
-      "training.calendar.remove",
-      "training.history.remove",
       "training.library.load",
       "training.library.save",
       "training.range.load"

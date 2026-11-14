@@ -12,7 +12,7 @@ Feature: The Training area shows the workouts that were done
   2026.
 
   Background:
-    Given the ridrs plugins "activity-session, recording-session, export-fit, history-ridrs, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-debriefing, ui-settings, ui-area-training, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan" together with the simulated intervals.icu
+    Given the ridrs plugins "activity-session, recording-session, export-fit, history-ridrs, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-debriefing, ui-settings, ui-area-training, ui-area-me, profile-local, planner-intervals-icu, ui-training-plan, ui-recycle-bin" together with the simulated intervals.icu
     And a test device plugin "test-device"
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And the local time is "2026-11-04 08:00"
@@ -118,7 +118,9 @@ Feature: The Training area shows the workouts that were done
     Then the calendar day "Wednesday" shows 1 done ride
     When I drag the ride "Ride" into the bin
     Then the calendar day "Wednesday" shows 0 done rides
-    When ridrs restarted
+    When I press "Bin"
+    And I delete "Ride" permanently from the bin
+    And ridrs restarted
     And I reload the UI
     And I press "Training"
     Then the calendar day "Wednesday" shows 0 done rides
@@ -141,5 +143,8 @@ Feature: The Training area shows the workouts that were done
     And I press "Training"
     And the simulated intervals.icu forgets the requests so far
     And I drag the ride "Evening spin" into the bin
+    Then the calendar day "Wednesday" shows 0 done rides
+    When I press "Bin"
+    And I delete "Evening spin" permanently from the bin
     Then intervals.icu received 1 requests "DELETE /api/v1/activity/*"
-    And the calendar day "Wednesday" shows 0 done rides
+    And the bin is empty

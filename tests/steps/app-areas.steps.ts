@@ -11,6 +11,7 @@ import {
   trainingLibraryState,
 } from '@ridrs/contracts';
 import { createEvent, fireEvent, waitFor, within } from '@testing-library/dom';
+import { type DragTransfer, dragTransfer } from '../support/drag-transfer.ts';
 import type { RidrsWorld } from '../support/world.ts';
 import { splitCsv } from './devices-and-metrics.steps.ts';
 
@@ -259,17 +260,43 @@ Then(
   },
 );
 
-/** Drags `source` onto the calendar day `day`, as the pointer does: start, over, drop, end. */
-async function dragOnto(world: RidrsWorld, source: HTMLElement, day: string): Promise<void> {
-  const target = calendarDay(world, day);
-  fireEvent.dragStart(source);
+/** The `dataTransfer` of the drag on its way: every event of one drag gets the same. */
+const transfers = new WeakMap<RidrsWorld, DragTransfer>();
+
+type DragEventName = 'dragStart' | 'dragOver' | 'drop' | 'dragEnd';
+
+/** Fires one event of the drag on its way at `element`, with the drag's data; `true` when it was taken. */
+function fireDrag(world: RidrsWorld, name: DragEventName, element: HTMLElement): boolean {
+  let transfer = transfers.get(world);
+  if (!transfer || name === 'dragStart') {
+    transfer = dragTransfer();
+    transfers.set(world, transfer);
+  }
+  const event = createEvent[name](element);
+  Object.defineProperty(event, 'dataTransfer', { value: transfer });
+  return !fireEvent(element, event);
+}
+
+/** Drags `source` onto `target`, as the pointer does: start, over, drop where it was taken, end. */
+async function dragOntoElement(
+  world: RidrsWorld,
+  source: HTMLElement,
+  target: () => HTMLElement,
+): Promise<void> {
+  fireDrag(world, 'dragStart', source);
   await world.settle();
-  fireEvent.dragOver(target);
+  const over = target();
+  const taken = fireDrag(world, 'dragOver', over);
   await world.settle();
-  fireEvent.drop(target);
-  fireEvent.dragEnd(source);
+  // The web view drops only where the drag over was taken.
+  if (taken) fireDrag(world, 'drop', over);
+  fireDrag(world, 'dragEnd', source);
   await world.settle();
 }
+
+/** Drags `source` onto the calendar day `day`. */
+const dragOnto = (world: RidrsWorld, source: HTMLElement, day: string): Promise<void> =>
+  dragOntoElement(world, source, () => calendarDay(world, day));
 
 /** The element to drag, once the screen has it. */
 const draggable = (world: RidrsWorld, selector: string, name: string): Promise<HTMLElement> =>
@@ -295,16 +322,19 @@ When(
   },
 );
 
-/** The bin a dragged entry of the calendar is dropped into, while the screen shows it. */
-const bin = (world: RidrsWorld): HTMLElement | null =>
-  shownScreen(world).querySelector<HTMLElement>('[data-calendar-bin]');
+/** The bin of the menu (ADR 0096), a drop target while something it takes is dragged. */
+const bin = (world: RidrsWorld): HTMLElement => {
+  const element = ui(world).querySelector<HTMLElement>('[data-recycle-bin]');
+  assert.ok(element, 'The menu has no bin');
+  return element;
+};
 
 /** The element a drag was started on, ended by `I end the drag`. */
 const dragged = new WeakMap<RidrsWorld, HTMLElement>();
 
 async function startDragging(world: RidrsWorld, source: HTMLElement): Promise<void> {
   dragged.set(world, source);
-  fireEvent.dragStart(source);
+  fireDrag(world, 'dragStart', source);
   await world.settle();
 }
 
@@ -322,24 +352,13 @@ When('I start dragging the workout {string}', async function (this: RidrsWorld, 
 When('I end the drag', async function (this: RidrsWorld) {
   const source = dragged.get(this);
   assert.ok(source, 'Nothing is being dragged');
-  fireEvent.dragEnd(source);
+  fireDrag(this, 'dragEnd', source);
   await this.settle();
 });
 
-/** Drags `source` into the bin, once the drag has shown it. */
-async function dragIntoBin(world: RidrsWorld, source: HTMLElement): Promise<void> {
-  await startDragging(world, source);
-  const target = await waitFor(() => {
-    const element = bin(world);
-    assert.ok(element, 'No bin is shown');
-    return element;
-  });
-  fireEvent.dragOver(target);
-  await world.settle();
-  fireEvent.drop(target);
-  fireEvent.dragEnd(source);
-  await world.settle();
-}
+/** Drags `source` into the bin of the menu. */
+const dragIntoBin = (world: RidrsWorld, source: HTMLElement): Promise<void> =>
+  dragOntoElement(world, source, () => bin(world));
 
 /** A ride done, as the calendar lists it: draggable, but only into the bin. */
 const RIDE = 'li[data-done][draggable="true"]';
@@ -366,31 +385,86 @@ When(
   },
 );
 
-Then('the page shows the bin {string}', async function (this: RidrsWorld, label: string) {
-  await waitFor(() => assert.equal(bin(this)?.textContent?.trim(), label));
-});
-
-Then('the page shows no bin', async function (this: RidrsWorld) {
-  await waitFor(() => assert.ok(!bin(this), 'A bin is shown'));
-});
-
-Then('the bin is at the bottom of the window', async function (this: RidrsWorld) {
-  const element = await waitFor(() => {
-    const shown = bin(this);
-    assert.ok(shown, 'No bin is shown');
-    return shown;
+Then('the bin in the menu takes it with {string}', async function (this: RidrsWorld, hint: string) {
+  await waitFor(() => {
+    const element = bin(this);
+    assert.equal(element.dataset.armed, 'true', 'The bin takes nothing');
+    assert.equal(element.querySelector('[data-bin-hint]')?.textContent?.trim(), hint);
   });
-  assert.ok(!element.closest('[data-week-start], [data-month]'), 'The bin is inside the calendar');
-  // The headless DOM has no layout, and its `getComputedStyle` takes gigabytes over the app's
-  // style sheets: the rule of the bin says where the window shows it.
+});
+
+Then('the bin in the menu takes nothing', async function (this: RidrsWorld) {
+  await waitFor(() => assert.equal(bin(this).dataset.armed, undefined, 'The bin takes a drag'));
+});
+
+/** The next ride of the menu (ADR 0096). */
+const nextRide = (world: RidrsWorld): HTMLElement => {
+  const element = ui(world).querySelector<HTMLElement>('[data-next-ride]');
+  assert.ok(element, 'The menu has no next ride');
+  return element;
+};
+
+/** Drags `source` onto the next ride of the menu. */
+const dragOntoNextRide = (world: RidrsWorld, source: HTMLElement): Promise<void> =>
+  dragOntoElement(world, source, () => nextRide(world));
+
+When(
+  'I drag the workout {string} onto the next ride',
+  async function (this: RidrsWorld, name: string) {
+    await dragOntoNextRide(this, await draggable(this, 'article[draggable="true"]', name));
+  },
+);
+
+When(
+  'I drag the planned workout {string} onto the next ride',
+  async function (this: RidrsWorld, name: string) {
+    await dragOntoNextRide(this, await draggable(this, 'li[draggable="true"]', name));
+  },
+);
+
+When(
+  'I drag the route {string} onto the next ride',
+  async function (this: RidrsWorld, title: string) {
+    await dragOntoNextRide(this, await draggable(this, 'article[draggable="true"]', title));
+  },
+);
+
+Then(
+  'the next ride holds the {word} {string}',
+  async function (this: RidrsWorld, slot: string, name: string) {
+    await waitFor(() =>
+      assert.equal(
+        nextRide(this).querySelector(`[data-next-ride-${slot}] [data-next-ride-name]`)?.textContent,
+        name,
+      ),
+    );
+  },
+);
+
+Then('the next ride holds no {word}', async function (this: RidrsWorld, slot: string) {
+  await waitFor(() => {
+    const zone = nextRide(this).querySelector(`[data-next-ride-${slot}]`);
+    assert.ok(zone, `The next ride has no place for a ${slot}`);
+    assert.equal(zone.querySelector('[data-next-ride-name]'), null, zone.textContent ?? '');
+  });
+});
+
+Then('the next ride reads {string}', async function (this: RidrsWorld, text: string) {
+  await waitFor(() =>
+    assert.ok(nextRide(this).textContent?.includes(text), nextRide(this).textContent ?? ''),
+  );
+});
+
+Then('the menu shows no next ride', async function (this: RidrsWorld) {
+  const element = await waitFor(() => nextRide(this));
+  await waitFor(() =>
+    assert.ok(element.closest('[data-breakpoint="compact"]'), 'The menu is not narrow'),
+  );
+  // The headless DOM has no layout: the next ride's own rule hides it on the narrow menu.
   const rules = [...document.querySelectorAll('style')]
     .map((sheet) => sheet.textContent ?? '')
-    .flatMap((css) => [...css.matchAll(/\.tw-bin\s*\{([^}]*)\}/g)].map((rule) => rule[1] ?? ''));
-  assert.ok(element.classList.contains('tw-bin'), 'The bin has no rule of its own');
-  assert.ok(
-    rules.some((rule) => /position:\s*fixed/.test(rule) && /bottom:/.test(rule)),
-    'The bin is not fixed to the bottom of the window',
-  );
+    .join('\n');
+  assert.match(rules, /\[data-breakpoint="compact"\] \[data-next-ride\]\s*\{[^}]*display:\s*none/);
 });
 
 Then('the Training area has no button {string}', function (this: RidrsWorld, name: string) {

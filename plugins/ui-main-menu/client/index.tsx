@@ -17,7 +17,9 @@ const LOGO_MARK = new URL('./assets/logo-mark.svg', import.meta.url).href;
 /**
  * Entries of `menu/item` follow one contract (ADR 0058): a `button[data-menu-item]` holding an
  * icon `[data-menu-icon]` and a label `[data-menu-label]`; the menu styles them all alike. The
- * labels leave the view on narrow screens but stay the buttons' names.
+ * labels leave the view on narrow screens but stay the buttons' names. `menu/section` sits below
+ * the entries (the next ride), `menu/footer` at the bottom of the menu (the bin, ADR 0096); their
+ * entries of the item contract are styled alike.
  */
 const CSS = `
 /* The brand starts level with the page title (\`--ridrs-page-top\`, ui-main-screen). */
@@ -27,6 +29,9 @@ const CSS = `
 .mm-brand-mark { display: none; }
 .mm-list { display: flex; flex-direction: column; gap: 6px; }
 .mm-list .mm-list, .mm-list [data-contribution] { display: contents; }
+.mm-section:empty, .mm-footer:empty { display: none; }
+.mm-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+.mm-footer [data-contribution] { display: contents; }
 .mm-nav [data-menu-item] { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px;
   border: 0; border-radius: 12px; background: transparent; color: var(--ridrs-text, #f2f5fa);
   font: 500 16px system-ui, sans-serif; text-align: left; cursor: pointer; }
@@ -42,6 +47,7 @@ const CSS = `
 [data-breakpoint="compact"] .mm-nav { flex-direction: row; padding: 6px 8px; }
 [data-breakpoint="compact"] .mm-brand, [data-breakpoint="compact"] .mm-brand-mark { display: none; }
 [data-breakpoint="compact"] .mm-list { flex: 1; flex-direction: row; justify-content: space-around; }
+[data-breakpoint="compact"] .mm-footer { margin-top: 0; flex-direction: row; }
 [data-breakpoint="compact"] .mm-nav [data-menu-item] { flex: 1; flex-direction: column; gap: 4px;
   width: auto; padding: 8px 12px; font-size: 12px; text-align: center; }
 [data-breakpoint="medium"] .mm-nav [data-menu-label] { position: absolute; width: 1px; height: 1px;
@@ -53,6 +59,11 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
   const items = useRef<HTMLDivElement>(null);
   // The other screens' entries; the menu does not know them.
   useEffect(() => (items.current ? ctx.slot('menu/item', items.current) : undefined), [ctx]);
+  // Below the entries and at the bottom: the next ride and the bin, also unknown to the menu.
+  const section = useRef<HTMLDivElement>(null);
+  const footer = useRef<HTMLDivElement>(null);
+  useEffect(() => (section.current ? ctx.slot('menu/section', section.current) : undefined), [ctx]);
+  useEffect(() => (footer.current ? ctx.slot('menu/footer', footer.current) : undefined), [ctx]);
   // Today stays marked while a dialog is open over it (ADR 0071).
   const [page, setPage] = useState<string>();
   useEffect(() => ctx.onNavigated((_, shownPage) => setPage(shownPage)), [ctx]);
@@ -75,6 +86,8 @@ function MainMenuView({ ctx }: { readonly ctx: UiContext }) {
         </button>
         <div ref={items} className="mm-list" data-testid="slot-menu-item" />
       </div>
+      <div ref={section} className="mm-section" data-testid="slot-menu-section" />
+      <div ref={footer} className="mm-footer" data-testid="slot-menu-footer" />
     </nav>
   );
 }

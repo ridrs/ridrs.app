@@ -11,6 +11,8 @@ import {
   routeOfferState,
   routeProfileCapability,
   routeRemoveService,
+  DRAG_ROUTE,
+  setDragged,
 } from '@ridrs/contracts';
 import {
   AreaPage,
@@ -345,6 +347,12 @@ function RouteCard({
         </>
       }
       onOpen={onOpen}
+      // The route can be the next ride's (ADR 0096): dragged onto it in the menu.
+      onDragStart={(event) => {
+        event.dataTransfer?.setData('text/plain', offer.title);
+        setDragged(event.dataTransfer, DRAG_ROUTE, { offer: offer.id, world: offer.world, title: offer.title });
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
+      }}
     />
   );
 }

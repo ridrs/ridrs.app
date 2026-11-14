@@ -45,7 +45,8 @@
       "ride.briefing",
       "route.offer",
       "training.calendar",
-      "training.library"
+      "training.library",
+      "trash.item"
     ],
     "calls": [
       "ride.briefing-set",
