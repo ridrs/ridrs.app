@@ -32,17 +32,21 @@ const PAGE = 'trash';
  * takes is dragged, a hint beside it. It is the drop target itself: the menu is beside every page.
  */
 const ENTRY_CSS = `
-[data-recycle-bin] { position: relative; }
-[data-recycle-bin] [data-bin-count] { margin-left: auto; min-width: 22px; padding: 1px 7px; border-radius: 999px;
+/* A large icon with its label under it, centred: the drop target is easy to hit. */
+.mm-nav [data-recycle-bin] { position: relative; flex-direction: column; justify-content: center; gap: 6px;
+  padding: 14px 12px; text-align: center; }
+.mm-nav [data-recycle-bin] [data-menu-icon] { width: 32px; height: 32px; }
+[data-recycle-bin] [data-bin-count] { position: absolute; top: 8px; left: calc(50% + 10px); min-width: 22px; padding: 1px 7px; border-radius: 999px;
   background: var(--ridrs-surface-2, #1c2840); color: var(--ridrs-text, #f2f5fa); font: 600 12px system-ui, sans-serif;
   text-align: center; }
+[data-breakpoint="compact"] .mm-nav [data-recycle-bin] { padding: 8px 12px; gap: 4px; }
+[data-breakpoint="compact"] .mm-nav [data-recycle-bin] [data-menu-icon] { width: 24px; height: 24px; }
+[data-breakpoint="compact"] [data-recycle-bin] [data-bin-count] { top: 0; }
 [data-recycle-bin][data-armed] { outline: 2px dashed var(--ridrs-danger, #ff4d6d); outline-offset: -2px; }
 [data-recycle-bin][data-over] { outline-style: solid; background: rgb(70 18 30 / .96); }
 [data-recycle-bin] [data-bin-hint] { position: absolute; left: calc(100% + 12px); top: 50%; z-index: 1000;
   transform: translateY(-50%); padding: 8px 12px; border-radius: 10px; white-space: nowrap;
   background: rgb(70 18 30 / .96); color: #fff; font: 500 14px system-ui, sans-serif; pointer-events: none; }
-[data-breakpoint="medium"] [data-recycle-bin] [data-bin-count] { position: absolute; top: 2px; right: 2px; margin: 0; }
-[data-breakpoint="compact"] [data-recycle-bin] [data-bin-count] { position: absolute; top: 0; right: 8px; margin: 0; }
 [data-breakpoint="compact"] [data-recycle-bin] [data-bin-hint] { left: 50%; top: auto; bottom: calc(100% + 8px);
   transform: translateX(-50%); }
 `;

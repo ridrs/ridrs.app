@@ -22,6 +22,8 @@ const CSS = `
   --ridrs-radius: 16px; --ridrs-gap: 16px; --ridrs-page-top: 40px;
   box-sizing: border-box; display: grid; height: 100%; min-height: 100vh;
   grid-template-columns: 200px minmax(0, 1fr); grid-template-areas: "menu main";
+  /* One row, the window's: a slot beside the menu and the page (an empty overlay) takes none. */
+  grid-template-rows: minmax(0, 1fr); grid-auto-rows: 0;
   background: var(--ridrs-bg); color: var(--ridrs-text); font: 15px/1.4 system-ui, sans-serif; }
 .ms-root *, .ms-root *::before, .ms-root *::after { box-sizing: inherit; }
 /* Scroll bars: a slim rounded thumb on no track, instead of the grey bar of the system. */

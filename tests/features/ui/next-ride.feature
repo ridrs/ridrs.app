@@ -17,6 +17,9 @@ Feature: The next ride is prepared in the menu
     And the main screen is 1400 px wide
     And the ridrs UI is shown
 
+  Scenario: The next ride sits at the bottom of the menu, above the trash
+    Then the next ride and the trash are at the bottom of the menu
+
   Scenario: The next ride is empty at first and cannot be started
     Then the next ride holds no workout
     And the next ride holds no route

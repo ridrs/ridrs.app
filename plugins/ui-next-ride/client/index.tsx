@@ -33,7 +33,8 @@ const PLAY = new URL('./assets/icons/play.svg', import.meta.url).href;
 
 /**
  * Under the menu's entries (ADR 0096), without a frame of its own: a head with the play arrow and
- * two places to drop a workout and a route onto. The whole of it is one control that starts the
+ * two places to drop a workout and a route onto, each a large icon with its text under it. The
+ * whole of it is one control that starts the
  * ride through the briefing. A filled place is dragged onto the bin to take it out. Narrow
  * (medium) the places are icons; on the bottom bar (compact) the next ride is not shown.
  */
@@ -58,11 +59,13 @@ const CSS = `
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 .nr-play .nr-glyph { width: 14px; height: 14px; margin-left: 2px; }
 
-.nr-slot { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 10px;
+.nr-slot { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; min-height: 92px; padding: 12px 10px; text-align: center;
   border-radius: 12px; overflow: hidden; }
-.nr-badge { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
-.nr-text { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
-.nr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.nr-badge { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; }
+.nr-badge .nr-glyph { width: 24px; height: 24px; }
+.nr-text { display: flex; flex-direction: column; align-items: center; max-width: 100%; min-width: 0; line-height: 1.25; }
+.nr-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .nr-fact { color: var(--ridrs-text-muted, #8b9bb4); font-size: 12px; }
 .nr-fact[data-gone] { color: var(--ridrs-warn, #ffb62e); }
 
@@ -72,10 +75,12 @@ const CSS = `
   outline: 1.5px dashed var(--ridrs-line, #1b2a3c); outline-offset: -1.5px; }
 .nr-slot[data-empty] .nr-badge { border: 1.5px solid currentColor; opacity: .7; }
 
-/* A filled place: a raised card with the gradient along its edge, its icon on the gradient. */
-.nr-slot:not([data-empty]) { background: var(--ridrs-surface-raised, #131b2a); cursor: grab; }
-.nr-slot:not([data-empty])::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
-  background: linear-gradient(180deg, var(--nr-cyan), var(--nr-volt)); }
+/* A filled place: a card with cut corners as in the calendar, the gradient along its top edge. */
+.nr-slot:not([data-empty]) { border-radius: 0; background: linear-gradient(160deg, rgb(0 240 255 / .10), transparent 60%),
+  var(--ridrs-surface-raised, #131b2a); cursor: grab;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+.nr-slot:not([data-empty])::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, var(--nr-cyan), var(--nr-volt)); }
 .nr-slot:not([data-empty]) .nr-badge { background: linear-gradient(135deg, rgb(0 240 255 / .18), rgb(204 255 0 / .18));
   color: var(--nr-volt); }
 
@@ -90,7 +95,8 @@ const CSS = `
 [data-breakpoint="medium"] .nr-head { justify-content: center; }
 [data-breakpoint="medium"] .nr-title, [data-breakpoint="medium"] .nr-text { position: absolute; width: 1px; height: 1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-[data-breakpoint="medium"] .nr-slot { justify-content: center; width: 48px; padding: 8px 0; }
+[data-breakpoint="medium"] .nr-slot { width: 52px; min-height: 52px; padding: 4px 0; }
+[data-breakpoint="medium"] .nr-badge { width: 40px; height: 40px; }
 [data-breakpoint="compact"] [data-next-ride] { display: none; }
 `;
 

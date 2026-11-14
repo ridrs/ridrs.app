@@ -49,8 +49,24 @@ Then('the bin is at the bottom of the menu', async function (this: RidrsWorld) {
     return element;
   });
   assert.ok(entry.closest('.mm-footer'), "The bin is not in the menu's footer");
-  // The headless DOM has no layout: the rules say where the window shows it. The menu fills the
-  // height of its place, and the footer takes the space left above it.
+  assertMenuFillsTheWindow();
+  // Without a next ride above it, the footer takes the space left above it.
+  assert.ok(
+    rulesOf(/\.mm-section:empty \+ \.mm-footer/).some((rule) => /margin-top:\s*auto/.test(rule)),
+    'The footer is not pushed to the bottom',
+  );
+});
+
+/**
+ * The headless DOM has no layout: the rules say where the window shows the menu. The main
+ * screen's grid gives anything beside the menu and the page no row of its own (an empty overlay
+ * slot took the height left on a short page), and the menu fills its place.
+ */
+export function assertMenuFillsTheWindow(): void {
+  assert.ok(
+    rulesOf(/\.ms-root/).some((rule) => /grid-auto-rows:\s*0/.test(rule)),
+    'Something beside the menu and the page can take a row of the window',
+  );
   assert.ok(
     rulesOf(/\.ms-menu > \[data-contribution\]/).some((rule) => /height:\s*100%/.test(rule)),
     'The menu does not fill the height of its place',
@@ -59,11 +75,37 @@ Then('the bin is at the bottom of the menu', async function (this: RidrsWorld) {
     rulesOf(/\.mm-nav/).some((rule) => /height:\s*100%/.test(rule)),
     'The menu does not fill its contribution',
   );
-  assert.ok(
-    rulesOf(/\.mm-footer/).some((rule) => /margin-top:\s*auto/.test(rule)),
-    'The footer is not pushed to the bottom',
-  );
-});
+}
+
+Then(
+  'the next ride and the trash are at the bottom of the menu',
+  async function (this: RidrsWorld) {
+    const [nextRide, trash] = await waitFor(() => {
+      const found = [
+        ui(this).querySelector('[data-next-ride]'),
+        ui(this).querySelector('[data-recycle-bin]'),
+      ];
+      assert.ok(found[0] && found[1], 'The menu lacks the next ride or the trash');
+      return found as [Element, Element];
+    });
+    const entries = [...ui(this).querySelectorAll('.mm-list [data-menu-item]')];
+    assert.ok(
+      entries.every(
+        (entry) => entry.compareDocumentPosition(nextRide) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+      'The next ride is not below the entries',
+    );
+    assert.ok(
+      nextRide.compareDocumentPosition(trash) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'The trash is not below the next ride',
+    );
+    assertMenuFillsTheWindow();
+    assert.ok(
+      rulesOf(/\.mm-section/).some((rule) => /margin-top:\s*auto/.test(rule)),
+      'The next ride is not pushed to the bottom',
+    );
+  },
+);
 
 Then('the bin in the menu counts {int} item(s)', async function (this: RidrsWorld, count: number) {
   await waitFor(() => {
