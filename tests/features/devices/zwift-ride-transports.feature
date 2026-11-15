@@ -9,7 +9,7 @@ Feature: The Zwift Ride over every BLE transport
     And the ridrs plugins "transport-ble-tauri, device-zwift-ride" running
     And both controllers of "Zwift Ride" are connected
     Then each controller of "Zwift Ride" received "RideOn" 1 time
-    When the left controller sends the keypad packet "23 08 ef ff ff ff 0f"
+    When the right controller sends the keypad packet "23 08 ef ff ff ff 0f"
     Then the buttons held down are "a"
 
   Scenario: The controllers are greeted over the companion bridge
@@ -20,6 +20,6 @@ Feature: The Zwift Ride over every BLE transport
     And the ridrs plugins "transport-ble-bridge, device-zwift-ride" running over the simulated network
     And both controllers of "Zwift Ride" are connected
     Then each controller of "Zwift Ride" received "RideOn" 1 time
-    When the left controller sends the keypad packet "23 08 ef ff ff ff 0f"
+    When the right controller sends the keypad packet "23 08 ef ff ff ff 0f"
     Then the buttons held down are "a"
 

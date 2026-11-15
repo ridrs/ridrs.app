@@ -1,8 +1,9 @@
 @devices @fake-timers
 Feature: The Zwift Ride controller
   The Zwift Ride is a pair of two controllers, the left and the right one: two BLE devices with
-  the same name and service. The left one forwards the right one's buttons, the right one does
-  not forward the left's: only both connections together hear every button. The Zwift Ride plugin
+  the same name and service. The left one forwards the right one's buttons, a little later, the
+  right one does not forward the left's: only both connections together hear every button, and
+  each controller counts for its own buttons only. The Zwift Ride plugin
   presents the pair as one device (ADR 0089): it connects both controllers, greets each with
   "RideOn" on its control point and turns their keypad packets into the buttons the pair holds
   down, under the pair's id. The pair counts as connected only once both controllers are. No
@@ -20,21 +21,21 @@ Feature: The Zwift Ride controller
       And each controller was already listened to when it received "RideOn"
 
     Scenario Outline: Keypad packets say which buttons are held down (<description>)
-      When the left controller sends the keypad packet "<bytes>"
+      When the <side> controller sends the keypad packet "<bytes>"
       Then the buttons held down are "<buttons>"
 
       Examples:
-        | description              | bytes                                                                                      | buttons                |
-        | all released, as sent    | 23 08 ff ff ff ff 0f 1a 04 08 00 10 00 1a 04 08 01 10 00 1a 04 08 02 10 00 1a 04 08 03 10 00 | none                   |
-        | d-pad left               | 23 08 fe ff ff ff 0f 1a 04 08 00 10 00 1a 04 08 01 10 00 1a 04 08 02 10 00 1a 04 08 03 10 00 | left                   |
-        | d-pad down               | 23 08 f7 ff ff ff 0f                                                                       | down                   |
-        | Z                        | 23 08 ff fe ff ff 0f                                                                       | z                      |
-        | left shift up            | 23 08 ff fd ff ff 0f                                                                       | shift-up-left          |
-        | left on/off              | 23 08 ff ef ff ff 0f                                                                       | on-off-left            |
-        | right shift up           | 23 08 ff df ff ff 0f                                                                       | shift-up-right         |
-        | right power-up           | 23 08 ff ff fe ff 0f                                                                       | power-up-right         |
-        | two at once              | 23 08 ee ff ff ff 0f                                                                       | left, a                |
-        | paddle pulled, no button | 23 08 ff ff ff ff 0f 1a 05 08 00 10 c7 01 1a 04 08 01 10 00                                | none                   |
+        | description              | side  | bytes                                                                                      | buttons                |
+        | all released, as sent    | left  | 23 08 ff ff ff ff 0f 1a 04 08 00 10 00 1a 04 08 01 10 00 1a 04 08 02 10 00 1a 04 08 03 10 00 | none                   |
+        | d-pad left               | left  | 23 08 fe ff ff ff 0f 1a 04 08 00 10 00 1a 04 08 01 10 00 1a 04 08 02 10 00 1a 04 08 03 10 00 | left                   |
+        | d-pad down               | left  | 23 08 f7 ff ff ff 0f                                                                       | down                   |
+        | Z                        | right | 23 08 ff fe ff ff 0f                                                                       | z                      |
+        | left shift up            | left  | 23 08 ff fd ff ff 0f                                                                       | shift-up-left          |
+        | left on/off              | left  | 23 08 ff ef ff ff 0f                                                                       | on-off-left            |
+        | right shift up           | right | 23 08 ff df ff ff 0f                                                                       | shift-up-right         |
+        | right power-up           | right | 23 08 ff ff fe ff 0f                                                                       | power-up-right         |
+        | two at once              | left  | 23 08 f6 ff ff ff 0f                                                                       | left, down             |
+        | paddle pulled, no button | left  | 23 08 ff ff ff ff 0f 1a 05 08 00 10 c7 01 1a 04 08 01 10 00                                | none                   |
 
     Scenario: The same buttons sent again are no news
       When the left controller sends the keypad packet "23 08 fe ff ff ff 0f"
@@ -126,13 +127,19 @@ Feature: The Zwift Ride controller
       Then the buttons held down on "ride-left" are "left, a"
       And no button change was published for "ride-right"
 
-    Scenario: A button both controllers tell counts once
-      When the controller with the id "ride-left" sends the keypad packet "23 08 ff df ff ff 0f"
-      And the controller with the id "ride-right" sends the keypad packet "23 08 ff df ff ff 0f"
+    Scenario: A press the left controller forwards late counts once
+      The left controller forwards the right one's buttons a little later: a short tap is already
+      released on the right one when the left one tells it. Each controller counts for its own
+      buttons only.
+
+      When the controller with the id "ride-right" sends the keypad packet "23 08 ff df ff ff 0f"
       And the controller with the id "ride-right" sends the keypad packet "23 08 ff ff ff ff 0f"
+      And the controller with the id "ride-left" sends the keypad packet "23 08 ff df ff ff 0f"
+      And the controller with the id "ride-left" sends the keypad packet "23 08 ff ff ff ff 0f"
       Then the buttons held down were:
         | buttons        |
         | shift-up-right |
+        | none           |
 
     Scenario: The pair is connected only once both controllers are
       When the controller with the id "ride-right" drops the connection and refuses new connections

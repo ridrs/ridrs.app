@@ -45,9 +45,17 @@ function sideOf(peripheral: BleDiscoveredPeripheral): DevicePart | undefined {
 }
 
 /**
+ * The buttons on each controller of the pair: the left one has the d-pad, the right one A, B, Y
+ * and Z; each has its shift, power-up and on/off buttons.
+ */
+const BUTTONS_ON: Record<DevicePart, ReadonlySet<ControllerButton>> = {
+  left: new Set(['left', 'up', 'right', 'down', 'shift-up-left', 'shift-down-left', 'power-up-left', 'on-off-left']),
+  right: new Set(['a', 'b', 'y', 'z', 'shift-up-right', 'shift-down-right', 'power-up-right', 'on-off-right']),
+};
+
+/**
  * Publishes what the pair holds down: the buttons held on either controller, in the order of the
- * contract. The left controller forwards the right one's buttons too: a button held on both
- * counts once.
+ * contract.
  */
 function publishButtons(ctx: PluginContext, state: ZwiftRideState, deviceId: string): void {
   const held = new Set([...(state.held.get(deviceId)?.values() ?? [])].flat());
@@ -76,8 +84,14 @@ function handleNotification(
     return;
   }
   if (parsed.buttons) {
+    // Each controller counts for its own buttons only. The left one forwards the right one's
+    // buttons too, a little later: a short tap would else be released on the right and then
+    // pressed again by the left, two presses for one. A controller of a recording from before the
+    // pair stands for all of them.
+    const own = device.part ? BUTTONS_ON[device.part] : undefined;
+    const buttons = own ? parsed.buttons.filter((b) => own.has(b)) : parsed.buttons;
     const pair = state.held.get(device.deviceId) ?? new Map();
-    pair.set(device.partId, parsed.buttons);
+    pair.set(device.partId, buttons);
     state.held.set(device.deviceId, pair);
     publishButtons(ctx, state, device.deviceId);
   }
