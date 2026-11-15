@@ -17,7 +17,7 @@ import { isPqBt2020 } from './hdr.ts';
 import { createHdrRenderer, type HdrRenderer } from './hdr-renderer.ts';
 import { messages } from './i18n/index.ts';
 import { loadDownloadedRoute, parseGpx, type VideoRoute } from './library.ts';
-import { buildVideoTime, type VideoTime, videoTimeAt } from './playback.ts';
+import { buildVideoTime, VideoClock, type VideoTime } from './playback.ts';
 import { plausibleTrack, type Repair } from './plausible-track.ts';
 import type { Track } from './track.ts';
 import { httpRangeReader, readVideoIndex, type VideoIndex } from './video-index.ts';
@@ -181,9 +181,10 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
       position: (position) => ctx.events.publish(uiPositionObservedEvent, position),
     });
     const player = new FramePlayer(video, httpRangeReader(route.videoUrl), webCodecsDecoder(video));
-    const offset = (route.startFrame - 1) / route.framerate;
+    const clock = new VideoClock(videoTime, (route.startFrame - 1) / route.framerate);
     let ride: string | undefined;
-    let distance = 0;
+    /** The presented distance of this ride; undefined before its first presented state. */
+    let distance: number | undefined;
     let drawn: VideoFrame | undefined;
     let disposed = false;
     // An HDR video is shown on the HDR canvas when the platform has one, else on the 2D canvas.
@@ -228,7 +229,8 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
       if (shown.status === 'available' && shown.sessionId === ride) {
         distance = shown.distance;
       }
-      const time = videoTimeAt(videoTime, distance, offset);
+      // A route later in its video plays up to its start until the rider rolls (VideoClock).
+      const time = clock.at(frame.time, distance);
       const picture = player.frameAt(time);
       const element = renderer ? hdrCanvas.current : canvas.current;
       if (picture && picture !== drawn && element) {
@@ -245,7 +247,7 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
         }
       }
       if (element) {
-        element.dataset.distance = distance.toFixed(2);
+        element.dataset.distance = (distance ?? 0).toFixed(2);
         element.dataset.time = time.toFixed(3);
         element.dataset.restarts = String(player.restarts);
       }
@@ -253,7 +255,7 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
         element.dataset.failed = String(player.error);
         ctx.logger.error(`The video of "${route.id}" stopped`, player.error);
       }
-      setFinished(distance >= track.length);
+      setFinished((distance ?? 0) >= track.length);
     });
     return () => {
       disposed = true;

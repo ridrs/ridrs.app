@@ -334,6 +334,14 @@ Then(
 );
 
 Then(
+  "the ride's time at {string} is {float} s",
+  function (this: RidrsWorld, time: string, seconds: number) {
+    const { step, timeFromStep } = stateAt(this, time);
+    assertClose(((step - (timeFromStep ?? 0)) * 10) / 1000, seconds, "ride's time (s)");
+  },
+);
+
+Then(
   'the virtual distance at {string} is {float} m',
   function (this: RidrsWorld, time: string, distance: number) {
     assertClose(stateAt(this, time).distance, distance, 'distance (m)');

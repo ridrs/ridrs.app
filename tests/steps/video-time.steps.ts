@@ -6,6 +6,7 @@ import { Given, Then, When } from '@cucumber/cucumber';
 import type { TrackPoint } from '../../plugins/ui-world-video/client/library.ts';
 import {
   buildVideoTime,
+  VideoClock,
   type VideoTime,
   videoTimeAt,
 } from '../../plugins/ui-world-video/client/playback.ts';
@@ -27,6 +28,10 @@ interface Scenario {
   ridden?: number[];
   /** The rider's time between two samples, s. */
   riddenStep?: number;
+  /** The video world's clock of the lead-in, from the first frame on. */
+  clock?: VideoClock;
+  /** The video time the world shows last, s. */
+  shown?: number;
 }
 
 const scenarios = new WeakMap<RidrsWorld, Scenario>();
@@ -248,5 +253,70 @@ Then(
   '{int} m beyond the end the video time is {int} s',
   function (this: RidrsWorld, beyond: number, expected: number) {
     assertTimeAt(this, (track) => track.length + beyond, expected);
+  },
+);
+
+/*
+ * The lead-in (video-lead-in.feature): the clock the video world asks every render frame, with
+ * the render time (ms) and the presented distance (m), undefined before the ride's first state.
+ */
+function show(world: RidrsWorld, seconds: number, distance: number | undefined): void {
+  const current = scenario(world);
+  current.clock ??= new VideoClock(current.table, current.offset);
+  current.shown = current.clock.at(seconds * 1000, distance);
+}
+
+Given(
+  'the video has played {float} s with the rider at the start',
+  function (this: RidrsWorld, seconds: number) {
+    show(this, 0, 0);
+    show(this, seconds, 0);
+  },
+);
+
+Given(
+  "the video has played {float} s before the ride's first state",
+  function (this: RidrsWorld, seconds: number) {
+    show(this, 0, undefined);
+    show(this, seconds, undefined);
+  },
+);
+
+Given(
+  'the rider has rolled {float} m after {float} s',
+  function (this: RidrsWorld, distance: number, seconds: number) {
+    show(this, seconds, distance);
+  },
+);
+
+When(
+  'the rider still stands at {float} m after {float} s',
+  function (this: RidrsWorld, distance: number, seconds: number) {
+    show(this, seconds, distance);
+  },
+);
+
+When(
+  'the rider stands at {float} m when the video is loaded',
+  function (this: RidrsWorld, distance: number) {
+    show(this, 0, distance);
+  },
+);
+
+function shown(world: RidrsWorld): number {
+  const { shown: time } = scenario(world);
+  assert.ok(time !== undefined, 'Expected the video to show a frame');
+  return time;
+}
+
+Then('the video shows the time {float} s', function (this: RidrsWorld, seconds: number) {
+  assert.ok(Math.abs(shown(this) - seconds) < 1e-6, `The video shows ${shown(this)} s`);
+});
+
+Then(
+  'the video shows a time between {float} s and {float} s',
+  function (this: RidrsWorld, from: number, to: number) {
+    const time = shown(this);
+    assert.ok(time >= from && time <= to, `The video shows ${time} s`);
   },
 );

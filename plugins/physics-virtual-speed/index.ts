@@ -219,6 +219,7 @@ export default definePlugin({
           driveForce: assertFinite(ctx, 'drive force', driveForce(power.wheelPower, 0)),
           resistance,
           road,
+          rolling: false,
         };
       },
 
@@ -248,6 +249,7 @@ export default definePlugin({
             driveForce: assertFinite(ctx, 'drive force', driveForce(power.wheelPower, 0)),
             resistance,
             road,
+            rolling: false,
           };
         }
         const next = integrate({
@@ -270,6 +272,7 @@ export default definePlugin({
           driveForce: assertFinite(ctx, 'drive force', next.driveForce),
           resistance,
           road,
+          rolling: true,
         };
       },
     });

@@ -66,6 +66,11 @@ export class RideSimulation {
   private lastPublishedStep = -1;
   /** Samples computed since the previous batch. */
   private pending: PhysicsSample[] = [];
+  /**
+   * The last step the ride waited at its start (`rolling: false`): its time counts from there.
+   * Undefined while the motion reports no barrier.
+   */
+  private timeFromStep: number | undefined;
 
   constructor(
     readonly sessionId: string,
@@ -76,6 +81,7 @@ export class RideSimulation {
   ) {
     this.base = startedAt;
     this.current = motion.initial(startedAt);
+    this.noteRolling();
     this.currentLoad = trainerLoad?.load(this.current);
     this.pending.push(sampleOf(0, this.current, this.currentLoad));
     this.emit();
@@ -104,6 +110,7 @@ export class RideSimulation {
       // After the motion, from its result: the load never feeds back into the motion.
       this.currentLoad = this.trainerLoad?.load(this.current);
       this.step += 1;
+      this.noteRolling();
       this.pending.push(sampleOf(this.step, this.current, this.currentLoad));
       if (this.step % ENGINE_DEFAULTS.publishEverySteps === 0) {
         this.emit();
@@ -138,7 +145,17 @@ export class RideSimulation {
       sessionId: this.sessionId,
       step: this.step,
       ...(this.currentLoad ? { trainerLoad: this.currentLoad } : {}),
+      ...(this.timeFromStep !== undefined ? { timeFromStep: this.timeFromStep } : {}),
     });
+  }
+
+  /** While the ride waits at its start, its time counts from the current step. */
+  private noteRolling(): void {
+    if (this.current.rolling === false) {
+      this.timeFromStep = this.step;
+    } else if (this.current.rolling === true) {
+      this.timeFromStep ??= 0;
+    }
   }
 
   private flush(): void {

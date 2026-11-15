@@ -147,6 +147,11 @@ export interface MotionResult extends MotionState {
   readonly resistance: ResistanceBreakdown;
   /** The road sample this state's forces used. */
   readonly road: RoadSample;
+  /**
+   * Whether the ride rolls: false while it waits at its start for its world and for the rider's
+   * first significant pedal stroke, true from then on. Absent from a motion without that barrier.
+   */
+  readonly rolling?: boolean;
 }
 
 export interface MotionCapability {
@@ -293,6 +298,12 @@ export interface PhysicsState extends MotionResult {
   readonly step: number;
   /** What a trainer should feel at this step; present when a trainer load is installed. */
   readonly trainerLoad?: TrainerLoadSample;
+  /**
+   * The step the ride's time counts from: the last step the ride waited at its start, so its
+   * time, `10 · (step - timeFromStep)` ms, stands at 0 until the ride rolls and counts every step
+   * from then on. Absent when the motion has no start barrier: the time counts from step 0.
+   */
+  readonly timeFromStep?: number;
 }
 
 export const physicsStateSchema: z.ZodType<PhysicsState> = z.object({
@@ -316,6 +327,8 @@ export const physicsStateSchema: z.ZodType<PhysicsState> = z.object({
     origin: z.literal('default'),
   }),
   trainerLoad: trainerLoadSampleSchema.optional(),
+  rolling: z.boolean().optional(),
+  timeFromStep: z.number().int().nonnegative().optional(),
 });
 
 /** Interim publication of the simulation state at about 4 Hz of simulation time. */

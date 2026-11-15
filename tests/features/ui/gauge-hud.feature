@@ -38,6 +38,16 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     And the ride shows the distance "12.34" "km"
     And the ride shows the speed "30.6" "km/h"
 
+  Scenario: The time stands at zero until the rider pedals
+    Given I press "Start ride"
+    When the physics reports step 1500 at a speed of 0 m/s after 0 m, waiting for the rider
+    Then the ride shows the time "0:00"
+
+  Scenario: The time counts from the rider's first pedal stroke
+    Given I press "Start ride"
+    When the physics reports step 7500 at a speed of 5 m/s after 300 m, rolling since step 1500
+    Then the ride shows the time "1:00"
+
   Scenario: Before the first physics state the ride shows dashes
     When I press "Start ride"
     Then the ride shows the time "–"

@@ -140,6 +140,9 @@ const EN_DASH = '–';
 /** The physics steps 10 ms each, and only while the ride runs: the time ridden. */
 const STEP_MS = 10;
 
+/** s ridden: the steps since the ride began to roll; 0 while it waits for the rider. */
+const riddenSeconds = (state: PhysicsState) => ((state.step - (state.timeFromStep ?? 0)) * STEP_MS) / 1000;
+
 const FACT_LABEL = {
   fontFamily: 'var(--ridrs-font-mono)',
   fontSize: 'var(--ridrs-size-label)',
@@ -183,7 +186,8 @@ function Fact({
 
 /**
  * The ride at the top centre, a HUD element of its own drawn like a ride card: the time ridden,
- * the distance and the speed, from the physics. Dashes until the first physics state.
+ * the distance and the speed, from the physics. Dashes until the first physics state. The time
+ * stands at 0:00 until the ride rolls with the rider's first pedal stroke.
  */
 function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
@@ -212,7 +216,7 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
         pointerEvents: 'none',
       }}
     >
-      <Fact kind="time" label={text.time} value={state ? formatDuration((state.step * STEP_MS) / 1000) : EN_DASH} />
+      <Fact kind="time" label={text.time} value={state ? formatDuration(riddenSeconds(state)) : EN_DASH} />
       <Fact
         kind="distance"
         label={text.distance}

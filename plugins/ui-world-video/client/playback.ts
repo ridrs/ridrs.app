@@ -102,3 +102,36 @@ export function videoTimeAt(table: VideoTime, distance: number, offset = 0): num
   const f = to === undefined || to <= from || distance <= from ? 0 : (distance - from) / (to - from);
   return (i + f) * TIME_STEP + offset;
 }
+
+/**
+ * The video time the video world shows, asked every render frame (video-lead-in.feature). A route
+ * that starts later in its video than at its first frame gets a lead-in: from the first frame
+ * with the rider at the start, the video plays in render time from its first frame and holds at
+ * the route's start. Once the rider rolled (a distance beyond 0), the picture follows the
+ * distance from the route's start, wherever the lead-in was, and stays on the route. Before the
+ * ride's first state it shows the first frame; a continued ride, beyond 0 from the start, has no
+ * lead-in.
+ */
+export class VideoClock {
+  /** Render time (ms) of the lead-in's first frame; undefined before it began. */
+  private leadInFrom: number | undefined;
+  private rolled = false;
+
+  constructor(
+    private readonly table: VideoTime,
+    private readonly offset: number,
+  ) {}
+
+  /** The video time (s) at render time `time` (ms) for the presented `distance` (m). */
+  at(time: number, distance: number | undefined): number {
+    this.rolled ||= distance !== undefined && distance > 0;
+    if (this.rolled) {
+      return videoTimeAt(this.table, distance ?? 0, this.offset);
+    }
+    if (distance === undefined) {
+      return 0;
+    }
+    this.leadInFrom ??= time;
+    return Math.min(this.offset, Math.max(0, (time - this.leadInFrom) / 1000));
+  }
+}

@@ -84,28 +84,46 @@ Then(
   },
 );
 
+/** A stand-in for the physics: no physics plugin runs in these scenarios. */
+async function reportPhysics(
+  world: RidrsWorld,
+  state: Pick<PhysicsState, 'step' | 'speed' | 'distance' | 'timeFromStep'>,
+): Promise<void> {
+  const ctx = world.ensureHost().getPluginContext('test-device');
+  assert.ok(ctx, 'Expected the test device');
+  ctx.inputs.accept(physicsStateEvent, {
+    sessionId: 'session-1',
+    at: state.step * 10,
+    acceleration: 0,
+    mass: 85,
+    riderPower: { status: 'unavailable', at: 0, reason: 'no-source' },
+    wheelPower: 0,
+    driveForce: 0,
+    resistance: { total: 0, contributions: [] },
+    road: { gradient: 0, surface: 'asphalt', origin: 'default' },
+    ...state,
+  });
+  await world.settle();
+}
+
 When(
   'the physics reports step {int} at a speed of {float} m\\/s after {int} m',
   async function (this: RidrsWorld, step: number, speed: number, distance: number) {
-    const ctx = this.ensureHost().getPluginContext('test-device');
-    assert.ok(ctx, 'Expected the test device');
-    const state: PhysicsState = {
-      sessionId: 'session-1',
-      step,
-      at: step * 10,
-      speed,
-      distance,
-      acceleration: 0,
-      mass: 85,
-      riderPower: { status: 'unavailable', at: 0, reason: 'no-source' },
-      wheelPower: 0,
-      driveForce: 0,
-      resistance: { total: 0, contributions: [] },
-      road: { gradient: 0, surface: 'asphalt', origin: 'default' },
-    };
-    // A stand-in for the physics: no physics plugin runs in these scenarios.
-    ctx.inputs.accept(physicsStateEvent, state);
-    await this.settle();
+    await reportPhysics(this, { step, speed, distance });
+  },
+);
+
+When(
+  'the physics reports step {int} at a speed of {float} m\\/s after {int} m, waiting for the rider',
+  async function (this: RidrsWorld, step: number, speed: number, distance: number) {
+    await reportPhysics(this, { step, speed, distance, timeFromStep: step });
+  },
+);
+
+When(
+  'the physics reports step {int} at a speed of {float} m\\/s after {int} m, rolling since step {int}',
+  async function (this: RidrsWorld, step: number, speed: number, distance: number, since: number) {
+    await reportPhysics(this, { step, speed, distance, timeFromStep: since });
   },
 );
 
