@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { fitPlaces, gradeColour, nearestIndex, profileOf, thin } from './route.ts';
+import { fitPlaces, gradeColour, headingAt, nearestIndex, profileOf, thin } from './route.ts';
 
 const NORTH_THEN_EAST = [
   { latitude: 46.0, longitude: 7.0 },
@@ -50,5 +50,38 @@ describe('profileOf', () => {
 
   it('has nothing to draw without two elevations', () => {
     expect(profileOf([100], 1000, 200, 50).stretches).toEqual([]);
+  });
+});
+
+describe('headingAt', () => {
+  it('points along the track, clockwise from north', () => {
+    expect(headingAt(NORTH_THEN_EAST, 0, 100)).toBeCloseTo(0, 0);
+    const east = [
+      { latitude: 46, longitude: 7 },
+      { latitude: 46, longitude: 7.01 },
+    ];
+    expect(headingAt(east, 0)).toBeCloseTo(90, 0);
+  });
+
+  it('faces along the road up to a hairpin, not across to the road after it', () => {
+    // 100 m east, a hairpin, then back west 20 m further north: about 0.0009° of longitude per
+    // 70 m at 46°, 0.00018° of latitude per 20 m.
+    const hairpin = [
+      { latitude: 46, longitude: 7 },
+      { latitude: 46, longitude: 7.0006 },
+      { latitude: 46, longitude: 7.0013 },
+      { latitude: 46.00018, longitude: 7.0013 },
+      { latitude: 46.00018, longitude: 7.0006 },
+      { latitude: 46.00018, longitude: 7 },
+    ];
+    expect(headingAt(hairpin, 0)).toBeCloseTo(90, 0);
+  });
+
+  it('keeps the last direction at the end of the track', () => {
+    const east = [
+      { latitude: 46, longitude: 7 },
+      { latitude: 46, longitude: 7.01 },
+    ];
+    expect(headingAt(east, 1)).toBeCloseTo(90, 0);
   });
 });

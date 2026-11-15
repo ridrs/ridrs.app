@@ -3,8 +3,10 @@ Feature: A box at the top right shows the route being ridden
   `ui-hud-gauges` adds a HUD element at the top right for the route of the ride: first its map,
   tilted a little as if seen from above and behind, with the track and where the rider is; below
   it the elevation profile with the part ridden and where the rider is along it; and the current
-  gradient of the road. The map draws the GPX track of the route's ride package (ADR 0094), the
-  profile the route offer's elevations. A ride without a route, or a route without a track or
+  gradient of the road. The map is a real map where the page can draw one (ADR 0097): OpenFreeMap's
+  tiles, leaning back, the camera following the rider. Where it cannot (no WebGL, as in these
+  headless scenarios, or offline), the map is the GPX track of the route's ride package (ADR 0094)
+  alone, on a plane leaning back. The profile draws the route offer's elevations. A ride without a route, or a route without a track or
   elevations, shows only what it has; the gradient comes from the physics in every ride.
 
   Background:
@@ -18,9 +20,10 @@ Feature: A box at the top right shows the route being ridden
     Then the route box sits at the top right
     And the route box shows, in this order, "map, profile, gradient"
 
-  Scenario: The map draws the whole track, tilted
+  Scenario: Without a map renderer the map draws the whole track alone, tilted
     When "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "hill"
-    Then the route map draws a track of 5 points
+    Then the route map is the track alone
+    And the route map draws a track of 5 points
     And the route map is tilted
 
   Scenario: The map marks the rider and the part ridden

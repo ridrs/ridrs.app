@@ -14,6 +14,7 @@ import { formatDecimal, localizeNumber, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useMemo, useState } from 'react';
 import { messages } from './i18n/index.ts';
+import { canDrawMap, LiveMap, MAP_ATTRIBUTION } from './live-map.tsx';
 import { fitPlaces, gradeColour, nearestIndex, polyline, profileOf, thin } from './route.ts';
 
 const EN_DASH = '–';
@@ -74,8 +75,11 @@ function useTrack(offer: RouteOffer | undefined): TrackPosition[] | undefined {
   return track;
 }
 
-/** The map: the whole track, the part ridden over it and the rider, on a plane leaning back. */
-function RouteMap({ track, position }: { readonly track: TrackPosition[]; readonly position?: WorldPosition }) {
+/**
+ * The track alone, without a map: the whole track, the part ridden over it and the rider, on a
+ * plane leaning back. Where no map can be drawn (no WebGL, offline).
+ */
+function TrackMap({ track, position }: { readonly track: TrackPosition[]; readonly position?: WorldPosition }) {
   const shown = useMemo(() => thin(track, MAX_POINTS), [track]);
   const project = useMemo(() => fitPlaces(shown, MAP.width, MAP.height, MAP.pad), [shown]);
   const points = useMemo(() => shown.map(project), [shown, project]);
@@ -85,6 +89,7 @@ function RouteMap({ track, position }: { readonly track: TrackPosition[]; readon
   return (
     <div
       data-testid="route-map"
+      data-map="track"
       style={{
         height: MAP_VIEW,
         overflow: 'hidden',
@@ -129,6 +134,46 @@ function RouteMap({ track, position }: { readonly track: TrackPosition[]; readon
           ) : null}
         </svg>
       </div>
+    </div>
+  );
+}
+
+/** The live map's height in the box: a little taller than the track alone. */
+const LIVE_HEIGHT = 150;
+
+/**
+ * The map of the route: a real map leaning back where the page can draw one (ADR 0097), else the
+ * track alone. A map that fails to load hands over to the track for the rest of the ride.
+ */
+function RouteMap({ track, position }: { readonly track: TrackPosition[]; readonly position?: WorldPosition }) {
+  const [failed, setFailed] = useState(false);
+  const live = useMemo(() => canDrawMap(), []);
+  if (!live || failed) return <TrackMap track={track} {...(position ? { position } : {})} />;
+  return (
+    <div
+      data-testid="route-map"
+      data-map="live"
+      style={{ position: 'relative', height: LIVE_HEIGHT, overflow: 'hidden', borderRadius: 10, background: '#0d1626' }}
+    >
+      <LiveMap
+        track={track}
+        {...(position ? { position } : {})}
+        height={LIVE_HEIGHT}
+        onFail={() => setFailed(true)}
+      />
+      <span
+        style={{
+          position: 'absolute',
+          right: 4,
+          bottom: 2,
+          fontSize: 8,
+          lineHeight: 1.2,
+          color: 'rgb(255 255 255 / .7)',
+          textShadow: '0 1px 2px rgb(0 0 0 / .8)',
+        }}
+      >
+        {MAP_ATTRIBUTION}
+      </span>
     </div>
   );
 }

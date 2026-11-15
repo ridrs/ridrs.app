@@ -94,6 +94,11 @@ Then(
   },
 );
 
+Then('the route map is the track alone', async function (this: RidrsWorld) {
+  const map = await within(await box(this)).findByTestId('route-map');
+  assert.equal(map.getAttribute('data-map'), 'track');
+});
+
 Then('the route map is tilted', async function (this: RidrsWorld) {
   const map = await within(await box(this)).findByTestId('route-map');
   const tilted = map.querySelector<HTMLElement>('[data-tilt]');

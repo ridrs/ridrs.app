@@ -140,3 +140,36 @@ export function profileOf(
   });
   return { stretches, line };
 }
+
+/** m between two places, on a sphere: enough to look ahead along a track. */
+function metresBetween(a: Place, b: Place): number {
+  const east = Math.cos((((a.latitude + b.latitude) / 2) * Math.PI) / 180);
+  const dx = (b.longitude - a.longitude) * east * METRES_PER_DEGREE;
+  const dy = (b.latitude - a.latitude) * METRES_PER_DEGREE;
+  return Math.hypot(dx, dy);
+}
+
+/**
+ * The direction of travel at the point `index` of `track`, in degrees clockwise from north: toward
+ * the point about `ahead` m further on. Short enough that a hairpin does not turn the map across
+ * the road before the rider reaches it; long enough that GPS jitter does not shake it.
+ */
+export function headingAt(track: readonly Place[], index: number, ahead = 50): number {
+  const from = track[index];
+  if (!from) return 0;
+  let to = from;
+  let travelled = 0;
+  for (let i = index + 1; i < track.length && travelled < ahead; i += 1) {
+    const next = track[i] as Place;
+    travelled += metresBetween(to, next);
+    to = next;
+  }
+  if (to === from) {
+    // At the end: keep the direction the track came from.
+    const before = track[index - 1];
+    return before ? headingAt([before, from], 0, ahead) : 0;
+  }
+  const east = Math.cos((from.latitude * Math.PI) / 180);
+  const degrees = (Math.atan2((to.longitude - from.longitude) * east, to.latitude - from.latitude) * 180) / Math.PI;
+  return (degrees + 360) % 360;
+}

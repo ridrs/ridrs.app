@@ -27,7 +27,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: ridrs-media: http://ridrs-media.localhost; media-src 'self' ridrs-media: http://ridrs-media.localhost; connect-src 'self' ipc: http://ipc.localhost ridrs-media: http://ridrs-media.localhost"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ridrs-media: http://ridrs-media.localhost https://tiles.openfreemap.org; media-src 'self' ridrs-media: http://ridrs-media.localhost; connect-src 'self' ipc: http://ipc.localhost ridrs-media: http://ridrs-media.localhost https://tiles.openfreemap.org; worker-src 'self' blob:; child-src 'self' blob:"
     }
   },
   "plugins": {
