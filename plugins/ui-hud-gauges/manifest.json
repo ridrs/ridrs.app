@@ -31,6 +31,12 @@
         "extensionPoint": "activity/hud",
         "export": "RideFacts",
         "order": 2
+      },
+      {
+        "id": "route",
+        "extensionPoint": "activity/hud",
+        "export": "RouteBox",
+        "order": 3
       }
     ],
     "events": {
@@ -40,14 +46,16 @@
         "metric.cadence",
         "activity.state-changed",
         "activity.athlete",
-        "physics.state"
+        "physics.state",
+        "world.position"
       ],
       "publish": []
     },
     "state": [
       "app.language",
       "athlete.profile",
-      "data.source"
+      "data.source",
+      "route.offer"
     ]
   }
 }

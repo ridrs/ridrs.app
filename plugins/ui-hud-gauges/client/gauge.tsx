@@ -66,7 +66,7 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
       aria-label={spoken}
       style={{
         pointerEvents: 'auto',
-        width: 'clamp(118px, 13vw, 176px)',
+        width: 'clamp(104px, 10vw, 160px)',
         aspectRatio: '1',
         borderRadius: '50%',
         boxShadow: '0 10px 28px rgb(0 0 0 / .38)',

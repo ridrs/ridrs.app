@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Gauge } from './gauge.tsx';
 import { messages } from './i18n/index.ts';
+import { RouteBoxView } from './route-box.tsx';
 import { cadenceScale, formatDuration, heartRateScale, powerScale, RideAverage } from './model.ts';
 
 /** The latest reading of a metric and, with `averaged`, its average over the ride. */
@@ -160,7 +161,7 @@ function Fact({
   readonly unit?: string;
 }) {
   return (
-    <div data-testid={`ride-${kind}`} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 92 }}>
+    <div data-testid={`ride-${kind}`} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 80 }}>
       <span style={FACT_LABEL}>{label}</span>
       <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
         <span
@@ -200,8 +201,8 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
-        gap: 28,
-        padding: '12px 24px',
+        gap: 20,
+        padding: '10px 18px',
         borderRadius: 16,
         background:
           'radial-gradient(120% 140% at 85% 0%, #2a4a78 0%, transparent 60%), linear-gradient(160deg, #1b2d4d, #0d1626)',
@@ -274,5 +275,11 @@ export const Telemetry: UiComponent = (container, ctx) => {
 export const RideFacts: UiComponent = (container, ctx) => {
   const root = createRoot(container);
   root.render(<RideFactsView ctx={ctx} />);
+  return () => root.unmount();
+};
+
+export const RouteBox: UiComponent = (container, ctx) => {
+  const root = createRoot(container);
+  root.render(<RouteBoxView ctx={ctx} />);
   return () => root.unmount();
 };

@@ -1132,6 +1132,9 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ridrs/ride':
+        specifier: workspace:*
+        version: link:../../packages/ride
       '@ridrs/ui-sdk':
         specifier: workspace:*
         version: link:../../packages/ui-sdk

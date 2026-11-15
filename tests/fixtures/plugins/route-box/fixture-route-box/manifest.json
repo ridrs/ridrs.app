@@ -1,0 +1,10 @@
+{
+  "id": "fixture-route-box",
+  "name": "The route of the route box scenarios (fixture)",
+  "version": "0.1.0",
+  "types": ["transport"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "state": { "owns": ["route.offer"] }
+}

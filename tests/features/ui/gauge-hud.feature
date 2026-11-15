@@ -20,7 +20,7 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
 
   Scenario: The gauge HUD takes the place of the HUD and keeps its widgets
     When I press "Start ride"
-    Then the slot "activity/hud" contains the contributions "ui-hud-gauges/hud, ui-hud-gauges/telemetry, ui-hud-gauges/ride" in this order
+    Then the slot "activity/hud" contains the contributions "ui-hud-gauges/hud, ui-hud-gauges/telemetry, ui-hud-gauges/ride, ui-hud-gauges/route" in this order
     And the slot "hud/widget" contains the contributions "ui-widget-power-heart-rate-ratio/power-heart-rate-ratio" in this order
     And pointer events pass through the gauge HUD except on its gauges and widgets
 

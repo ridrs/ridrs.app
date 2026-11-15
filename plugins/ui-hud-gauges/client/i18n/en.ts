@@ -7,6 +7,7 @@ export const en = {
   time: 'Time',
   distance: 'Distance',
   speed: 'Speed',
+  gradient: 'Gradient',
   cadence: 'Cadence',
   /** Before the average of the ride. */
   average: 'avg',

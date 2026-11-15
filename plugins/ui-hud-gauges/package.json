@@ -6,6 +6,7 @@
   "type": "module",
   "dependencies": {
     "@ridrs/contracts": "workspace:*",
+    "@ridrs/ride": "workspace:*",
     "@ridrs/ui-sdk": "workspace:*",
     "@ridrs/workout": "workspace:*",
     "react": "19.3.1",
