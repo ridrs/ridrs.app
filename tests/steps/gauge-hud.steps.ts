@@ -40,7 +40,7 @@ Then(
       getComputedStyle(within(hud).getByTestId('slot-hud-widget')).pointerEvents,
       'none',
     );
-    const cluster = within(hud).getByTestId('gauges');
+    const cluster = await within(ui(this)).findByTestId('gauges');
     assert.equal(getComputedStyle(cluster).pointerEvents, 'none');
     for (const element of within(cluster).getAllByTestId(/^gauge-/)) {
       assert.equal(getComputedStyle(element).pointerEvents, 'auto');
@@ -65,15 +65,17 @@ Then('the gauges are shown in the order {string}', async function (this: RidrsWo
 });
 
 // happy-dom has no layout: the place is asserted on the declared position, as for the HUD layers.
-Then('the gauges sit at the top left, below the Pause button', async function (this: RidrsWorld) {
+Then('the telemetry sits at the top centre', async function (this: RidrsWorld) {
   const cluster = await within(ui(this)).findByTestId('gauges');
-  const pause = within(ui(this)).getByRole('button', { name: 'Pause' });
   assert.equal(cluster.style.position, 'absolute');
-  assert.equal(cluster.style.left, pause.style.left, 'aligned with Pause on the left');
-  assert.ok(
-    Number.parseFloat(cluster.style.top) >= Number.parseFloat(pause.style.top) + 48,
-    `top ${cluster.style.top} leaves no room for Pause at ${pause.style.top}`,
-  );
+  assert.equal(cluster.style.top, '16px');
+  assert.equal(cluster.style.left, '50%');
+  assert.equal(cluster.style.transform, 'translateX(-50%)');
+});
+
+Then("the widgets of the HUD keep clear of the ride's buttons", async function (this: RidrsWorld) {
+  const slot = await within(ui(this)).findByTestId('slot-hud-widget');
+  assert.match(slot.style.bottom, /var\(--ridrs-hud-inset-bottom/);
 });
 
 Then(

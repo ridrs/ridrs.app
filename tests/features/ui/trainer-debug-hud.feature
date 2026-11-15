@@ -13,6 +13,9 @@ Feature: A debug HUD of the trainer's control during a ride
     And the ridrs UI is shown
     And I press "Start ride"
 
+  Scenario: The debug HUD sits at the top right
+    Then the trainer debug HUD sits at the top right
+
   Scenario: Without a trainer the debug HUD shows dashes
     Then the trainer debug HUD shows "Mode" "–"
     And the trainer debug HUD shows "Command" "–"

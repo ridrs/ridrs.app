@@ -1,8 +1,8 @@
 @ui
 Feature: An alternative HUD shows power, heart rate and cadence as analogue gauges
   `ui-hud-gauges` takes the place of `ui-hud` on the activity screen: it offers the same
-  `hud/widget` extension point in the lower corners, and draws a cluster of three round gauges at
-  the top left, below Pause, like the dials of a car. Power and heart rate also show their average
+  `hud/widget` extension point in the lower corners, above the ride's buttons, and adds a HUD
+  element of its own at the top centre: the telemetry, three round gauges like the dials of a car. Power and heart rate also show their average
   over the ride; cadence shows its value only. The scale of each gauge is coloured by zone: power
   by the power zones of the athlete profile in watts of the FTP, heart rate by its heart rate
   zones in bpm. Cadence has no zones in the profile and is coloured by fixed cadence bands.
@@ -18,14 +18,15 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
 
   Scenario: The gauge HUD takes the place of the HUD and keeps its widgets
     When I press "Start ride"
-    Then the slot "activity/hud" contains the contribution "ui-hud-gauges/hud"
+    Then the slot "activity/hud" contains the contributions "ui-hud-gauges/hud, ui-hud-gauges/telemetry" in this order
     And the slot "hud/widget" contains the contributions "ui-widget-power-heart-rate-ratio/power-heart-rate-ratio" in this order
     And pointer events pass through the gauge HUD except on its gauges and widgets
 
-  Scenario: The gauges sit at the top left, below Pause
+  Scenario: The telemetry sits at the top centre, the widgets above the ride's buttons
     When I press "Start ride"
     Then the gauges are shown in the order "power, heart-rate, cadence"
-    And the gauges sit at the top left, below the Pause button
+    And the telemetry sits at the top centre
+    And the widgets of the HUD keep clear of the ride's buttons
 
   Scenario: The gauges show the current values
     Given I press "Start ride"

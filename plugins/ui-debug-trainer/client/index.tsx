@@ -155,9 +155,9 @@ function TrainerDebugHudView({ ctx }: { readonly ctx: UiContext }) {
       aria-label={text.title}
       style={{
         position: 'absolute',
-        // Below Pause, clear of the widgets in the lower corners.
-        top: 72,
-        left: 16,
+        // Top right: the telemetry takes the top centre, the ride's buttons the bottom.
+        top: 16,
+        right: 16,
         maxWidth: 'calc(100% - 32px)',
         padding: '8px 12px',
         borderRadius: 10,

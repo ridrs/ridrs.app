@@ -124,3 +124,14 @@ Then('the trainer debug HUD has nothing focusable', async function (this: RidrsW
   assert.equal(hud.querySelectorAll('button, [tabindex], input, a[href]').length, 0);
   assert.equal(hud.hasAttribute('tabindex'), false);
 });
+
+// happy-dom has no layout: the place is asserted on the declared position.
+Then('the trainer debug HUD sits at the top right', async function (this: RidrsWorld) {
+  const view = this.uiViews[0];
+  assert.ok(view, 'Expected the ridrs UI to be shown');
+  const hud = await within(view.root).findByTestId('debug-trainer');
+  assert.equal(hud.style.position, 'absolute');
+  assert.equal(hud.style.top, '16px');
+  assert.equal(hud.style.right, '16px');
+  assert.equal(hud.style.left, '');
+});

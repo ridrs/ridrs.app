@@ -2,6 +2,8 @@
 Feature: The rider pauses and resumes a ride on the activity screen
   While a ride runs the activity screen offers Pause next to Finish ride; a paused ride says so
   and offers Resume (ADR 0056). Both work with the arrow keys and Enter (AGENTS.md rule 12).
+  They are round buttons with an icon, side by side at the bottom centre, drawn like the global
+  actions of the main screen; the screen keeps the bottom of the HUD free for them.
 
   Background:
     Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, ui-activity-screen" together with a test device plugin "test-device"
@@ -33,3 +35,11 @@ Feature: The rider pauses and resumes a ride on the activity screen
     Then the focus is on "Pause"
     When I press Enter
     Then the page offers a "Resume" button
+
+  Scenario: Pause and Finish ride are round buttons at the bottom centre
+    Then the ride's buttons "Pause, Finish ride" are round and side by side at the bottom centre
+    And the screen keeps the bottom of the HUD free for the ride's buttons
+
+  Scenario: Resume takes the place of Pause at the bottom centre
+    When I press "Pause"
+    Then the ride's buttons "Resume, Finish ride" are round and side by side at the bottom centre

@@ -19,6 +19,12 @@
         "extensionPoints": [
           "hud/widget"
         ]
+      },
+      {
+        "id": "telemetry",
+        "extensionPoint": "activity/hud",
+        "export": "Telemetry",
+        "order": 1
       }
     ],
     "events": {

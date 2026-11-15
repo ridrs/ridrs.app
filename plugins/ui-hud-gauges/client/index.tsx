@@ -66,14 +66,12 @@ function useAthlete(ctx: UiContext) {
 }
 
 /**
- * The gauge HUD: three round dials at the top left, below Pause, and the `hud/widget` slot of the
- * plain HUD in the lower corners, so every other widget keeps its place. The HUD lets pointer
- * events through; only the gauges and the widgets take them.
+ * The telemetry, a HUD element of its own: three round dials side by side at the top centre.
+ * Only the gauges take pointer events.
  */
-function GaugeHudView({ ctx }: { readonly ctx: UiContext }) {
+function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);
-  const widgets = useRef<HTMLDivElement>(null);
   const athlete = useAthlete(ctx);
   const power = useRideMetric(ctx, metricPowerEvent, true);
   const heartRate = useRideMetric(ctx, metricHeartRateEvent, true);
@@ -89,6 +87,60 @@ function GaugeHudView({ ctx }: { readonly ctx: UiContext }) {
     [ftp, powerZones, heartRateZones, lthr, maxHeartRate],
   );
 
+  return (
+    <div
+      data-testid="gauges"
+      style={{
+        position: 'absolute',
+        top: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        gap: 12,
+        pointerEvents: 'none',
+      }}
+    >
+      <Gauge
+        kind="power"
+        label={text.power}
+        unit="W"
+        reading={power.reading}
+        scale={scales.power}
+        language={language}
+        average={{ label: text.average, value: power.average }}
+        zoneName={text.zone}
+      />
+      <Gauge
+        kind="heart-rate"
+        label={text.heartRate}
+        unit="bpm"
+        reading={heartRate.reading}
+        scale={scales.heartRate}
+        language={language}
+        average={{ label: text.average, value: heartRate.average }}
+        zoneName={text.zone}
+      />
+      <Gauge
+        kind="cadence"
+        label={text.cadence}
+        unit="rpm"
+        reading={cadence.reading}
+        scale={scales.cadence}
+        language={language}
+        zoneName={text.zone}
+      />
+    </div>
+  );
+}
+
+/**
+ * The gauge HUD's layer: the `hud/widget` slot of the plain HUD in the lower corners, above the
+ * ride's buttons (the screen keeps their room free with `--ridrs-hud-inset-bottom`), so every
+ * other widget keeps its place. It lets pointer events through; only the widgets take them.
+ */
+function GaugeHudView({ ctx }: { readonly ctx: UiContext }) {
+  const widgets = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!widgets.current) return undefined;
     return ctx.slot('hud/widget', widgets.current);
@@ -97,55 +149,13 @@ function GaugeHudView({ ctx }: { readonly ctx: UiContext }) {
   return (
     <div data-testid="hud" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       <div
-        data-testid="gauges"
-        style={{
-          position: 'absolute',
-          top: 76,
-          left: 16,
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 12,
-          pointerEvents: 'none',
-        }}
-      >
-        <Gauge
-          kind="power"
-          label={text.power}
-          unit="W"
-          reading={power.reading}
-          scale={scales.power}
-          language={language}
-          average={{ label: text.average, value: power.average }}
-          zoneName={text.zone}
-        />
-        <Gauge
-          kind="heart-rate"
-          label={text.heartRate}
-          unit="bpm"
-          reading={heartRate.reading}
-          scale={scales.heartRate}
-          language={language}
-          average={{ label: text.average, value: heartRate.average }}
-          zoneName={text.zone}
-        />
-        <Gauge
-          kind="cadence"
-          label={text.cadence}
-          unit="rpm"
-          reading={cadence.reading}
-          scale={scales.cadence}
-          language={language}
-          zoneName={text.zone}
-        />
-      </div>
-      <div
         data-testid="slot-hud-widget"
         ref={widgets}
         style={{
           position: 'absolute',
           left: 16,
           right: 16,
-          bottom: 16,
+          bottom: 'var(--ridrs-hud-inset-bottom, 16px)',
           display: 'flex',
           // Widgets that do not fit wrap upwards, keeping the first ones in the bottom row.
           flexWrap: 'wrap-reverse',
@@ -162,5 +172,11 @@ function GaugeHudView({ ctx }: { readonly ctx: UiContext }) {
 export const GaugeHud: UiComponent = (container, ctx) => {
   const root = createRoot(container);
   root.render(<GaugeHudView ctx={ctx} />);
+  return () => root.unmount();
+};
+
+export const Telemetry: UiComponent = (container, ctx) => {
+  const root = createRoot(container);
+  root.render(<TelemetryView ctx={ctx} />);
   return () => root.unmount();
 };
