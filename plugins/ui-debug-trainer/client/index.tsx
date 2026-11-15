@@ -155,17 +155,20 @@ function TrainerDebugHudView({ ctx }: { readonly ctx: UiContext }) {
       aria-label={text.title}
       style={{
         position: 'absolute',
-        // Top right: the telemetry takes the top centre, the ride's buttons the bottom.
-        top: 16,
+        // Bottom right, beside the ride's buttons and below the widgets: those keep the bottom
+        // of the HUD free (`--ridrs-hud-inset-bottom`), this fits into it.
+        bottom: 16,
         right: 16,
-        maxWidth: 'calc(100% - 32px)',
-        padding: '8px 12px',
+        maxWidth: 'calc(50% - 140px)',
+        maxHeight: 'calc(var(--ridrs-hud-inset-bottom, 96px) - 20px)',
+        overflow: 'hidden',
+        padding: '5px 10px',
         borderRadius: 10,
         background: 'rgba(16, 20, 24, 0.72)',
         color: '#fff',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 13,
-        lineHeight: 1.5,
+        fontSize: 12,
+        lineHeight: 1.35,
         pointerEvents: 'none',
       }}
     >

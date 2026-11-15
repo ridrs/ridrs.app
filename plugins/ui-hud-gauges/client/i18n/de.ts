@@ -6,6 +6,9 @@ import type { Messages } from './en.ts';
 export const de: Messages = {
   power: 'Leistung',
   heartRate: 'Puls',
+  time: 'Zeit',
+  distance: 'Distanz',
+  speed: 'Tempo',
   cadence: 'Trittfrequenz',
   average: 'Ø',
   zone: (zone: number) => `Zone ${zone}`,

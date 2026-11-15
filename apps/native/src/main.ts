@@ -10,8 +10,8 @@ import { enableOverlayTitleBar } from './title-bar.ts';
 
 /**
  * Plugins that are bundled but not started in the app: the console output is for headless use;
- * the gauge HUD (`ui-hud-gauges`) takes the place of the plain HUD and shows power, heart rate and
- * cadence itself, so the plain HUD and those three widgets would only repeat it.
+ * the gauge HUD (`ui-hud-gauges`) takes the place of the plain HUD and shows power, heart rate,
+ * cadence, speed and distance itself, so the plain HUD and those widgets would only repeat it.
  */
 const DISABLED_IN_APP = [
   'output-console',
@@ -19,6 +19,8 @@ const DISABLED_IN_APP = [
   'ui-widget-power',
   'ui-widget-heart-rate',
   'ui-widget-cadence',
+  'ui-widget-virtual-speed',
+  'ui-widget-virtual-distance',
 ];
 
 async function main(): Promise<void> {

@@ -11,14 +11,16 @@ import {
   metricCadenceEvent,
   metricHeartRateEvent,
   metricPowerEvent,
+  type PhysicsState,
+  physicsStateEvent,
 } from '@ridrs/contracts';
-import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { formatDecimal, localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Gauge } from './gauge.tsx';
 import { messages } from './i18n/index.ts';
-import { cadenceScale, heartRateScale, powerScale, RideAverage } from './model.ts';
+import { cadenceScale, formatDuration, heartRateScale, powerScale, RideAverage } from './model.ts';
 
 /** The latest reading of a metric and, with `averaged`, its average over the ride. */
 function useRideMetric<R extends MetricReading>(
@@ -66,7 +68,7 @@ function useAthlete(ctx: UiContext) {
 }
 
 /**
- * The telemetry, a HUD element of its own: three round dials side by side at the top centre.
+ * The telemetry, a HUD element of its own: three round dials side by side at the top left.
  * Only the gauges take pointer events.
  */
 function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
@@ -93,8 +95,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
       style={{
         position: 'absolute',
         top: 16,
-        left: '50%',
-        transform: 'translateX(-50%)',
+        left: 16,
         display: 'flex',
         gap: 12,
         pointerEvents: 'none',
@@ -130,6 +131,95 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         zoneName={text.zone}
       />
     </div>
+  );
+}
+
+const EN_DASH = '–';
+
+/** The physics steps 10 ms each, and only while the ride runs: the time ridden. */
+const STEP_MS = 10;
+
+const FACT_LABEL = {
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: '.12em',
+  textTransform: 'uppercase',
+  color: 'rgb(255 255 255 / .82)',
+} as const;
+
+/** One value of the ride: its name above, the number large, the unit beside it. */
+function Fact({
+  kind,
+  label,
+  value,
+  unit,
+}: {
+  readonly kind: string;
+  readonly label: string;
+  readonly value: string;
+  readonly unit?: string;
+}) {
+  return (
+    <div data-testid={`ride-${kind}`} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 92 }}>
+      <span style={FACT_LABEL}>{label}</span>
+      <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
+        <span
+          data-testid="value"
+          style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}
+        >
+          {value}
+        </span>
+        {unit === undefined ? null : (
+          <span data-testid="unit" style={{ fontSize: 13, fontWeight: 600, color: 'rgb(255 255 255 / .82)' }}>
+            {unit}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The ride at the top centre, a HUD element of its own drawn like a ride card: the time ridden,
+ * the distance and the speed, from the physics. Dashes until the first physics state.
+ */
+function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
+  const [state, setState] = useState<PhysicsState>();
+  useEffect(() => ctx.events.subscribe(physicsStateEvent, ({ payload }) => setState(payload)), [ctx]);
+  const number = (value: number, decimals: number) => localizeNumber(formatDecimal(value, decimals), language);
+
+  return (
+    <section
+      data-testid="ride-facts"
+      aria-label={[text.time, text.distance, text.speed].join(', ')}
+      style={{
+        position: 'absolute',
+        top: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        gap: 28,
+        padding: '12px 24px',
+        borderRadius: 16,
+        background:
+          'radial-gradient(120% 140% at 85% 0%, #2a4a78 0%, transparent 60%), linear-gradient(160deg, #1b2d4d, #0d1626)',
+        boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .12), 0 10px 28px rgb(0 0 0 / .38)',
+        color: '#fff',
+        fontFamily: 'system-ui, sans-serif',
+        pointerEvents: 'none',
+      }}
+    >
+      <Fact kind="time" label={text.time} value={state ? formatDuration((state.step * STEP_MS) / 1000) : EN_DASH} />
+      <Fact
+        kind="distance"
+        label={text.distance}
+        value={state ? number(state.distance / 1000, 2) : EN_DASH}
+        unit="km"
+      />
+      <Fact kind="speed" label={text.speed} value={state ? number(state.speed * 3.6, 1) : EN_DASH} unit="km/h" />
+    </section>
   );
 }
 
@@ -178,5 +268,11 @@ export const GaugeHud: UiComponent = (container, ctx) => {
 export const Telemetry: UiComponent = (container, ctx) => {
   const root = createRoot(container);
   root.render(<TelemetryView ctx={ctx} />);
+  return () => root.unmount();
+};
+
+export const RideFacts: UiComponent = (container, ctx) => {
+  const root = createRoot(container);
+  root.render(<RideFactsView ctx={ctx} />);
   return () => root.unmount();
 };

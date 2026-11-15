@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
-import { Then } from '@cucumber/cucumber';
+import { Then, When } from '@cucumber/cucumber';
+import { type PhysicsState, physicsStateEvent } from '@ridrs/contracts';
 import { waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 
@@ -65,13 +66,73 @@ Then('the gauges are shown in the order {string}', async function (this: RidrsWo
 });
 
 // happy-dom has no layout: the place is asserted on the declared position, as for the HUD layers.
-Then('the telemetry sits at the top centre', async function (this: RidrsWorld) {
+Then('the telemetry sits at the top left', async function (this: RidrsWorld) {
   const cluster = await within(ui(this)).findByTestId('gauges');
   assert.equal(cluster.style.position, 'absolute');
   assert.equal(cluster.style.top, '16px');
-  assert.equal(cluster.style.left, '50%');
-  assert.equal(cluster.style.transform, 'translateX(-50%)');
+  assert.equal(cluster.style.left, '16px');
 });
+
+Then(
+  "the ride's time, distance and speed sit at the top centre",
+  async function (this: RidrsWorld) {
+    const ride = await within(ui(this)).findByTestId('ride-facts');
+    assert.equal(ride.style.position, 'absolute');
+    assert.equal(ride.style.top, '16px');
+    assert.equal(ride.style.left, '50%');
+    assert.equal(ride.style.transform, 'translateX(-50%)');
+  },
+);
+
+When(
+  'the physics reports step {int} at a speed of {float} m\\/s after {int} m',
+  async function (this: RidrsWorld, step: number, speed: number, distance: number) {
+    const ctx = this.ensureHost().getPluginContext('test-device');
+    assert.ok(ctx, 'Expected the test device');
+    const state: PhysicsState = {
+      sessionId: 'session-1',
+      step,
+      at: step * 10,
+      speed,
+      distance,
+      acceleration: 0,
+      mass: 85,
+      riderPower: { status: 'unavailable', at: 0, reason: 'no-source' },
+      wheelPower: 0,
+      driveForce: 0,
+      resistance: { total: 0, contributions: [] },
+      road: { gradient: 0, surface: 'asphalt', origin: 'default' },
+    };
+    // A stand-in for the physics: no physics plugin runs in these scenarios.
+    ctx.inputs.accept(physicsStateEvent, state);
+    await this.settle();
+  },
+);
+
+async function fact(world: RidrsWorld, kind: string): Promise<HTMLElement> {
+  const ride = await within(ui(world)).findByTestId('ride-facts');
+  return within(ride).getByTestId(`ride-${kind}`);
+}
+
+Then('the ride shows the time {string}', async function (this: RidrsWorld, value: string) {
+  const element = await fact(this, 'time');
+  await eventually(this, () =>
+    assert.equal(within(element).getByTestId('value').textContent, value),
+  );
+});
+
+for (const kind of ['distance', 'speed']) {
+  Then(
+    `the ride shows the ${kind} {string} {string}`,
+    async function (this: RidrsWorld, value: string, unit: string) {
+      const element = await fact(this, kind);
+      await eventually(this, () => {
+        assert.equal(within(element).getByTestId('value').textContent, value);
+        assert.equal(within(element).getByTestId('unit').textContent, unit);
+      });
+    },
+  );
+}
 
 Then("the widgets of the HUD keep clear of the ride's buttons", async function (this: RidrsWorld) {
   const slot = await within(ui(this)).findByTestId('slot-hud-widget');

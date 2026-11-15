@@ -48,17 +48,30 @@ const CONTROLS_CSS = `
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 `;
 
-function controlStyle(side: 'left' | 'right'): CSSProperties {
+/** A left edge as an offset from the centre, e.g. `calc(50% - 64px)`. */
+function fromCentre(offset: number): string {
+  return offset < 0 ? `calc(50% - ${-offset}px)` : `calc(50% + ${offset}px)`;
+}
+
+/**
+ * The left edges of the row Pause, the contributed controls, Finish ride: centred as a whole,
+ * whatever number of controls there is.
+ */
+function rowLayout(controls: number): { readonly pause: number; readonly controls: number; readonly finish: number } {
+  const count = controls + 2;
+  const start = -(count * BUTTON_SIZE + (count - 1) * BUTTON_GAP) / 2;
+  const step = BUTTON_SIZE + BUTTON_GAP;
+  return { pause: start, controls: start + step, finish: start + (count - 1) * step };
+}
+
+function controlStyle(left: number): CSSProperties {
   return {
     position: 'absolute',
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
     borderRadius: '50%',
     bottom: BUTTON_BOTTOM,
-    left:
-      side === 'left'
-        ? `calc(50% - ${BUTTON_SIZE + BUTTON_GAP / 2}px)`
-        : `calc(50% + ${BUTTON_GAP / 2}px)`,
+    left: fromCentre(left),
     zIndex: Z_CONTROLS,
   };
 }
@@ -67,14 +80,14 @@ function controlStyle(side: 'left' | 'right'): CSSProperties {
 function Control({
   label,
   icon,
-  side,
+  left,
   testId,
   onPress,
   buttonRef,
 }: {
   readonly label: string;
   readonly icon: string;
-  readonly side: 'left' | 'right';
+  readonly left: number;
   readonly testId: string;
   readonly onPress: () => void;
   readonly buttonRef?: Ref<HTMLButtonElement>;
@@ -87,7 +100,7 @@ function Control({
       data-testid={testId}
       aria-label={label}
       title={label}
-      style={controlStyle(side)}
+      style={controlStyle(left)}
       onClick={onPress}
     >
       <span className="as-control-icon" aria-hidden="true" style={{ '--icon': `url("${icon}")` } as CSSProperties} />
@@ -99,6 +112,10 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   const landscape = useRef<HTMLDivElement>(null);
   const hud = useRef<HTMLDivElement>(null);
   const finish = useRef<HTMLButtonElement>(null);
+  const controls = useRef<HTMLDivElement>(null);
+  // How many controls other plugins add between Pause and Finish ride: the row is centred on all.
+  const [controlCount, setControlCount] = useState(0);
+  const row = rowLayout(controlCount);
   const [paused, setPaused] = useState(false);
   // The landscape of the ride's world; null for a free ride, undefined until the state is known.
   const [world, setWorld] = useState<string | null>();
@@ -113,6 +130,22 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
       return undefined;
     }
     return ctx.slot('activity/hud', hud.current);
+  }, [ctx]);
+
+  useEffect(() => {
+    const container = controls.current;
+    if (!container) {
+      return undefined;
+    }
+    const count = () => setControlCount(container.children.length);
+    const observer = new MutationObserver(count);
+    observer.observe(container, { childList: true });
+    const release = ctx.slot('activity/control', container);
+    count();
+    return () => {
+      observer.disconnect();
+      release();
+    };
   }, [ctx]);
 
   useEffect(() => {
@@ -161,15 +194,16 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
       ) : null}
       <style>{CONTROLS_CSS}</style>
       {/*
-        Direct children like the HUD: one stacking context; Pause (or Resume) and Finish ride side
-        by side at the bottom centre. They come first in reading order: the first arrow of a ride
-        focuses Pause, not a HUD control that changes the ride.
+        Direct children like the HUD: one stacking context; Pause (or Resume), the controls of
+        other plugins (`activity/control`, such as ERG) and Finish ride side by side at the bottom
+        centre. They come first in reading order: the first arrow of a ride focuses Pause, not a
+        control that changes the ride.
       */}
       {paused ? (
         <Control
           label="Resume"
           icon={RESUME}
-          side="left"
+          left={row.pause}
           testId="resume-ride"
           onPress={() => ctx.events.publish(activityResumeRequestedEvent, {})}
         />
@@ -177,16 +211,29 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         <Control
           label="Pause"
           icon={PAUSE}
-          side="left"
+          left={row.pause}
           testId="pause-ride"
           onPress={() => ctx.events.publish(activityPauseRequestedEvent, {})}
         />
       )}
+      <div
+        ref={controls}
+        data-testid="slot-activity-control"
+        style={{
+          position: 'absolute',
+          bottom: BUTTON_BOTTOM,
+          left: fromCentre(row.controls),
+          height: BUTTON_SIZE,
+          display: 'flex',
+          gap: BUTTON_GAP,
+          zIndex: Z_CONTROLS,
+        }}
+      />
       <Control
         buttonRef={finish}
         label="Finish ride"
         icon={FINISH}
-        side="right"
+        left={row.finish}
         testId="finish-ride"
         onPress={() => ctx.events.publish(activityFinishRequestedEvent, {})}
       />

@@ -13,9 +13,9 @@
     "contributions": [
       {
         "id": "erg",
-        "extensionPoint": "hud/widget",
+        "extensionPoint": "activity/control",
         "export": "ErgToggle",
-        "order": 8
+        "order": 0
       },
       {
         "id": "target-power",

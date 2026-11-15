@@ -30,8 +30,10 @@ function useTarget(ctx: UiContext): number | null {
 }
 
 /**
- * The ERG toggle: Enter turns ERG on at the default target and off again; it says "On" or "Off",
- * nothing more. The target shows where the gear was (`hud/erg-on`). It only asks
+ * The ERG toggle, a round control of the activity screen between Pause and Finish ride
+ * (`activity/control`), drawn like them: a round glass with a light edge. Enter turns ERG on at
+ * the default target and off again; it says "On" or "Off", nothing more, and shows the state in
+ * the info colour while on. The target shows where the gear was (`hud/erg-on`). It only asks
  * (`trainer.erg-requested`); the ERG driver sets the target.
  */
 function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
@@ -43,30 +45,38 @@ function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
       type="button"
       aria-label={text.erg}
       aria-pressed={erg}
+      title={text.erg}
       data-testid="widget-erg"
       data-status={erg ? 'available' : 'unavailable'}
       onClick={() => ctx.events.publish(trainerErgRequestedEvent, { change: erg ? 'leave' : 'enter' })}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={{
-        pointerEvents: 'auto',
-        minWidth: 110,
-        padding: '12px 18px',
-        borderRadius: 14,
-        border: 'none',
-        textAlign: 'left',
-        background: erg ? 'rgba(10, 70, 90, 0.85)' : 'rgba(16, 20, 24, 0.72)',
-        color: '#fff',
+        width: 56,
+        height: 56,
+        borderRadius: '50%',
+        display: 'grid',
+        placeContent: 'center',
+        gap: 1,
+        padding: 0,
+        border: `1px solid ${erg ? '#2aa8ff' : 'rgb(255 255 255 / .14)'}`,
+        background: erg ? 'rgb(42 168 255 / .28)' : 'rgb(11 18 32 / .55)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        boxShadow: '0 6px 18px rgb(0 0 0 / .3)',
+        color: erg ? '#2aa8ff' : '#f2f5fa',
         fontFamily: 'system-ui, sans-serif',
+        lineHeight: 1,
+        cursor: 'pointer',
         // The focus is always clearly visible.
-        outline: focused ? '3px solid #ffd60a' : 'none',
+        outline: focused ? '3px solid #fff' : 'none',
         outlineOffset: 2,
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.erg}</div>
-      <div data-testid="value" style={{ fontSize: 28, fontWeight: 700, minHeight: 53, lineHeight: '53px' }}>
+      <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.06em' }}>{text.erg}</span>
+      <span data-testid="value" style={{ fontSize: 10, fontWeight: 600, opacity: 0.85 }}>
         {erg ? text.on : text.off}
-      </div>
+      </span>
     </button>
   );
 }

@@ -236,3 +236,12 @@ export class RideAverage {
     return this.count === 0 ? undefined : this.sum / this.count;
   }
 }
+
+/** Seconds as `1:02:03`, or `4:05` below an hour. */
+export function formatDuration(seconds: number): string {
+  const whole = Math.max(Math.floor(seconds), 0);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const rest = String(whole % 60).padStart(2, '0');
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`;
+}

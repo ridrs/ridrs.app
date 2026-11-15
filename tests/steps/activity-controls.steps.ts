@@ -16,6 +16,21 @@ function ui(world: RidrsWorld): HTMLElement {
 
 const px = (value: string) => Number.parseFloat(value);
 
+/** The element that places a button: itself, or the slot container around a contributed one. */
+function placed(button: HTMLElement): HTMLElement {
+  let element: HTMLElement | null = button;
+  while (element && element.style.position !== 'absolute') element = element.parentElement;
+  assert.ok(element, `"${button.getAttribute('aria-label')}" is not placed`);
+  return element;
+}
+
+/** `calc(50% - 64px)` gives -64: the offset from the centre. */
+function offset(left: string): number {
+  const match = /^calc\(50% ([-+]) (\d+(?:\.\d+)?)px\)$/.exec(left);
+  assert.ok(match, `"${left}" is not placed from the centre`);
+  return (match[1] === '-' ? -1 : 1) * Number(match[2]);
+}
+
 // happy-dom has no layout: the place and the shape are asserted on the declared styles.
 Then(
   "the ride's buttons {string} are round and side by side at the bottom centre",
@@ -24,17 +39,23 @@ Then(
     const buttons = await Promise.all(
       labels.map((name) => within(ui(this)).findByRole('button', { name })),
     );
-    for (const button of buttons) {
-      assert.equal(button.style.position, 'absolute');
-      assert.equal(button.style.borderRadius, '50%');
-      assert.equal(button.style.width, button.style.height, 'as wide as high');
-      assert.equal(button.style.bottom, buttons[0]?.style.bottom, 'on one line');
-      assert.equal(button.style.top, '');
+    const boxes = buttons.map(placed);
+    for (const [index, button] of buttons.entries()) {
+      assert.equal(button.style.borderRadius, '50%', `${labels[index]} is round`);
+      assert.ok(
+        button.style.width !== '' && button.style.width === button.style.height,
+        'as wide as high',
+      );
+      assert.equal(boxes[index]?.style.bottom, boxes[0]?.style.bottom, 'on one line');
+      assert.equal(boxes[index]?.style.top, '');
     }
-    const [first, second] = buttons;
-    assert.ok(first && second);
-    assert.match(first.style.left, /50% -/, `${first.style.left} is not left of the centre`);
-    assert.match(second.style.left, /50% \+/, `${second.style.left} is not right of the centre`);
+    const offsets = boxes.map((box) => offset(box.style.left));
+    assert.deepEqual(
+      [...offsets].sort((a, b) => a - b),
+      offsets,
+      `left to right as named: ${offsets.join(', ')}`,
+    );
+    assert.ok((offsets[0] ?? 0) < 0 && (offsets.at(-1) ?? 0) > 0, 'around the centre');
   },
 );
 

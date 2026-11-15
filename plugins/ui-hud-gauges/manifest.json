@@ -25,6 +25,12 @@
         "extensionPoint": "activity/hud",
         "export": "Telemetry",
         "order": 1
+      },
+      {
+        "id": "ride",
+        "extensionPoint": "activity/hud",
+        "export": "RideFacts",
+        "order": 2
       }
     ],
     "events": {
@@ -33,7 +39,8 @@
         "metric.heart-rate",
         "metric.cadence",
         "activity.state-changed",
-        "activity.athlete"
+        "activity.athlete",
+        "physics.state"
       ],
       "publish": []
     },

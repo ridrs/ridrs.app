@@ -16,7 +16,8 @@
         "export": "ActivityScreen",
         "extensionPoints": [
           "activity/landscape",
-          "activity/hud"
+          "activity/hud",
+          "activity/control"
         ]
       }
     ],

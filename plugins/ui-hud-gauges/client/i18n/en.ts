@@ -4,6 +4,9 @@
 export const en = {
   power: 'Power',
   heartRate: 'Heart rate',
+  time: 'Time',
+  distance: 'Distance',
+  speed: 'Speed',
   cadence: 'Cadence',
   /** Before the average of the ride. */
   average: 'avg',

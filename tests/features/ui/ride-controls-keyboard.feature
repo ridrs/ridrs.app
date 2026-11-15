@@ -1,8 +1,9 @@
 @phase-8 @ui
 Feature: ERG and virtual gears with the keyboard alone
   During a ride the rider controls the trainer with the keyboard or a remote (AGENTS.md rule 12),
-  until keys can be mapped in settings. The ERG button in the HUD is a pure toggle: Enter turns
-  ERG on (at the default target) and off, and it says "On" or "Off". One place in the HUD shows
+  until keys can be mapped in settings. The ERG button is a pure toggle: Enter turns
+  ERG on (at the default target) and off, and it says "On" or "Off". It is a round button of the
+  activity screen's controls, between Pause and Finish ride (`activity/control`). One place in the HUD shows
   either the gear or the target power: a dispatching widget shows the gear while ERG is off and
   the target power while it is on, without knowing either widget. While the target power has the
   focus, Up and Down change it by 5 W; while the gear has it, Up shifts one gear harder and Down
@@ -17,6 +18,10 @@ Feature: ERG and virtual gears with the keyboard alone
     And the ridrs UI is shown
     And I press "Start ride"
     And eventually the virtual gear widget shows "12"
+
+  Scenario: The ERG button is the third round button, between Pause and Finish ride
+    Then the ride's buttons "Pause, ERG, Finish ride" are round and side by side at the bottom centre
+    And the ERG button is not in the HUD
 
   Scenario: The first arrow of a ride focuses Pause
     When I press the arrow key "Down"
@@ -64,12 +69,12 @@ Feature: ERG and virtual gears with the keyboard alone
   Scenario: Up and Down on the ERG button move the focus, with and without ERG
     Given I move the focus to "ERG"
     When I press the arrow key "Up"
-    Then the focus is on "Gear"
+    Then the focus is on "Pause"
     And the ERG button is off
     When I move the focus to "ERG"
     And I press Enter
-    And I press the arrow key "Up"
-    Then the focus is on "Target power"
+    And I press the arrow key "Down"
+    Then the focus is on "Finish ride"
     And the ERG button is on
     And eventually the target power widget shows "150 W"
 
@@ -77,7 +82,7 @@ Feature: ERG and virtual gears with the keyboard alone
     Given I move the focus to "ERG"
     And I press Enter
     When I press the arrow key "Left"
-    Then the focus is on "Target power"
+    Then the focus is on "Pause"
     When I press the arrow key "Right"
     Then the focus is on "ERG"
     And eventually the target power widget shows "150 W"
@@ -94,9 +99,9 @@ Feature: ERG and virtual gears with the keyboard alone
 
   Scenario: Left and Right move the focus from the gear
     Given I move the focus to "Gear"
-    When I press the arrow key "Right"
-    Then the focus is on "ERG"
     When I press the arrow key "Left"
+    Then the focus is on "Finish ride"
+    When I press the arrow key "Right"
     Then the focus is on "Gear"
     And the virtual gear widget shows "12"
 

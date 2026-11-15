@@ -160,6 +160,13 @@ Then('the virtual gear widget shows {string}', async function (this: RidrsWorld,
   await waitFor(() => assert.equal(within(element).getByTestId('value').textContent, gear));
 });
 
+Then('the ERG button is not in the HUD', async function (this: RidrsWorld) {
+  const element = await widget('erg');
+  const hud = this.uiViews[0]?.root.querySelector('[data-testid="slot-activity-hud"]');
+  assert.ok(hud, 'Expected the HUD');
+  assert.equal(hud.contains(element), false);
+});
+
 Then('the ERG button is on', async function (this: RidrsWorld) {
   const element = await widget('erg');
   await waitFor(() => {

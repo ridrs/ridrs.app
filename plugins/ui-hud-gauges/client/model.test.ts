@@ -5,6 +5,7 @@ import {
   angleOf,
   bandAt,
   cadenceScale,
+  formatDuration,
   heartRateScale,
   powerScale,
   RideAverage,
@@ -120,5 +121,13 @@ describe('RideAverage', () => {
     average.add(300, 2);
     average.activity(running('b'), 3);
     expect(average.value).toBeUndefined();
+  });
+});
+
+describe('formatDuration', () => {
+  it('shows minutes and seconds below an hour, hours above', () => {
+    expect(formatDuration(0)).toBe('0:00');
+    expect(formatDuration(245.9)).toBe('4:05');
+    expect(formatDuration(3723.5)).toBe('1:02:03');
   });
 });

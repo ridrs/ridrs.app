@@ -1,8 +1,10 @@
 @ui
 Feature: An alternative HUD shows power, heart rate and cadence as analogue gauges
   `ui-hud-gauges` takes the place of `ui-hud` on the activity screen: it offers the same
-  `hud/widget` extension point in the lower corners, above the ride's buttons, and adds a HUD
-  element of its own at the top centre: the telemetry, three round gauges like the dials of a car. Power and heart rate also show their average
+  `hud/widget` extension point in the lower corners, above the ride's buttons, and adds two HUD
+  elements of its own: at the top left the telemetry, three round gauges like the dials of a car,
+  and at the top centre the ride's time, distance and speed. The time is the time ridden: the
+  physics counts its steps only while the ride runs. Power and heart rate also show their average
   over the ride; cadence shows its value only. The scale of each gauge is coloured by zone: power
   by the power zones of the athlete profile in watts of the FTP, heart rate by its heart rate
   zones in bpm. Cadence has no zones in the profile and is coloured by fixed cadence bands.
@@ -18,15 +20,29 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
 
   Scenario: The gauge HUD takes the place of the HUD and keeps its widgets
     When I press "Start ride"
-    Then the slot "activity/hud" contains the contributions "ui-hud-gauges/hud, ui-hud-gauges/telemetry" in this order
+    Then the slot "activity/hud" contains the contributions "ui-hud-gauges/hud, ui-hud-gauges/telemetry, ui-hud-gauges/ride" in this order
     And the slot "hud/widget" contains the contributions "ui-widget-power-heart-rate-ratio/power-heart-rate-ratio" in this order
     And pointer events pass through the gauge HUD except on its gauges and widgets
 
-  Scenario: The telemetry sits at the top centre, the widgets above the ride's buttons
+  Scenario: The telemetry sits at the top left, the ride at the top centre, the widgets above the ride's buttons
     When I press "Start ride"
     Then the gauges are shown in the order "power, heart-rate, cadence"
-    And the telemetry sits at the top centre
+    And the telemetry sits at the top left
+    And the ride's time, distance and speed sit at the top centre
     And the widgets of the HUD keep clear of the ride's buttons
+
+  Scenario: The top centre shows the time ridden, the distance and the speed
+    Given I press "Start ride"
+    When the physics reports step 372350 at a speed of 8.5 m/s after 12340 m
+    Then the ride shows the time "1:02:03"
+    And the ride shows the distance "12.34" "km"
+    And the ride shows the speed "30.6" "km/h"
+
+  Scenario: Before the first physics state the ride shows dashes
+    When I press "Start ride"
+    Then the ride shows the time "–"
+    And the ride shows the distance "–" "km"
+    And the ride shows the speed "–" "km/h"
 
   Scenario: The gauges show the current values
     Given I press "Start ride"

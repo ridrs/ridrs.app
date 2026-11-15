@@ -25,13 +25,15 @@ apps/native  (one process: the Tauri WebView)
    │                      ◄─ ui-area-ride, ui-area-events, ui-area-me   cards on Today (preview)
    │                      ◄─ ui-training-plan     the next workout
    │     └─ content area  screens ride, training, events, me, search, settings, setup (layout.json)
-   └─ screen "activity"  ui-activity-screen      declares: activity/landscape, activity/hud   [Pause|Resume] [Finish ride]
+   └─ screen "activity"  ui-activity-screen      declares: activity/landscape, activity/hud, activity/control
+         │                                         round, bottom centre: [Pause|Resume] [activity/control …] [Finish ride]
+         ├─ activity/control    ◄─ ui-widget-target-power   the ERG toggle
          ├─ activity/landscape  ◄─ ui-landscape-demo     (Phase 10: the world's sensor, publishes ui.terrain-observed)
          └─ activity/hud        ◄─ ui-hud                declares: hud/widget
-                                ◄─ ui-hud-gauges         declares: hud/widget; the native app's HUD, and its
-                                                          telemetry: power, heart rate, cadence as round gauges
-                                                          at the top centre
-                                ◄─ ui-debug-trainer      the trainer's control, at the top right
+                                ◄─ ui-hud-gauges         declares: hud/widget; the native app's HUD, its telemetry
+                                                          (power, heart rate, cadence as round gauges, top left)
+                                                          and the ride (time, distance, speed, top centre)
+                                ◄─ ui-debug-trainer      the trainer's control, at the bottom right
                └─ hud/widget    ◄─ ui-widget-power, ui-widget-cadence,
                                    ui-widget-heart-rate, ui-widget-power-heart-rate-ratio (Phase 4)
 
@@ -110,7 +112,7 @@ Back goes to the component that registered `ctx.onBack(handler)` last and is sti
 
 ## Layering
 
-`ui-activity-screen` stacks its two slot containers absolutely in one stacking context: `activity/landscape` (z 0), `activity/hud` (z 1, `pointer-events: none`), its own **Pause** (or **Resume**, with a large "Paused" while the ride stands still) and **Finish ride** as round icon buttons side by side at the bottom centre, drawn like the global actions of the main screen (z 2; the HUD slot carries `--ridrs-hud-inset-bottom`, the room HUDs keep free for them below their widgets; [ADR 0056](../decisions/0056-pause-and-resume-a-ride.md), `pause-a-ride.feature`). `ui-hud` lays out `hud/widget` in the lower corners and lets pointer events through except on widgets. `ui-hud-gauges` is the alternative the native app starts instead (`DISABLED_IN_APP` in `apps/native/src/main.ts` turns off `ui-hud` and the power, heart rate and cadence widgets): the same `hud/widget` slot, plus the telemetry as a HUD element of its own (`ui-hud-gauges/telemetry`): three analogue gauges at the top centre, with the scales coloured by the zones of the athlete profile and the ride's average power and heart rate (`gauge-hud.feature`). The e2e scenarios of `tests/features/apps/` keep the plain HUD. Screens navigate on `activity.state-changed`, not on clicks: `running` and `paused` lead to `activity` (including the replayed state after a reload), `finished` to the debriefing of `ui-debriefing` when that screen is there (`ctx.hasScreen`; Save or Delete, [ADR 0064](../decisions/0064-ride-debriefing-and-activity-upload.md)), anything else back to `main`. The keep-awake follows `running` only.
+`ui-activity-screen` stacks its two slot containers absolutely in one stacking context: `activity/landscape` (z 0), `activity/hud` (z 1, `pointer-events: none`), its own **Pause** (or **Resume**, with a large "Paused" while the ride stands still) and **Finish ride** as round icon buttons side by side at the bottom centre, drawn like the global actions of the main screen (z 2; the HUD slot carries `--ridrs-hud-inset-bottom`, the room HUDs keep free for them below their widgets; [ADR 0056](../decisions/0056-pause-and-resume-a-ride.md), `pause-a-ride.feature`). `ui-hud` lays out `hud/widget` in the lower corners and lets pointer events through except on widgets. `ui-hud-gauges` is the alternative the native app starts instead (`DISABLED_IN_APP` in `apps/native/src/main.ts` turns off `ui-hud` and the power, heart rate and cadence widgets): the same `hud/widget` slot, plus the telemetry as a HUD element of its own (`ui-hud-gauges/telemetry`): three analogue gauges at the top left, with the scales coloured by the zones of the athlete profile and the ride's average power and heart rate (`gauge-hud.feature`); a second element (`ui-hud-gauges/ride`) shows the time ridden, the distance and the speed from `physics.state` at the top centre. Between Pause and Finish ride the screen offers `activity/control` for further round buttons, centring the whole row: the ERG toggle of `ui-widget-target-power` is one. The e2e scenarios of `tests/features/apps/` keep the plain HUD. Screens navigate on `activity.state-changed`, not on clicks: `running` and `paused` lead to `activity` (including the replayed state after a reload), `finished` to the debriefing of `ui-debriefing` when that screen is there (`ctx.hasScreen`; Save or Delete, [ADR 0064](../decisions/0064-ride-debriefing-and-activity-upload.md)), anything else back to `main`. The keep-awake follows `running` only.
 
 ## Main screen layout
 
