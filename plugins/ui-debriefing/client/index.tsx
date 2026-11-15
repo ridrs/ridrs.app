@@ -27,38 +27,41 @@ const SERVICE = 'intervals.icu';
 const MAIN = 'main';
 const ACTIVITY = 'activity';
 
-/** The look of the training plan and the device setup (docs/ux-draft). Plugins share no code. */
+/** The unified look (docs/design/unified), as tokens. Plugins share no code. */
 const COLORS = {
-  panel: '#0a1520',
-  line: '#1f3447',
-  cyan: '#27c8ff',
-  lime: '#8dff2a',
-  amber: '#ffb62e',
-  muted: '#8b9db2',
-  red: '#ff4d5e',
+  panel: 'var(--ridrs-card-quiet)',
+  line: 'var(--ridrs-line)',
+  cyan: 'var(--ridrs-info)',
+  lime: 'var(--ridrs-accent)',
+  amber: 'var(--ridrs-warn)',
+  muted: 'var(--ridrs-text-muted)',
+  red: 'var(--ridrs-danger)',
 } as const;
 
 const CSS = `
 .db-screen { box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; height: 100%;
   max-width: 640px; margin: 0 auto; padding: 48px 24px; overflow-y: auto;
-  color: var(--ridrs-text, #fff); font: 500 15px system-ui, sans-serif; }
+  color: var(--ridrs-text); font: 500 15px var(--ridrs-font-text); }
 .db-screen h1 { margin: 0; font-size: 34px; }
-.db-facts { display: flex; gap: 32px; margin: 0; }
-.db-facts div { display: flex; flex-direction: column; gap: 2px; }
-.db-facts dt { color: ${COLORS.muted}; font-size: 13px; }
-.db-facts dd { margin: 0; font-size: 26px; font-weight: 700; }
+.db-facts { display: flex; flex-wrap: wrap; gap: var(--ridrs-gap); margin: 0; }
+.db-facts div { display: flex; flex-direction: column; gap: 2px; min-width: 140px; padding: 14px 20px;
+  border-radius: var(--ridrs-radius-lg); background: var(--ridrs-card); box-shadow: var(--ridrs-edge), var(--ridrs-shadow); }
+.db-facts dt { color: var(--ridrs-info); font: 500 var(--ridrs-size-label) var(--ridrs-font-mono);
+  letter-spacing: .12em; text-transform: uppercase; }
+.db-facts dd { margin: 0; font-size: var(--ridrs-size-value); font-weight: 500; font-variant-numeric: tabular-nums; }
 .db-note { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: ${COLORS.muted}; }
 .db-warn { color: ${COLORS.amber}; }
 .db-actions { display: flex; flex-wrap: wrap; gap: 12px; }
-.db-button { padding: 12px 26px; border: 1.5px solid ${COLORS.line}; border-radius: 999px;
-  background: ${COLORS.panel}; color: #fff; font: 600 16px system-ui, sans-serif; cursor: pointer; }
-.db-primary { border-color: ${COLORS.lime}; background: ${COLORS.lime}; color: #0a1520; }
+.db-button { padding: 12px 26px; border: 0; border-radius: var(--ridrs-radius);
+  background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); color: var(--ridrs-text);
+  font: 500 var(--ridrs-size-body) var(--ridrs-font-text); cursor: pointer; transition: filter var(--ridrs-ease); }
+.db-primary { background: ${COLORS.lime}; box-shadow: none; color: var(--ridrs-accent-text); }
 .db-delete { color: ${COLORS.red}; }
-.db-button:hover { border-color: ${COLORS.cyan}; }
-.db-button:focus-visible { outline: 2px solid ${COLORS.lime}; outline-offset: 3px; }
+.db-button:hover { filter: brightness(1.2); }
+.db-button:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
 .db-button:disabled { opacity: .5; cursor: default; }
 .db-spin { display: inline-block; width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid ${COLORS.cyan}40; border-top-color: ${COLORS.cyan}; animation: db-spin 1s linear infinite; }
+  border: 2px solid rgb(255 255 255 / .2); border-top-color: ${COLORS.cyan}; animation: db-spin 1s linear infinite; }
 @keyframes db-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .db-spin { animation: none; } }
 `;

@@ -179,6 +179,7 @@ function Library({
   return (
     <section className="pv-section" data-testid="library">
       <h2>{text.library}</h2>
+      <div className="pv-row">
       <button
         type="button"
         className="pv-button"
@@ -193,6 +194,7 @@ function Library({
           {browse.importWorkouts}
         </button>
       ) : null}
+      </div>
       {providers.length === 0 ? <p className="pv-muted">{text.libraryEmpty}</p> : null}
       {providers.length > 0 && shown.length === 0 ? <p className="pv-muted">{browse.noMatch}</p> : null}
       {shown.map((source) => (

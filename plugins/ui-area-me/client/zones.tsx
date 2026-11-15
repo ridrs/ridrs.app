@@ -15,15 +15,15 @@ export const ZONES_CSS = `
 .me-zones { display: grid; gap: 8px; max-width: 640px; }
 .me-zone { display: grid; grid-template-columns: 28px minmax(120px, 1fr) 110px minmax(90px, auto) 40px;
   align-items: center; gap: 8px; }
-.me-zone-number { font-weight: 700; text-align: center; color: var(--ridrs-text-muted, #93a1b8); }
-.me-zone-field { min-height: 40px; min-width: 0; padding: 6px 10px; border: 1px solid var(--ridrs-line, #24324d);
-  border-radius: 12px; background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa);
-  font: 16px system-ui, sans-serif; font-variant-numeric: tabular-nums; }
-.me-zone-field:focus-visible { outline: 3px solid var(--ridrs-focus, #fff); outline-offset: 2px; }
-.me-zone-field[aria-invalid="true"] { border-color: var(--ridrs-warn, #ffb62e); }
-.me-zone-open { color: var(--ridrs-text-muted, #93a1b8); padding: 0 10px; white-space: nowrap; }
-.me-zone-absolute { font-variant-numeric: tabular-nums; color: var(--ridrs-text-muted, #93a1b8); white-space: nowrap; }
-.me-zone-problem { margin: 0; color: var(--ridrs-warn, #ffb62e); }
+.me-zone-number { font-weight: 500; text-align: center; color: var(--ridrs-text-muted); }
+.me-zone-field { min-height: 40px; min-width: 0; padding: 6px 10px; border: 0; box-shadow: var(--ridrs-edge);
+  border-radius: var(--ridrs-radius); background: var(--ridrs-card-quiet); color: var(--ridrs-text);
+  font: 16px var(--ridrs-font-text); font-variant-numeric: tabular-nums; }
+.me-zone-field:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
+.me-zone-field[aria-invalid="true"] { border-color: var(--ridrs-warn); }
+.me-zone-open { color: var(--ridrs-text-muted); padding: 0 10px; white-space: nowrap; }
+.me-zone-absolute { font-variant-numeric: tabular-nums; color: var(--ridrs-text-muted); white-space: nowrap; }
+.me-zone-problem { margin: 0; color: var(--ridrs-warn); }
 [data-breakpoint="compact"] .me-zone { grid-template-columns: 24px minmax(0, 1fr) 90px 40px; }
 [data-breakpoint="compact"] .me-zone-absolute { display: none; }
 `;

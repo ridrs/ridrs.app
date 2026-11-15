@@ -93,7 +93,7 @@ function TrackMap({ track, position }: { readonly track: TrackPosition[]; readon
       style={{
         height: MAP_VIEW,
         overflow: 'hidden',
-        borderRadius: 10,
+        borderRadius: 'var(--ridrs-radius)',
         background: 'radial-gradient(90% 80% at 50% 100%, rgb(42 74 120 / .45), rgb(6 10 20 / .55))',
       }}
     >
@@ -120,7 +120,7 @@ function TrackMap({ track, position }: { readonly track: TrackPosition[]; readon
               data-testid="route-ridden"
               points={polyline(points.slice(0, here + 1))}
               fill="none"
-              stroke="#b8f53b"
+              stroke="var(--ridrs-accent)"
               strokeWidth={3.5}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -128,8 +128,8 @@ function TrackMap({ track, position }: { readonly track: TrackPosition[]; readon
           ) : null}
           {rider ? (
             <g data-testid="route-rider">
-              <circle cx={rider.x} cy={rider.y} r={9} fill="rgb(184 245 59 / .25)" />
-              <circle cx={rider.x} cy={rider.y} r={5} fill="#b8f53b" stroke="#0d1626" strokeWidth={2} />
+              <circle cx={rider.x} cy={rider.y} r={9} fill="rgb(204 255 0 / .25)" />
+              <circle cx={rider.x} cy={rider.y} r={5} fill="var(--ridrs-accent)" stroke="var(--ridrs-surface)" strokeWidth={2} />
             </g>
           ) : null}
         </svg>
@@ -153,7 +153,7 @@ function RouteMap({ track, position }: { readonly track: TrackPosition[]; readon
     <div
       data-testid="route-map"
       data-map="live"
-      style={{ position: 'relative', height: LIVE_HEIGHT, overflow: 'hidden', borderRadius: 10, background: '#0d1626' }}
+      style={{ position: 'relative', height: LIVE_HEIGHT, overflow: 'hidden', borderRadius: 'var(--ridrs-radius)', background: 'var(--ridrs-surface)' }}
     >
       <LiveMap
         track={track}
@@ -210,8 +210,8 @@ function RouteProfile({ offer, distance }: { readonly offer: RouteOffer; readonl
       <polyline points={polyline(line)} fill="none" stroke="rgb(255 255 255 / .8)" strokeWidth={1.5} />
       {x === undefined ? null : (
         <g>
-          <line x1={x} y1={0} x2={x} y2={PROFILE.height} stroke="#b8f53b" strokeWidth={1.5} />
-          <circle cx={x} cy={4} r={3.5} fill="#b8f53b" />
+          <line x1={x} y1={0} x2={x} y2={PROFILE.height} stroke="var(--ridrs-accent)" strokeWidth={1.5} />
+          <circle cx={x} cy={4} r={3.5} fill="var(--ridrs-accent)" />
         </g>
       )}
     </svg>
@@ -250,12 +250,11 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
         flexDirection: 'column',
         gap: 10,
         padding: 12,
-        borderRadius: 16,
-        background:
-          'radial-gradient(120% 90% at 85% 0%, #2a4a78 0%, transparent 60%), linear-gradient(160deg, #1b2d4d, #0d1626)',
-        boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .12), 0 10px 28px rgb(0 0 0 / .38)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
+        borderRadius: 'var(--ridrs-radius-lg)',
+        background: 'var(--ridrs-card)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+        color: 'var(--ridrs-text)',
+        fontFamily: 'var(--ridrs-font-text)',
         pointerEvents: 'none',
       }}
     >
@@ -263,7 +262,14 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
       {offer && hasProfile ? <RouteProfile offer={offer} {...(state ? { distance: state.distance } : {})} /> : null}
       <div data-testid="route-gradient" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span
-          style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', opacity: 0.82 }}
+          style={{
+            fontFamily: 'var(--ridrs-font-mono)',
+            fontSize: 'var(--ridrs-size-label)',
+            fontWeight: 500,
+            letterSpacing: '.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ridrs-info)',
+          }}
         >
           {text.gradient}
         </span>
@@ -271,15 +277,15 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
           data-testid="value"
           style={{
             marginLeft: 'auto',
-            fontSize: 26,
-            fontWeight: 800,
+            fontSize: 'var(--ridrs-size-value)',
+            fontWeight: 500,
             fontVariantNumeric: 'tabular-nums',
-            color: percent === undefined ? '#fff' : gradeColour(percent),
+            color: percent === undefined ? 'var(--ridrs-text)' : gradeColour(percent),
           }}
         >
           {percent === undefined ? EN_DASH : localizeNumber(formatDecimal(percent, 1), language)}
         </span>
-        <span data-testid="unit" style={{ fontSize: 13, fontWeight: 600, opacity: 0.82 }}>
+        <span data-testid="unit" style={{ fontSize: 'var(--ridrs-size-small)', fontWeight: 500, color: 'var(--ridrs-text-muted)' }}>
           %
         </span>
       </div>

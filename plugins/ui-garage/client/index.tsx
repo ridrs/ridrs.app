@@ -21,14 +21,14 @@ const WAREHOUSE = new URL('./assets/icons/warehouse.svg', import.meta.url).href;
 const CSS = `
 .ga-row { display: grid; grid-template-columns: 170px auto; align-items: center; gap: 12px; }
 [data-breakpoint="compact"] .ga-row { grid-template-columns: 1fr; }
-.ga-field { min-height: 44px; max-width: 320px; padding: 8px 14px; border: 1px solid var(--ridrs-line, #24324d);
-  border-radius: 12px; background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa);
-  font: 16px system-ui, sans-serif; }
-.ga-field:focus-visible { outline: 3px solid var(--ridrs-focus, #fff); outline-offset: 2px; }
-.ga-value { min-width: 90px; font-size: 20px; font-weight: 700; text-align: center; }
+.ga-field { min-height: 44px; max-width: 320px; padding: 8px 14px; border: 0; box-shadow: var(--ridrs-edge);
+  border-radius: var(--ridrs-radius); background: var(--ridrs-card-quiet); color: var(--ridrs-text);
+  font: 16px var(--ridrs-font-text); }
+.ga-field:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
+.ga-value { min-width: 90px; font-size: 20px; font-weight: 500; text-align: center; }
 .ga-teeth { margin: 0; font-variant-numeric: tabular-nums; }
-.ga-notice { padding: 10px 14px; border-radius: 12px; background: var(--ridrs-surface-raised, #1a2540);
-  color: var(--ridrs-warn, #ffb62e); }
+.ga-notice { padding: 10px 14px; border-radius: var(--ridrs-radius); background: var(--ridrs-surface-raised);
+  color: var(--ridrs-warn); }
 `;
 
 const MODES: readonly ShiftMode[] = ['manual', 'semi-synchro', 'full-synchro'];

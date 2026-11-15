@@ -23,10 +23,10 @@ const LOGO_MARK = new URL('./assets/logo-mark.svg', import.meta.url).href;
  */
 const CSS = `
 /* The brand starts level with the page title (\`--ridrs-page-top\`, ui-main-screen). */
-.mm-nav { --mm-cyan: var(--ridrs-info, #00f0ff); --mm-volt: var(--ridrs-accent, #ccff00);
+.mm-nav { --mm-cyan: var(--ridrs-info); --mm-volt: var(--ridrs-accent);
   position: relative; display: flex; flex-direction: column; gap: 28px; height: 100%;
-  padding: var(--ridrs-page-top, 28px) 12px 20px;
-  background: linear-gradient(180deg, rgb(13 18 28 / .55), rgb(7 9 14 / 0) 40%, rgb(0 240 255 / .04)); }
+  padding: var(--ridrs-page-top) 12px 20px;
+  background: linear-gradient(180deg, rgb(14 21 35 / .55), rgb(7 9 14 / 0) 40%, rgb(0 240 255 / .04)); }
 .mm-brand { display: block; width: 140px; height: auto; margin: 0 12px; }
 .mm-brand-mark { display: none; }
 .mm-list { display: flex; flex-direction: column; gap: 4px; }
@@ -35,38 +35,35 @@ const CSS = `
 .mm-section:empty, .mm-footer:empty { display: none; }
 .mm-section { margin-top: auto; }
 .mm-section:empty + .mm-footer { margin-top: auto; }
-.mm-footer { display: flex; flex-direction: column; gap: 4px; margin-top: -16px; }
+.mm-footer { display: flex; flex-direction: column; gap: 4px; padding-top: 12px; border-top: 1px solid var(--ridrs-line); }
 .mm-footer [data-contribution] { display: contents; }
 
-/* An entry: soft and round under the pointer; the page's own is a volt block with cut corners and
-   a label in the calendar's italic capitals, as the calendar marks a ride done. */
+/* An entry: a round surface under the pointer; the page's own is the navy card with its light edge
+   and its icon and label in volt. Nothing is clipped, so the focus ring is always whole. */
 .mm-nav [data-menu-item] { position: relative; display: flex; align-items: center; gap: 14px; width: 100%;
-  padding: 12px 14px; border: 0; border-radius: 12px; background: transparent;
-  color: var(--ridrs-text-muted, #8b9bb4); font: 600 15px system-ui, sans-serif; text-align: left; cursor: pointer;
-  transition: background .15s, color .15s; }
-.mm-nav [data-menu-label] { font-family: 'Chakra Petch', system-ui, sans-serif !important; font-style: italic;
+  padding: 12px 14px; border: 0; border-radius: var(--ridrs-radius); background: transparent;
+  color: var(--ridrs-text-muted); font: 500 var(--ridrs-size-body) var(--ridrs-font-text); text-align: left; cursor: pointer;
+  transition: background var(--ridrs-ease), color var(--ridrs-ease); }
+.mm-nav [data-menu-label] { font-family: var(--ridrs-font-display) !important; font-style: italic;
   text-transform: uppercase; letter-spacing: .08em; }
-.mm-nav [data-menu-item]:hover { background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa); }
-.mm-nav [data-menu-item]:hover [data-menu-icon] { color: var(--mm-cyan); }
-.mm-nav [data-menu-item][aria-current="page"] { border-radius: 0; background: var(--mm-volt);
-  color: var(--ridrs-accent-text, #07090e);
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-  box-shadow: 0 0 24px rgb(204 255 0 / .25); }
+.mm-nav [data-menu-item]:hover { background: var(--ridrs-surface-raised); color: var(--ridrs-text); }
+.mm-nav [data-menu-item][aria-current="page"] { background: var(--ridrs-card-quiet); box-shadow: var(--ridrs-edge);
+  color: var(--mm-volt); }
 .mm-nav [data-menu-item][aria-current="page"] [data-menu-icon] { color: inherit; }
-.mm-nav [data-menu-item]:focus-visible { outline: 3px solid var(--ridrs-focus, #fff); outline-offset: 2px; }
+.mm-nav [data-menu-item]:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .mm-nav [data-menu-icon] { flex: none; width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat;
   transition: color .15s; }
 @media (prefers-reduced-motion: reduce) { .mm-nav [data-menu-item], .mm-nav [data-menu-icon] { transition: none; } }
 
-[data-breakpoint="medium"] .mm-nav { align-items: center; padding: var(--ridrs-page-top, 24px) 10px 20px; }
+[data-breakpoint="medium"] .mm-nav { align-items: center; padding: var(--ridrs-page-top) 10px 20px; }
 [data-breakpoint="medium"] .mm-brand { display: none; }
 [data-breakpoint="medium"] .mm-brand-mark { display: block; width: 36px; height: auto; margin: 0; }
 [data-breakpoint="medium"] .mm-nav [data-menu-item] { justify-content: center; padding: 12px; }
 [data-breakpoint="compact"] .mm-nav { flex-direction: row; padding: 6px 8px; background: none; }
 [data-breakpoint="compact"] .mm-brand, [data-breakpoint="compact"] .mm-brand-mark { display: none; }
 [data-breakpoint="compact"] .mm-list { flex: 1; flex-direction: row; justify-content: space-around; }
-[data-breakpoint="compact"] .mm-section:empty + .mm-footer, [data-breakpoint="compact"] .mm-footer { margin-top: 0; flex-direction: row; }
+[data-breakpoint="compact"] .mm-section:empty + .mm-footer, [data-breakpoint="compact"] .mm-footer { margin-top: 0; padding-top: 0; border-top: 0; flex-direction: row; }
 [data-breakpoint="compact"] .mm-nav [data-menu-item] { flex: 1; flex-direction: column; gap: 4px;
   width: auto; padding: 8px 12px; font-size: 11px; text-align: center; }
 [data-breakpoint="medium"] .mm-nav [data-menu-label] { position: absolute; width: 1px; height: 1px;

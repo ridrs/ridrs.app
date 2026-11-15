@@ -404,52 +404,47 @@ export const WEEK_CSS = `
 .tw { display: flex; flex-direction: column; gap: 14px; }
 .tw-bar { display: flex; align-items: center; gap: 10px; }
 .tw-bar-range { flex: 1; font-size: 22px; letter-spacing: .02em; }
-.tw-bar-range small { margin-left: 10px; color: var(--ridrs-text-muted, #8b9bb4); font-size: 12px; }
+.tw-bar-range small { margin-left: 10px; color: var(--ridrs-text-muted); font-size: var(--ridrs-size-label); }
 .tw-nav { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
-  padding: 0; border: 1px solid var(--ridrs-line, #1b2a3c); border-radius: 10px;
-  background: rgb(255 255 255 / .03); color: var(--ridrs-text, #f1f5f9); cursor: pointer; }
-.tw-nav:hover { border-color: var(--ridrs-info, #00f0ff); color: var(--ridrs-info, #00f0ff); }
-.tw-nav:focus-visible { outline: 3px solid var(--ridrs-focus, #00f0ff); outline-offset: 2px; }
+  padding: 0; border: 0; border-radius: var(--ridrs-radius);
+  background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); color: var(--ridrs-text); cursor: pointer; }
+.tw-nav:hover { filter: brightness(1.2); }
+.tw-nav:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .tw-grid { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-  overflow: hidden; border: 1px solid var(--ridrs-line, #1b2a3c); border-radius: 14px;
-  background: linear-gradient(180deg, rgb(0 240 255 / .045), transparent 40%), var(--ridrs-surface, #0d121c); }
+  overflow: hidden; border-radius: var(--ridrs-radius-lg); box-shadow: var(--ridrs-edge);
+  background: var(--ridrs-card-quiet); }
 .tw-day { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0;
   min-height: var(--tw-day-height, 230px); padding: 0 8px 12px;
-  border-left: 1px solid var(--ridrs-line, #1b2a3c); transition: background .15s; }
+  border-left: 1px solid var(--ridrs-line); transition: background .15s; }
 .tw-day:first-child { border-left: 0; }
 .tw-day-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 4px 8px;
-  border-bottom: 1px solid var(--ridrs-line, #1b2a3c); }
-.tw-day-name { font-size: 13px; letter-spacing: .14em; color: var(--ridrs-text-muted, #8b9bb4); }
-.tw-date-name { margin-left: auto; font-size: 30px; line-height: 1; font-weight: 600; color: var(--ridrs-text, #f1f5f9); }
+  border-bottom: 1px solid var(--ridrs-line); }
+.tw-day-name { font-size: var(--ridrs-size-label); letter-spacing: .12em; color: var(--ridrs-text-muted); }
+.tw-date-name { margin-left: auto; font-size: 30px; line-height: 1; font-weight: 500; color: var(--ridrs-text); }
 .tw-day[data-today] { background: linear-gradient(180deg, rgb(204 255 0 / .1), transparent 55%); }
 .tw-day[data-today]::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px;
-  background: var(--ridrs-accent, #ccff00); box-shadow: 0 0 18px 2px rgb(204 255 0 / .55); }
-.tw-day[data-today] .tw-day-name, .tw-day[data-today] .tw-date-name { color: var(--ridrs-accent, #ccff00); }
-.tw-day[data-past] .tw-date-name { color: var(--ridrs-text-muted, #8b9bb4); }
-.tw-day[data-over] { background: rgb(0 240 255 / .1); box-shadow: inset 0 0 0 2px var(--ridrs-info, #00f0ff); }
+  background: var(--ridrs-accent); }
+.tw-day[data-today] .tw-day-name, .tw-day[data-today] .tw-date-name { color: var(--ridrs-accent); }
+.tw-day[data-past] .tw-date-name { color: var(--ridrs-text-muted); }
+.tw-day[data-over] { background: rgb(204 255 0 / .08); box-shadow: inset 0 0 0 2px var(--ridrs-accent); }
 .tw-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.tw-entry { transition: background .25s, box-shadow .25s; position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 8px 14px;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+.tw-entry { transition: background var(--ridrs-ease), box-shadow var(--ridrs-ease); position: relative; display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px 8px 14px; overflow: hidden; border-radius: var(--ridrs-radius-sm);
+  background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); }
 .tw-entry-name { overflow-wrap: anywhere; font-size: 14px; line-height: 1.15; }
 .tw-entry-open { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.tw-entry-open:focus-visible { outline: 3px solid var(--ridrs-focus, #00f0ff); outline-offset: 3px; }
-.tw-entry-label { font-size: 11px; letter-spacing: .06em; opacity: .75; }
-/* Planned: a cut-corner outline with a cyan edge, like a slot waiting to be ridden. */
-.tw-entry[data-state="planned"] { background: rgb(0 240 255 / .1); color: var(--ridrs-text, #f1f5f9); }
-.tw-entry[data-state="planned"]::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
-  background: var(--ridrs-info, #00f0ff); box-shadow: 0 0 12px rgb(0 240 255 / .7); }
+.tw-entry-open:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 4px; border-radius: 2px; }
+.tw-entry-label { font-size: var(--ridrs-size-label); letter-spacing: .06em; color: var(--ridrs-text-muted); }
+/* Every entry is a small card of the same shape; its kind is the bar at its left edge: planned cyan,
+   done volt, outdoor green, rest and note grey. A done entry also shows a check in volt. */
+.tw-entry::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--ridrs-info); }
 .tw-entry[draggable="true"] { cursor: grab; }
-.tw-entry[data-state="planned"][draggable="true"]:hover { background: rgb(0 240 255 / .2); }
-.tw-entry[data-kind="rest"], .tw-entry[data-kind="note"] { background: rgb(255 255 255 / .05); }
-.tw-entry[data-kind="rest"]::before, .tw-entry[data-kind="note"]::before { background: var(--ridrs-text-muted, #8b9bb4); box-shadow: none; }
-.tw-entry[data-kind="outdoor"] { background: rgb(61 220 132 / .12); }
-.tw-entry[data-kind="outdoor"]::before { background: var(--ridrs-ok, #3ddc84); box-shadow: 0 0 12px rgb(61 220 132 / .6); }
-/* Done: solid volt, the way a finished ride should shine. */
-.tw-entry[data-state="done"] { background: var(--ridrs-accent, #ccff00); color: var(--ridrs-accent-text, #07090e);
-  box-shadow: 0 0 22px rgb(204 255 0 / .28); }
+.tw-entry[data-state="planned"][draggable="true"]:hover { background: var(--ridrs-card-quiet); }
+.tw-entry[data-kind="rest"]::before, .tw-entry[data-kind="note"]::before { background: var(--ridrs-text-muted); }
+.tw-entry[data-kind="outdoor"]::before { background: var(--ridrs-ok); }
+.tw-entry[data-state="done"]::before { background: var(--ridrs-accent); }
 .tw-entry[data-state="done"] .tw-entry-name { display: flex; align-items: center; gap: 6px; }
-.tw-entry[data-state="done"] .pv-glyph { width: 14px; height: 14px; }
-.tw-entry[data-state="done"] .tw-entry-label { color: var(--ridrs-accent-text, #07090e) !important; opacity: .75; }
+.tw-entry[data-state="done"] .pv-glyph { width: 14px; height: 14px; color: var(--ridrs-accent); }
 /* Not kept yet: a light sweeps across the entry until the provider has it. */
 .tw-entry[data-pending] { overflow: hidden; }
 .tw-entry[data-pending]::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
@@ -457,54 +452,54 @@ export const WEEK_CSS = `
   animation: tw-sweep 1.1s ease-in-out infinite; }
 @keyframes tw-sweep { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .tw-entry[data-pending]::after { animation: none; transform: none; opacity: .4; } }
-.tw-note { margin: 0; color: var(--ridrs-text-muted, #8b9bb4); font-size: 13px; }
+.tw-note { margin: 0; color: var(--ridrs-text-muted); font-size: var(--ridrs-size-small); }
 /* The way back to today's week or month: a link beside what is shown. */
-.tw-current { margin-left: 10px; padding: 2px 4px; border: 0; border-radius: 4px; background: none;
-  color: var(--ridrs-info, #00f0ff); font: inherit; font-size: 12px; letter-spacing: .02em; text-transform: inherit;
+.tw-current { margin-left: 10px; padding: 2px 4px; border: 0; border-radius: var(--ridrs-radius-sm); background: none;
+  color: var(--ridrs-info); font: inherit; font-size: var(--ridrs-size-label); letter-spacing: .02em; text-transform: inherit;
   text-decoration: underline; text-underline-offset: 3px; cursor: pointer; vertical-align: middle; }
-.tw-current:hover { color: var(--ridrs-text, #f1f5f9); }
-.tw-current:focus-visible { outline: 3px solid var(--ridrs-focus, #00f0ff); outline-offset: 2px; }
+.tw-current:hover { color: var(--ridrs-text); }
+.tw-current:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; border-radius: var(--ridrs-radius-sm); }
 /* The box of the rider's workouts' tiles: where a planned workout is dropped to become one of the workouts. */
-.tr-workouts-drop { position: relative; min-height: 96px; border-radius: 16px; transition: box-shadow .15s; }
-.tr-workouts-drop[data-dragging] { box-shadow: 0 0 0 2px rgb(0 240 255 / .5); }
-.tr-workouts-drop[data-dragging][data-refused] { box-shadow: 0 0 0 2px rgb(139 155 180 / .4); }
-.tr-workouts-drop[data-over] { box-shadow: 0 0 0 3px var(--ridrs-info, #00f0ff); }
+.tr-workouts-drop { position: relative; min-height: 96px; border-radius: var(--ridrs-radius-lg); transition: box-shadow var(--ridrs-ease); }
+.tr-workouts-drop[data-dragging] { box-shadow: 0 0 0 2px rgb(204 255 0 / .5); }
+.tr-workouts-drop[data-dragging][data-refused] { box-shadow: 0 0 0 2px var(--ridrs-line); }
+.tr-workouts-drop[data-over] { box-shadow: 0 0 0 3px var(--ridrs-accent); }
 /* While a planned workout is dragged, the box says over its tiles whether it takes it. */
 .tr-workouts-drop-hint { position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-start;
-  justify-content: center; margin: 0; padding: 24px 20px; border-radius: 16px;
-  background: rgb(13 18 28 / .82); color: var(--ridrs-text, #f1f5f9); font-size: 15px; letter-spacing: .02em;
+  justify-content: center; margin: 0; padding: 24px 20px; border-radius: var(--ridrs-radius-lg);
+  background: var(--ridrs-surface); color: var(--ridrs-text); font-size: 15px; letter-spacing: .02em;
   text-align: center; backdrop-filter: blur(4px); pointer-events: none; }
-.tr-workouts-drop[data-over] .tr-workouts-drop-hint { background: rgb(0 40 48 / .86); }
-.tr-workouts-drop-hint[data-refused] { color: var(--ridrs-text-muted, #8b9bb4); }
+.tr-workouts-drop[data-over] .tr-workouts-drop-hint { background: var(--ridrs-surface-raised); }
+.tr-workouts-drop-hint[data-refused] { color: var(--ridrs-text-muted); }
 /* The month: whole weeks, each day a cell with its number and what it lists. */
 .tm .tw-bar-range { font-size: 30px; }
 .tm-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden;
-  border: 1px solid var(--ridrs-line, #1b2a3c); border-radius: 14px; background: var(--ridrs-surface, #0d121c); }
-.tm-weekday { padding: 10px 10px 8px; font-size: 12px; letter-spacing: .14em; color: var(--ridrs-text-muted, #8b9bb4);
-  border-bottom: 1px solid var(--ridrs-line, #1b2a3c); }
+  border-radius: var(--ridrs-radius-lg); box-shadow: var(--ridrs-edge); background: var(--ridrs-card-quiet); }
+.tm-weekday { padding: 10px 10px 8px; font-size: var(--ridrs-size-label); letter-spacing: .12em; color: var(--ridrs-text-muted);
+  border-bottom: 1px solid var(--ridrs-line); }
 .tm-day { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 118px;
-  padding: 8px; border-top: 1px solid var(--ridrs-line, #1b2a3c); border-left: 1px solid var(--ridrs-line, #1b2a3c);
+  padding: 8px; border-top: 1px solid var(--ridrs-line); border-left: 1px solid var(--ridrs-line);
   transition: background .15s; }
 .tm-day:nth-child(7n + 1) { border-left: 0; }
 .tm-day:nth-child(-n + 14) { border-top: 0; }
-.tm-date { align-self: flex-end; font-size: 18px; line-height: 1; font-weight: 600; color: var(--ridrs-text, #f1f5f9); }
-.tm-day[data-past] .tm-date { color: var(--ridrs-text-muted, #8b9bb4); }
+.tm-date { align-self: flex-end; font-size: 18px; line-height: 1; font-weight: 500; color: var(--ridrs-text); }
+.tm-day[data-past] .tm-date { color: var(--ridrs-text-muted); }
 .tm-day[data-outside] { background: rgb(0 0 0 / .25); }
 .tm-day[data-outside] .tm-date { opacity: .45; }
 .tm-day[data-today] { background: linear-gradient(180deg, rgb(204 255 0 / .1), transparent 70%); }
 .tm-day[data-today]::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px;
-  background: var(--ridrs-accent, #ccff00); box-shadow: 0 0 18px 2px rgb(204 255 0 / .55); }
-.tm-day[data-today] .tm-date { color: var(--ridrs-accent, #ccff00); }
-.tm-day[data-over] { background: rgb(0 240 255 / .1); box-shadow: inset 0 0 0 2px var(--ridrs-info, #00f0ff); }
+  background: var(--ridrs-accent); }
+.tm-day[data-today] .tm-date { color: var(--ridrs-accent); }
+.tm-day[data-over] { background: rgb(204 255 0 / .08); box-shadow: inset 0 0 0 2px var(--ridrs-accent); }
 .tm-day .tw-list { gap: 4px; }
-.tm-day .tw-entry { padding: 4px 6px 4px 10px; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
-.tm-day .tw-entry-name { font-size: 12px; }
-.tm-day .tw-entry-label { font-size: 10px; }
+.tm-day .tw-entry { padding: 4px 6px 4px 10px; }
+.tm-day .tw-entry-name { font-size: var(--ridrs-size-label); }
+.tm-day .tw-entry-label { font-size: var(--ridrs-size-label); }
 [data-breakpoint="compact"] .tm-day { min-height: 72px; padding: 4px; }
 [data-breakpoint="compact"] .tm-day .tw-entry-label { display: none; }
 [data-breakpoint="compact"] .tw-grid { grid-template-columns: minmax(0, 1fr); }
 [data-breakpoint="compact"] .tw-day { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 4px 12px;
-  min-height: 0; border-left: 0; border-top: 1px solid var(--ridrs-line, #1b2a3c); padding: 8px 12px; }
+  min-height: 0; border-left: 0; border-top: 1px solid var(--ridrs-line); padding: 8px 12px; }
 [data-breakpoint="compact"] .tw-day:first-child { border-top: 0; }
 [data-breakpoint="compact"] .tw-day-head { border-bottom: 0; padding: 4px 0; flex-direction: column; gap: 0; }
 [data-breakpoint="compact"] .tw-date-name { margin-left: 0; font-size: 24px; }

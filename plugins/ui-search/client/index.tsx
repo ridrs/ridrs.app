@@ -13,12 +13,12 @@ const SEARCH = new URL('./assets/icons/search.svg', import.meta.url).href;
 
 const CSS = `
 .se-field { width: 100%; max-width: 640px; min-height: 48px; padding: 10px 16px;
-  border: 1px solid var(--ridrs-line, #24324d); border-radius: 12px;
-  background: var(--ridrs-surface, #131c2e); color: var(--ridrs-text, #f2f5fa); font: 16px system-ui, sans-serif; }
-.se-field:focus-visible { outline: 3px solid var(--ridrs-focus, #fff); outline-offset: 2px; }
+  border: 0; box-shadow: var(--ridrs-edge); border-radius: var(--ridrs-radius);
+  background: var(--ridrs-card-quiet); color: var(--ridrs-text); font: 16px var(--ridrs-font-text); }
+.se-field:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .se-results { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
-.se-results .pv-open { padding: 12px 16px; border: 1px solid var(--ridrs-line, #24324d); border-radius: 12px;
-  background: var(--ridrs-surface, #131c2e); }
+.se-results .pv-open { padding: 12px 16px; border: 0; box-shadow: var(--ridrs-edge); border-radius: var(--ridrs-radius);
+  background: var(--ridrs-card-quiet); }
 `;
 
 const KINDS: readonly ResultKind[] = ['route', 'workout', 'event'];

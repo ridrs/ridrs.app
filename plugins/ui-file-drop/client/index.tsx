@@ -412,21 +412,21 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
 const CSS = `
 .fd-layer { position: fixed; inset: 0; z-index: 1000;
   background: rgb(5 9 16 / .82); backdrop-filter: blur(10px) saturate(.6);
-  font: 15px/1.4 system-ui, sans-serif; color: var(--ridrs-text, #f2f5fa); }
+  font: 15px/1.4 var(--ridrs-font-text); color: var(--ridrs-text); }
 /* The place to let go: the whole window, a little inside its edge. */
 .fd-frame { position: absolute; inset: 16px; display: flex; flex-direction: column; align-items: center;
-  gap: 16px; padding: 24px; border: 2px dashed var(--ridrs-line, #24324d);
-  border-radius: calc(var(--ridrs-radius, 16px) + 8px); transition: border-color .15s; }
-.fd-layer[data-takes] .fd-frame { border-color: var(--ridrs-accent, #b8f53b); }
+  gap: 16px; padding: 24px; border: 2px dashed var(--ridrs-line);
+  border-radius: var(--ridrs-radius-lg); transition: border-color .15s; }
+.fd-layer[data-takes] .fd-frame { border-color: var(--ridrs-accent); }
 .fd-layer:not([data-phase="over"]) .fd-frame { border-color: transparent; }
 /* The caption is pressed into the backdrop: grey, a light edge below, a dark one above. */
 .fd-head { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
-.fd-caption, .fd-hint { margin: 0; color: #56637a;
+.fd-caption, .fd-hint { margin: 0; color: var(--ridrs-text-muted);
   text-shadow: 0 1px 0 rgb(255 255 255 / .08), 0 -1px 0 rgb(0 0 0 / .75); }
-.fd-caption { font: 700 14px/1.3 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-.fd-hint { font-size: 12px; }
+.fd-caption { font: 500 14px/1.3 var(--ridrs-font-text); letter-spacing: .08em; text-transform: uppercase; }
+.fd-hint { font-size: var(--ridrs-size-small); }
 .fd-tiles { flex: 1; display: flex; flex-wrap: wrap; justify-content: center; align-content: center;
-  align-items: center; gap: var(--ridrs-gap, 16px); width: 100%; min-height: 0; overflow: auto; }
+  align-items: center; gap: var(--ridrs-gap); width: 100%; min-height: 0; overflow: auto; }
 .fd-open { width: 100%; cursor: inherit; }
 .fd-open h4 { margin: 0; font-size: 16px; font-weight: 400; }
 .fd-chart { pointer-events: none; }
@@ -435,11 +435,11 @@ const CSS = `
 /* The card keeps its 16:10 from its width, not from the height of the row. */
 .fd-route .pv-teaser { width: 100%; height: auto; }
 .fd-profile { position: absolute; inset: 0; }
-.fd-mark { font-size: 12px; color: var(--ridrs-text-muted, #93a1b8); }
+.fd-mark { font-size: 12px; color: var(--ridrs-text-muted); }
 .fd-tile[data-duplicate] { opacity: .6; }
 .fd-foot { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
-.fd-say, .fd-more { margin: 0; font-size: 14px; color: var(--ridrs-text-muted, #93a1b8); }
-.fd-layer[data-takes] .fd-say { color: var(--ridrs-text, #f2f5fa); }
+.fd-say, .fd-more { margin: 0; font-size: 14px; color: var(--ridrs-text-muted); }
+.fd-layer[data-takes] .fd-say { color: var(--ridrs-text); }
 `;
 
 /** The layer over the main screen while files are dragged onto the window (ADR 0093). */

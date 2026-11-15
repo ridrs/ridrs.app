@@ -13,40 +13,75 @@
  */
 import { useEffect } from 'react';
 
-/** Elements that read as headlines across plugins: they take the display face. */
-const HEAD = `:is(h1, h2, h3, [class$="-title"], [class*="-title "], [class$="-greeting"], [class$="-name"], [class$="-teaser-title"])`;
-/** Small uppercase labels ("FREE RIDE", "NEXT EVENT"). */
-const LABEL = `:is([class$="-eyebrow"], [class$="-classifier"], [class$="-kicker"], [class*="-label"])`;
+/**
+ * Small uppercase labels ("FREE RIDE", "NEXT EVENT", the briefing's section heads, a figure's name):
+ * one style everywhere. New code asks for it with \`data-label\` or \`.ridrs-label\`; the rest are
+ * the old class names that were labels already.
+ */
+const LABEL_ONLY = `.ridrs-label, [data-label], .nr-title, .br-section > h2, .br-group, .db-facts dt, .rt-classifier`;
+const LABEL = `:is([class$="-eyebrow"], [class$="-classifier"], [class$="-kicker"], [class*="-label"], ${LABEL_ONLY})`;
+/** Elements that read as headlines across plugins: they take the display face (labels excepted). */
+const HEAD = `:is(h1, h2, h3, [class$="-title"], [class*="-title "], [class$="-greeting"], [class$="-name"], [class$="-teaser-title"]):not(${LABEL_ONLY})`;
 /** The page titles that are outlined. */
 const OUTLINED = `:is(.tb-greeting, .pv-title h1):not(.ms-dialog *)`;
 /** Hero titles: big, solid, in the text face. */
 const HERO = `:is(.rs-title, .pv-hero-text h2, .ms-dialog .pv-title h1)`;
 
+/**
+ * The design tokens of ridrs, one set (docs/design/unified): the language of the route cards on Ride
+ * and of the route box in the ride. A surface is the navy card (gradient and light edge), shapes
+ * are 8 / 12 / 16 px or a pill, a label is small mono capitals, a number is tabular, volt marks the
+ * action and the progress, cyan the focus and the information. Plugins draw with these names only.
+ */
+export const TOKENS = `
+  --ridrs-bg: #07090e; --ridrs-surface: #0e1523; --ridrs-surface-raised: #17233a;
+  --ridrs-card-glow: #2a4a78; --ridrs-card-top: #1b2d4d; --ridrs-card-bottom: #0d1626;
+  --ridrs-card: radial-gradient(120% 90% at 85% 0%, var(--ridrs-card-glow) 0%, transparent 60%), linear-gradient(160deg, var(--ridrs-card-top), var(--ridrs-card-bottom));
+  --ridrs-card-quiet: linear-gradient(160deg, #15233b, #0d1626);
+  --ridrs-edge: inset 0 0 0 1px rgb(255 255 255 / .12);
+  --ridrs-shadow: 0 10px 28px rgb(0 0 0 / .38);
+  --ridrs-line: rgb(255 255 255 / .14);
+  --ridrs-text: #f1f5f9; --ridrs-text-muted: #b0bdd1;
+  --ridrs-accent: #ccff00; --ridrs-accent-text: #07090e; --ridrs-on-accent: #07090e;
+  --ridrs-info: #00f0ff; --ridrs-ok: #3ddc84; --ridrs-warn: #ffb62e; --ridrs-danger: #ff5a6e;
+  --ridrs-favourite: #ccff00; --ridrs-focus: #00f0ff;
+  --ridrs-radius-sm: 8px; --ridrs-radius: 12px; --ridrs-radius-lg: 16px; --ridrs-radius-pill: 999px;
+  --ridrs-gap: 16px; --ridrs-gap-sm: 8px;
+  --ridrs-font-text: 'Plus Jakarta Sans', sans-serif; --ridrs-font-display: 'Chakra Petch', sans-serif;
+  --ridrs-font-mono: 'JetBrains Mono', monospace;
+  --ridrs-size-label: 11px; --ridrs-size-small: 13px; --ridrs-size-body: 15px; --ridrs-size-title: 19px;
+  --ridrs-size-value: 28px; --ridrs-size-hero: 40px;
+  --ridrs-ease: .15s ease;
+  --ridrs-focus-ring: 3px solid var(--ridrs-focus);
+`;
+
 const CSS = `
-:root, :root .ms-root { --ridrs-bg: #07090e; --ridrs-surface: #0d121c; --ridrs-surface-raised: #131b2a;
-  --ridrs-line: #1b2a3c; --ridrs-text: #f1f5f9; --ridrs-text-muted: #8b9bb4; --ridrs-accent: #ccff00;
-  --ridrs-accent-text: #07090e; --ridrs-info: #00f0ff; --ridrs-ok: #3ddc84; --ridrs-warn: #ffb62e;
-  --ridrs-favourite: #ccff00; --ridrs-focus: #00f0ff; --ridrs-radius: 12px; --ridrs-gap: 16px; }
+:root, :root .ms-root { ${TOKENS} }
 :root body { background: var(--ridrs-bg); }
-:root body, :root body * { font-family: 'Plus Jakarta Sans', sans-serif !important; font-synthesis: none; }
-:root ${HEAD} { font-family: 'Chakra Petch', sans-serif !important; font-style: italic;
+:root body { font-family: var(--ridrs-font-text); font-synthesis: none; }
+/* Controls take the page's face, but a plugin's own font (a label, a display title) still wins. */
+:where(button, input, select, textarea) { font-family: inherit; }
+:root ${HEAD} { font-family: var(--ridrs-font-display) !important; font-style: italic;
   text-transform: uppercase; font-weight: 600 !important; }
 :root .ms-root { background:
   radial-gradient(ellipse 70% 45% at 55% -15%, rgb(0 240 255 / .14), transparent),
   radial-gradient(circle at 85% 95%, rgb(204 255 0 / .06), transparent 40%), var(--ridrs-bg); }
 :root ${OUTLINED} { color: transparent !important; -webkit-text-stroke: 1.3px var(--ridrs-text); font-size: 48px; }
-:root ${HERO} { font-family: 'Plus Jakarta Sans', sans-serif !important; font-style: normal;
+:root ${HERO} { font-family: var(--ridrs-font-text) !important; font-style: normal;
   text-transform: none; font-weight: 500 !important; letter-spacing: -.025em; line-height: 1.05; }
 :root .rs-title { font-size: 40px; }
-:root .rs-tile { background: radial-gradient(120% 140% at 85% 0%, rgb(0 240 255 / .22) 0%, transparent 60%),
-  linear-gradient(160deg, var(--ridrs-surface-raised), var(--ridrs-surface)) !important; }
-/* Dark text on the cyan of a selected entry or chip: white on it has far too little contrast. */
-:root :is(.mm-nav [data-menu-item][aria-current="page"], .pv-chip[aria-pressed="true"], .pv-badge[data-tone="busy"]) {
-  color: var(--ridrs-accent-text) !important; }
+/* A selected chip is filled light, never cyan: cyan is the focus ring, and selected is not focused. */
+:root .pv-chip[aria-pressed="true"] {
+  background: var(--ridrs-text) !important; color: var(--ridrs-accent-text) !important; }
 :root :is(.pv-teaser-title, .dt-title, [data-tile] :is(h2, h3, [class$="-title"]):not(.rs-title)) {
-  font-weight: 400 !important; font-size: 19px; line-height: 1.05; letter-spacing: -.02em; }
-:root ${LABEL} { font-family: 'JetBrains Mono', monospace !important; color: var(--ridrs-info) !important;
-  letter-spacing: .12em; }
+  font-weight: 400 !important; font-size: var(--ridrs-size-title); line-height: 1.05; letter-spacing: -.02em; }
+:root ${LABEL} { font-family: var(--ridrs-font-mono) !important; color: var(--ridrs-info) !important;
+  font-size: var(--ridrs-size-label); font-style: normal; font-weight: 500; letter-spacing: .12em;
+  text-transform: uppercase; }
+/* One focus ring for everything a rider can reach: 3 px cyan, 2 px off the shape. */
+:root :focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
+/* Figures never jitter. */
+:root :is([data-testid="value"], [data-numeric], .tnum) { font-variant-numeric: tabular-nums; }
 `;
 
 /**

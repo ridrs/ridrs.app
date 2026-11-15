@@ -67,10 +67,8 @@ Feature: Using the UI with arrow keys, Enter and Back
     Given "test-device" reported its "heart-rate" "HRM-Pro 42" as "connected"
     And I move the focus to "All devices"
     And I press Enter
+    Then the focus is on the "Power Meter" row
     When I press the arrow key "Down"
-    Then the focus is on "Close"
-    When I press the arrow key "Down"
-    And I press the arrow key "Down"
     And I press the arrow key "Down"
     Then the focus is on the "Heart Rate Monitor" row
     When I press Enter

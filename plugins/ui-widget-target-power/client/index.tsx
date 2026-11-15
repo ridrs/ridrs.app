@@ -59,22 +59,21 @@ function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
         placeContent: 'center',
         gap: 1,
         padding: 0,
-        border: `1px solid ${erg ? '#2aa8ff' : 'rgb(255 255 255 / .14)'}`,
-        background: erg ? 'rgb(42 168 255 / .28)' : 'rgb(11 18 32 / .55)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        boxShadow: '0 6px 18px rgb(0 0 0 / .3)',
-        color: erg ? '#2aa8ff' : '#f2f5fa',
-        fontFamily: 'system-ui, sans-serif',
+        border: 0,
+        // Like Pause and Finish: the card. On is volt, never cyan (cyan is the focus).
+        background: 'var(--ridrs-card-quiet)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+        color: erg ? 'var(--ridrs-accent)' : 'var(--ridrs-text)',
+        fontFamily: 'var(--ridrs-font-text)',
         lineHeight: 1,
         cursor: 'pointer',
         // The focus is always clearly visible.
-        outline: focused ? '3px solid #fff' : 'none',
+        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
         outlineOffset: 2,
       }}
     >
-      <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.06em' }}>{text.erg}</span>
-      <span data-testid="value" style={{ fontSize: 10, fontWeight: 600, opacity: 0.85 }}>
+      <span style={{ fontSize: 13, fontWeight: 500, letterSpacing: '.06em' }}>{text.erg}</span>
+      <span data-testid="value" style={{ fontSize: 'var(--ridrs-size-label)', fontWeight: 500 }}>
         {erg ? text.on : text.off}
       </span>
     </button>
@@ -151,17 +150,18 @@ function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
         pointerEvents: 'auto',
         minWidth: 110,
         padding: '12px 18px',
-        borderRadius: 14,
-        background: 'rgba(10, 70, 90, 0.85)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
+        borderRadius: 'var(--ridrs-radius)',
+        background: 'var(--ridrs-card)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+        color: 'var(--ridrs-text)',
+        fontFamily: 'var(--ridrs-font-text)',
         // The focus is always clearly visible.
-        outline: focused ? '3px solid #ffd60a' : 'none',
+        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
         outlineOffset: 2,
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.target}</div>
-      <div data-testid="value" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.1 }}>
+      <div style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>{text.target}</div>
+      <div data-testid="value" style={{ fontSize: 44, fontWeight: 500, lineHeight: 1.1 }}>
         {text.watts(watts)}
       </div>
       {focused && (

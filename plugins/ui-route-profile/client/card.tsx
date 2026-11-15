@@ -31,8 +31,8 @@ const TRACE_DOT = {
   height: 7,
   margin: '-3.5px 0 0 -3.5px',
   borderRadius: '50%',
-  background: '#fff',
-  boxShadow: '0 0 6px 2px var(--ridrs-accent, #b8f53b), 0 0 16px 5px rgb(184 245 59 / .55)',
+  background: 'var(--ridrs-text)',
+  boxShadow: '0 0 6px 2px var(--ridrs-accent), 0 0 16px 5px rgb(204 255 0 / .55)',
   opacity: 0,
   pointerEvents: 'none',
   // Keeps the dot on its own layer at all times. Otherwise the browser layers it (and the title
@@ -118,7 +118,7 @@ export function CardProfile({
       aria-label={text.profileOf(offer.title)}
       viewBox="0 0 100 32"
       preserveAspectRatio="none"
-      style={{ width: '100%', height: '100%', color: 'var(--ridrs-accent, #b8f53b)' }}
+      style={{ width: '100%', height: '100%', color: 'var(--ridrs-accent)' }}
     >
       <defs>
         <linearGradient id={fill} x1="0" y1="0" x2="0" y2="1">

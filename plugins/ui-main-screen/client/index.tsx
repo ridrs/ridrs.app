@@ -7,7 +7,7 @@ import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 're
 import { createRoot } from 'react-dom/client';
 import configured from '../layout.json' with { type: 'json' };
 import { messages } from './i18n/index.ts';
-import { KineticStyle } from './kinetic.tsx';
+import { KineticStyle, TOKENS } from './kinetic.tsx';
 import { BREAKPOINTS, type Breakpoint, breakpointAt, columnsAt, type Layout, layoutSchema, type Tile } from './layout.ts';
 
 /**
@@ -15,21 +15,17 @@ import { BREAKPOINTS, type Breakpoint, breakpointAt, columnsAt, type Layout, lay
  * carries `data-breakpoint`, so contributions can follow the breakpoint in their own style sheets.
  */
 const CSS = `
-.ms-root { --ridrs-bg: #0b1220; --ridrs-surface: #131c2e; --ridrs-surface-raised: #1a2540;
-  --ridrs-line: #24324d; --ridrs-text: #f2f5fa; --ridrs-text-muted: #93a1b8;
-  --ridrs-accent: #b8f53b; --ridrs-accent-text: #0b1220; --ridrs-info: #2aa8ff;
-  --ridrs-ok: #3ddc84; --ridrs-warn: #ffb62e; --ridrs-favourite: #ffd60a; --ridrs-focus: #ffffff;
-  --ridrs-radius: 16px; --ridrs-gap: 16px; --ridrs-page-top: 40px;
+.ms-root { ${TOKENS} --ridrs-page-top: 40px;
   box-sizing: border-box; display: grid; height: 100%; min-height: 100vh;
   grid-template-columns: 200px minmax(0, 1fr); grid-template-areas: "menu main";
   /* One row, the window's: a slot beside the menu and the page (an empty overlay) takes none. */
   grid-template-rows: minmax(0, 1fr); grid-auto-rows: 0;
-  background: var(--ridrs-bg); color: var(--ridrs-text); font: 15px/1.4 system-ui, sans-serif; }
+  background: var(--ridrs-bg); color: var(--ridrs-text); font: var(--ridrs-size-body)/1.4 var(--ridrs-font-text); }
 .ms-root *, .ms-root *::before, .ms-root *::after { box-sizing: inherit; }
 /* Scroll bars: a slim rounded thumb on no track, instead of the grey bar of the system. */
 .ms-root ::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
 .ms-root ::-webkit-scrollbar-track, .ms-root ::-webkit-scrollbar-corner { background: transparent; }
-.ms-root ::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 6px;
+.ms-root ::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: var(--ridrs-radius-sm);
   background: rgb(255 255 255 / .16) padding-box; }
 .ms-root ::-webkit-scrollbar-thumb:hover { background-color: rgb(255 255 255 / .32); }
 .ms-root ::-webkit-scrollbar-thumb:active { background-color: var(--ridrs-info); }
@@ -78,12 +74,12 @@ const CSS = `
 .ms-root[data-breakpoint="compact"] .ms-column { --ms-fade: 56px; }
 .ms-actions [data-contribution] { display: contents; }
 .ms-actions [data-action] { position: relative; display: grid; place-items: center; width: 44px;
-  height: 44px; padding: 0; border: 1px solid var(--ridrs-line); border-radius: 50%;
-  background: var(--ridrs-surface); color: var(--ridrs-text); cursor: pointer; }
+  height: 44px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--ridrs-card-quiet); box-shadow: var(--ridrs-edge); color: var(--ridrs-text); cursor: pointer; }
 .ms-actions [data-action]:hover { background: var(--ridrs-surface-raised); }
-.ms-actions [data-action][aria-current="page"] { border-color: var(--ridrs-info);
-  color: var(--ridrs-info); }
-.ms-actions [data-action]:focus-visible { outline: 3px solid var(--ridrs-focus); outline-offset: 2px; }
+.ms-actions [data-action][aria-current="page"] { background: var(--ridrs-surface-raised);
+  color: var(--ridrs-accent); }
+.ms-actions [data-action]:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .ms-actions [data-action-icon] { width: 20px; height: 20px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 .ms-actions [data-action-tone] { position: absolute; top: 2px; right: 2px; width: 11px; height: 11px;
@@ -102,15 +98,15 @@ const CSS = `
   background: rgb(4 8 16 / .66); backdrop-filter: blur(6px); }
 .ms-dialog[hidden] { display: none; }
 .ms-dialog-panel { position: relative; display: flex; flex-direction: column; width: min(960px, 100%);
-  max-height: 100%; overflow: hidden; border: 1px solid var(--ridrs-line); border-radius: 20px;
-  background: var(--ridrs-bg); box-shadow: 0 24px 64px rgb(0 0 0 / .5); }
+  max-height: 100%; overflow: hidden; border: 1px solid var(--ridrs-line); border-radius: var(--ridrs-radius-lg);
+  background: var(--ridrs-bg); box-shadow: var(--ridrs-edge), 0 24px 64px rgb(0 0 0 / .5); }
 .ms-dialog-panel:focus { outline: none; }
 .ms-dialog-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; overflow: auto; }
 .ms-dialog-close { position: absolute; top: 16px; right: 16px; z-index: 1; width: 40px; height: 40px;
-  padding: 0; border: 1px solid var(--ridrs-line); border-radius: 50%; background: var(--ridrs-surface);
+  padding: 0; border: 0; box-shadow: var(--ridrs-edge); border-radius: 50%; background: var(--ridrs-card-quiet);
   color: var(--ridrs-text); cursor: pointer; }
 .ms-dialog-close:hover { background: var(--ridrs-surface-raised); }
-.ms-dialog-close:focus-visible { outline: 3px solid var(--ridrs-focus); outline-offset: 2px; }
+.ms-dialog-close:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .ms-dialog-close::before, .ms-dialog-close::after { content: ""; position: absolute; top: 50%; left: 50%;
   width: 16px; height: 2px; border-radius: 1px; background: currentColor; }
 .ms-dialog-close::before { transform: translate(-50%, -50%) rotate(45deg); }

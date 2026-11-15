@@ -24,15 +24,16 @@ function VirtualDistanceWidgetView({ ctx }: { readonly ctx: UiContext }) {
         pointerEvents: 'auto',
         minWidth: 140,
         padding: '12px 18px',
-        borderRadius: 14,
-        background: 'rgba(16, 20, 24, 0.72)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
+        borderRadius: 'var(--ridrs-radius)',
+        background: 'var(--ridrs-card-quiet)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+        color: 'var(--ridrs-text)',
+        fontFamily: 'var(--ridrs-font-text)',
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.title}</div>
+      <div style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>{text.title}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <span data-testid="value" style={{ fontSize: 44, fontWeight: 700 }}>
+        <span data-testid="value" style={{ fontSize: 44, fontWeight: 500 }}>
           {state ? localizeNumber(formatDecimal(state.distance / 1000, 2), language) : EN_DASH}
         </span>
         <span data-testid="unit" style={{ fontSize: 18 }}>

@@ -31,17 +31,17 @@ const USER = new URL('./assets/icons/user.svg', import.meta.url).href;
 const CSS = `${ZONES_CSS}
 .me-stepper { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 10px;
   max-width: 420px; }
-.me-stepper output { min-width: 80px; font-size: 20px; font-weight: 700; text-align: center; }
+.me-stepper output { min-width: 80px; font-size: 20px; font-weight: 500; text-align: center; }
 `;
 
 // The tile is drawn without the area's style sheet, so its bar carries its own style.
 const BAR = {
   height: 10,
   overflow: 'hidden',
-  borderRadius: 999,
-  background: 'var(--ridrs-surface-raised, #1a2540)',
+  borderRadius: 'var(--ridrs-radius-pill)',
+  background: 'var(--ridrs-surface-raised)',
 } as const;
-const FILL = { display: 'block', height: '100%', background: 'var(--ridrs-accent, #b8f53b)' } as const;
+const FILL = { display: 'block', height: '100%', background: 'var(--ridrs-accent)' } as const;
 
 /** Hours ridden this week: a placeholder until rides are summed up. */
 const RIDDEN_HOURS = 2.5;

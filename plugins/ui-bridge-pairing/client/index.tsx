@@ -16,7 +16,7 @@ interface Companion {
 }
 
 /** The look of the device setup around it (`ui-devices`): dark tiles and fields. */
-const COLORS = { line: '#1f3447', muted: '#8b9db2', field: '#06121c' } as const;
+const COLORS = { line: 'var(--ridrs-line)', muted: 'var(--ridrs-text-muted)', field: 'var(--ridrs-surface)' } as const;
 
 /** The code the companion shows has six digits. */
 const CODE_LENGTH = 6;
@@ -29,11 +29,11 @@ const TILE = {
   justifyItems: 'center',
   gap: 10,
   padding: 12,
-  borderRadius: 12,
+  borderRadius: 'var(--ridrs-radius)',
   border: `1px solid ${COLORS.line}`,
 } as const;
 
-const HEADING = { margin: 0, fontSize: 15, fontWeight: 700 } as const;
+const HEADING = { margin: 0, fontSize: 15, fontWeight: 500 } as const;
 
 /**
  * Code entry for a companion found in the network: the code the phone shows. The sixth digit
@@ -95,10 +95,10 @@ function PairForm({
           textAlign: 'center',
           font: '700 20px ui-monospace, monospace',
           letterSpacing: 4,
-          color: '#fff',
+          color: 'var(--ridrs-text)',
           background: COLORS.field,
           border: `1.5px solid ${COLORS.line}`,
-          borderRadius: 10,
+          borderRadius: 'var(--ridrs-radius)',
         }}
       />
     </form>
@@ -114,7 +114,7 @@ function PairingQr({ uri, text }: { readonly uri: string; readonly text: Message
       data-uri={uri}
       alt={text.qrAlt}
       src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
-      style={{ width: 132, height: 132, background: '#fff', borderRadius: 8 }}
+      style={{ width: 132, height: 132, background: '#fff', borderRadius: 'var(--ridrs-radius-sm)' }}
     />
   );
 }

@@ -15,17 +15,17 @@ import { type Messages, messages } from './i18n/index.ts';
 
 const CSS = `
 .rr-card { display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-  padding: 18px 24px; border: 1.5px solid var(--ridrs-warn, #ffb62e); border-radius: var(--ridrs-radius, 16px);
-  background: var(--ridrs-surface, #0a1520);
-  color: #fff; font: 500 14px system-ui, sans-serif; }
-.rr-title { font-size: 18px; font-weight: 700; }
-.rr-facts { color: #8b9db2; }
+  padding: 18px 24px; border: 0; border-radius: var(--ridrs-radius-lg); box-shadow: inset 0 0 0 1px var(--ridrs-warn);
+  background: var(--ridrs-card-quiet);
+  color: var(--ridrs-text); font: 500 14px var(--ridrs-font-text); }
+.rr-title { font-size: 18px; font-weight: 500; }
+.rr-facts { color: var(--ridrs-text-muted); }
 .rr-actions { display: flex; gap: 12px; }
-.rr-button { padding: 10px 20px; border: 1.5px solid #1f3447; border-radius: 999px;
-  background: #0a1520; color: #fff; font: 600 15px system-ui, sans-serif; cursor: pointer; }
-.rr-button.rr-primary { border-color: #27c8ff; }
-.rr-button:hover { border-color: #27c8ff; }
-.rr-button:focus-visible { outline: 2px solid #8dff2a; outline-offset: 2px; }
+.rr-button { padding: 10px 20px; border: 0; border-radius: var(--ridrs-radius); box-shadow: var(--ridrs-edge);
+  background: var(--ridrs-surface-raised); color: var(--ridrs-text); font: 500 var(--ridrs-size-body) var(--ridrs-font-text); cursor: pointer; }
+.rr-button.rr-primary { background: var(--ridrs-accent); box-shadow: none; color: var(--ridrs-accent-text); }
+.rr-button:hover { filter: brightness(1.15); }
+.rr-button:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 `;
 
 function facts(ride: RecoverableRide, text: Messages, language: Language): string {

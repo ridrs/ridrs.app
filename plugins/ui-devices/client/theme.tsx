@@ -4,17 +4,17 @@ import type { BleRoute } from '@ridrs/contracts';
 import type { RowKind } from './devices.ts';
 
 /**
- * The look of docs/ux-draft: dark panels, cyan for "busy", lime for "ok", amber for "warn".
+ * The unified look (docs/design/unified): navy cards, cyan for "busy", volt for "ok", amber for "warn".
  * Animations and pseudo elements need a style sheet; class names carry the plugin's prefix.
  */
 const CSS = `
-.rd-row:hover, .rd-back:hover, .rd-continue:hover { border-color: #27c8ff !important; }
-.rd-line:hover { background: #27c8ff14 !important; }
+.rd-row:hover, .rd-back:hover, .rd-continue:hover { filter: brightness(1.18); }
+.rd-line:hover { background: var(--ridrs-surface-raised) !important; }
 .rd-row:focus-visible, .rd-back:focus-visible,
-.rd-continue:focus-visible { outline: 2px solid #8dff2a; outline-offset: 2px; }
+.rd-continue:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .rd-spin { display: inline-block; flex: none; vertical-align: middle;
-  width: 16px; height: 16px; border-radius: 50%; border: 2px solid #27c8ff40;
-  border-top-color: #27c8ff; animation: rd-spin 1s linear infinite; }
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgb(255 255 255 / .2);
+  border-top-color: var(--ridrs-info); animation: rd-spin 1s linear infinite; }
 @keyframes rd-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rd-spin { animation: none; } }
 `;
@@ -24,13 +24,13 @@ export function DeviceStyles() {
 }
 
 export const COLORS = {
-  panel: '#0a1520',
-  line: '#1f3447',
-  cyan: '#27c8ff',
-  lime: '#8dff2a',
-  amber: '#ffb62e',
-  muted: '#8b9db2',
-  red: '#ff4d5e',
+  panel: 'var(--ridrs-card-quiet)',
+  line: 'var(--ridrs-line)',
+  cyan: 'var(--ridrs-info)',
+  lime: 'var(--ridrs-accent)',
+  amber: 'var(--ridrs-warn)',
+  muted: 'var(--ridrs-text-muted)',
+  red: 'var(--ridrs-danger)',
 } as const;
 
 /**

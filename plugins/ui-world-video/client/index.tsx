@@ -273,10 +273,10 @@ const OVERLAY = {
   left: '50%',
   transform: 'translateX(-50%)',
   padding: '8px 16px',
-  borderRadius: 10,
-  background: 'rgba(11, 18, 32, 0.7)',
-  color: '#f2f5fa',
-  font: '600 16px system-ui, sans-serif',
+  borderRadius: 'var(--ridrs-radius)',
+  background: 'rgb(11 18 32 / .7)',
+  color: 'var(--ridrs-text)',
+  font: '500 16px var(--ridrs-font-text)',
   pointerEvents: 'none',
 } as const;
 
@@ -338,7 +338,7 @@ function VideoLandscapeView({ ctx }: { readonly ctx: UiContext }) {
       <div
         data-testid="video-world"
         data-status={loaded.status}
-        style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#0b1220', color: '#93a1b8' }}
+        style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--ridrs-bg)', color: 'var(--ridrs-text-muted)' }}
       >
         {loaded.status === 'loading' ? text.loading : text.cannotShow(loaded.message)}
       </div>

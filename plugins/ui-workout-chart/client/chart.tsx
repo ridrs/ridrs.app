@@ -80,7 +80,7 @@ export const variantOf = (variant: ChartInput['variant']): 'micro' | 'mini' | 'f
 
 export const CHART_CSS = `${PALETTE_CSS}
 .wc { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--wc-text);
-  font: 500 12px system-ui, sans-serif; }
+  font: 500 12px var(--ridrs-font-text); }
 .wc svg { display: block; width: 100%; overflow: visible; }
 .wc[data-variant="micro"] svg { height: 18px; }
 .wc[data-variant="mini"] svg, .wc[data-variant="hud"] svg { height: 56px; }
@@ -103,9 +103,9 @@ export const CHART_CSS = `${PALETTE_CSS}
 .wc-handle-hit { fill: transparent; touch-action: none; }
 .wc[data-variant="edit"] [data-step] { cursor: pointer; }
 .wc-tooltip { position: absolute; top: 0; z-index: 2; min-width: 9em; padding: 6px 10px; border: 1px solid var(--wc-line);
-  border-radius: 8px; background: var(--wc-surface); color: var(--wc-text); font-size: 12px; line-height: 1.35;
+  border-radius: var(--ridrs-radius-sm); background: var(--wc-surface); color: var(--wc-text); font-size: 12px; line-height: 1.35;
   pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; }
-.wc-tooltip b { display: block; font-weight: 700; }
+.wc-tooltip b { display: block; font-weight: 500; }
 .wc-tooltip span { display: block; color: var(--wc-muted); }
 `;
 

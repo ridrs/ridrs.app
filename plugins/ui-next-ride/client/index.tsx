@@ -39,57 +39,45 @@ const PLAY = new URL('./assets/icons/play.svg', import.meta.url).href;
  * (medium) the places are icons; on the bottom bar (compact) the next ride is not shown.
  */
 const CSS = `
-.nr { --nr-cyan: var(--ridrs-info, #00f0ff); --nr-volt: var(--ridrs-accent, #ccff00);
-  display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: 14px; cursor: pointer;
-  color: var(--ridrs-text, #f1f5f9); font: 14px system-ui, sans-serif; outline: none;
-  transition: background .15s; }
-.nr:hover:not([aria-disabled="true"]) { background: var(--ridrs-surface, #0d121c); }
-.nr:focus-visible { box-shadow: 0 0 0 3px var(--ridrs-focus, #00f0ff); }
+.nr { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: var(--ridrs-radius-lg); cursor: pointer;
+  color: var(--ridrs-text); font: var(--ridrs-size-small) var(--ridrs-font-text); outline: none;
+  transition: background var(--ridrs-ease); }
+.nr:hover:not([aria-disabled="true"]) { background: var(--ridrs-surface-raised); }
+.nr:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .nr[aria-disabled="true"] { cursor: default; }
 .nr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px; }
-.nr-title { margin: 0; color: var(--ridrs-text-muted, #8b9bb4); font: 700 11px system-ui, sans-serif;
-  letter-spacing: .14em; text-transform: uppercase; }
+.nr-title { margin: 0; color: var(--ridrs-text-muted); font: 500 var(--ridrs-size-label) var(--ridrs-font-mono);
+  letter-spacing: .12em; text-transform: uppercase; }
 .nr-play { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--nr-cyan), var(--nr-volt)); color: var(--ridrs-accent-text, #07090e);
-  box-shadow: 0 0 14px rgb(204 255 0 / .35); transition: transform .15s, box-shadow .15s; }
-.nr:hover:not([aria-disabled="true"]) .nr-play { transform: scale(1.08); box-shadow: 0 0 20px rgb(204 255 0 / .55); }
-.nr[aria-disabled="true"] .nr-play { background: var(--ridrs-surface-raised, #131b2a);
-  color: var(--ridrs-text-muted, #8b9bb4); box-shadow: none; }
+  background: var(--ridrs-accent); color: var(--ridrs-accent-text); }
+.nr[aria-disabled="true"] .nr-play { background: var(--ridrs-surface-raised); color: var(--ridrs-text-muted); }
 .nr-glyph { flex: none; width: 16px; height: 16px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 .nr-play .nr-glyph { width: 14px; height: 14px; margin-left: 2px; }
 
 .nr-slot { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 6px; min-height: 92px; padding: 12px 10px; text-align: center;
-  border-radius: 12px; overflow: hidden; }
-.nr-badge { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; }
+  border-radius: var(--ridrs-radius); overflow: hidden; }
+.nr-badge { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--ridrs-radius-sm); }
 .nr-badge .nr-glyph { width: 24px; height: 24px; }
 .nr-text { display: flex; flex-direction: column; align-items: center; max-width: 100%; min-width: 0; line-height: 1.25; }
-.nr-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-.nr-fact { color: var(--ridrs-text-muted, #8b9bb4); font-size: 12px; }
-.nr-fact[data-gone] { color: var(--ridrs-warn, #ffb62e); }
+.nr-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.nr-fact { color: var(--ridrs-text); opacity: .78; font-size: var(--ridrs-size-label); }
+.nr-fact[data-gone] { color: var(--ridrs-warn); }
 
-/* An empty place: a dashed outline over faint stripes, its icon in a ring. */
-.nr-slot[data-empty] { color: var(--ridrs-text-muted, #8b9bb4); font-size: 12px;
-  background: repeating-linear-gradient(135deg, rgb(255 255 255 / .025) 0 6px, transparent 6px 12px);
-  outline: 1.5px dashed var(--ridrs-line, #1b2a3c); outline-offset: -1.5px; }
-.nr-slot[data-empty] .nr-badge { border: 1.5px solid currentColor; opacity: .7; }
+/* An empty place is the one dashed shape of the app: a place to drop onto. */
+.nr-slot[data-empty] { color: var(--ridrs-text-muted); font-size: var(--ridrs-size-label);
+  border: 1px dashed var(--ridrs-line); }
+.nr-slot[data-empty] .nr-badge { opacity: .7; }
 
-/* A filled place: a card with cut corners as in the calendar, the gradient along its top edge. */
-.nr-slot:not([data-empty]) { border-radius: 0; background: linear-gradient(160deg, rgb(0 240 255 / .10), transparent 60%),
-  var(--ridrs-surface-raised, #131b2a); cursor: grab;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
-.nr-slot:not([data-empty])::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
-  background: linear-gradient(90deg, var(--nr-cyan), var(--nr-volt)); }
-.nr-slot:not([data-empty]) .nr-badge { background: linear-gradient(135deg, rgb(0 240 255 / .18), rgb(204 255 0 / .18));
-  color: var(--nr-volt); }
+/* A filled place is a card like the route cards: the navy gradient and its light edge. */
+.nr-slot:not([data-empty]) { background: var(--ridrs-card); box-shadow: var(--ridrs-edge); cursor: grab; }
+.nr-slot:not([data-empty]) .nr-badge { background: rgb(204 255 0 / .14); color: var(--ridrs-accent); }
 
-/* While a workout or a route is dragged: the places glow and their outline runs. */
-.nr[data-armed] .nr-slot { outline: 1.5px dashed var(--nr-cyan); outline-offset: -1.5px;
-  box-shadow: 0 0 0 1px rgb(0 240 255 / .15), 0 0 18px rgb(0 240 255 / .18); animation: nr-pulse 1.2s ease-in-out infinite; }
-.nr[data-over] .nr-slot { outline: 2px solid var(--nr-volt); box-shadow: 0 0 22px rgb(204 255 0 / .35); animation: none; }
-@keyframes nr-pulse { 50% { box-shadow: 0 0 0 1px rgb(0 240 255 / .3), 0 0 26px rgb(0 240 255 / .3); } }
-@media (prefers-reduced-motion: reduce) { .nr, .nr-play { transition: none; } .nr[data-armed] .nr-slot { animation: none; } }
+/* While a workout or a route is dragged, the places show their edge in cyan; over one, in volt. */
+.nr[data-armed] .nr-slot { border: 1px dashed var(--ridrs-accent); }
+.nr[data-over] .nr-slot { border: 2px solid var(--ridrs-accent); }
+@media (prefers-reduced-motion: reduce) { .nr { transition: none; } }
 
 [data-breakpoint="medium"] .nr { align-items: center; padding: 8px 4px; }
 [data-breakpoint="medium"] .nr-head { justify-content: center; }

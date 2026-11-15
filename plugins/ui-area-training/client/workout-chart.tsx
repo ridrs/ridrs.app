@@ -147,7 +147,7 @@ export const CHART_SLOT_CSS = `
 .tw-entry .tr-chart { margin: 2px 0; }
 .tr-filters { display: flex; flex-direction: column; gap: 8px; }
 .tr-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.tr-filter-group > span { min-width: 5.5em; color: var(--ridrs-text-muted, #93a1b8); font-size: 13px; }
+.tr-filter-group > span { min-width: 5.5em; color: var(--ridrs-text-muted); font-size: 13px; }
 .tr-library-open { width: 100%; }
 .tr-library-open h4 { margin: 0; font-size: 16px; font-weight: 400; }
 `;

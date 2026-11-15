@@ -38,12 +38,11 @@ const HUD_INSET_BOTTOM = BUTTON_BOTTOM + BUTTON_SIZE + 16;
  * over a picture: a round glass with a light edge, the icon in the colour of the text.
  */
 const CONTROLS_CSS = `
-.as-control { display: grid; place-items: center; padding: 0;
-  border: 1px solid rgb(255 255 255 / .14); background: rgb(11 18 32 / .55);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #f2f5fa; cursor: pointer;
-  box-shadow: 0 6px 18px rgb(0 0 0 / .3); }
-.as-control:hover { background: rgb(26 37 64 / .75); }
-.as-control:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.as-control { display: grid; place-items: center; padding: 0; border: 0;
+  background: var(--ridrs-card-quiet); box-shadow: var(--ridrs-edge), var(--ridrs-shadow);
+  color: var(--ridrs-text); cursor: pointer; transition: filter var(--ridrs-ease); }
+.as-control:hover { filter: brightness(1.25); }
+.as-control:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
 .as-control-icon { width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 `;
@@ -180,11 +179,19 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
           style={{
             position: 'absolute',
             top: '40%',
-            left: 0,
-            right: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: Z_CONTROLS,
-            textAlign: 'center',
-            fontSize: 48,
+            padding: '12px 28px',
+            borderRadius: 'var(--ridrs-radius-lg)',
+            background: 'var(--ridrs-card)',
+            boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+            color: 'var(--ridrs-text)',
+            fontFamily: 'var(--ridrs-font-display)',
+            fontStyle: 'italic',
+            textTransform: 'uppercase',
+            letterSpacing: '.08em',
+            fontSize: 'var(--ridrs-size-hero)',
             fontWeight: 600,
             pointerEvents: 'none',
           }}

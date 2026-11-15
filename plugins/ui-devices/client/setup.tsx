@@ -60,14 +60,14 @@ const BADGE = {
   height: 22,
   padding: '0 4px',
   boxSizing: 'border-box',
-  borderRadius: 11,
+  borderRadius: 'var(--ridrs-radius-pill)',
   display: 'grid',
   placeItems: 'center',
   background: COLORS.lime,
-  color: '#031',
+  color: 'var(--ridrs-accent-text)',
   fontSize: 13,
   fontStyle: 'normal',
-  fontWeight: 900,
+  fontWeight: 500,
 } as const;
 
 /** The d-pad buttons show an arrow icon, turned from "up" by these degrees. */
@@ -162,8 +162,9 @@ function Status({
 }
 
 const PANEL = {
-  border: `1.5px solid ${COLORS.line}`,
-  borderRadius: 18,
+  border: 0,
+  borderRadius: 'var(--ridrs-radius)',
+  boxShadow: 'var(--ridrs-edge)',
   background: COLORS.panel,
 } as const;
 
@@ -177,12 +178,12 @@ const COUNT = {
   height: 20,
   padding: '0 7px',
   boxSizing: 'border-box',
-  borderRadius: 10,
-  border: `1.5px solid ${COLORS.cyan}`,
+  borderRadius: 'var(--ridrs-radius-pill)',
+  boxShadow: 'inset 0 0 0 1px var(--ridrs-info)',
   color: COLORS.cyan,
   fontSize: 12,
   fontStyle: 'normal',
-  fontWeight: 700,
+  fontWeight: 500,
   lineHeight: 1,
   fontVariantNumeric: 'tabular-nums',
   whiteSpace: 'nowrap',
@@ -297,13 +298,13 @@ function Row({
 
 const BUTTON = {
   padding: '10px 16px',
-  fontSize: 16,
-  fontWeight: 700,
-  fontStyle: 'italic',
-  color: '#fff',
-  background: '#0a2230',
-  border: `1.5px solid ${COLORS.cyan}`,
-  borderRadius: 12,
+  fontSize: 15,
+  fontWeight: 500,
+  color: 'var(--ridrs-text)',
+  background: 'var(--ridrs-surface-raised)',
+  border: 0,
+  boxShadow: 'var(--ridrs-edge)',
+  borderRadius: 'var(--ridrs-radius)',
 } as const;
 
 /** One line of the details grid: the term and its value, with an icon. */
@@ -376,9 +377,9 @@ function StatusPill({ status, tone }: { readonly status: string; readonly tone: 
         alignItems: 'center',
         gap: 6,
         padding: '4px 12px',
-        borderRadius: 999,
+        borderRadius: 'var(--ridrs-radius-pill)',
         border: `1.5px solid ${TONE_COLOR[tone]}`,
-        background: `${TONE_COLOR[tone]}1a`,
+        background: `color-mix(in srgb, ${TONE_COLOR[tone]} 12%, transparent)`,
         color: TONE_COLOR[tone],
         fontSize: 14,
         whiteSpace: 'nowrap',
@@ -489,7 +490,7 @@ function DetailsCard({
         <h2
           data-testid="details-device"
           title={device}
-          style={{ ...ROW_TITLE, display: 'block', margin: 0, fontWeight: 700 }}
+          style={{ ...ROW_TITLE, display: 'block', margin: 0, fontWeight: 500 }}
         >
           {device}
         </h2>
@@ -1032,7 +1033,7 @@ function CompanionDetails({
   );
 }
 
-const TITLE = { textAlign: 'center', fontSize: 34, fontWeight: 800, margin: '14px 0 6px' } as const;
+const TITLE = { textAlign: 'center', fontSize: 34, fontWeight: 500, margin: '14px 0 6px' } as const;
 
 const SUBTITLE = {
   textAlign: 'center',
@@ -1112,6 +1113,12 @@ export function DeviceSetupView({
         ?.focus();
     }
   }, [details]);
+  // Opened, the setup puts the focus on its first row, so the rider sees at once where they are.
+  useEffect(() => {
+    // `focusVisible`: the ring shows however the rider opened the setup (a pointer click too).
+    if (!opened.current)
+      list.current?.querySelector<HTMLButtonElement>('button')?.focus({ focusVisible: true } as FocusOptions);
+  }, []);
   // Back closes the details, or leaves the setup.
   const leave = useRef(close);
   leave.current = details ? close : () => ctx.leave();
@@ -1125,10 +1132,9 @@ export function DeviceSetupView({
         padding: '32px 16px',
         display: 'flex',
         justifyContent: 'center',
-        background: 'radial-gradient(1200px 600px at 50% -10%, #0b2236, #03070d)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
-        fontStyle: 'italic',
+        background: 'transparent',
+        color: 'var(--ridrs-text)',
+        fontStyle: 'normal',
       }}
     >
       <DeviceStyles />
@@ -1167,9 +1173,10 @@ export function DeviceSetupView({
                 display: 'grid',
                 placeItems: 'center',
                 borderRadius: '50%',
-                border: `1.5px solid ${COLORS.line}`,
-                background: COLORS.panel,
-                color: '#fff',
+                border: 0,
+                boxShadow: 'var(--ridrs-edge)',
+                background: 'var(--ridrs-surface-raised)',
+                color: 'var(--ridrs-text)',
                 fontSize: 22,
                 fontStyle: 'normal',
               }}
@@ -1202,16 +1209,7 @@ export function DeviceSetupView({
             </div>
             <h1 style={TITLE}>
               {text.titleStart}{' '}
-              <em
-                style={{
-                  background: `linear-gradient(90deg, ${COLORS.cyan}, ${COLORS.lime})`,
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  color: 'transparent',
-                }}
-              >
-                {text.titleEnd}
-              </em>
+              {text.titleEnd}
             </h1>
             <p data-testid="device-summary" aria-live="polite" style={SUBTITLE}>
               {summary.text}
@@ -1266,20 +1264,17 @@ export function DeviceSetupView({
             onClick={() => ctx.leave()}
             style={{
               marginTop: 22,
-              padding: 18,
-              fontSize: 26,
-              fontWeight: 800,
-              fontStyle: 'italic',
-              color: '#fff',
-              background: COLORS.panel,
-              border: `1.5px solid ${COLORS.line}`,
-              borderRadius: 14,
+              padding: '14px 18px',
+              fontSize: 17,
+              fontWeight: 500,
+              color: 'var(--ridrs-accent-text)',
+              background: 'var(--ridrs-accent)',
+              border: 0,
+              borderRadius: 'var(--ridrs-radius)',
             }}
           >
             {summary.settled ? text.done : text.continue}{' '}
-            <span aria-hidden style={{ color: COLORS.lime }}>
-              »
-            </span>
+            <span aria-hidden>»</span>
           </button>
         )}
       </div>

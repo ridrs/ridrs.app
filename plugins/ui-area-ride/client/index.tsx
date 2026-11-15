@@ -155,8 +155,8 @@ const KICKER = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 8,
-  color: 'rgb(255 255 255 / .85)',
-  font: '700 12px/1.2 system-ui, sans-serif',
+  color: 'var(--ridrs-text)',
+  font: '700 12px/1.2 var(--ridrs-font-text)',
   letterSpacing: '.08em',
   textTransform: 'uppercase',
 } as const;
@@ -174,13 +174,13 @@ const STAT_LABEL = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 6,
-  color: 'var(--ridrs-text-muted, #93a1b8)',
+  color: 'var(--ridrs-text-muted)',
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: 500,
   letterSpacing: '.06em',
   textTransform: 'uppercase',
 } as const;
-const STAT_VALUE = { margin: 0, font: '800 24px/1.2 system-ui, sans-serif' } as const;
+const STAT_VALUE = { margin: 0, font: '800 24px/1.2 var(--ridrs-font-text)' } as const;
 const CLIMBS = { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 } as const;
 const CLIMB = { display: 'flex', alignItems: 'center', gap: 12 } as const;
 /** A climb's category in a red disc. */
@@ -190,10 +190,10 @@ const CATEGORY_BADGE = {
   width: 30,
   height: 30,
   borderRadius: '50%',
-  background: '#d4202c',
-  color: '#fff',
+  background: 'var(--ridrs-danger)',
+  color: 'var(--ridrs-accent-text)',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 500,
   flex: 'none',
 } as const;
 

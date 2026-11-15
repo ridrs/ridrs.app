@@ -183,8 +183,8 @@ function StepLine({
       <span className="wk-label" style={{ fontSize: Math.max(13, size * 0.55), opacity: 0.75, minWidth: 64 }}>
         {label}
       </span>{' '}
-      <span style={{ fontSize: size, fontWeight: 600 }}>{lengthText(step, text)}</span>{' '}
-      {target ? <span style={{ fontSize: size, fontWeight: 600 }}>{target}</span> : null}{' '}
+      <span style={{ fontSize: size, fontWeight: 500 }}>{lengthText(step, text)}</span>{' '}
+      {target ? <span style={{ fontSize: size, fontWeight: 500 }}>{target}</span> : null}{' '}
       {cadence ? <span style={{ fontSize: size * 0.8, opacity: 0.9 }}>{cadence}</span> : null}
     </div>
   );
@@ -280,11 +280,11 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
         flex: '1 1 420px',
         maxWidth: 640,
         padding: '14px 20px 16px',
-        borderRadius: 'var(--ridrs-radius, 14px)',
-        background: 'rgba(10, 14, 20, 0.82)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
-        boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.08)',
+        borderRadius: 'var(--ridrs-radius)',
+        background: 'var(--ridrs-card-quiet)',
+        color: 'var(--ridrs-text)',
+        fontFamily: 'var(--ridrs-font-text)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
       }}
     >
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
@@ -296,7 +296,7 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
             className="wk-label"
             data-testid="workout-set"
             aria-label={text.setLabel(set.at, set.of)}
-            style={{ fontSize: 22, fontWeight: 500, color: 'var(--ridrs-accent, #00e5ff)' }}
+            style={{ fontSize: 22, fontWeight: 500, color: 'var(--ridrs-accent)' }}
           >
             {`${set.at}/${set.of}`}
           </span>
@@ -315,7 +315,7 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
             view ? (
               <StepLine label={text.now} step={view} text={text} testId="workout-now" size={32} withCadence />
             ) : (
-              <div data-testid="workout-now" style={{ fontSize: 32, fontWeight: 600 }}>
+              <div data-testid="workout-now" style={{ fontSize: 32, fontWeight: 500 }}>
                 {text.starting}
               </div>
             ),
@@ -328,14 +328,14 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={percent}
-                style={{ flex: 1, height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.18)', overflow: 'hidden' }}
+                style={{ flex: 1, height: 12, borderRadius: 'var(--ridrs-radius-sm)', background: 'rgba(255,255,255,0.18)', overflow: 'hidden' }}
               >
                 <div
                   data-testid="workout-bar"
-                  style={{ width: `${percent}%`, height: '100%', background: 'var(--ridrs-accent, #00e5ff)' }}
+                  style={{ width: `${percent}%`, height: '100%', background: 'var(--ridrs-accent)' }}
                 />
               </div>
-              <span data-testid="workout-time-left" style={{ fontSize: 26, fontWeight: 600, minWidth: 120, textAlign: 'right' }}>
+              <span data-testid="workout-time-left" style={{ fontSize: 26, fontWeight: 500, minWidth: 120, textAlign: 'right' }}>
                 {text.left(clock(remaining))}
               </span>
             </div>
@@ -351,7 +351,7 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
       <div
         data-testid="workout-note"
         role="status"
-        style={cue ? { marginTop: 10, fontSize: 24, fontWeight: 500, color: '#ccff00' } : undefined}
+        style={cue ? { marginTop: 10, fontSize: 24, fontWeight: 500, color: 'var(--ridrs-accent)' } : undefined}
       >
         {cue?.text}
       </div>
@@ -362,7 +362,7 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
         style={
           countdown === undefined
             ? undefined
-            : { position: 'absolute', right: 28, top: 10, fontSize: 72, fontWeight: 600, lineHeight: 1, color: '#ccff00' }
+            : { position: 'absolute', right: 28, top: 10, fontSize: 72, fontWeight: 500, lineHeight: 1, color: 'var(--ridrs-accent)' }
         }
       >
         {countdown}

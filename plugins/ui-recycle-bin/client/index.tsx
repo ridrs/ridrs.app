@@ -32,23 +32,25 @@ const PAGE = 'trash';
  * takes is dragged, a hint beside it. It is the drop target itself: the menu is beside every page.
  */
 const ENTRY_CSS = `
-/* A large icon with its label under it, centred: the drop target is easy to hit. */
-.mm-nav [data-recycle-bin] { position: relative; flex-direction: column; justify-content: center; gap: 2px;
-  padding: 8px 12px; font-size: 12px; text-align: center; }
-.mm-nav [data-recycle-bin] [data-menu-icon] { width: 26px; height: 26px; }
-[data-recycle-bin] [data-bin-count] { position: absolute; top: 2px; left: calc(50% + 8px); min-width: 22px; padding: 1px 7px; border-radius: 999px;
-  background: var(--ridrs-surface-2, #1c2840); color: var(--ridrs-text, #f2f5fa); font: 600 12px system-ui, sans-serif;
-  text-align: center; }
-[data-breakpoint="compact"] .mm-nav [data-recycle-bin] { padding: 8px 12px; gap: 4px; }
-[data-breakpoint="compact"] .mm-nav [data-recycle-bin] [data-menu-icon] { width: 24px; height: 24px; }
-[data-breakpoint="compact"] [data-recycle-bin] [data-bin-count] { top: 0; }
-[data-recycle-bin][data-armed] { outline: 2px dashed var(--ridrs-danger, #ff4d6d); outline-offset: -2px; }
-[data-recycle-bin][data-over] { outline-style: solid; background: rgb(70 18 30 / .96); }
-[data-recycle-bin] [data-bin-hint] { position: absolute; left: calc(100% + 12px); top: 50%; z-index: 1000;
-  transform: translateY(-50%); padding: 8px 12px; border-radius: 10px; white-space: nowrap;
-  background: rgb(70 18 30 / .96); color: #fff; font: 500 14px system-ui, sans-serif; pointer-events: none; }
-[data-breakpoint="compact"] [data-recycle-bin] [data-bin-hint] { left: 50%; top: auto; bottom: calc(100% + 8px);
-  transform: translateX(-50%); }
+/* An entry like the others: icon and label in a row, the count a pill at its end. */
+.mm-nav [data-recycle-bin] { position: relative; }
+.mm-nav [data-recycle-bin] [data-menu-label] { flex: 1; }
+[data-recycle-bin] [data-bin-count] { min-width: 22px; padding: 1px 7px; border-radius: var(--ridrs-radius-pill);
+  background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); color: var(--ridrs-text);
+  font: 500 var(--ridrs-size-label) var(--ridrs-font-mono); font-variant-numeric: tabular-nums; text-align: center; }
+[data-breakpoint="medium"] [data-recycle-bin] [data-bin-count] { position: absolute; top: 2px; right: 2px; }
+[data-breakpoint="compact"] .mm-nav [data-recycle-bin] { flex-direction: column; gap: 4px; padding: 8px 12px; font-size: 11px; text-align: center; }
+[data-breakpoint="compact"] [data-recycle-bin] [data-bin-count] { position: absolute; top: 2px; right: 6px; }
+/* A removable item is dragged: the entry gets the danger edge; over it, a danger tint. */
+[data-recycle-bin][data-armed] { box-shadow: inset 0 0 0 1px var(--ridrs-danger); color: var(--ridrs-text); }
+[data-recycle-bin][data-over] { background: rgb(255 90 110 / .16); box-shadow: inset 0 0 0 2px var(--ridrs-danger); color: var(--ridrs-text); }
+[data-recycle-bin] [data-bin-hint] { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 1000;
+  padding: 8px 12px; border-radius: var(--ridrs-radius); background: var(--ridrs-card-quiet);
+  box-shadow: inset 0 0 0 1px var(--ridrs-danger), var(--ridrs-shadow); color: var(--ridrs-text);
+  font: 500 var(--ridrs-size-small)/1.3 var(--ridrs-font-text); text-align: center; text-transform: none; font-style: normal; pointer-events: none; }
+[data-breakpoint="medium"] [data-recycle-bin] [data-bin-hint] { left: calc(100% + 12px); right: auto; bottom: auto; top: 50%;
+  transform: translateY(-50%); width: max-content; }
+[data-breakpoint="compact"] [data-recycle-bin] [data-bin-hint] { left: auto; right: 0; width: max-content; max-width: calc(100vw - 24px); }
 `;
 
 /** What a drag carries for the bin, read on its start: the data store can be read then. */
@@ -134,16 +136,16 @@ export const BinEntry = reactComponent((ctx) => <BinEntryView ctx={ctx} />);
 
 const PAGE_CSS = `
 .rb-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.rb-item { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px;
-  background: var(--ridrs-surface, #131c2e); }
+.rb-item { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--ridrs-radius);
+  background: var(--ridrs-card-quiet); box-shadow: var(--ridrs-edge); }
 .rb-item-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 220px; min-width: 0; }
 .rb-item-text strong { overflow-wrap: anywhere; }
 .rb-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.rb-danger { color: var(--ridrs-danger, #ff4d6d); }
-.rb-refusal { flex-basis: 100%; margin: 0; color: var(--ridrs-danger, #ff4d6d); }
+.rb-danger { color: var(--ridrs-danger); }
+.rb-refusal { flex-basis: 100%; margin: 0; color: var(--ridrs-danger); }
 .rb-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.rb-ask { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--ridrs-danger, #ff4d6d);
-  border-radius: 12px; background: var(--ridrs-surface, #131c2e); }
+.rb-ask { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--ridrs-danger);
+  border-radius: var(--ridrs-radius); background: var(--ridrs-card-quiet); }
 .rb-ask p { margin: 0; }
 `;
 

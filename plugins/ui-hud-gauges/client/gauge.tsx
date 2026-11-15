@@ -9,7 +9,7 @@ const C = 100;
 const BAND_RADIUS = 84;
 const BAND_WIDTH = 9;
 const TICK_OUTER = 76;
-const NEUTRAL = '#f2f5fa';
+const NEUTRAL = 'var(--ridrs-text)';
 
 function point(radius: number, degrees: number): [number, number] {
   const rad = (degrees * Math.PI) / 180;
@@ -70,18 +70,18 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
         aspectRatio: '1',
         borderRadius: '50%',
         boxShadow: '0 10px 28px rgb(0 0 0 / .38)',
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: 'var(--ridrs-font-text)',
       }}
     >
       <svg viewBox="0 0 200 200" width="100%" height="100%" role="img" aria-hidden="true">
         <defs>
           <linearGradient id={`${id}-bg`} x1="0.25" y1="0" x2="0.75" y2="1">
-            <stop offset="0" stopColor="#1b2d4d" />
-            <stop offset="1" stopColor="#0d1626" />
+            <stop offset="0" stopColor="var(--ridrs-card-top)" />
+            <stop offset="1" stopColor="var(--ridrs-card-bottom)" />
           </linearGradient>
           <radialGradient id={`${id}-glow`} cx="0.85" cy="0" r="0.95">
-            <stop offset="0" stopColor="#2a4a78" />
-            <stop offset="0.6" stopColor="#2a4a78" stopOpacity="0" />
+            <stop offset="0" stopColor="var(--ridrs-card-glow)" />
+            <stop offset="0.6" stopColor="var(--ridrs-card-glow)" stopOpacity="0" />
           </radialGradient>
           <linearGradient id={`${id}-shade`} x1="0" y1="1" x2="0" y2="0">
             <stop offset="0" stopColor="rgb(6 10 20)" stopOpacity="0.7" />
@@ -93,7 +93,7 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
         <circle cx={C} cy={C} r={99} fill={`url(#${id}-bg)`} />
         <circle cx={C} cy={C} r={99} fill={`url(#${id}-glow)`} />
         <circle cx={C} cy={C} r={99} fill={`url(#${id}-shade)`} />
-        <circle cx={C} cy={C} r={98.5} fill="none" stroke="rgb(255 255 255 / .12)" strokeWidth={1} />
+        <circle cx={C} cy={C} r={98.5} fill="none" stroke="var(--ridrs-line)" strokeWidth={1} />
 
         {/* The scale: a track, the zones on it, the ticks and their numbers. */}
         <path
@@ -147,7 +147,7 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
                 textAnchor="middle"
                 dominantBaseline="central"
                 fontSize={tick.value >= 1000 ? 9 : 11}
-                fontWeight={600}
+                fontWeight={500}
                 fill="rgb(255 255 255 / .62)"
               >
                 {tick.value}
@@ -160,9 +160,9 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
           y={124}
           textAnchor="middle"
           fontSize={9}
-          fontWeight={700}
+          fontWeight={500}
           letterSpacing="1.4"
-          fill="#fff"
+          fill="var(--ridrs-text)"
           opacity={0.9}
           style={{ textTransform: 'uppercase' }}
         >
@@ -184,14 +184,14 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
             style={{ filter: `drop-shadow(0 0 3px ${accent})` }}
           />
         </g>
-        <circle cx={C} cy={C} r={8} fill="#0d1626" stroke="rgb(255 255 255 / .35)" strokeWidth={1.5} />
+        <circle cx={C} cy={C} r={8} fill="var(--ridrs-surface)" stroke="rgb(255 255 255 / .35)" strokeWidth={1.5} />
         <circle cx={C} cy={C} r={3} fill={accent} />
 
-        <text x={C} y={156} textAnchor="middle" fill="#fff" style={{ textShadow: '0 1px 6px rgb(0 0 0 / .5)' }}>
-          <tspan data-testid="value" fontSize={30} fontWeight={800}>
+        <text x={C} y={156} textAnchor="middle" fill="var(--ridrs-text)" style={{ textShadow: '0 1px 6px rgb(0 0 0 / .5)' }}>
+          <tspan data-testid="value" fontSize={30} fontWeight={500}>
             {display.text}
           </tspan>
-          <tspan dx={3} data-testid="unit" fontSize={12} fontWeight={600} fill="rgb(255 255 255 / .82)">
+          <tspan dx={3} data-testid="unit" fontSize={12} fontWeight={500} fill="rgb(255 255 255 / .82)">
             {unit}
           </tspan>
         </text>
@@ -208,10 +208,10 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
           </text>
         ) : average ? (
           <text x={C} y={176} textAnchor="middle" fontSize={12} fill="rgb(255 255 255 / .82)">
-            <tspan fontSize={10} fontWeight={700} letterSpacing="1" fill="#2aa8ff">
+            <tspan fontSize={11} fontWeight={500} letterSpacing="1" fill="var(--ridrs-info)">
               {average.label.toUpperCase()}
             </tspan>
-            <tspan dx={4} data-testid="average" fontWeight={700}>
+            <tspan dx={4} data-testid="average" fontWeight={500}>
               {averageText}
             </tspan>
           </text>

@@ -141,11 +141,12 @@ const EN_DASH = '–';
 const STEP_MS = 10;
 
 const FACT_LABEL = {
-  fontSize: 10,
-  fontWeight: 700,
+  fontFamily: 'var(--ridrs-font-mono)',
+  fontSize: 'var(--ridrs-size-label)',
+  fontWeight: 500,
   letterSpacing: '.12em',
   textTransform: 'uppercase',
-  color: 'rgb(255 255 255 / .82)',
+  color: 'var(--ridrs-info)',
 } as const;
 
 /** One value of the ride: its name above, the number large, the unit beside it. */
@@ -166,12 +167,12 @@ function Fact({
       <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
         <span
           data-testid="value"
-          style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}
+          style={{ fontSize: 30, fontWeight: 500, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}
         >
           {value}
         </span>
         {unit === undefined ? null : (
-          <span data-testid="unit" style={{ fontSize: 13, fontWeight: 600, color: 'rgb(255 255 255 / .82)' }}>
+          <span data-testid="unit" style={{ fontSize: 13, fontWeight: 500, color: 'var(--ridrs-text-muted)' }}>
             {unit}
           </span>
         )}
@@ -203,12 +204,11 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
         display: 'flex',
         gap: 20,
         padding: '10px 18px',
-        borderRadius: 16,
-        background:
-          'radial-gradient(120% 140% at 85% 0%, #2a4a78 0%, transparent 60%), linear-gradient(160deg, #1b2d4d, #0d1626)',
-        boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .12), 0 10px 28px rgb(0 0 0 / .38)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
+        borderRadius: 'var(--ridrs-radius-lg)',
+        background: 'var(--ridrs-card)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+        color: 'var(--ridrs-text)',
+        fontFamily: 'var(--ridrs-font-text)',
         pointerEvents: 'none',
       }}
     >
@@ -246,7 +246,7 @@ function GaugeHudView({ ctx }: { readonly ctx: UiContext }) {
           position: 'absolute',
           left: 16,
           right: 16,
-          bottom: 'var(--ridrs-hud-inset-bottom, 16px)',
+          bottom: 'var(--ridrs-hud-inset-bottom)',
           display: 'flex',
           // Widgets that do not fit wrap upwards, keeping the first ones in the bottom row.
           flexWrap: 'wrap-reverse',

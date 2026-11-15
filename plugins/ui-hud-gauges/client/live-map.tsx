@@ -22,7 +22,7 @@ const MAX_POINTS = 2000;
 /** ms between two camera moves: the position comes often, the map glides between them. */
 const CAMERA_EVERY = 1000;
 
-const LIME = '#b8f53b';
+const LIME = '#ccff00';
 
 /** Whether this page can draw a WebGL map at all; the headless scenarios cannot. */
 export function canDrawMap(): boolean {

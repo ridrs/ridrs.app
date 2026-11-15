@@ -54,9 +54,9 @@ function Teeth({
       onBlur={() => setFocused(false)}
       style={{
         padding: '0 4px',
-        borderRadius: 8,
+        borderRadius: 'var(--ridrs-radius-sm)',
         // The focus is always clearly visible.
-        outline: focused ? '3px solid #ffd60a' : 'none',
+        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
         outlineOffset: 2,
       }}
     >
@@ -143,17 +143,18 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
           pointerEvents: 'auto',
           minWidth: 110,
           padding: '12px 18px',
-          borderRadius: 14,
-          background: 'rgba(16, 20, 24, 0.72)',
-          color: '#fff',
-          fontFamily: 'system-ui, sans-serif',
+          borderRadius: 'var(--ridrs-radius)',
+          background: 'var(--ridrs-card-quiet)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+          color: 'var(--ridrs-text)',
+          fontFamily: 'var(--ridrs-font-text)',
         }}
       >
-        <div style={{ fontSize: 14, opacity: 0.8 }}>{text.gear}</div>
-        <div data-testid="value" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.1 }}>
+        <div style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>{text.gear}</div>
+        <div data-testid="value" style={{ fontSize: 44, fontWeight: 500, lineHeight: 1.1 }}>
           {`${teeth.front}×${teeth.rear}`}
         </div>
-        <div data-testid="teeth" style={{ fontSize: 18, fontWeight: 600, opacity: 0.9 }}>
+        <div data-testid="teeth" style={{ fontSize: 18, fontWeight: 500, opacity: 0.9 }}>
           <Teeth label={text.chainring} value={teeth.chainring} onShift={shiftOn('front')} />
           {' × '}
           <Teeth label={text.sprocket} value={teeth.sprocket} onShift={shiftOn('rear')} />
@@ -183,18 +184,19 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
         pointerEvents: 'auto',
         minWidth: 110,
         padding: '12px 18px',
-        borderRadius: 14,
-        background: 'rgba(16, 20, 24, 0.72)',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
+        borderRadius: 'var(--ridrs-radius)',
+        background: 'var(--ridrs-card-quiet)',
+        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
+        color: 'var(--ridrs-text)',
+        fontFamily: 'var(--ridrs-font-text)',
         // The focus is always clearly visible.
-        outline: focused ? '3px solid #ffd60a' : 'none',
+        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
         outlineOffset: 2,
       }}
     >
-      <div style={{ fontSize: 14, opacity: 0.8 }}>{text.gear}</div>
+      <div style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>{text.gear}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <span data-testid="value" style={{ fontSize: 44, fontWeight: 700 }}>
+        <span data-testid="value" style={{ fontSize: 44, fontWeight: 500 }}>
           {gear ? String(gear.index) : EN_DASH}
         </span>
         <span data-testid="unit" style={{ fontSize: 18 }}>

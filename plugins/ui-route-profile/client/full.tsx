@@ -25,9 +25,9 @@ const FALLBACK_WIDTH = 960;
 const FULL_HEIGHT_GRADE = 0.012;
 
 const RED = '#d4202c';
-const INK = 'var(--ridrs-text, #f2f5fa)';
-const MUTED = 'var(--ridrs-text-muted, #93a1b8)';
-const GRID = 'var(--ridrs-line, #24324d)';
+const INK = 'var(--ridrs-text)';
+const MUTED = 'var(--ridrs-text-muted)';
+const GRID = 'var(--ridrs-line)';
 
 /** The width of an element as it is laid out, following it. */
 function useWidth() {
@@ -101,12 +101,12 @@ function Summit({
         y={labelY + 4.5}
         textAnchor="middle"
         fontSize={climb.category === 'HC' ? 10 : 13}
-        fontWeight={800}
+        fontWeight={500}
         fill="#fff"
       >
         {climb.category}
       </text>
-      <text x={textX} y={labelY - 2} textAnchor={anchor} fontSize={14} fontWeight={700} fill={INK}>
+      <text x={textX} y={labelY - 2} textAnchor={anchor} fontSize={14} fontWeight={500} fill={INK}>
         {climb.name ?? altitude}
       </text>
       <text x={textX} y={labelY + 14} textAnchor={anchor} fontSize={12} fill={MUTED}>
@@ -166,7 +166,7 @@ export function FullProfile({ offer, text }: { readonly offer: RouteOffer; reado
         width="100%"
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        style={{ display: 'block', maxWidth: '100%', overflow: 'visible', font: '12px system-ui, sans-serif' }}
+        style={{ display: 'block', maxWidth: '100%', overflow: 'visible', font: '12px var(--ridrs-font-text)' }}
       >
         <defs>
           <linearGradient id={shade} x1="0" y1="0" x2="0" y2="1">
@@ -207,7 +207,7 @@ export function FullProfile({ offer, text }: { readonly offer: RouteOffer; reado
             </text>
           </g>
         ))}
-        <text x={right} y={base + 19} textAnchor="end" fontWeight={700} fill={INK}>
+        <text x={right} y={base + 19} textAnchor="end" fontWeight={500} fill={INK}>
           {text.km(offer.distance)} km
         </text>
         {climbs.map((climb, i) => {
