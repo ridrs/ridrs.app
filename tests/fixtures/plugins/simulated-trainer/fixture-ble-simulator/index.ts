@@ -79,12 +79,16 @@ export default definePlugin({
 
     let started = false;
     let trainer: SimulatedPeripheral | undefined;
-    // The pair: the left controller forwards the right one's buttons, so it presses them.
-    const ride = simulator.addZwiftRide('Zwift Ride', {
+    // The pair: the right controller presses its buttons, and the left one forwards them a little
+    // later, as the real pair does; the app counts each button on its own controller only.
+    const left = simulator.addZwiftRide('Zwift Ride', {
       peripheralId: 'sim-ride-left',
       side: 'left',
     });
-    simulator.addZwiftRide('Zwift Ride', { peripheralId: 'sim-ride-right', side: 'right' });
+    const right = simulator.addZwiftRide('Zwift Ride', {
+      peripheralId: 'sim-ride-right',
+      side: 'right',
+    });
     simulator.onScanStart(() => {
       if (started) {
         return;
@@ -105,8 +109,10 @@ export default definePlugin({
         if (!held) {
           throw new Error(`The fixture's controller has no "${button}"`);
         }
-        ride.notifyZwiftRide(held);
-        ride.notifyZwiftRide(KEYPAD_RELEASED);
+        right.notifyZwiftRide(held);
+        right.notifyZwiftRide(KEYPAD_RELEASED);
+        left.notifyZwiftRide(held);
+        left.notifyZwiftRide(KEYPAD_RELEASED);
       },
     };
     (globalThis as Record<symbol, unknown>)[CONTROL] = control;
