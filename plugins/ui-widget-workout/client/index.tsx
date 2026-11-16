@@ -13,7 +13,7 @@ import {
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { defaultPowerZones, type TimelineSegment, workoutTimeline, zoneOf } from '@ridrs/workout';
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Messages } from './i18n/en.ts';
 import { messages } from './i18n/index.ts';
@@ -22,11 +22,11 @@ import {
   countdownAt,
   cueAt,
   type EffortLevel,
-  effortBars,
   effortLevel,
   elapsedSeconds,
+  inkOn,
+  spanOf,
   type StepView,
-  setOf,
   stepView,
   vivid,
   zoneColour,
@@ -64,6 +64,7 @@ function useWorkoutRide(ctx: UiContext) {
   const [step, setStep] = useState<StepEvent>();
   const [finishedAt, setFinishedAt] = useState<number>();
   const [elapsed, setElapsed] = useState(0);
+  const [paused, setPaused] = useState(false);
   const track = useRef<Track>({ pausedMs: 0 });
 
   useEffect(() => {
@@ -79,6 +80,7 @@ function useWorkoutRide(ctx: UiContext) {
         setFinishedAt(undefined);
         setElapsed(0);
       }
+      setPaused(payload.state === 'paused');
       const now = track.current;
       if (payload.state === 'paused') {
         now.pausedAt ??= payload.pausedAt;
@@ -129,29 +131,11 @@ function useWorkoutRide(ctx: UiContext) {
   const thisStep = ride && step && step.startedAt >= ride.startedAt ? step : undefined;
   const finished = ride && finishedAt !== undefined && finishedAt >= ride.startedAt;
   const ftp = ride && ftpOf?.sessionId === ride.sessionId ? ftpOf.ftp : undefined;
-  return { ride, ftp, step: thisStep, finished: finished === true, elapsed };
+  return { ride, ftp, step: thisStep, finished: finished === true, elapsed, paused };
 }
 
-/**
- * "at 115 % 288 W", "Free ride": what the step asks. Power reads in that order and is spoken so;
- * the eye gets the watts first and large, the % beside them, the "at" not at all.
- */
-function Target({ step, text }: { readonly step: StepView; readonly text: Messages }) {
-  const { effort } = step;
-  if (effort.kind !== 'power') {
-    const said = targetText(step, text);
-    return said ? <span className="wk-target wk-said">{said}</span> : null;
-  }
-  return (
-    <span className="wk-target">
-      <span className="wk-hidden">{text.at}</span>{' '}
-      {effort.percent ? <span className="wk-percent">{`${effort.percent}${NBSP}%`}</span> : null}{' '}
-      {effort.watts ? <span className="wk-watts">{`${effort.watts}${NBSP}W`}</span> : null}
-    </span>
-  );
-}
-
-function targetText(step: StepView, text: Messages): string | undefined {
+/** "288 W", "125 → 188 W", "Free ride", "150 bpm": what a segment asks, watts only. */
+function targetText(step: StepView, text: Messages): string {
   const { effort } = step;
   switch (effort.kind) {
     case 'free':
@@ -159,22 +143,20 @@ function targetText(step: StepView, text: Messages): string | undefined {
     case 'max-effort':
       return text.maxEffort;
     case 'heart-rate':
-      return `${text.at} ${text.heartRate(effort.bpm)}`;
+      return text.heartRate(effort.bpm);
     case 'none':
-      return undefined;
-    case 'power': {
-      const percent = effort.percent ? `${effort.percent}${NBSP}%` : undefined;
-      const watts = effort.watts ? `${effort.watts}${NBSP}W` : undefined;
-      return `${text.at} ${[percent, watts].filter(Boolean).join(' ')}`;
-    }
+      return '';
+    case 'power':
+      return effort.watts ? `${effort.watts}${NBSP}W` : effort.percent ? `${effort.percent}${NBSP}%` : '';
   }
 }
 
+/** "4 min", "1 min 30 s", "2.5 km": how long a segment lasts. */
 function lengthText(step: StepView, text: Messages): string {
   const { duration } = step;
   switch (duration.kind) {
     case 'time':
-      return clock(duration.seconds);
+      return text.span(spanOf(duration.seconds));
     case 'distance':
       return text.distance(duration.meters);
     case 'energy':
@@ -184,86 +166,91 @@ function lengthText(step: StepView, text: Messages): string {
   }
 }
 
-/** How many coming steps the ladder lists. */
-const LADDER = 4;
+/** How many segments follow the current one in the list. */
+const COMING = 5;
 
 /** The glass of the gauges (`ui-hud-gauges`), as a panel: the HUD lies over a video and is always dark. */
 const WORKOUT_CSS = `
-.wk { box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 14px 14px 12px;
-  border-radius: 22px; border: 1px solid rgb(255 255 255 / .12); color: #f2f5fa;
+.wk { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px 10px 10px;
+  border-radius: 20px; border: 1px solid rgb(255 255 255 / .12); color: #f2f5fa;
   background: linear-gradient(165deg, rgb(22 34 56 / .88) 0%, rgb(11 18 32 / .93) 64%, rgb(8 13 24 / .96) 100%);
   box-shadow: 0 20px 45px -12px rgb(0 0 0 / .7), inset 0 1px 1px rgb(255 255 255 / .14), inset 0 -2px 8px rgb(0 0 0 / .6);
   font-family: var(--ridrs-font-text); font-variant-numeric: tabular-nums; line-height: 1.15; dynamic-range-limit: no-limit; }
 .wk-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.wk-head { display: flex; align-items: baseline; gap: 10px; padding: 0 4px; }
-.wk-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgb(242 245 250 / .72); }
+.wk-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 12px; padding: 0 6px; }
+.wk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgb(242 245 250 / .62); }
 .wk-total { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: rgb(242 245 250 / .72); }
 .wk-total svg { width: 12px; height: 12px; opacity: .8; }
-.wk-ribbon { display: flex; align-items: flex-end; gap: 1px; height: 28px; padding: 0 4px; }
-.wk-seg { position: relative; flex-basis: 0; min-width: 1px; border-radius: 2px 2px 1px 1px; overflow: hidden;
-  background: color-mix(in srgb, var(--hue) 34%, transparent); }
-.wk-seg-lit { position: absolute; inset: 0 auto 0 0; background: var(--lit); }
-.wk-seg[data-current] { overflow: visible; box-shadow: 0 0 10px -1px var(--lit); }
-.wk-seg[data-current]::after { content: ""; position: absolute; left: 0; right: 0; top: -4px; height: 2px;
-  border-radius: 1px; background: #f2f5fa; }
-.wk-step { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "now set" "now left" "bar bar"; column-gap: 12px; row-gap: 2px;
-  padding: 12px 14px 12px 18px; border-radius: 16px; overflow: hidden;
-  background: linear-gradient(100deg, color-mix(in srgb, var(--hue) 24%, transparent), rgb(255 255 255 / .03) 72%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06); }
-.wk-step::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
-  border-radius: 0 3px 3px 0; background: var(--lit); box-shadow: 0 0 12px var(--lit); }
-/* The step reads "NOW 4:00 at 115 % 288 W 95–105 rpm"; the eye gets the watts large, the rest below. */
-.wk-now { grid-area: now; display: grid; grid-template-columns: auto auto minmax(0, 1fr);
-  grid-template-areas: "tag tag tag" "watts watts watts" "percent len cad"; align-content: start; white-space: nowrap; }
-.wk-now .wk-tag { grid-area: tag; margin-bottom: 6px; }
-.wk-now .wk-target { display: contents; }
-.wk-now .wk-said { display: block; grid-area: watts; font-size: 24px; font-weight: 600; }
-.wk-now .wk-watts { grid-area: watts; font-size: 40px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
-.wk-now .wk-percent, .wk-now .wk-len, .wk-now .wk-cad { margin-top: 5px; font-size: 13px; color: rgb(242 245 250 / .72); }
-.wk-now .wk-percent { grid-area: percent; }
-.wk-now .wk-len { grid-area: len; }
-.wk-now .wk-cad { grid-area: cad; overflow: hidden; text-overflow: ellipsis; }
-.wk-now:has(.wk-percent) .wk-len::before { content: "\u00a0·\u00a0"; }
-.wk-now .wk-cad::before { content: "\u00a0·\u00a0"; }
-.wk-tag { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: color-mix(in srgb, var(--hue) 55%, #fff); }
-.wk-set { grid-area: set; justify-self: end; font-size: 15px; font-weight: 600; }
-.wk-set-of { color: rgb(242 245 250 / .55); }
-.wk-left { grid-area: left; justify-self: end; align-self: end; display: flex; align-items: baseline; gap: 5px;
-  transition: opacity .2s; }
-.wk-left-clock { font-size: 40px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
-.wk-left-word { font-size: 12px; color: rgb(242 245 250 / .6); }
-.wk-countdown { position: absolute; right: 14px; bottom: 22px; font-size: 64px; font-weight: 700; line-height: 1;
-  color: var(--lit); text-shadow: 0 0 18px var(--lit); }
-.wk-step[data-counting] .wk-left { opacity: 0; }
-.wk-track { grid-area: bar; height: 6px; margin-top: 10px; border-radius: 3px; overflow: hidden;
-  background: color-mix(in srgb, var(--hue) 26%, rgb(255 255 255 / .08)); }
-.wk-fill { height: 100%; border-radius: 3px; background: var(--lit); box-shadow: 0 0 10px var(--lit); }
-.wk-done { grid-area: now; font-size: 26px; font-weight: 600; }
-.wk-note:not(:empty) { margin: -2px 4px 0; padding-left: 10px; border-left: 2px solid var(--lit, #f2f5fa);
-  font-size: 15px; font-weight: 500; }
-.wk-ladder { list-style: none; margin: 0; padding: 0 4px; display: flex; flex-direction: column; gap: 7px; }
-.wk-rung { display: grid; grid-template-columns: 44px minmax(36px, 1fr) auto minmax(54px, auto); align-items: center;
-  column-gap: 10px; font-size: 13px; }
-.wk-rung:nth-child(2) { opacity: .8; } .wk-rung:nth-child(3) { opacity: .62; } .wk-rung:nth-child(4) { opacity: .46; }
-.wk-rung .wk-tag { color: rgb(242 245 250 / .6); }
-.wk-rail { height: 8px; border-radius: 4px; background: rgb(255 255 255 / .06); overflow: hidden; }
-.wk-bar { height: 100%; border-radius: 4px; background: color-mix(in srgb, var(--hue) 62%, transparent); }
-.wk-rung .wk-len { color: rgb(242 245 250 / .72); }
-.wk-rung .wk-target { display: flex; justify-content: flex-end; align-items: baseline; gap: 6px; }
-.wk-rung .wk-watts { order: -1; font-weight: 600; font-size: 14px; }
-.wk-rung .wk-percent { color: rgb(242 245 250 / .55); font-size: 12px; }
-.wk-more { padding: 0 4px; font-size: 12px; color: rgb(242 245 250 / .55); }
+.wk-count { grid-column: 1 / -1; font-size: 30px; font-weight: 700; font-style: italic; letter-spacing: -.02em; line-height: 1; }
+.wk-count-of { font-size: 15px; font-weight: 600; color: rgb(242 245 250 / .55); }
+.wk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.wk-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "zone len target";
+  align-items: center; column-gap: 12px; min-height: 30px; border-radius: 8px; overflow: hidden;
+  background: rgb(255 255 255 / .05); font-size: 15px; font-weight: 600; }
+/* Done: the row filled in its zone, a little calmer than the current one. */
+.wk-row[data-state="done"] { background: color-mix(in oklab, var(--lit) 62%, rgb(70 80 96)); color: var(--ink); }
+.wk-row[data-state="done"] .wk-zone { background: none; }
+.wk-row[data-state="done"] .wk-len { color: inherit; opacity: .75; }
+.wk-zone { grid-area: zone; align-self: stretch; display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; background: var(--lit); color: var(--ink); }
+/* No zone (no FTP, heart rate, free ride): a quiet edge instead of an empty chip. */
+.wk-zone:empty { background: linear-gradient(90deg, var(--lit) 0 3px, color-mix(in srgb, var(--hue) 16%, transparent) 3px); }
+.wk-len { grid-area: len; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(242 245 250 / .82); }
+.wk-target { grid-area: target; padding-right: 12px; white-space: nowrap; }
+/*
+ * The current row is its own bar: the zone's colour grows from the chip to the right edge as the
+ * segment goes by. Its content lies twice: light on the glass below, in the zone's ink on the
+ * colour above, cut at the edge of the fill, so every letter reads on either side of it.
+ */
+.wk-row[data-state="current"] { display: block; position: relative; overflow: visible; background: none; }
+.wk-cur { position: relative; border-radius: 8px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1), 0 0 20px -6px var(--lit); }
+.wk-layer { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-areas: "zone clock target" "zone detail target"; align-items: center; column-gap: 12px; row-gap: 1px;
+  min-height: 58px; background: color-mix(in srgb, var(--hue) 16%, rgb(255 255 255 / .07)); color: #f2f5fa; }
+.wk-layer .wk-zone { font-size: 15px; }
+.wk-layer .wk-target { font-size: 21px; font-weight: 700; }
+.wk-fill-layer { position: absolute; inset: 0; background: var(--lit); color: var(--ink);
+  clip-path: inset(0 calc((100% - 38px) * (1 - var(--p, 0))) 0 0); transition: clip-path 1s linear; }
+.wk-fill-layer .wk-zone { background: none; color: inherit; }
+.wk-clock { grid-area: clock; align-self: end; position: relative; font-size: 26px; font-weight: 800;
+  letter-spacing: -.01em; line-height: 1; padding-top: 8px; }
+.wk-detail { grid-area: detail; align-self: start; padding-bottom: 8px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 12px; font-weight: 600; opacity: .72; }
+.wk-detail .wk-len { color: inherit; }
+.wk-cad:not(:empty)::before { content: " · "; }
+.wk-countdown { position: absolute; left: 0; bottom: 0; }
+.wk-countdown:empty { display: none; }
+.wk-cur[data-counting] .wk-left { visibility: hidden; }
+.wk-cur[data-counting] .wk-countdown { animation: wk-tick 1s ease-out infinite; transform-origin: left bottom; }
+@keyframes wk-tick { from { transform: scale(1.3); } to { transform: scale(1); } }
+/* A cue: for its time in the middle of the screen, a card like the one of a pause. */
+.wk-cue { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); box-sizing: border-box;
+  width: max-content; max-width: min(70%, 760px); pointer-events: none; text-align: center; }
+.wk-cue:empty { display: none; }
+.wk-cue-card { display: block; padding: 14px 28px 14px 32px; border-radius: var(--ridrs-radius-lg, 18px);
+  background: var(--ridrs-card, rgb(14 22 38 / .92)); color: var(--ridrs-text, #f2f5fa);
+  box-shadow: inset 4px 0 0 var(--lit), var(--ridrs-edge, inset 0 1px 1px rgb(255 255 255 / .14)), var(--ridrs-shadow, 0 20px 45px -12px rgb(0 0 0 / .7));
+  font-family: var(--ridrs-font-display, var(--ridrs-font-text)); font-style: italic; font-weight: 600;
+  font-size: clamp(22px, 2.4vw, 34px); line-height: 1.2; text-wrap: balance;
+  animation: wk-cue-in .28s ease-out; }
+@keyframes wk-cue-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .wk-cue-card { animation: none; }
+  .wk-fill-layer { transition: none; }
+  .wk-cur[data-counting] .wk-countdown { animation: none; }
+}
+.wk-done { padding: 6px; font-size: 22px; font-weight: 600; }
 `;
 
 /** No zone (no FTP, heart rate, free ride): the gauges' neutral blue. */
 const NEUTRAL = '#38bdf8';
 
-/** The hue of a zone (dimmed, for `color-mix`) and its light in Display P3. */
+/** The hue of a zone (dimmed, for `color-mix`), its light in Display P3 and the ink on it. */
 function zoneStyle(zone: number | undefined, count: number): CSSProperties {
   const hex = zone === undefined ? NEUTRAL : zoneColour(zone, count);
-  return { '--hue': hex, '--lit': vivid(hex) } as CSSProperties;
+  return { '--hue': hex, '--lit': vivid(hex), '--ink': inkOn(hex) } as CSSProperties;
 }
 
 /** The power zones the steps are coloured by: those of the chosen profile, else Coggan's. */
@@ -274,94 +261,118 @@ function usePowerZones(ctx: UiContext) {
   return useMemo(() => zones ?? defaultPowerZones(), [zones]);
 }
 
-/** "1:47 left", "noch 1:47": the clock large and the words small, in the language's order. */
-function TimeLeft({ seconds, text }: { readonly seconds: number; readonly text: Messages }) {
-  const time = clock(seconds);
-  const [before = '', after = ''] = text.left('\u0000').split('\u0000');
-  return (
-    <div className="wk-left" data-testid="workout-time-left">
-      {before.trim() ? <span className="wk-left-word">{before.trim()}</span> : null}{' '}
-      <span className="wk-left-clock">{time}</span>{' '}
-      {after.trim() ? <span className="wk-left-word">{after.trim()}</span> : null}
-    </div>
-  );
+/** Where the ride stands in the current segment: the time left in it, its fill and 3-2-1. */
+interface Live {
+  readonly remaining: number | undefined;
+  readonly percent: number;
+  readonly countdown: number | undefined;
 }
 
-/** One rung of the ladder: a coming step, its bar as long as it is hard. */
-function Rung({
+/** One segment: its zone, length and target; the current one also its cadence and its fill. */
+function Row({
   step,
-  tag,
-  bar,
+  state,
   zone,
   zoneCount,
+  live,
   text,
 }: {
   readonly step: StepView;
-  readonly tag: string | undefined;
-  readonly bar: number | undefined;
+  readonly state: 'done' | 'current' | 'coming';
   readonly zone: number | undefined;
   readonly zoneCount: number;
+  readonly live?: Live;
   readonly text: Messages;
 }) {
-  return (
-    <li className="wk-rung" style={zoneStyle(zone, zoneCount)} {...(tag ? { 'data-testid': 'workout-next' } : {})}>
-      <span className="wk-tag">{tag}</span>{' '}
-      <span className="wk-rail" aria-hidden="true">
-        {bar === undefined ? null : <span className="wk-bar" data-effort-bar="" style={{ display: 'block', width: `${bar}%` }} />}
+  const parts = (
+    <>
+      <span className="wk-zone" data-part="zone">
+        {zone === undefined ? '' : `Z${zone}`}
       </span>{' '}
-      <span className="wk-len">{lengthText(step, text)}</span>{' '}
-      <Target step={step} text={text} />
-    </li>
+      <span className="wk-len" data-part="length">
+        {lengthText(step, text)}
+      </span>{' '}
+      <span className="wk-target" data-part="target">
+        {targetText(step, text)}
+      </span>
+    </>
   );
-}
-
-/**
- * The whole workout as a ribbon: each step as wide as it lasts and as high as it is hard, in its
- * zone's colour dimmed, lit up to where the ride is, like the scale of a gauge.
- */
-function Ribbon({
-  segments,
-  bars,
-  zones,
-  zoneCount,
-  progress,
-  current,
-  label,
-}: {
-  readonly segments: readonly TimelineSegment[];
-  readonly bars: readonly (number | undefined)[];
-  readonly zones: readonly (number | undefined)[];
-  readonly zoneCount: number;
-  readonly progress: number;
-  readonly current: number | undefined;
-  readonly label: string;
-}) {
+  if (!live) {
+    return (
+      <li className="wk-row" data-state={state} style={zoneStyle(zone, zoneCount)}>
+        {parts}
+      </li>
+    );
+  }
+  const { remaining, percent, countdown } = live;
+  const zoneText = zone === undefined ? '' : `Z${zone}`;
+  const cadence = step.cadence ? `${step.cadence}${NBSP}${text.rpm}` : '';
+  // The same content twice; only the lower one is read out and tested, the upper one is paint.
+  const layer = (marked: boolean) => (
+    <>
+      <span className="wk-zone" {...(marked ? { 'data-part': 'zone' } : {})}>
+        {zoneText}
+      </span>
+      <span className="wk-clock">
+        <span className="wk-left" {...(marked ? { 'data-testid': 'workout-time-left', 'aria-hidden': true } : {})}>
+          {remaining === undefined ? lengthText(step, text) : clock(remaining)}
+        </span>
+        <span
+          className="wk-countdown"
+          {...(marked
+            ? {
+                'data-testid': 'workout-countdown',
+                role: 'status',
+                'aria-label': countdown === undefined ? undefined : text.countdown(countdown),
+              }
+            : {})}
+        >
+          {countdown}
+        </span>
+      </span>
+      <span className="wk-target" {...(marked ? { 'data-part': 'target' } : {})}>
+        {targetText(step, text)}
+      </span>
+      <span className="wk-detail">
+        <span className="wk-len" {...(marked ? { 'data-part': 'length' } : {})}>
+          {remaining === undefined ? '' : lengthText(step, text)}
+        </span>
+        <span className="wk-cad" {...(marked ? { 'data-testid': 'workout-cadence' } : {})}>
+          {cadence}
+        </span>
+      </span>
+    </>
+  );
   return (
-    <div className="wk-ribbon" data-testid="workout-ribbon" data-seconds={String(progress)} role="img" aria-label={label}>
-      {segments.map((segment, at) => {
-        const lit =
-          segment.durationSeconds > 0
-            ? Math.min(1, Math.max(0, (progress - segment.startSeconds) / segment.durationSeconds))
-            : progress >= segment.startSeconds ? 1 : 0;
-        return (
-          <div
-            key={segment.index}
-            className="wk-seg"
-            data-ribbon-step=""
-            data-step-id={segment.stepId}
-            data-start-seconds={String(segment.startSeconds)}
-            {...(segment.index === current ? { 'data-current': '' } : {})}
-            style={{
-              ...zoneStyle(zones[at], zoneCount),
-              flexGrow: segment.durationSeconds,
-              height: `${Math.max(18, bars[at] ?? 30)}%`,
-            }}
-          >
-            {lit > 0 ? <div className="wk-seg-lit" style={{ width: `${lit * 100}%` }} /> : null}
-          </div>
-        );
-      })}
-    </div>
+    <li
+      className="wk-row"
+      data-state={state}
+      data-testid="workout-step"
+      {...(zone === undefined ? {} : { 'data-zone': String(zone) })}
+      style={zoneStyle(zone, zoneCount)}
+    >
+      <div
+        className="wk-cur"
+        data-testid="workout-now"
+        {...(countdown === undefined ? {} : { 'data-counting': '' })}
+        style={{ '--p': String(percent / 100) } as CSSProperties}
+        {...(remaining === undefined
+          ? {}
+          : {
+              role: 'progressbar',
+              'aria-label': text.barLabel,
+              'aria-valuemin': 0,
+              'aria-valuemax': 100,
+              'aria-valuenow': percent,
+              'aria-valuetext': text.left(clock(remaining)),
+            })}
+      >
+        <div className="wk-layer">{layer(true)}</div>
+        <div className="wk-layer wk-fill-layer" aria-hidden="true">
+          {layer(false)}
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -374,14 +385,13 @@ const CLOCK_ICON = (
 
 function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
-  const { ride, ftp, step, finished, elapsed } = useWorkoutRide(ctx);
+  const { ride, ftp, step, finished, elapsed, paused } = useWorkoutRide(ctx);
   const powerZones = usePowerZones(ctx);
   const timeline = useMemo(() => (ride ? workoutTimeline(ride.workout) : undefined), [ride]);
   const levels = useMemo<readonly EffortLevel[]>(
     () => timeline?.segments.map((segment) => effortLevel(segment.effort, ftp)) ?? [],
     [timeline, ftp],
   );
-  const bars = useMemo(() => effortBars(levels), [levels]);
   const zones = useMemo(
     () => levels.map((level) => (level.percentFtp === undefined ? undefined : zoneOf(level.percentFtp, powerZones))),
     [levels, powerZones],
@@ -390,65 +400,31 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
 
   const zoneCount = powerZones.length;
   const { segments } = timeline;
-  const current: TimelineSegment | undefined = step ? segments[step.index] : undefined;
-  const firstComing = finished ? segments.length : current ? current.index + 1 : 0;
-  const coming = segments.slice(firstComing, firstComing + LADDER);
-  const more = segments.length - firstComing - coming.length;
-  const upcoming = coming[0];
-  const shown = current ?? segments[0];
-  const set = shown ? setOf(shown, segments.length) : undefined;
-  const view = current ? stepView(current, ftp) : undefined;
-  const zone = current ? zones[current.index] : undefined;
+  const current: TimelineSegment | undefined = finished || !step ? undefined : segments[step.index];
+  const at = finished ? segments.length : current ? current.index + 1 : 0;
+  // The segment just ridden, the current one and the next five.
+  const first = current ? Math.max(0, current.index - 1) : at;
+  const shown = finished ? [] : segments.slice(first, at + COMING);
 
+  const currentZone = current ? zones[current.index] : undefined;
   const timed = current?.duration.kind === 'time';
   const inStep = current ? Math.min(elapsed, current.durationSeconds) : 0;
   const remaining = current && timed ? current.durationSeconds - inStep : undefined;
-  const cue = current && !finished ? cueAt(current.cues, elapsed) : undefined;
-  const countdown = finished ? undefined : countdownAt(remaining, upcoming !== undefined);
+  const live: Live | undefined = current
+    ? {
+        remaining,
+        percent: timed && current.durationSeconds > 0 ? Math.round((inStep / current.durationSeconds) * 100) : 0,
+        countdown: countdownAt(remaining, current.index + 1 < segments.length),
+      }
+    : undefined;
+  // A cue shows for its time in the middle of the screen; a pause has that place to itself.
+  const note = current && !paused ? cueAt(current.cues, elapsed)?.text : undefined;
   const progress = finished ? timeline.durationSeconds : (current?.startSeconds ?? 0) + inStep;
-  const percent = current && timed && current.durationSeconds > 0 ? Math.round((inStep / current.durationSeconds) * 100) : 0;
   const totalLeft = Math.max(0, timeline.durationSeconds - progress);
 
-  let body: ReactNode;
-  if (finished) {
-    body = (
-      <div data-testid="workout-done" role="status" className="wk-done">
-        {text.done}
-      </div>
-    );
-  } else {
-    body = (
-      <>
-        {view ? (
-          <div data-testid="workout-now" className="wk-now">
-            <span className="wk-tag">{text.now}</span>{' '}
-            <span className="wk-len">{lengthText(view, text)}</span>{' '}
-            <Target step={view} text={text} />{' '}
-            {view.cadence ? <span className="wk-cad">{`${view.cadence}${NBSP}${text.rpm}`}</span> : null}
-          </div>
-        ) : (
-          <div data-testid="workout-now" className="wk-now">
-            <span className="wk-target" style={{ fontSize: 24 }}>{text.starting}</span>
-          </div>
-        )}
-        {remaining !== undefined ? <TimeLeft seconds={remaining} text={text} /> : null}
-        {remaining !== undefined ? (
-          <div
-            className="wk-track"
-            role="progressbar"
-            aria-label={text.barLabel}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-          >
-            <div className="wk-fill" data-testid="workout-bar" style={{ width: `${percent}%` }} />
-          </div>
-        ) : null}
-      </>
-    );
-  }
-
   return (
+    <>
+      <style>{WORKOUT_CSS}</style>
     <section
       data-testid="widget-workout"
       data-status="available"
@@ -459,13 +435,12 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
         // Top left, below the window's own buttons, which the Mac app has over the page.
         top: 'var(--ridrs-page-top, 40px)',
         left: 16,
-        width: 'clamp(290px, 24vw, 350px)',
+        width: 'clamp(260px, 21vw, 310px)',
         maxHeight: 'calc(100% - var(--ridrs-page-top, 40px) - 16px)',
         overflow: 'hidden',
         pointerEvents: 'none',
       }}
     >
-      <style>{WORKOUT_CSS}</style>
       <header className="wk-head">
         <span className="wk-name" data-testid="workout-name">
           {ride.workout.name}
@@ -475,67 +450,40 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
           <span className="wk-hidden">{text.totalLeft}</span>
           <span data-testid="workout-total-left">{clock(totalLeft)}</span>
         </span>
+        <span className="wk-count" data-testid="workout-position" aria-label={text.positionLabel(at, segments.length)}>
+          {at}
+          <span className="wk-count-of">{`/${segments.length}`}</span>
+        </span>
       </header>
 
-      <Ribbon
-        segments={segments}
-        bars={bars}
-        zones={zones}
-        zoneCount={zoneCount}
-        progress={progress}
-        current={finished ? undefined : current?.index}
-        label={text.ribbonLabel}
-      />
-
-      <div
-        className="wk-step"
-        data-testid="workout-step"
-        {...(zone === undefined ? {} : { 'data-zone': String(zone) })}
-        {...(countdown === undefined ? {} : { 'data-counting': '' })}
-        style={zoneStyle(zone, zoneCount)}
-      >
-        {body}
-        {set && !finished ? (
-          <span className="wk-set" data-testid="workout-set" aria-label={text.setLabel(set.at, set.of)}>
-            {set.at}
-            <span className="wk-set-of">{`/${set.of}`}</span>
-          </span>
-        ) : null}
-        <div
-          data-testid="workout-countdown"
-          className="wk-countdown"
-          role="status"
-          aria-label={countdown === undefined ? undefined : text.countdown(countdown)}
-        >
-          {countdown}
+      {finished ? (
+        <div data-testid="workout-done" role="status" className="wk-done">
+          {text.done}
         </div>
-      </div>
-
-      <div data-testid="workout-note" role="status" className="wk-note" style={zoneStyle(zone, zoneCount)}>
-        {cue?.text}
-      </div>
-
-      {coming.length > 0 ? (
-        <ol className="wk-ladder" data-testid="workout-coming">
-          {coming.map((segment, at) => (
-            <Rung
+      ) : (
+        <ol className="wk-list" data-testid="workout-segments" aria-label={text.segmentsLabel}>
+          {shown.map((segment) => (
+            <Row
               key={segment.index}
               step={stepView(segment, ftp)}
-              tag={at === 0 ? text.next : undefined}
-              bar={bars[segment.index]}
+              state={segment === current ? 'current' : segment.index < at ? 'done' : 'coming'}
               zone={zones[segment.index]}
               zoneCount={zoneCount}
+              {...(segment === current && live ? { live } : {})}
               text={text}
             />
           ))}
         </ol>
-      ) : null}
-      {more > 0 ? (
-        <div className="wk-more" data-testid="workout-more">
-          {text.more(more)}
-        </div>
-      ) : null}
+      )}
     </section>
+    <div className="wk-cue" data-testid="workout-note" role="status" style={zoneStyle(currentZone, zoneCount)}>
+      {note ? (
+        <span key={note} className="wk-cue-card">
+          {note}
+        </span>
+      ) : null}
+    </div>
+    </>
   );
 }
 

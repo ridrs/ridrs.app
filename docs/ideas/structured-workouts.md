@@ -383,24 +383,22 @@ The player starts **simple and robust**; refinement comes later.
 **HUD widget `ui-widget-workout`** (a contribution to `activity/hud`, top left below the window's own buttons):
 
 ```
-╭─ SWEET SPOT OVER-UNDERS ─────────── ◷ 35:40 ─╮
-│  ▃▃▃▅▅▆▂▂▅▅▆▂▂▅▅▆▂▂▇▁▇▁▇▁▇▁▃▃▃   ← ribbon     │
-│ ┃ NOW                                  1/3   │
-│ ┃ 270 W                          noch 0:40   │
-│ ┃ 108 % · 1:00                               │
-│ ┃ ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │
-│  NEXT  ▬▬▬▬▬▬       3:00   125 W   50 %      │
-│        ▬▬▬▬▬▬▬▬▬▬   5:00   225 W   90 %      │
-│        ▬▬▬▬▬▬▬▬▬▬▬▬ 1:00   270 W  108 %      │
-│  +12 more                                    │
-╰──────────────────────────────────────────────╯
+╭─ THRESHOLD PYRAMID ──────── ◷ 23:56 ─╮
+│  3/12                                │
+│ ███Z3██ 1 min ████████████ 200 W ██  │  ← just ridden, filled
+│ ▐Z3▌ 0:31 ██████████████ 1│90 W      │  ← current, filling up
+│ ▐  ▌ 2 min · 90–100 rpm ██│          │
+│ ▐Z5▌ 1 min 30 s               300 W  │
+│ ▐Z2▌ 3 min                    140 W  │  ← the next five
+│  …                                   │
+╰──────────────────────────────────────╯
 ```
 
-- **Design:** the glass of the gauges, as a panel: their dark navy, light edge and shadow, and their light. The zone colours of the chart and the gauges are dimmed where something is coming and lit in Display P3 where the ride is, as a gauge's scale lights up to its value.
-- **Shows:** the workout's name and the time left in it; a ribbon of all its steps, each as wide as it lasts and as high as it is hard, lit up to where the ride is, a white mark over the current one; the current step glowing in its zone (a lit edge and tint): its watts large, % FTP, its length and the cadence target below, the set or repeat ("3/5"), the time left in it large with a bar; then the next four steps as a ladder, each with a bar as long as it is hard against the hardest step, fading downwards, and how many more follow.
+- **Design:** the glass of the gauges, as a panel: their dark navy, light edge and shadow, and their light. Each segment is a row with a chip in its zone's colour (lit in Display P3, the ink that reads best on it), its length ("4 min", "1 min 30 s") and its watts.
+- **Shows:** the workout's name, the time left in it and the segment the ride is in ("3/12"); then the segments as a list: the one just ridden filled in its zone's colour, a little calmer; the current one larger, its zone's colour growing from the chip to the right edge as it goes by, the time left counting down, its length and cadence below; then the next five. The current row's content lies twice, light on the glass and in the zone's ink on the colour, cut at the edge of the fill, so it reads on either side.
 - **Zones:** % FTP of the step (its end for a ramp) in the power zones of the chosen athlete profile, Coggan's without one; without an FTP no zone, the gauges' neutral blue.
 - **Reads** the workout and the step from the bus (`activity.state-changed`, `workout.step-changed`). Rendering reads, it never drives (rule 10).
-- **Brief notes:** the cues of the workout (text events) for their duration, in the step's colour below it, and 3-2-1 large in place of the time left before a step changes.
+- **Brief notes:** the cues of the workout (text events) for their duration in the middle of the screen, in a card like the one of a pause, with an edge in the segment's colour; not while the ride is paused, when "Paused" has that place. 3-2-1 in place of the time left before a segment changes.
 - Without a workout the widget does not show.
 
 **Not yet (later refinements):** intensity up and down, extending a step, smoothing the target or the trainer's ramp-up, a lap per step in the ride's FIT export, a score of how well the workout went in the debriefing.

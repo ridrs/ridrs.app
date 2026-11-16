@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { WorkoutEffort } from '@ridrs/contracts';
-import type { TimelineSegment } from '@ridrs/workout';
 import { describe, expect, it } from 'vitest';
 import {
   cadenceOf,
   clock,
   countdownAt,
   cueAt,
-  effortBars,
+  inkOn,
   effortLevel,
   effortOf,
   elapsedSeconds,
   rangeText,
-  setOf,
+  spanOf,
   vivid,
   zoneColour,
 } from './model.ts';
@@ -77,20 +76,12 @@ describe('the target of a step', () => {
   });
 });
 
-describe('the set', () => {
-  const segment = (repeats: TimelineSegment['repeats'], index = 4): TimelineSegment =>
-    ({ index, repeats }) as TimelineSegment;
-
-  it('is the round of the innermost counted repeat', () => {
-    expect(setOf(segment([{ repeatId: 'a', iteration: 3, count: 5 }]), 10)).toEqual({ at: 3, of: 5 });
-    expect(
-      setOf(segment([{ repeatId: 'a', iteration: 1, count: 2 }, { repeatId: 'b', iteration: 4, count: 6 }]), 10),
-    ).toEqual({ at: 4, of: 6 });
-  });
-
-  it('is the place among the steps without a counted repeat', () => {
-    expect(setOf(segment([]), 10)).toEqual({ at: 5, of: 10 });
-    expect(setOf(segment([{ repeatId: 'a', iteration: 1 }]), 10)).toEqual({ at: 5, of: 10 });
+describe('the length of a segment', () => {
+  it('splits it into hours, minutes and seconds', () => {
+    expect(spanOf(240)).toEqual({ hours: 0, minutes: 4, seconds: 0 });
+    expect(spanOf(90)).toEqual({ hours: 0, minutes: 1, seconds: 30 });
+    expect(spanOf(3900.4)).toEqual({ hours: 1, minutes: 5, seconds: 0 });
+    expect(spanOf(-3)).toEqual({ hours: 0, minutes: 0, seconds: 0 });
   });
 });
 
@@ -155,17 +146,6 @@ describe('how hard a step is', () => {
     expect(effortLevel({ kind: 'free' }, 250).value).toBeUndefined();
   });
 
-  it('gives each bar its length against the hardest step', () => {
-    const levels = [watts(288), watts(125)].map((effort) => effortLevel(effort, 250));
-    expect(effortBars(levels)).toEqual([100, 43]);
-    expect(effortBars([...levels, effortLevel({ kind: 'free' }, 250), effortLevel({ kind: 'max-effort' }, 250)])).toEqual([
-      100,
-      43,
-      undefined,
-      100,
-    ]);
-    expect(effortBars([effortLevel({ kind: 'free' }, 250)])).toEqual([undefined]);
-  });
 });
 
 describe('the colour of a zone', () => {
@@ -176,5 +156,11 @@ describe('the colour of a zone', () => {
 
   it('lights it in Display P3 at full brightness', () => {
     expect(vivid('#0a3aff')).toBe('color(display-p3 0.039 0.227 1.000)');
+  });
+
+  it('writes on its chip in the ink that reads best', () => {
+    expect(inkOn('#0a3aff')).toBe('#f2f5fa');
+    expect(inkOn('#f5ff3d')).toBe('#0b1220');
+    expect(inkOn('#0ffae3')).toBe('#0b1220');
   });
 });

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
-import { Given, Then, When } from '@cucumber/cucumber';
+import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
 import {
   activityAthleteEvent,
   activityStateChangedEvent,
@@ -232,21 +232,32 @@ Then('the workout HUD shows the name {string}', async function (this: RidrsWorld
   await sees(this, 'workout-name', name);
 });
 
-Then('the workout HUD shows the set {string}', async function (this: RidrsWorld, set: string) {
-  await sees(this, 'workout-set', set);
+Then('the workout HUD shows the segment {string}', async function (this: RidrsWorld, at: string) {
+  await sees(this, 'workout-position', at);
 });
 
+/** The current segment by its parts, whatever the row shows in their place (the time left). */
+async function seesCurrent(world: RidrsWorld, expected: string): Promise<void> {
+  await shown(world);
+  await waitFor(() => {
+    const row = hud(world)?.querySelector<HTMLElement>('[data-testid="workout-step"]');
+    const read = (part: string) => plain(row?.querySelector(`[data-part="${part}"]`)?.textContent);
+    assert.equal(plain(['zone', 'length', 'target'].map(read).join(' ')), expected);
+  });
+}
+
 Then(
-  'the workout HUD shows the current step {string}',
+  'the workout HUD shows the current segment {string}',
   async function (this: RidrsWorld, text: string) {
-    await sees(this, 'workout-now', text);
+    await seesCurrent(this, text);
   },
 );
 
 Then(
-  'the workout HUD shows the next step {string}',
-  async function (this: RidrsWorld, text: string) {
-    await sees(this, 'workout-next', text);
+  'the workout HUD shows the current segment {string} with {string}',
+  async function (this: RidrsWorld, text: string, cadence: string) {
+    await seesCurrent(this, text);
+    await sees(this, 'workout-cadence', cadence);
   },
 );
 
@@ -254,6 +265,17 @@ Then(
   'the workout HUD shows the time left {string}',
   async function (this: RidrsWorld, text: string) {
     await sees(this, 'workout-time-left', text);
+  },
+);
+
+Then(
+  'the workout HUD reads the time left as {string}',
+  async function (this: RidrsWorld, text: string) {
+    await shown(this);
+    await waitFor(() => {
+      const bar = hud(this)?.querySelector<HTMLElement>('[role="progressbar"]');
+      assert.equal(bar?.getAttribute('aria-valuetext'), text);
+    });
   },
 );
 
@@ -268,14 +290,38 @@ Then(
   },
 );
 
+/** The cue lies beside the panel, in the middle of the screen. */
+const note = (world: RidrsWorld) =>
+  ui(world).querySelector<HTMLElement>('[data-testid="workout-note"]');
+
 Then('the workout HUD shows no note', async function (this: RidrsWorld) {
   await shown(this);
-  await waitFor(() => assert.equal(part(this, 'workout-note'), ''));
+  await waitFor(() => assert.equal(plain(note(this)?.textContent), ''));
 });
 
 Then('the workout HUD shows the note {string}', async function (this: RidrsWorld, text: string) {
-  await sees(this, 'workout-note', text);
+  await shown(this);
+  await waitFor(() => assert.equal(plain(note(this)?.textContent), text));
 });
+
+// happy-dom has no layout: the place is the declared one, where the card of a pause lies too.
+Then(
+  'the note shows in the middle of the screen, outside the workout HUD',
+  async function (this: RidrsWorld) {
+    const widget = await shown(this);
+    const found = note(this);
+    assert.ok(found, 'No note');
+    assert.equal(widget.contains(found), false);
+    assert.match(found.className, /\bwk-cue\b/);
+    const css = [...ui(this).querySelectorAll('style')]
+      .map((style) => style.textContent ?? '')
+      .join('\n');
+    assert.match(
+      css,
+      /\.wk-cue \{[^}]*position: absolute; top: 40%; left: 50%; transform: translateX\(-50%\)/,
+    );
+  },
+);
 
 Then('the workout HUD counts nothing down', async function (this: RidrsWorld) {
   await shown(this);
@@ -297,46 +343,6 @@ Then('the workout HUD is not shown', async function (this: RidrsWorld) {
   assert.equal(hud(this), null);
 });
 
-const ribbon = (world: RidrsWorld) =>
-  hud(world)?.querySelector<HTMLElement>('[data-testid="workout-ribbon"]') ?? null;
-
-Then(
-  'the ribbon of the workout HUD has {int} steps, each as long as it lasts',
-  async function (this: RidrsWorld, count: number) {
-    await shown(this);
-    await waitFor(() => {
-      const steps = [...(ribbon(this)?.querySelectorAll<HTMLElement>('[data-ribbon-step]') ?? [])];
-      assert.equal(steps.length, count);
-      const lengths = segments('x').map((segment) => String(segment.durationSeconds));
-      // happy-dom has no layout: the length is the declared flex grow.
-      assert.deepEqual(
-        steps.map((step) => step.style.flexGrow),
-        lengths,
-      );
-    });
-  },
-);
-
-Then(
-  'the ribbon of the workout HUD is lit up to {int} seconds',
-  async function (this: RidrsWorld, seconds: number) {
-    await shown(this);
-    await waitFor(() => assert.equal(ribbon(this)?.dataset.seconds, String(seconds)));
-  },
-);
-
-Then(
-  'the ribbon of the workout HUD highlights the step {string} at {int} seconds',
-  async function (this: RidrsWorld, stepId: string, seconds: number) {
-    await waitFor(() => {
-      const current = ribbon(this)?.querySelector<HTMLElement>('[data-current]');
-      assert.ok(current, 'No step of the ribbon is highlighted');
-      assert.equal(current.dataset.stepId, stepId);
-      assert.equal(current.dataset.startSeconds, String(seconds));
-    });
-  },
-);
-
 Then(
   'the workout HUD shows the time left in the workout {string}',
   async function (this: RidrsWorld, text: string) {
@@ -357,40 +363,26 @@ Then(
   },
 );
 
-const coming = (world: RidrsWorld) => [
-  ...(hud(world)?.querySelectorAll<HTMLElement>('[data-testid="workout-coming"] > li') ?? []),
+const rows = (world: RidrsWorld) => [
+  ...(hud(world)?.querySelectorAll<HTMLElement>('[data-testid="workout-segments"] > li') ?? []),
 ];
 
-Then(
-  'the workout HUD lists the coming steps {string}',
-  async function (this: RidrsWorld, stepsCsv: string) {
-    await shown(this);
-    await waitFor(() =>
-      assert.deepEqual(
-        coming(this).map((step) => plain(step.textContent)),
-        stepsCsv.split(',').map((step) => step.trim()),
-      ),
-    );
-  },
-);
-
-Then('the workout HUD says {string} below them', async function (this: RidrsWorld, text: string) {
-  await sees(this, 'workout-more', text);
+Then('the workout HUD lists the segments', async function (this: RidrsWorld, table: DataTable) {
+  await shown(this);
+  const read = (row: HTMLElement, part: string) =>
+    plain(row.querySelector(`[data-part="${part}"]`)?.textContent);
+  await waitFor(() =>
+    assert.deepEqual(
+      rows(this).map((row) => ({
+        state: row.dataset.state ?? '',
+        zone: read(row, 'zone'),
+        length: read(row, 'length'),
+        target: read(row, 'target'),
+      })),
+      table.hashes(),
+    ),
+  );
 });
-
-Then(
-  'the bars of the coming steps are as long as they are hard: {string} %',
-  async function (this: RidrsWorld, percentsCsv: string) {
-    await waitFor(() =>
-      assert.deepEqual(
-        coming(this).map(
-          (step) => step.querySelector<HTMLElement>('[data-effort-bar]')?.style.width,
-        ),
-        percentsCsv.split(',').map((percent) => `${percent.trim()}%`),
-      ),
-    );
-  },
-);
 
 Then(
   'the workout HUD shows the current step in zone {int}',

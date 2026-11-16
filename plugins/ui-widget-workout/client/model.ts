@@ -19,6 +19,18 @@ export function clock(totalSeconds: number): string {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
 }
 
+/** A length in whole hours, minutes and seconds, for "4 min", "1 min 30 s", "1 h 5 min". */
+export interface Span {
+  readonly hours: number;
+  readonly minutes: number;
+  readonly seconds: number;
+}
+
+export function spanOf(totalSeconds: number): Span {
+  const total = Math.max(0, Math.round(totalSeconds));
+  return { hours: Math.floor(total / 3600), minutes: Math.floor((total % 3600) / 60), seconds: total % 60 };
+}
+
 /** "288", "95–105": a range as the rider reads it; one number for an exact value. */
 export function rangeText(range: WorkoutRange): string {
   return round(range.low) === round(range.high) ? `${round(range.low)}` : `${round(range.low)}–${round(range.high)}`;
@@ -116,13 +128,6 @@ export function stepView(segment: TimelineSegment, ftp: number | undefined): Ste
   };
 }
 
-/** "3/5": the round of the innermost counted repeat, else the place among all the steps. */
-export function setOf(segment: TimelineSegment, count: number): { readonly of: number; readonly at: number } {
-  const repeat = segment.repeats.at(-1);
-  if (repeat?.count !== undefined) return { at: repeat.iteration, of: repeat.count };
-  return { at: segment.index + 1, of: count };
-}
-
 /** The cue that is up at `seconds` into the step, if any: the first of those that overlap. */
 export function cueAt(cues: readonly WorkoutCue[], seconds: number): WorkoutCue | undefined {
   return cues.find((cue) => {
@@ -175,20 +180,6 @@ export function effortLevel(effort: WorkoutEffort, ftp: number | undefined): Eff
 }
 
 /**
- * The bar of each step in %, as long as it is hard against the hardest step of the workout
- * (max effort is 100 %); undefined for a step without a level (free ride, heart rate).
- */
-export function effortBars(levels: readonly EffortLevel[]): readonly (number | undefined)[] {
-  const values = levels.flatMap((level) => (level.value === undefined ? [] : [level.value]));
-  const hardest = values.length === 0 ? undefined : Math.max(...values);
-  return levels.map((level) => {
-    if (level.max) return 100;
-    if (level.value === undefined || !hardest) return undefined;
-    return Math.round((level.value * 100) / hardest);
-  });
-}
-
-/**
  * The zone ramp of the workout chart (`ui-workout-chart/client/palette.ts`, dark theme), cool to
  * hot, as the gauges keep it too. Plugins share no code, so the widget keeps its own copy; the
  * HUD lies over a video and is always dark.
@@ -229,4 +220,15 @@ export function vivid(hex: string): string {
   const brightest = Math.max(...channels, 1e-6);
   const [r, g, b] = channels.map((channel) => (channel / brightest).toFixed(3));
   return `color(display-p3 ${r} ${g} ${b})`;
+}
+
+/** The ink on a chip of colour `hex`: dark on a light zone, light on a dark one (WCAG luminance). */
+export function inkOn(hex: string): string {
+  const [r = 0, g = 0, b = 0] = [1, 3, 5].map((at) => {
+    const channel = Number.parseInt(hex.slice(at, at + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // The ink with the better contrast: #0b1220 (L ≈ 0.006) or #f2f5fa (L ≈ 0.91).
+  return (luminance + 0.05) / 0.056 >= 0.96 / (luminance + 0.05) ? '#0b1220' : '#f2f5fa';
 }

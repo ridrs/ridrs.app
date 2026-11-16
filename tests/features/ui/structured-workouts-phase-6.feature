@@ -44,7 +44,7 @@ Feature: Phase 6: from the next workout through the briefing to a ride the worko
       | +0 s   | 125 W  |
       | +30 s  | 157 W  |
       | +60 s  | 225 W  |
-    And the workout HUD shows the set "1/2"
+    And the workout HUD shows the segment "2/6"
     When I press "Finish ride"
     And the recording is replayed
     Then the replay is identical

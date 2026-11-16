@@ -2,14 +2,15 @@
 Feature: The workout in the HUD
   During a ride with a workout the HUD shows where the rider is in it (structured-workouts.md,
   section 11a), in a glass panel at the top left, drawn like the gauges: the workout's name, the
-  set ("3/5") and the time left in the whole workout; a ribbon of all its steps, as long as they
-  last, in their zones' colours dimmed and lit up to where the ride is; the current step with its
-  target in % and W (the ride's workout holds watts; % beside them when the ride's athlete has an
-  FTP) and its cadence, glowing in its zone, the time left in it with a bar; the next steps below
-  it as a ladder, each with a bar as long as it is hard, and how many more follow; the workout's
-  cues for their duration and 3-2-1 before a step changes. The widget only reads: `activity.state-changed`, `activity.athlete`,
-  `workout.step-changed`, `workout.finished` and the clock of the frames; it takes no focus.
-  Without a workout it does not show.
+  time left in it and the segment the ride is in ("5/10"); below them the segments as a list, each
+  a row with its zone ("Z5", in the zone's colour), its length and its target (the ride's workout
+  holds watts): the segment just ridden filled in its zone's colour; the current one larger, its
+  zone's colour growing from the chip to the right edge as it goes by, the time left in it counting
+  down, its length and cadence below; then the next five. The workout's cues show for their
+  duration in the middle of the screen, where a pause shows, and not during one; 3-2-1 shows in
+  place of the time left before a segment changes. The widget only reads: `activity.state-changed`,
+  `activity.athlete`, `workout.step-changed`, `workout.finished` and the clock of the frames; it takes no focus. Without a workout it does not
+  show.
 
   Here the scenarios publish those events directly, as the workout player does; the workout is
   5 times (4 minutes at 288 W with 95–105 rpm, 4 minutes at 125 W) for an athlete with an FTP of 250 W.
@@ -17,33 +18,40 @@ Feature: The workout in the HUD
   Background:
     Given the ridrs plugins "ui-main-screen, ui-activity-screen, ui-hud, ui-widget-workout, ui-settings" for the workout HUD
 
-  Scenario: The HUD shows the step, its target, the time left and the next step
+  Scenario: The HUD shows the segment, its target and the time left in it, filling up as it goes by
     Given the workout HUD is shown
     And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
     When the workout player reports step 5 of the workout
     And 133 seconds go by
     Then the workout HUD shows the name "VO2max 5×4"
-    And the workout HUD shows the set "3/5"
+    And the workout HUD shows the segment "5/10"
     And the workout HUD shows the time left in the workout "21:47"
-    And the workout HUD shows the current step "NOW 4:00 at 115 % 288 W 95–105 rpm"
-    And the workout HUD shows the time left "1:47 left"
+    And the workout HUD shows the current segment "Z5 4 min 288 W" with "95–105 rpm"
+    And the workout HUD shows the time left "1:47"
+    And the workout HUD reads the time left as "1:47 left"
     And the workout HUD shows the bar at 55 %
-    And the workout HUD shows the next step "NEXT 4:00 at 50 % 125 W"
 
   Scenario: The HUD sits at the top left, below the window's own buttons
     Given the workout HUD is shown
     And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
     Then the workout HUD sits at the top left, below the window's own buttons
 
-  Scenario: The next steps follow as a ladder, each as long as it is hard
+  Scenario: The segments show as a list: the one just ridden, the current one and the next five
     Given the workout HUD is shown
     And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
     When the workout player reports step 5 of the workout
-    Then the workout HUD lists the coming steps "NEXT 4:00 at 50 % 125 W, 4:00 at 115 % 288 W, 4:00 at 50 % 125 W, 4:00 at 115 % 288 W"
-    And the workout HUD says "+1 more" below them
-    And the bars of the coming steps are as long as they are hard: "43, 100, 43, 100" %
+    Then the workout HUD lists the segments
+      | state   | zone | length | target |
+      | done    | Z1   | 4 min  | 125 W  |
+      | current | Z5   | 4 min  | 288 W  |
+      | coming  | Z1   | 4 min  | 125 W  |
+      | coming  | Z5   | 4 min  | 288 W  |
+      | coming  | Z1   | 4 min  | 125 W  |
+      | coming  | Z5   | 4 min  | 288 W  |
+      | coming  | Z1   | 4 min  | 125 W  |
+    And the workout HUD offers nothing to focus
 
-  Scenario: The current step glows in the colour of its zone
+  Scenario: The current segment shows in the colour of its zone
     Given the workout HUD is shown
     And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
     When the workout player reports step 5 of the workout
@@ -51,25 +59,12 @@ Feature: The workout in the HUD
     When the workout player reports step 6 of the workout
     Then the workout HUD shows the current step in zone 1
 
-  Scenario: Without an FTP the HUD shows watts only
+  Scenario: Without an FTP the HUD shows watts without zones
     Given the workout HUD is shown
     And a ride with the workout "VO2max 5×4" starts for an athlete without an FTP
     When the workout player reports step 5 of the workout
-    Then the workout HUD shows the current step "NOW 4:00 at 288 W 95–105 rpm"
-    And the workout HUD shows the next step "NEXT 4:00 at 125 W"
+    Then the workout HUD shows the current segment "4 min 288 W" with "95–105 rpm"
     And the workout HUD shows the current step in no zone
-
-  Scenario: The ribbon of the workout lights up with the ride's time
-    Given the workout HUD is shown
-    And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
-    When the workout player reports step 5 of the workout
-    And 133 seconds go by
-    Then the ribbon of the workout HUD has 10 steps, each as long as it lasts
-    And the ribbon of the workout HUD is lit up to 1093 seconds
-    And the ribbon of the workout HUD highlights the step "work" at 960 seconds
-    When 20 seconds go by
-    Then the ribbon of the workout HUD is lit up to 1113 seconds
-    And the workout HUD offers nothing to focus
 
   Scenario: A pause holds the step and the ride goes on from there
     Given the workout HUD is shown
@@ -78,10 +73,10 @@ Feature: The workout in the HUD
     And 60 seconds go by
     And the workout ride is paused
     And 90 seconds go by
-    Then the workout HUD shows the time left "3:00 left"
+    Then the workout HUD shows the time left "3:00"
     When the workout ride goes on
     And 30 seconds go by
-    Then the workout HUD shows the time left "2:30 left"
+    Then the workout HUD shows the time left "2:30"
 
   Scenario: A cue shows for its duration
     Given the workout HUD is shown
@@ -91,8 +86,20 @@ Feature: The workout in the HUD
     Then the workout HUD shows no note
     When 15 seconds go by
     Then the workout HUD shows the note "Stay seated, spin it out"
+    And the note shows in the middle of the screen, outside the workout HUD
     When 15 seconds go by
     Then the workout HUD shows no note
+
+  Scenario: A pause has the middle of the screen to itself
+    Given the workout HUD is shown
+    And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
+    When the workout player reports step 5 of the workout
+    And 35 seconds go by
+    Then the workout HUD shows the note "Stay seated, spin it out"
+    When the workout ride is paused
+    Then the workout HUD shows no note
+    When the workout ride goes on
+    Then the workout HUD shows the note "Stay seated, spin it out"
 
   Scenario: 3-2-1 before the step changes
     Given the workout HUD is shown
@@ -108,7 +115,7 @@ Feature: The workout in the HUD
     Then the workout HUD counts down "1"
     When the workout player reports step 6 of the workout
     Then the workout HUD counts nothing down
-    And the workout HUD shows the current step "NOW 4:00 at 50 % 125 W"
+    And the workout HUD shows the current segment "Z1 4 min 125 W"
 
   Scenario: Without a workout nothing shows
     Given the workout HUD is shown
@@ -119,7 +126,14 @@ Feature: The workout in the HUD
     Given the workout HUD is shown
     And the workout player reported step 5 of the workout in an earlier ride
     When a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
-    Then the workout HUD shows the next step "NEXT 4:00 at 115 % 288 W"
+    Then the workout HUD shows the segment "0/10"
+    And the workout HUD lists the segments
+      | state  | zone | length | target |
+      | coming | Z5   | 4 min  | 288 W  |
+      | coming | Z1   | 4 min  | 125 W  |
+      | coming | Z5   | 4 min  | 288 W  |
+      | coming | Z1   | 4 min  | 125 W  |
+      | coming | Z5   | 4 min  | 288 W  |
 
   Scenario: After the workout it says so
     Given the workout HUD is shown
@@ -135,8 +149,7 @@ Feature: The workout in the HUD
     And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
     When the workout player reports step 5 of the workout
     And 133 seconds go by
-    Then the workout HUD shows the current step "JETZT 4:00 bei 115 % 288 W 95–105 U/min"
-    And the workout HUD shows the time left "noch 1:47"
-    And the workout HUD shows the next step "DANACH 4:00 bei 50 % 125 W"
+    Then the workout HUD shows the current segment "Z5 4 Min. 288 W" with "95–105 U/min"
+    And the workout HUD reads the time left as "noch 1:47"
     When the workout player reports the workout finished
     Then the workout HUD says "Workout geschafft"
