@@ -4,7 +4,7 @@ import type { MetricReading } from '@ridrs/contracts';
 import { describeMetricReading, formatDecimal } from '@ridrs/ui-sdk';
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createHdrLayer, HDR_MARGIN, type HdrLayer } from './hdr-layer.ts';
-import { angleOf, bandAt, dimmed, type Scale, ticksOf, vivid } from './model.ts';
+import { angleOf, bandNear, dimmed, lit, type Scale, ticksOf } from './model.ts';
 
 /** The dial is drawn on 200 × 200 units, its centre at (C, C). */
 const C = 100;
@@ -15,9 +15,26 @@ const TRACK_WIDTH = 3.3;
 const TICK_OUTER = 85.3;
 const TICK_INNER_MAJOR = 77.3;
 const TICK_INNER_MINOR = 80.7;
-const TICK_LABEL = 66.7;
+const TICK_LABEL = 64;
 /** The scale's colour without zones (no FTP, say). */
 const NEUTRAL = '#38bdf8';
+/** The track while the metric has no value: no zone colours, so a glance tells it is not live. */
+const IDLE_TRACK = 'rgb(51 65 85)';
+/** Half the lit arc's width as an angle: its round caps end exactly at the value, not beyond it. */
+const CAP_ANGLE = ((ARC_WIDTH / 2 / ARC_RADIUS) * 180) / Math.PI;
+/** Where the average's mark ends: just across the outer edge of the scale. */
+const AVERAGE_TIP = C - ARC_RADIUS + 3.3;
+
+/**
+ * Text sizes in units of the 200-unit dial; the dial is at least 168 px wide, so a unit is at
+ * least 0.84 px. Read from the trainer, about 1.5 m away, nothing is below 10 px.
+ */
+const SIZE = { value: 54, valueLong: 44, unit: 13, label: 11, secondary: 22, tick: 12, tickLong: 10.5 };
+/**
+ * The weights the Kinetic look bundles (`ui-main-screen/client/kinetic.tsx`): the text face in
+ * 400 and 500 only, with font synthesis off. Heavier weights would fall back to 500 anyway.
+ */
+const WEIGHT = { regular: 400, medium: 500 };
 
 /** Red and white beyond sRGB, for the FTP, the average and the value. */
 const FTP_RED = 'color(display-p3 1 0.1 0.1)';
@@ -26,6 +43,8 @@ const WHITE = 'color(display-p3 1 1 1)';
 const GREY_LIGHT = 'rgb(226 232 240)';
 const GREY = 'rgb(203 213 225)';
 const GREY_DARK = 'rgb(148 163 184)';
+/** Why there is no value: the Kinetic look's warning amber (`--ridrs-warn`). */
+const WARN = '#ffb62e';
 /** The outline that keeps a mark apart from the scale under it. */
 const OUTLINE = '#0b1220';
 
@@ -76,7 +95,7 @@ export interface GaugeProps {
  * One round dial of translucent glass, without a needle: the zones as a thin dimmed track around a
  * 250° sweep, lit up to the current value, the value large at the centre with the unit below it
  * and, for some, the average at the bottom. The average and the FTP are also marked on the scale:
- * a white triangle outside it, a red line across it with a red triangle inside. The glass lets the
+ * a white triangle on its outer edge, a red line across it with a red triangle inside. The glass lets the
  * scenery through; nothing drawn on it does. The lit colours are Display P3 at full brightness and,
  * on an HDR screen, the whole drawing goes beyond SDR white (`hdr-layer.ts`). The metric's name is spoken, not drawn. A gauge
  * without an average may show the virtual gear in its place, a control of its own.
@@ -94,18 +113,21 @@ export function Gauge({
   zoneName,
 }: GaugeProps) {
   const [gearFocused, setGearFocused] = useState(false);
+  const shownZone = useRef<number | undefined>(undefined);
   const svg = useRef<SVGSVGElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [hdr, setHdr] = useState<HdrLayer>();
   const display = describeMetricReading(reading, language);
   const value = reading?.status === 'available' ? reading.value : undefined;
-  const band = value === undefined ? undefined : bandAt(scale, value);
+  const band = value === undefined ? undefined : bandNear(scale, value, shownZone.current);
+  shownZone.current = band?.zone;
   const start = angleOf(scale, scale.min);
   const angle = angleOf(scale, value ?? scale.min);
-  const accent = vivid(band?.colour ?? NEUTRAL);
+  const accent = lit(band?.colour ?? NEUTRAL);
+  const live = value !== undefined;
   const averageValue = average?.value === undefined ? undefined : Math.round(average.value);
   const averageText = averageValue === undefined ? '–' : formatDecimal(averageValue, 0);
-  const lit = value !== undefined && angle - start > 0.5;
+  const lights = live && angle - start > 0.5;
   const spoken = [
     `${label} ${display.text} ${unit}`,
     band ? `${zoneName(band.zone)}${band.name ? ` ${band.name}` : ''}` : undefined,
@@ -163,7 +185,7 @@ export function Gauge({
       style={{
         position: 'relative',
         pointerEvents: 'auto',
-        width: 'clamp(120px, 13vw, 210px)',
+        width: 'clamp(168px, 14vw, 240px)',
         aspectRatio: '1',
         borderRadius: '50%',
         boxSizing: 'border-box',
@@ -197,7 +219,7 @@ export function Gauge({
           <path
             d={arc(ARC_RADIUS, start, angleOf(scale, scale.max))}
             fill="none"
-            stroke={dimmed(NEUTRAL)}
+            stroke={live ? dimmed(NEUTRAL) : IDLE_TRACK}
             strokeWidth={TRACK_WIDTH}
             strokeLinecap="round"
           />
@@ -211,17 +233,17 @@ export function Gauge({
             data-to={String(item.to)}
             d={arc(ARC_RADIUS, angleOf(scale, item.from), angleOf(scale, item.to))}
             fill="none"
-            stroke={dimmed(item.colour)}
+            stroke={live ? dimmed(item.colour) : IDLE_TRACK}
             strokeWidth={TRACK_WIDTH}
           >
             <title>{`${zoneName(item.zone)}${item.name ? ` · ${item.name}` : ''}`}</title>
           </path>
         ))}
-        {lit ? (
+        {lights ? (
           <path
             data-testid="active-arc"
             data-value={display.text}
-            d={arc(ARC_RADIUS, start, angle)}
+            d={arc(ARC_RADIUS, start + CAP_ANGLE, Math.max(angle - CAP_ANGLE, start + CAP_ANGLE + 0.01))}
             fill="none"
             stroke={accent}
             strokeWidth={ARC_WIDTH}
@@ -258,8 +280,8 @@ export function Gauge({
                 y={y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={tick.value >= 1000 ? 7.5 : 9}
-                fontWeight={600}
+                fontSize={tick.value >= 1000 ? SIZE.tickLong : SIZE.tick}
+                fontWeight={WEIGHT.medium}
                 fill={GREY_LIGHT}
               >
                 {tick.value}
@@ -290,11 +312,11 @@ export function Gauge({
           </g>
         ) : null}
 
-        {/* The average: a white triangle outside the scale, pointing at it. */}
+        {/* The average: a white triangle on the rim, pointing into the scale. */}
         {averageValue !== undefined ? (
           <g data-testid="average-marker" data-value={String(averageValue)} transform={towards(angleOf(scale, averageValue))}>
             <polygon
-              points={`${C - 5.7},-2.7 ${C + 5.7},-2.7 ${C},6`}
+              points={`${C - 5.5},0.8 ${C + 5.5},0.8 ${C},${AVERAGE_TIP}`}
               fill={WHITE}
               stroke={OUTLINE}
               strokeWidth={1.07}
@@ -310,107 +332,69 @@ export function Gauge({
           y={C}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={display.text.length > 3 ? 42 : 52}
-          fontWeight={800}
-          letterSpacing={-1.7}
-          fill={WHITE}
+          fontSize={display.text.length > 3 ? SIZE.valueLong : SIZE.value}
+          fontWeight={WEIGHT.medium}
+          letterSpacing={-1.5}
+          fill={live ? WHITE : GREY_DARK}
         >
           {display.text}
         </text>
-        <text
-          data-testid="unit"
-          x={C}
-          y={132}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={11.3}
-          fontWeight={600}
-          fill={GREY}
-        >
-          {unit}
-        </text>
-
-        {/* At the bottom: the gear, else why there is no value, else the average. */}
-        {gear ? (
-          <>
-            {display.reason !== undefined ? (
-              // Small, between the unit and the gear: the gear does not depend on the reading.
-              <text
-                data-testid="reason"
-                x={C}
-                y={146}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={7.5}
-                fill={GREY}
-              >
-                {display.reason}
-              </text>
-            ) : null}
-            <text
-              x={C}
-              y={158}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={7.7}
-              fontWeight={600}
-              letterSpacing={0.53}
-              fill={GREY_DARK}
-            >
-              {gear.label.toUpperCase()}
-            </text>
-            <text
-              data-testid="gear"
-              x={C}
-              y={174}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={20.7}
-              fontWeight={700}
-              letterSpacing={-0.53}
-              fill={GREY_LIGHT}
-            >
-              {gear.text}
-            </text>
-          </>
-        ) : display.reason !== undefined ? (
+        {display.reason === undefined ? (
+          <text
+            data-testid="unit"
+            x={C}
+            y={134}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={SIZE.unit}
+            fontWeight={WEIGHT.medium}
+            fill={GREY}
+          >
+            {unit}
+          </text>
+        ) : (
+          // Why there is no value, in the unit's place: the dash above says the rest.
           <text
             data-testid="reason"
             x={C}
-            y={162}
+            y={134}
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize={9}
-            fill={GREY}
+            fontSize={SIZE.unit}
+            fontWeight={WEIGHT.medium}
+            fill={WARN}
           >
             {display.reason}
           </text>
-        ) : average ? (
+        )}
+
+        {/* At the bottom, in the opening of the scale: the gear, else the average. */}
+        {gear ?? average ? (
           <>
             <text
               x={C}
-              y={158}
+              y={157}
               textAnchor="middle"
               dominantBaseline="central"
-              fontSize={7.7}
-              fontWeight={600}
-              letterSpacing={0.53}
+              fontSize={SIZE.label}
+              fontWeight={WEIGHT.medium}
+              letterSpacing={1.1}
               fill={GREY_DARK}
             >
-              {average.label.toUpperCase()}
+              {(gear ?? average)?.label.toUpperCase()}
             </text>
             <text
-              data-testid="average"
+              data-testid={gear ? 'gear' : 'average'}
               x={C}
-              y={174}
+              y={175}
               textAnchor="middle"
               dominantBaseline="central"
-              fontSize={20.7}
-              fontWeight={700}
-              letterSpacing={-0.53}
+              fontSize={SIZE.secondary}
+              fontWeight={WEIGHT.medium}
+              letterSpacing={-0.5}
               fill={GREY_LIGHT}
             >
-              {averageText}
+              {gear ? gear.text : averageText}
             </text>
           </>
         ) : null}
@@ -450,9 +434,9 @@ export function Gauge({
           style={{
             position: 'absolute',
             left: '30%',
-            top: '74%',
+            top: '73%',
             width: '40%',
-            height: '19%',
+            height: '21%',
             borderRadius: 'var(--ridrs-radius-sm)',
             // The focus is always clearly visible.
             outline: gearFocused ? 'var(--ridrs-focus-ring)' : 'none',

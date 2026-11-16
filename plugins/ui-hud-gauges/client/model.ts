@@ -58,16 +58,30 @@ export function vivid(hex: string): string {
 }
 
 /**
- * A `#rrggbb` colour dimmed towards the dial's own colour, `#0b1220`, by `share` of it, as a solid
- * colour: the part of the scale not lit yet keeps its zone colours but lets nothing through.
+ * The lightness, in OKLCH, the lit scale keeps at least. The zone ramp starts with a deep blue
+ * (`#0a3aff`, L 0.47) that all but vanishes on the navy glass (L 0.18): lit, every zone reads at
+ * a glance, its hue unchanged.
  */
-export function dimmed(hex: string, share = 0.55): string {
-  const dial = [0x0b, 0x12, 0x20];
-  const [r, g, b] = [1, 3, 5].map((at, index) => {
-    const channel = Number.parseInt(hex.slice(at, at + 2), 16);
-    return Math.round(channel + ((dial[index] ?? 0) - channel) * share);
-  });
-  return `rgb(${r} ${g} ${b})`;
+export const LIT_LIGHTNESS = 0.74;
+
+/**
+ * The lit colour of a zone: `vivid` at full brightness, lifted to `LIT_LIGHTNESS` where it is
+ * darker, in CSS relative colour syntax, so the browser maps it to the screen's gamut.
+ */
+export function lit(hex: string): string {
+  return `oklch(from ${vivid(hex)} max(l, ${LIT_LIGHTNESS}) c h)`;
+}
+
+/** The lightness of the part of the scale not lit yet: one for every zone, the hue tells them apart. */
+export const TRACK_LIGHTNESS = 0.5;
+
+/**
+ * A `#rrggbb` colour as the track of the scale not lit yet: every zone at the same lightness, its
+ * chroma reduced, solid. Dimming towards the dial instead left the first zones almost invisible
+ * and the yellow ones brighter than the rest.
+ */
+export function dimmed(hex: string): string {
+  return `oklch(from ${hex} ${TRACK_LIGHTNESS} calc(c * 0.6) h)`;
 }
 
 /** The colour of a 1-based zone, spreading `count` zones over the ramp as the chart does. */
@@ -177,13 +191,45 @@ export function heartRateScale(
  */
 export const CADENCE_ZONES: TrainingZones = [{ upTo: 60 }, { upTo: 75 }, { upTo: 90 }, { upTo: 105 }, {}];
 
+/**
+ * Cadence is no intensity: the effort ramp would paint the sweet spot red. Its bands say how well
+ * the rider spins instead: coasting slate, grinding amber, the sweet spot green, spinning out amber
+ * again (`--ridrs-warn`, `--ridrs-ok` of the Kinetic look).
+ */
+export const CADENCE_COLOURS = ['#7c8ba1', '#ffb62e', '#a3e635', '#3ddc84', '#ffb62e'] as const;
+
 export function cadenceScale(): Scale {
-  return { min: 0, max: 140, major: 20, minor: 5, bands: bandsOf(CADENCE_ZONES, (rpm) => rpm, 0, 140) };
+  const bands = bandsOf(CADENCE_ZONES, (rpm) => rpm, 0, 150).map((band) => ({
+    ...band,
+    colour: CADENCE_COLOURS[band.zone - 1] ?? CADENCE_COLOURS[0],
+  }));
+  return { min: 0, max: 150, major: 30, minor: 10, bands };
 }
 
 /** The band a value lies in, by the exact bounds (inclusive, as `zoneOf`); none on a neutral scale. */
 export function bandAt(scale: Scale, value: number): Band | undefined {
   return scale.bands.find((band) => band.limit === undefined || value <= band.limit) ?? scale.bands.at(-1);
+}
+
+/** How far, as a share of the scale, a value must pass a zone's bound before the zone changes. */
+export const ZONE_HYSTERESIS = 0.01;
+
+/**
+ * The band to show for `value`, given the band shown so far: it changes only once the value is
+ * clearly in another zone, so a power that wavers around a bound does not flicker the scale
+ * between two colours with every reading.
+ */
+export function bandNear(scale: Scale, value: number, shown: number | undefined): Band | undefined {
+  const exact = bandAt(scale, value);
+  const previous = scale.bands.find((band) => band.zone === shown);
+  if (!exact || !previous || exact.zone === previous.zone) {
+    return exact;
+  }
+  const margin = (scale.max - scale.min) * ZONE_HYSTERESIS;
+  const below = scale.bands.find((band) => band.zone === previous.zone - 1);
+  const lower = below?.limit ?? Number.NEGATIVE_INFINITY;
+  const upper = previous.limit ?? Number.POSITIVE_INFINITY;
+  return value > lower - margin && value <= upper + margin ? previous : exact;
 }
 
 /** The gauge's sweep: 250°, open at the bottom, clockwise from the lower left. */

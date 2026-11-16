@@ -5,7 +5,12 @@ import {
   angleOf,
   bandAt,
   cadenceScale,
+  bandNear,
+  CADENCE_COLOURS,
   dimmed,
+  LIT_LIGHTNESS,
+  lit,
+  TRACK_LIGHTNESS,
   formatDuration,
   heartRateScale,
   powerScale,
@@ -62,8 +67,14 @@ describe('heartRateScale', () => {
 });
 
 describe('cadenceScale', () => {
-  it('has five fixed bands up to 140 rpm', () => {
-    expect(cadenceScale().bands.map((band) => band.to)).toEqual([60, 75, 90, 105, 140]);
+  it('has five fixed bands up to 150 rpm', () => {
+    expect(cadenceScale().bands.map((band) => band.to)).toEqual([60, 75, 90, 105, 150]);
+  });
+
+  it('colours the sweet spot green and both ends amber, not by the effort ramp', () => {
+    expect(cadenceScale().bands.map((band) => band.colour)).toEqual([...CADENCE_COLOURS]);
+    expect(bandAt(cadenceScale(), 95)?.colour).toBe('#3ddc84');
+    expect(bandAt(cadenceScale(), 120)?.colour).toBe('#ffb62e');
   });
 });
 
@@ -71,14 +82,14 @@ describe('angleOf and ticksOf', () => {
   it('sweeps from the start to the end and holds at the ends', () => {
     const scale = cadenceScale();
     expect(angleOf(scale, 0)).toBe(START_ANGLE);
-    expect(angleOf(scale, 70)).toBe(START_ANGLE + SWEEP / 2);
+    expect(angleOf(scale, 75)).toBe(START_ANGLE + SWEEP / 2);
     expect(angleOf(scale, 999)).toBe(START_ANGLE + SWEEP);
     expect(angleOf(scale, -5)).toBe(START_ANGLE);
   });
 
   it('marks every major step', () => {
     const majors = ticksOf(cadenceScale()).filter((tick) => tick.major);
-    expect(majors.map((tick) => tick.value)).toEqual([0, 20, 40, 60, 80, 100, 120, 140]);
+    expect(majors.map((tick) => tick.value)).toEqual([0, 30, 60, 90, 120, 150]);
   });
 });
 
@@ -139,9 +150,32 @@ describe('the solid colours of the dial', () => {
     expect(vivid('#f68c14')).toBe('color(display-p3 1.000 0.569 0.081)');
   });
 
-  it('dims a colour towards the dial without making it see-through', () => {
-    expect(dimmed('#ffffff', 0)).toBe('rgb(255 255 255)');
-    expect(dimmed('#ffffff', 1)).toBe('rgb(11 18 32)');
-    expect(dimmed('#fe2966')).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
+  it('lifts a dark zone colour to a readable lightness, its hue unchanged', () => {
+    expect(lit('#0a3aff')).toBe(`oklch(from ${vivid('#0a3aff')} max(l, ${LIT_LIGHTNESS}) c h)`);
+  });
+
+  it('draws the track of every zone at one lightness, solid', () => {
+    expect(dimmed('#fe2966')).toBe(`oklch(from #fe2966 ${TRACK_LIGHTNESS} calc(c * 0.6) h)`);
+    expect(dimmed('#fe2966')).not.toMatch(/\//);
+  });
+});
+
+describe('bandNear', () => {
+  // FTP 250: zone 2 ends at 75 % (187.5 W), the scale spans 0 to 500 W, so the margin is 5 W.
+  const scale = powerScale(250, undefined);
+
+  it('takes the exact zone without one shown so far', () => {
+    expect(bandNear(scale, 189, undefined)?.zone).toBe(3);
+  });
+
+  it('keeps the zone shown while the value wavers just across its bound', () => {
+    expect(bandNear(scale, 189, 2)?.zone).toBe(2);
+    expect(bandNear(scale, 186, 3)?.zone).toBe(3);
+  });
+
+  it('changes the zone once the value is clearly in another one', () => {
+    expect(bandNear(scale, 193, 2)?.zone).toBe(3);
+    expect(bandNear(scale, 180, 3)?.zone).toBe(2);
+    expect(bandNear(scale, 400, 1)?.zone).toBe(7);
   });
 });
