@@ -17,7 +17,7 @@ import {
 import { Card, iconStyle, PREVIEW_CSS } from '@ridrs/ui-preview';
 import { type UiContext, type UiComponent, localizeNumber } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type Messages, messages } from './i18n/index.ts';
 
@@ -312,12 +312,33 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
   const [hidden, setHidden] = useState<FileDrop>();
   const [moving, setMoving] = useState(false);
   const place = useRef<HTMLDivElement>(null);
+  // A drag the layer takes away is forgotten in `file.drop` too, unless it is being added: the
+  // layer of a screen shown later (after a ride) does not show it again.
+  const forget = useCallback(
+    (gone: FileDrop) => {
+      setHidden(gone);
+      if (gone.phase === 'importing') return;
+      ctx.call(fileDropCancelService, {}).catch((error: unknown) => {
+        ctx.logger.warn(`The drag could not be forgotten: ${String(error)}`);
+      });
+    },
+    [ctx],
+  );
   // What letting go did is said for a moment; the next drag shows the layer again.
   useEffect(() => {
     if (drop?.phase !== 'done') return undefined;
-    const timer = setTimeout(() => setHidden(drop), DONE_SHOWN);
+    const timer = setTimeout(() => forget(drop), DONE_SHOWN);
     return () => clearTimeout(timer);
-  }, [drop]);
+  }, [drop, forget]);
+  // Taken away before the moment is over (a ride starts), what letting go did is forgotten as well.
+  const latest = useRef(drop);
+  latest.current = drop;
+  useEffect(
+    () => () => {
+      if (latest.current?.phase === 'done') forget(latest.current);
+    },
+    [forget],
+  );
   const shown = drop !== undefined && hidden !== drop;
   // Files ridrs cannot import are ignored: no layer for them, and no tile beside others. While
   // nothing is known yet the layer waits, so a file that turns out to be one does not flash it.
@@ -332,16 +353,11 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      setHidden(drop);
-      if (drop.phase === 'over') {
-        ctx.call(fileDropCancelService, {}).catch((error: unknown) => {
-          ctx.logger.warn(`The drag could not be cancelled: ${String(error)}`);
-        });
-      }
+      forget(drop);
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
-  }, [ctx, drop, visible]);
+  }, [drop, forget, visible]);
 
   if (!visible || !drop) return <div ref={place} hidden />;
 
@@ -371,7 +387,7 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
         event.preventDefault();
         // Nothing new to add (the library has it, or ridrs cannot import it): the layer goes.
         if (!takes) {
-          setHidden(drop);
+          forget(drop);
           return;
         }
         const move = moves(event);
@@ -380,7 +396,7 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
           ctx.logger.warn(`The dropped files could not be added: ${String(error)}`);
         });
       }}
-      onClick={() => drop.phase === 'done' && setHidden(drop)}
+      onClick={() => drop.phase === 'done' && forget(drop)}
     >
       <style>{PREVIEW_CSS}</style>
       <style>{CSS}</style>

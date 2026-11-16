@@ -125,9 +125,12 @@ export class FileDrops {
     this.show();
   }
 
-  /** Escape over the layer: the drag is forgotten, as if it had left the window. */
+  /**
+   * Escape over the layer, or the layer is done saying what letting go did: the drag is
+   * forgotten, as if it had left the window. Not while it is being added.
+   */
   cancel(): void {
-    if (this.importing || this.outcome) return;
+    if (this.importing) return;
     this.leave();
   }
 

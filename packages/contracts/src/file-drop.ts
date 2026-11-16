@@ -90,7 +90,9 @@ export const fileDropImportService = defineService('file.drop.import', {
 
 /**
  * Forgets the drag as if it had left the window (Escape over the layer): `file.drop` is gone, and
- * letting go of the same drag afterwards adds nothing.
+ * letting go of the same drag afterwards adds nothing. Once its import is done, the layer forgets
+ * it so as well when it stops saying what letting go did: no screen shown later says it again.
+ * While the import runs, it does nothing.
  */
 export const fileDropCancelService = defineService('file.drop.cancel', {
   request: z.object({}).strict(),

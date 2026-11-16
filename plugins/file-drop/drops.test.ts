@@ -154,4 +154,18 @@ describe('FileDrops', () => {
     expect(saved).toEqual([]);
     expect(last()).toBeUndefined();
   });
+
+  it('forgets a drag once what letting go did was said, but not while it is being added', async () => {
+    const { drops, saved, last } = setup();
+    drops.enter([dropped('drop-1', 'a.erg', { bytes: fixture('threshold-2x10.erg') })]);
+    const adding = drops.import();
+    drops.cancel();
+    expect(last()?.phase).toBe('importing');
+    await adding;
+    expect(last()?.phase).toBe('done');
+    drops.cancel();
+    expect(last()).toBeUndefined();
+    await drops.import();
+    expect(saved).toHaveLength(1);
+  });
 });

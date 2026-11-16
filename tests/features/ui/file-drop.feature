@@ -11,7 +11,7 @@ Feature: Files dragged onto the window go to the library
   real plugins on app files and a media folder of the scenario.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-workout-chart, ui-route-profile, library-ridrs, profile-local, video-source-local, data-archive-node, storage-media-node, file-drop, ui-file-drop" together with the simulated drop
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-workout-chart, ui-route-profile, library-ridrs, profile-local, video-source-local, data-archive-node, storage-media-node, file-drop, ui-file-drop, ui-activity-screen" together with the simulated drop
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
@@ -106,3 +106,12 @@ Feature: Files dragged onto the window go to the library
     When the rider lets go of it
     Then the drop layer is not shown
     And the library "ridrs" holds 16 workouts
+
+  Scenario: What letting go did is not said again after a ride
+    Given the rider drags the workout file "threshold-2x10.erg" onto the window
+    And the rider lets go of it
+    And the drop layer says "Added 1 workout to your workouts"
+    When I press "Start ride"
+    And I press "Finish ride"
+    Then the "main" screen is shown
+    And the drop layer is not shown
