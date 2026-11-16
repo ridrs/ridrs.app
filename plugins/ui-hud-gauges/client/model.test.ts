@@ -5,11 +5,13 @@ import {
   angleOf,
   bandAt,
   cadenceScale,
+  dimmed,
   formatDuration,
   heartRateScale,
   powerScale,
   RideAverage,
   START_ANGLE,
+  vivid,
   SWEEP,
   ticksOf,
 } from './model.ts';
@@ -129,5 +131,17 @@ describe('formatDuration', () => {
     expect(formatDuration(0)).toBe('0:00');
     expect(formatDuration(245.9)).toBe('4:05');
     expect(formatDuration(3723.5)).toBe('1:02:03');
+  });
+});
+
+describe('the solid colours of the dial', () => {
+  it('lights a colour at full brightness in Display P3', () => {
+    expect(vivid('#f68c14')).toBe('color(display-p3 1.000 0.569 0.081)');
+  });
+
+  it('dims a colour towards the dial without making it see-through', () => {
+    expect(dimmed('#ffffff', 0)).toBe('rgb(255 255 255)');
+    expect(dimmed('#ffffff', 1)).toBe('rgb(11 18 32)');
+    expect(dimmed('#fe2966')).toMatch(/^rgb\(\d+ \d+ \d+\)$/);
   });
 });

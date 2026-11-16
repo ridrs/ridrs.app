@@ -46,6 +46,30 @@ const ZONE_COLOURS = [
   '#8b49fa',
 ] as const;
 
+/**
+ * A `#rrggbb` colour as the wide-gamut colour of the same coordinates in Display P3, at full
+ * brightness: more vivid on a P3 or HDR screen (the Mac's), the nearest colour on an sRGB one.
+ */
+export function vivid(hex: string): string {
+  const channels = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16) / 255);
+  const brightest = Math.max(...channels, 1e-6);
+  const [r, g, b] = channels.map((channel) => (channel / brightest).toFixed(3));
+  return `color(display-p3 ${r} ${g} ${b})`;
+}
+
+/**
+ * A `#rrggbb` colour dimmed towards the dial's own colour, `#0b1220`, by `share` of it, as a solid
+ * colour: the part of the scale not lit yet keeps its zone colours but lets nothing through.
+ */
+export function dimmed(hex: string, share = 0.55): string {
+  const dial = [0x0b, 0x12, 0x20];
+  const [r, g, b] = [1, 3, 5].map((at, index) => {
+    const channel = Number.parseInt(hex.slice(at, at + 2), 16);
+    return Math.round(channel + ((dial[index] ?? 0) - channel) * share);
+  });
+  return `rgb(${r} ${g} ${b})`;
+}
+
 /** The colour of a 1-based zone, spreading `count` zones over the ramp as the chart does. */
 export function zoneColour(zone: number, count: number): string {
   const slots = ZONE_COLOURS.length;

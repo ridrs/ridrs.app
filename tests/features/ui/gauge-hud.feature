@@ -79,6 +79,19 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     And the power gauge lights its scale up to 200
     And the power gauge draws no needle
 
+  # Glass over the scenery: the dial lets the video show through, but nothing drawn on it is
+  # see-through, so the scale, the numbers and the marks keep their full colour on any background.
+  # On an HDR screen they are also drawn brighter than SDR white (on a WebGPU canvas, ADR 0099);
+  # that cannot be seen headless.
+  Scenario: The dial is translucent glass, everything drawn on it is solid
+    Given I press "Start ride"
+    When "test-device" publishes a power measurement of 200 W from device "trainer-1"
+    And "test-device" publishes a heart-rate measurement of 150 bpm from device "hrm-1"
+    Then the dial of the power gauge lets the scenery show through
+    And everything the power gauge draws is fully opaque
+    And everything the heart-rate gauge draws is fully opaque
+    And everything the cadence gauge draws is fully opaque
+
   Scenario: The power gauge marks the FTP on its scale, the other gauges none
     When I press "Start ride"
     Then the power gauge marks the FTP at 250 on its scale

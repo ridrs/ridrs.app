@@ -366,3 +366,48 @@ Then('the {word} gauge draws no needle', async function (this: RidrsWorld, kind:
 Then('the {word} gauge draws no ERG target', async function (this: RidrsWorld, kind: string) {
   assert.equal(within(await gauge(this, kind)).queryByTestId('target-arc'), null);
 });
+
+/** The alpha of each `rgb(… / a)` or `rgba(…, a)` in a CSS value; colours without one are opaque. */
+function alphas(value: string): number[] {
+  return [...value.matchAll(/(?:\/|rgba\([^)]*,)\s*([\d.]+)(%?)\s*\)/g)].map(
+    ([, number = '1', percent]) => (percent ? Number(number) / 100 : Number(number)),
+  );
+}
+
+Then(
+  'the dial of the {word} gauge lets the scenery show through',
+  async function (this: RidrsWorld, kind: string) {
+    const element = await gauge(this, kind);
+    const background = element.style.backgroundColor;
+    const found = alphas(background);
+    assert.ok(found.length > 0, `Expected a translucent dial, got "${background}"`);
+    assert.ok(
+      found.every((alpha) => alpha < 1),
+      `Expected every colour of the dial to be translucent, got ${found.join(', ')}`,
+    );
+  },
+);
+
+Then(
+  'everything the {word} gauge draws is fully opaque',
+  async function (this: RidrsWorld, kind: string) {
+    const element = await gauge(this, kind);
+    const svg = element.querySelector('svg');
+    assert.ok(svg, 'Expected the gauge to draw its dial');
+    for (const shape of svg.querySelectorAll('path, line, polygon, text, circle')) {
+      for (const name of ['opacity', 'fill-opacity', 'stroke-opacity']) {
+        const value = shape.getAttribute(name);
+        assert.ok(value === null || Number(value) === 1, `${shape.tagName} has ${name}="${value}"`);
+      }
+      for (const name of ['fill', 'stroke', 'filter']) {
+        const value = shape.getAttribute(name) ?? '';
+        assert.ok(
+          alphas(value).every((alpha) => alpha === 1),
+          `${shape.tagName} is see-through: ${name}="${value}"`,
+        );
+      }
+      // A blurred glow is a see-through halo.
+      assert.equal(shape.getAttribute('filter'), null, `${shape.tagName} has a glow filter`);
+    }
+  },
+);

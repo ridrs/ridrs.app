@@ -2,13 +2,16 @@
 
 import type { MetricReading } from '@ridrs/contracts';
 import { describeMetricReading, formatDecimal } from '@ridrs/ui-sdk';
-import { type CSSProperties, type KeyboardEvent, useId, useState } from 'react';
-import { angleOf, bandAt, type Scale, ticksOf } from './model.ts';
+import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createHdrLayer, HDR_MARGIN, type HdrLayer } from './hdr-layer.ts';
+import { angleOf, bandAt, dimmed, type Scale, ticksOf, vivid } from './model.ts';
 
 /** The dial is drawn on 200 × 200 units, its centre at (C, C). */
 const C = 100;
 const ARC_RADIUS = 90.7;
 const ARC_WIDTH = 7.3;
+/** The part of the scale not lit yet: a thinner track along the middle of the lit one. */
+const TRACK_WIDTH = 3.3;
 const TICK_OUTER = 85.3;
 const TICK_INNER_MAJOR = 77.3;
 const TICK_INNER_MINOR = 80.7;
@@ -16,26 +19,15 @@ const TICK_LABEL = 66.7;
 /** The scale's colour without zones (no FTP, say). */
 const NEUTRAL = '#38bdf8';
 
-/**
- * Lets an HDR screen show what glows brighter than SDR white; not in React's CSS types yet. On
- * other screens it does nothing.
- */
-const HDR: CSSProperties = { ['dynamicRangeLimit' as string]: 'no-limit' };
-
-/**
- * A `#rrggbb` colour as the wide-gamut colour of the same coordinates in Display P3, at full
- * brightness: more vivid on a P3 or HDR screen (the Mac's), the nearest colour on an sRGB one.
- */
-function vivid(hex: string): string {
-  const channels = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16) / 255);
-  const brightest = Math.max(...channels, 1e-6);
-  const [r, g, b] = channels.map((channel) => (channel / brightest).toFixed(3));
-  return `color(display-p3 ${r} ${g} ${b})`;
-}
-
-/** Red and white beyond sRGB, for the FTP and the average. */
+/** Red and white beyond sRGB, for the FTP, the average and the value. */
 const FTP_RED = 'color(display-p3 1 0.1 0.1)';
-const MARK_WHITE = 'color(display-p3 1 1 1)';
+const WHITE = 'color(display-p3 1 1 1)';
+/** Solid greys for what is read less often: minor ticks, captions, the unit. */
+const GREY_LIGHT = 'rgb(226 232 240)';
+const GREY = 'rgb(203 213 225)';
+const GREY_DARK = 'rgb(148 163 184)';
+/** The outline that keeps a mark apart from the scale under it. */
+const OUTLINE = '#0b1220';
 
 function point(radius: number, degrees: number): [number, number] {
   const rad = (degrees * Math.PI) / 180;
@@ -81,11 +73,12 @@ export interface GaugeProps {
 }
 
 /**
- * One round dial of glass, without a needle: the zones dimmed around a 250° sweep and lit up to
- * the current value, the value large at the centre with the unit below it and, for some, the
- * average at the bottom. The average and the FTP are also marked on the scale: a white triangle
- * outside it, a red line across it with a red triangle inside. What glows is drawn in Display P3
- * and may go beyond SDR white on an HDR screen. The metric's name is spoken, not drawn. A gauge
+ * One round dial of translucent glass, without a needle: the zones as a thin dimmed track around a
+ * 250° sweep, lit up to the current value, the value large at the centre with the unit below it
+ * and, for some, the average at the bottom. The average and the FTP are also marked on the scale:
+ * a white triangle outside it, a red line across it with a red triangle inside. The glass lets the
+ * scenery through; nothing drawn on it does. The lit colours are Display P3 at full brightness and,
+ * on an HDR screen, the whole drawing goes beyond SDR white (`hdr-layer.ts`). The metric's name is spoken, not drawn. A gauge
  * without an average may show the virtual gear in its place, a control of its own.
  */
 export function Gauge({
@@ -100,8 +93,10 @@ export function Gauge({
   gear,
   zoneName,
 }: GaugeProps) {
-  const id = useId().replaceAll(':', '');
   const [gearFocused, setGearFocused] = useState(false);
+  const svg = useRef<SVGSVGElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [hdr, setHdr] = useState<HdrLayer>();
   const display = describeMetricReading(reading, language);
   const value = reading?.status === 'available' ? reading.value : undefined;
   const band = value === undefined ? undefined : bandAt(scale, value);
@@ -119,6 +114,45 @@ export function Gauge({
     .filter(Boolean)
     .join(', ');
 
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element) {
+      return undefined;
+    }
+    let layer: HdrLayer | undefined;
+    let gone = false;
+    void createHdrLayer(element).then((created) => {
+      if (gone) {
+        created?.destroy();
+        return;
+      }
+      layer = created;
+      setHdr(created);
+    });
+    return () => {
+      gone = true;
+      layer?.destroy();
+    };
+  }, []);
+
+  // Every render the HDR canvas draws the dial again; the latest drawing wins.
+  useLayoutEffect(() => {
+    if (hdr && svg.current) {
+      hdr.draw(svg.current);
+    }
+  });
+
+  // And when the dial changes size: the canvas draws in the screen's pixels.
+  useEffect(() => {
+    const element = svg.current;
+    if (!hdr || !element || typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+    const observer = new ResizeObserver(() => hdr.draw(element));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hdr]);
+
   return (
     <section
       data-testid={`gauge-${kind}`}
@@ -133,43 +167,39 @@ export function Gauge({
         aspectRatio: '1',
         borderRadius: '50%',
         boxSizing: 'border-box',
-        border: '1px solid rgb(255 255 255 / .12)',
-        background:
-          'radial-gradient(circle at 50% 42%, rgb(22 34 56 / .88) 0%, rgb(11 18 32 / .94) 72%, rgb(8 13 24 / .97) 100%)',
+        border: '1px solid rgb(255 255 255 / .16)',
+        // Glass: the scenery shows through, blurred, darker towards the rim.
+        backgroundColor: 'rgb(11 18 32 / .58)',
+        backgroundImage:
+          'radial-gradient(circle at 50% 40%, rgb(30 44 70 / .35) 0%, rgb(11 18 32 / .1) 60%, rgb(4 8 16 / .35) 100%)',
+        backdropFilter: 'blur(14px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(14px) saturate(140%)',
         boxShadow:
-          '0 20px 45px -12px rgb(0 0 0 / .7), inset 0 1px 1px rgb(255 255 255 / .14), inset 0 -2px 8px rgb(0 0 0 / .6)',
+          '0 20px 45px -12px rgb(0 0 0 / .55), inset 0 1px 1px rgb(255 255 255 / .18), inset 0 -2px 8px rgb(0 0 0 / .35)',
         fontFamily: 'var(--ridrs-font-text)',
         fontVariantNumeric: 'tabular-nums',
       }}
     >
       <svg
+        ref={svg}
         viewBox="0 0 200 200"
         width="100%"
         height="100%"
         role="img"
         aria-hidden="true"
         overflow="visible"
-        style={{ overflow: 'visible', ...HDR }}
+        // On an HDR screen the canvas over it shows the same drawing, brighter.
+        style={{ overflow: 'visible', opacity: hdr ? 0 : 1 }}
       >
-        <defs>
-          {/* In units of the dial, not of the shape: a straight line has no width to scale by. */}
-          <filter id={`${id}-glow`} filterUnits="userSpaceOnUse" x={-20} y={-20} width={240} height={240}>
-            <feGaussianBlur stdDeviation={3} result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
 
         {/* The zones, dimmed; the scale lights up from its start to the value. */}
         {scale.bands.length === 0 ? (
           <path
             d={arc(ARC_RADIUS, start, angleOf(scale, scale.max))}
             fill="none"
-            stroke={NEUTRAL}
-            strokeOpacity={0.32}
-            strokeWidth={ARC_WIDTH}
+            stroke={dimmed(NEUTRAL)}
+            strokeWidth={TRACK_WIDTH}
+            strokeLinecap="round"
           />
         ) : null}
         {scale.bands.map((item) => (
@@ -181,9 +211,8 @@ export function Gauge({
             data-to={String(item.to)}
             d={arc(ARC_RADIUS, angleOf(scale, item.from), angleOf(scale, item.to))}
             fill="none"
-            stroke={item.colour}
-            strokeOpacity={0.32}
-            strokeWidth={ARC_WIDTH}
+            stroke={dimmed(item.colour)}
+            strokeWidth={TRACK_WIDTH}
           >
             <title>{`${zoneName(item.zone)}${item.name ? ` · ${item.name}` : ''}`}</title>
           </path>
@@ -197,7 +226,6 @@ export function Gauge({
             stroke={accent}
             strokeWidth={ARC_WIDTH}
             strokeLinecap="round"
-            filter={`url(#${id}-glow)`}
           />
         ) : null}
 
@@ -213,8 +241,8 @@ export function Gauge({
               y1={y0}
               x2={x1}
               y2={y1}
-              stroke={tick.major ? 'rgb(248 250 252 / .85)' : 'rgb(148 163 184 / .45)'}
-              strokeWidth={tick.major ? 1.33 : 0.73}
+              stroke={tick.major ? WHITE : GREY_DARK}
+              strokeWidth={tick.major ? 1.47 : 0.87}
               strokeLinecap="round"
             />
           );
@@ -232,7 +260,7 @@ export function Gauge({
                 dominantBaseline="central"
                 fontSize={tick.value >= 1000 ? 7.5 : 9}
                 fontWeight={600}
-                fill="rgb(226 232 240 / .85)"
+                fill={GREY_LIGHT}
               >
                 {tick.value}
               </text>
@@ -242,7 +270,7 @@ export function Gauge({
         {/* The FTP: a red line across the scale and a red triangle inside it. */}
         {ftp !== undefined ? (
           <g data-testid="ftp-marker" data-value={String(Math.round(ftp))} transform={towards(angleOf(scale, ftp))}>
-            <line x1={C} y1={5.7} x2={C} y2={13} stroke="#090e1a" strokeWidth={3.5} strokeLinecap="round" />
+            <line x1={C} y1={5.7} x2={C} y2={13} stroke={OUTLINE} strokeWidth={3.5} strokeLinecap="round" />
             <line
               x1={C}
               y1={5.7}
@@ -251,12 +279,11 @@ export function Gauge({
               stroke={FTP_RED}
               strokeWidth={2}
               strokeLinecap="round"
-              filter={`url(#${id}-glow)`}
             />
             <polygon
               points={`${C - 5.7},22 ${C + 5.7},22 ${C},13.3`}
               fill={FTP_RED}
-              stroke="#0f172a"
+              stroke={OUTLINE}
               strokeWidth={1.07}
               strokeLinejoin="round"
             />
@@ -268,8 +295,8 @@ export function Gauge({
           <g data-testid="average-marker" data-value={String(averageValue)} transform={towards(angleOf(scale, averageValue))}>
             <polygon
               points={`${C - 5.7},-2.7 ${C + 5.7},-2.7 ${C},6`}
-              fill={MARK_WHITE}
-              stroke="#0f172a"
+              fill={WHITE}
+              stroke={OUTLINE}
               strokeWidth={1.07}
               strokeLinejoin="round"
             />
@@ -286,7 +313,7 @@ export function Gauge({
           fontSize={display.text.length > 3 ? 42 : 52}
           fontWeight={800}
           letterSpacing={-1.7}
-          fill="#f8fafc"
+          fill={WHITE}
         >
           {display.text}
         </text>
@@ -298,7 +325,7 @@ export function Gauge({
           dominantBaseline="central"
           fontSize={11.3}
           fontWeight={600}
-          fill="rgb(203 213 225 / .85)"
+          fill={GREY}
         >
           {unit}
         </text>
@@ -315,7 +342,7 @@ export function Gauge({
                 textAnchor="middle"
                 dominantBaseline="central"
                 fontSize={7.5}
-                fill="rgb(203 213 225 / .75)"
+                fill={GREY}
               >
                 {display.reason}
               </text>
@@ -328,7 +355,7 @@ export function Gauge({
               fontSize={7.7}
               fontWeight={600}
               letterSpacing={0.53}
-              fill="rgb(148 163 184 / .8)"
+              fill={GREY_DARK}
             >
               {gear.label.toUpperCase()}
             </text>
@@ -341,7 +368,7 @@ export function Gauge({
               fontSize={20.7}
               fontWeight={700}
               letterSpacing={-0.53}
-              fill="rgb(226 232 240 / .96)"
+              fill={GREY_LIGHT}
             >
               {gear.text}
             </text>
@@ -354,7 +381,7 @@ export function Gauge({
             textAnchor="middle"
             dominantBaseline="central"
             fontSize={9}
-            fill="rgb(203 213 225 / .75)"
+            fill={GREY}
           >
             {display.reason}
           </text>
@@ -368,7 +395,7 @@ export function Gauge({
               fontSize={7.7}
               fontWeight={600}
               letterSpacing={0.53}
-              fill="rgb(148 163 184 / .8)"
+              fill={GREY_DARK}
             >
               {average.label.toUpperCase()}
             </text>
@@ -381,13 +408,25 @@ export function Gauge({
               fontSize={20.7}
               fontWeight={700}
               letterSpacing={-0.53}
-              fill="rgb(226 232 240 / .96)"
+              fill={GREY_LIGHT}
             >
               {averageText}
             </text>
           </>
         ) : null}
       </svg>
+      <canvas
+        ref={canvas}
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: `${(-HDR_MARGIN / 200) * 100}%`,
+          width: `${100 + (HDR_MARGIN / 100) * 100}%`,
+          height: `${100 + (HDR_MARGIN / 100) * 100}%`,
+          pointerEvents: 'none',
+          display: hdr ? 'block' : 'none',
+        }}
+      />
       {gear ? (
         // The gear as a control of its own over its numbers: Up and Down shift (AGENTS.md rule 12).
         <div
