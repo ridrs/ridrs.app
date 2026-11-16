@@ -35,6 +35,8 @@ import {
   type CapabilityCardinality,
   type CapabilityContract,
   configSnapshotCapability,
+  controllerBindingsSetService,
+  controllerBindingsState,
   controllerButtonsChangedEvent,
   dataArchiveCapability,
   dataDropCapability,
@@ -271,6 +273,7 @@ const testOfferSchema = z
 const testOfferState = defineState('test.offer', testOfferSchema);
 const TEST_STATES: readonly StateDefinition[] = [
   appLanguageState,
+  controllerBindingsState,
   dataSourceState,
   athleteProfileState,
   routeOfferState,
@@ -299,6 +302,7 @@ const TEST_STATES: readonly StateDefinition[] = [
 /** Services of ridrs and of the scenarios of ADR 0068. */
 const TEST_SERVICES: readonly ServiceDefinition[] = [
   appLanguageSetService,
+  controllerBindingsSetService,
   dataSelectService,
   athleteProfileUpdateService,
   routeFetchService,

@@ -27,6 +27,8 @@ import {
   bridgePairingState,
   bridgePairService,
   configSnapshotCapability,
+  controllerBindingsSetService,
+  controllerBindingsState,
   controllerButtonsChangedEvent,
   DEFAULT_LANGUAGE,
   dataArchiveCapability,
@@ -223,6 +225,7 @@ const CAPABILITIES = [
 /** Every app state topic the host knows (ADR 0068): owned and watched beside the bus. */
 const STATES: readonly StateDefinition[] = [
   appLanguageState,
+  controllerBindingsState,
   dataSourceState,
   athleteProfileState,
   routeOfferState,
@@ -249,6 +252,7 @@ const STATES: readonly StateDefinition[] = [
 /** Every service the host knows (ADR 0068): provided and called beside the bus. */
 const SERVICES: readonly ServiceDefinition[] = [
   appLanguageSetService,
+  controllerBindingsSetService,
   dataSelectService,
   athleteProfileUpdateService,
   routeFetchService,

@@ -125,6 +125,21 @@ export {
   jsonValueSchema,
 } from './config.ts';
 export {
+  BINDABLE_CONTROLLER_BUTTONS,
+  type BindableControllerButton,
+  bindableControllerButtonSchema,
+  bindControllerButton,
+  CONTROLLER_BINDINGS_KEY,
+  CONTROLLER_COMMANDS,
+  type ControllerBindings,
+  type ControllerCommand,
+  controllerBindingsSchema,
+  controllerBindingsSetService,
+  controllerBindingsState,
+  controllerCommandSchema,
+  DEFAULT_CONTROLLER_BINDINGS,
+} from './controller-bindings.ts';
+export {
   type DataArchive,
   type DataDrop,
   type DataFetch,

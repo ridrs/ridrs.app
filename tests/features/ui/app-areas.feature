@@ -91,7 +91,7 @@ Feature: The app's areas as a clickable preview
     When I press the arrow key "Up"
     Then the focus is on "Close"
     When I press the arrow key "Down"
-    Then the focus is on "Metric"
+    Then the focus is on "General"
     When I press Back
     Then no dialog is shown
     And the focus is on "Settings"

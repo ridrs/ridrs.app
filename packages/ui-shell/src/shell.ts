@@ -25,6 +25,7 @@ import type {
   UiLogger,
   Unsubscribe,
 } from '@ridrs/ui-sdk';
+import { controllerKeys } from './controller-keys.ts';
 import { keyboardNavigation } from './keyboard.ts';
 
 export interface ShellOptions {
@@ -783,6 +784,7 @@ export function mountShell(
   const stopListening = bridge.onRegistryChanged(onRegistry);
   const stopKeyboard = keyboardNavigation(root, { back });
   const stopBackButton = options.backButton?.(back);
+  const stopController = controllerKeys(document, bridge);
   show(defaultScreen());
 
   return () => {
@@ -790,6 +792,7 @@ export function mountShell(
     stopListening();
     stopKeyboard();
     stopBackButton?.();
+    stopController();
     show(undefined);
   };
 }

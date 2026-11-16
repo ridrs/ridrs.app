@@ -3,6 +3,11 @@
 import {
   APP_LANGUAGE_KEY,
   activityStateChangedEvent,
+  CONTROLLER_BINDINGS_KEY,
+  controllerBindingsSchema,
+  controllerBindingsSetService,
+  controllerBindingsState,
+  DEFAULT_CONTROLLER_BINDINGS,
   appLanguageSetService,
   appLanguageState,
   athleteProfileChangedEvent,
@@ -28,6 +33,13 @@ const languageDocument = {
   name: 'language',
   version: 1,
   schema: z.object({ language: languageSchema }).strict(),
+};
+
+/** The rider's controller bindings (ADR 0098). */
+const controllerDocument = {
+  name: 'controller',
+  version: 1,
+  schema: z.object({ bindings: controllerBindingsSchema }).strict(),
 };
 
 /** The data types with a choice (ADR 0075); the library has none. */
@@ -60,6 +72,23 @@ export default definePlugin({
       await kept
         .write({ language })
         .catch((error: unknown) => ctx.logger.warn(`Could not keep the language: ${String(error)}`));
+      return {};
+    });
+
+    // The controller's bindings, like the language: at once, then kept. Bindings that cannot be
+    // read any more give way to the defaults.
+    const controller = ctx.settings.user(controllerDocument);
+    const keptBindings = await controller.read().catch(() => undefined);
+    ctx.state.set(
+      controllerBindingsState,
+      CONTROLLER_BINDINGS_KEY,
+      keptBindings?.bindings ?? DEFAULT_CONTROLLER_BINDINGS,
+    );
+    ctx.services.provide(controllerBindingsSetService, async ({ bindings }) => {
+      ctx.state.set(controllerBindingsState, CONTROLLER_BINDINGS_KEY, bindings);
+      await controller
+        .write({ bindings })
+        .catch((error: unknown) => ctx.logger.warn(`Could not keep the controller bindings: ${String(error)}`));
       return {};
     });
 

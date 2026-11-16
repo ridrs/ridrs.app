@@ -14,7 +14,8 @@
   "state": {
     "owns": [
       "app.language",
-      "data.source"
+      "data.source",
+      "controller.bindings"
     ],
     "watches": [
       "athlete.profile",
@@ -25,7 +26,8 @@
   "services": {
     "provides": [
       "app.set-language",
-      "data.select"
+      "data.select",
+      "controller.set-bindings"
     ]
   },
   "ui": {
@@ -45,12 +47,14 @@
     ],
     "events": {
       "subscribe": [
-        "activity.state-changed"
+        "activity.state-changed",
+        "controller.buttons-changed"
       ],
       "publish": []
     },
     "state": [
       "app.language",
+      "controller.bindings",
       "athlete.profile",
       "data.source",
       "training.calendar",
@@ -58,7 +62,8 @@
     ],
     "calls": [
       "app.set-language",
-      "data.select"
+      "data.select",
+      "controller.set-bindings"
     ]
   }
 }

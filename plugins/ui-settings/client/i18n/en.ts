@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-import type { DataSourceStatus } from '@ridrs/contracts';
+import type { ControllerButton, ControllerCommand, DataSourceStatus } from '@ridrs/contracts';
 
 /** The settings' texts in English (ADR 0072): the shape of every language. */
 export const en = {
@@ -53,6 +53,59 @@ export const en = {
     })[status],
   riding: 'A ride is under way: a new source applies from the next ride.',
   placeholder: 'Units, sounds and smoothing are not read yet; the ride keeps metric units.',
+  tabs: { general: 'General', controller: 'Controller' },
+  controller: {
+    navigation: 'Zwift Ride: menus',
+    intro:
+      'Which button of the controller stands for which key. Choose a command, then press the button on the controller.',
+    command: 'Command',
+    button: 'Button',
+    commands: {
+      up: 'Up',
+      down: 'Down',
+      left: 'Left',
+      right: 'Right',
+      confirm: 'Confirm (Enter)',
+      back: 'Back (Escape)',
+    } as Record<ControllerCommand, string>,
+    buttonNames: {
+      left: 'Left',
+      up: 'Up',
+      right: 'Right',
+      down: 'Down',
+      a: 'A',
+      b: 'B',
+      y: 'Y',
+      z: 'Z',
+      'shift-up-left': 'Shift up, left',
+      'shift-down-left': 'Shift down, left',
+      'power-up-left': 'Power-up, left',
+      'on-off-left': 'On/off, left',
+      'shift-up-right': 'Shift up, right',
+      'shift-down-right': 'Shift down, right',
+      'power-up-right': 'Power-up, right',
+      'on-off-right': 'On/off, right',
+    } as Record<ControllerButton, string>,
+    slot: (command: string, button: string) => `${command}: ${button}`,
+    waitingFor: (command: string) => `${command}: press a button on the controller`,
+    pressButton: 'Press a button…',
+    change: 'Change',
+    cancelHint: 'Esc: cancel',
+    bound: (command: string, button: string) => `${command} is on ${button} now.`,
+    swapped: (command: string, button: string, other: string, otherButton: string) =>
+      `${command} is on ${button} now; ${other} moved to ${otherButton}.`,
+    notBindable: (button: string) => `${button} keeps its ride function. Press another button.`,
+    reset: 'Reset to defaults',
+    resetDone: 'The controller has its default buttons again.',
+    ride: 'Zwift Ride: riding',
+    rideIntro: 'These buttons keep their function during a ride.',
+    fixed: {
+      shiftUp: 'Shift harder',
+      shiftDown: 'Shift easier',
+      powerUp: 'ERG target: lower (left), raise (right)',
+    },
+    fixedHint: 'fixed',
+  },
 };
 
 export type Messages = typeof en;

@@ -16,9 +16,10 @@ import {
 import { ActionButton, AreaPage, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { appVersion } from './about.generated.ts';
+import { ControllerTab } from './controller-tab.tsx';
 import { messages } from './i18n/index.ts';
 import { type Chosen, LicensesPage } from './licenses-page.tsx';
 
@@ -210,6 +211,42 @@ function LibraryRow({ ctx, name }: { readonly ctx: UiContext; readonly name: str
   );
 }
 
+/** The tabs of the settings, in this order. */
+const TABS = ['general', 'controller'] as const;
+
+type Tab = (typeof TABS)[number];
+
+/** The row of tabs: one button each, the shown one selected. */
+function Tabs({
+  tab,
+  names,
+  onChoose,
+}: {
+  readonly tab: Tab;
+  readonly names: Record<Tab, string>;
+  readonly onChoose: (tab: Tab) => void;
+}) {
+  return (
+    <div className="pv-row" role="tablist" aria-label={names.general}>
+      {TABS.map((each) => (
+        <button
+          key={each}
+          type="button"
+          role="tab"
+          id={`settings-tab-${each}`}
+          className="pv-chip"
+          aria-selected={tab === each}
+          aria-pressed={tab === each}
+          aria-controls={`settings-panel-${each}`}
+          onClick={() => onChoose(each)}
+        >
+          {names[each]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const [state, change] = useSettings(ctx);
@@ -219,7 +256,12 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   const [licenses, setLicenses] = useState(false);
   const [chosen, setChosen] = useState<Chosen>();
   const riding = useRiding(ctx);
+  const [tab, setTab] = useState<Tab>('general');
+  const tabBack = useRef<() => boolean>(undefined);
   useBack(ctx, () => {
+    if (tabBack.current?.()) {
+      return true;
+    }
     if (chosen) {
       setChosen(undefined);
       return true;
@@ -244,98 +286,107 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   }
   return (
     <AreaPage title={text.title} intro={text.intro}>
-      <section className="pv-section">
-        <h2>{text.basics}</h2>
-        <Choice
-          ctx={ctx}
-          name={text.units}
-          setting="units"
-          options={[
-            { value: 'metric', label: text.metric },
-            { value: 'imperial', label: text.imperial },
-          ]}
-        />
-        <LanguageChoice ctx={ctx} name={text.language} />
-        <div className="pv-row">
-          <span style={{ minWidth: 140 }}>{text.sounds}</span>
-          <Toggle label={text.sounds} on={state.sounds} onChange={(on) => change((s) => ({ ...s, sounds: on }))}>
-            {state.sounds ? text.on : text.off}
-          </Toggle>
-        </div>
-      </section>
-      <section className="pv-section">
-        <h2>{text.dataSources}</h2>
-        <SourceRow ctx={ctx} type="athlete.profile" topic={athleteProfileState} name={text.athleteProfile} />
-        <SourceRow ctx={ctx} type="training.calendar" topic={trainingCalendarState} name={text.plannedWorkouts} />
-        <LibraryRow ctx={ctx} name={text.workoutLibrary} />
-        {riding ? <p className="pv-muted">{text.riding}</p> : null}
-      </section>
-      <section className="pv-section">
-        <div className="pv-row">
-          <button
-            type="button"
-            className="pv-button"
-            aria-expanded={advanced}
-            onClick={() => setAdvanced((open) => !open)}
-          >
-            {text.advanced}
-          </button>
-          <button
-            type="button"
-            className="pv-button"
-            onClick={() => {
-              change(() => DEFAULTS);
-              ctx
-                .call(appLanguageSetService, { language: DEFAULT_LANGUAGE })
-                .catch((error: unknown) =>
-                  ctx.logger.warn(`Could not change the language: ${String(error)}`),
-                );
-            }}
-          >
-            {text.reset}
-          </button>
-        </div>
-        {advanced ? (
+      <Tabs tab={tab} names={text.tabs} onChoose={setTab} />
+      <div role="tabpanel" id={`settings-panel-${tab}`} aria-labelledby={`settings-tab-${tab}`} className="pv-section" style={{ gap: 28 }}>
+        {tab === 'general' ? (
           <>
-            <Choice
-              ctx={ctx}
-              name={text.smoothing}
-              setting="smoothing"
-              options={[
-                { value: 'off', label: text.off },
-                { value: '3s', label: text.seconds(3) },
-                { value: '10s', label: text.seconds(10) },
-              ]}
-            />
-            <div className="pv-row">
-              <span style={{ minWidth: 140 }}>{text.frameRate}</span>
-              <Toggle
-                label={text.showFrameRate}
-                on={state.frameRate}
-                onChange={(on) => change((s) => ({ ...s, frameRate: on }))}
-              >
-                {state.frameRate ? text.shown : text.hidden}
-              </Toggle>
-            </div>
+              <section className="pv-section">
+                <h2>{text.basics}</h2>
+                <Choice
+                  ctx={ctx}
+                  name={text.units}
+                  setting="units"
+                  options={[
+                    { value: 'metric', label: text.metric },
+                    { value: 'imperial', label: text.imperial },
+                  ]}
+                />
+                <LanguageChoice ctx={ctx} name={text.language} />
+                <div className="pv-row">
+                  <span style={{ minWidth: 140 }}>{text.sounds}</span>
+                  <Toggle label={text.sounds} on={state.sounds} onChange={(on) => change((s) => ({ ...s, sounds: on }))}>
+                    {state.sounds ? text.on : text.off}
+                  </Toggle>
+                </div>
+              </section>
+              <section className="pv-section">
+                <h2>{text.dataSources}</h2>
+                <SourceRow ctx={ctx} type="athlete.profile" topic={athleteProfileState} name={text.athleteProfile} />
+                <SourceRow ctx={ctx} type="training.calendar" topic={trainingCalendarState} name={text.plannedWorkouts} />
+                <LibraryRow ctx={ctx} name={text.workoutLibrary} />
+                {riding ? <p className="pv-muted">{text.riding}</p> : null}
+              </section>
+              <section className="pv-section">
+                <div className="pv-row">
+                  <button
+                    type="button"
+                    className="pv-button"
+                    aria-expanded={advanced}
+                    onClick={() => setAdvanced((open) => !open)}
+                  >
+                    {text.advanced}
+                  </button>
+                  <button
+                    type="button"
+                    className="pv-button"
+                    onClick={() => {
+                      change(() => DEFAULTS);
+                      ctx
+                        .call(appLanguageSetService, { language: DEFAULT_LANGUAGE })
+                        .catch((error: unknown) =>
+                          ctx.logger.warn(`Could not change the language: ${String(error)}`),
+                        );
+                    }}
+                  >
+                    {text.reset}
+                  </button>
+                </div>
+                {advanced ? (
+                  <>
+                    <Choice
+                      ctx={ctx}
+                      name={text.smoothing}
+                      setting="smoothing"
+                      options={[
+                        { value: 'off', label: text.off },
+                        { value: '3s', label: text.seconds(3) },
+                        { value: '10s', label: text.seconds(10) },
+                      ]}
+                    />
+                    <div className="pv-row">
+                      <span style={{ minWidth: 140 }}>{text.frameRate}</span>
+                      <Toggle
+                        label={text.showFrameRate}
+                        on={state.frameRate}
+                        onChange={(on) => change((s) => ({ ...s, frameRate: on }))}
+                      >
+                        {state.frameRate ? text.shown : text.hidden}
+                      </Toggle>
+                    </div>
+                  </>
+                ) : null}
+              </section>
+              <p className="pv-muted">{text.placeholder}</p>
           </>
         ) : null}
-      </section>
-      <p className="pv-muted">{text.placeholder}</p>
+        {tab === 'controller' ? <ControllerTab ctx={ctx} backRef={tabBack} /> : null}
+      </div>
+      {/* About stays at the end of the settings, below every tab. */}
       <section className="pv-section">
-        <h2>{text.about}</h2>
-        <p>
-          <strong>{text.appName}</strong> · {text.version(appVersion)}
-        </p>
-        <p>{text.licensedUnder}</p>
-        <div className="pv-row">
-          <a className="pv-button" href={SOURCE_CODE_URL} target="_blank" rel="noopener noreferrer">
-            {text.sourceCode}
-          </a>
-          <button type="button" className="pv-button" onClick={() => setLicenses(true)}>
-            {text.licensesAndCredits}
-          </button>
-        </div>
-      </section>
+          <h2>{text.about}</h2>
+          <p>
+            <strong>{text.appName}</strong> · {text.version(appVersion)}
+          </p>
+          <p>{text.licensedUnder}</p>
+          <div className="pv-row">
+            <a className="pv-button" href={SOURCE_CODE_URL} target="_blank" rel="noopener noreferrer">
+              {text.sourceCode}
+            </a>
+            <button type="button" className="pv-button" onClick={() => setLicenses(true)}>
+              {text.licensesAndCredits}
+            </button>
+          </div>
+        </section>
     </AreaPage>
   );
 }
