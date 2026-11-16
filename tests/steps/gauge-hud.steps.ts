@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { Then, When } from '@cucumber/cucumber';
-import { type PhysicsState, physicsStateEvent } from '@ridrs/contracts';
+import { type PhysicsState, physicsStateEvent, trainerTargetPowerEvent } from '@ridrs/contracts';
 import { waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 
@@ -66,11 +66,12 @@ Then('the gauges are shown in the order {string}', async function (this: RidrsWo
 });
 
 // happy-dom has no layout: the place is asserted on the declared position, as for the HUD layers.
-Then('the telemetry sits at the top left', async function (this: RidrsWorld) {
+Then('the telemetry sits at the bottom centre', async function (this: RidrsWorld) {
   const cluster = await within(ui(this)).findByTestId('gauges');
   assert.equal(cluster.style.position, 'absolute');
-  assert.equal(cluster.style.top, '16px');
-  assert.equal(cluster.style.left, '16px');
+  assert.match(cluster.style.bottom, /var\(--ridrs-hud-inset-bottom/);
+  assert.equal(cluster.style.left, '50%');
+  assert.equal(cluster.style.transform, 'translateX(-50%)');
 });
 
 Then(
@@ -152,9 +153,10 @@ for (const kind of ['distance', 'speed']) {
   );
 }
 
-Then("the widgets of the HUD keep clear of the ride's buttons", async function (this: RidrsWorld) {
+Then('the widgets of the HUD sit in the lower corners', async function (this: RidrsWorld) {
   const slot = await within(ui(this)).findByTestId('slot-hud-widget');
   assert.match(slot.style.bottom, /var\(--ridrs-hud-inset-bottom/);
+  assert.equal(slot.style.justifyContent, 'space-between');
 });
 
 Then(
@@ -179,11 +181,57 @@ Then(
   },
 );
 
-Then('the {word} gauge shows no label', async function (this: RidrsWorld, kind: string) {
-  const element = await gauge(this, kind);
-  const drawn = element.querySelector('svg')?.textContent ?? '';
-  assert.doesNotMatch(drawn, /[A-Za-z]{3,}/, `the ${kind} gauge draws words: ${drawn}`);
+Then(
+  'the {word} gauge does not draw its name {string}',
+  async function (this: RidrsWorld, kind: string, name: string) {
+    const drawn = (await gauge(this, kind)).querySelector('svg')?.textContent ?? '';
+    assert.ok(
+      !drawn.toLowerCase().includes(name.toLowerCase()),
+      `the ${kind} gauge draws: ${drawn}`,
+    );
+  },
+);
+
+Then(
+  'the {word} gauge lights its scale up to {int}',
+  async function (this: RidrsWorld, kind: string, value: number) {
+    const element = await gauge(this, kind);
+    await eventually(this, () =>
+      assert.equal(within(element).getByTestId('active-arc').dataset.value, String(value)),
+    );
+  },
+);
+
+Then(
+  'the {word} gauge marks the FTP at {int} on its scale',
+  async function (this: RidrsWorld, kind: string, value: number) {
+    const element = await gauge(this, kind);
+    await eventually(this, () =>
+      assert.equal(within(element).getByTestId('ftp-marker').dataset.value, String(value)),
+    );
+  },
+);
+
+Then('the {word} gauge marks no FTP', async function (this: RidrsWorld, kind: string) {
+  assert.equal(within(await gauge(this, kind)).queryByTestId('ftp-marker'), null);
 });
+
+Then(
+  'the {word} gauge marks its average at {int} on its scale',
+  async function (this: RidrsWorld, kind: string, value: number) {
+    const element = await gauge(this, kind);
+    await eventually(this, () =>
+      assert.equal(within(element).getByTestId('average-marker').dataset.value, String(value)),
+    );
+  },
+);
+
+Then(
+  'the {word} gauge marks no average on its scale',
+  async function (this: RidrsWorld, kind: string) {
+    assert.equal(within(await gauge(this, kind)).queryByTestId('average-marker'), null);
+  },
+);
 
 Then(
   'the {word} gauge draws its {word} at least {int} units high on a dial of 200',
@@ -203,6 +251,17 @@ Then(
   async function (this: RidrsWorld, kind: string, name: string) {
     const element = await gauge(this, kind);
     assert.match(element.getAttribute('aria-label') ?? '', new RegExp(`^${name} `));
+  },
+);
+
+Then(
+  'the {word} gauge draws its value at the centre of the dial',
+  async function (this: RidrsWorld, kind: string) {
+    const value = within(await gauge(this, kind)).getByTestId('value');
+    assert.equal(value.getAttribute('x'), '100');
+    assert.equal(value.getAttribute('y'), '100');
+    assert.equal(value.getAttribute('text-anchor'), 'middle');
+    assert.equal(value.getAttribute('dominant-baseline'), 'central');
   },
 );
 
@@ -274,3 +333,36 @@ Then(
     await eventually(this, () => assert.equal(element.dataset.zone, String(zone)));
   },
 );
+
+Then(
+  /^(?:eventually )?the (\w[\w-]*) gauge shows the gear "([^"]+)"$/,
+  async function (this: RidrsWorld, kind: string, gear: string) {
+    const element = await gauge(this, kind);
+    await waitFor(() => assert.equal(within(element).getByTestId('gear').textContent, gear));
+  },
+);
+
+Then('the {word} gauge shows no gear', async function (this: RidrsWorld, kind: string) {
+  const element = await gauge(this, kind);
+  await waitFor(() => assert.equal(within(element).queryByTestId('gear'), null));
+});
+
+Then(
+  /^eventually the ERG target power is (\d+) W$/,
+  async function (this: RidrsWorld, watts: number) {
+    await waitFor(() => {
+      const latest = this.tapped
+        .filter((event) => event.type === trainerTargetPowerEvent.id)
+        .at(-1);
+      assert.deepEqual(latest?.payload, { watts });
+    });
+  },
+);
+
+Then('the {word} gauge draws no needle', async function (this: RidrsWorld, kind: string) {
+  assert.equal(within(await gauge(this, kind)).queryByTestId('needle'), null);
+});
+
+Then('the {word} gauge draws no ERG target', async function (this: RidrsWorld, kind: string) {
+  assert.equal(within(await gauge(this, kind)).queryByTestId('target-arc'), null);
+});

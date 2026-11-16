@@ -155,12 +155,12 @@ function TrainerDebugHudView({ ctx }: { readonly ctx: UiContext }) {
       aria-label={text.title}
       style={{
         position: 'absolute',
-        // Bottom right, beside the ride's buttons and below the widgets: those keep the bottom
-        // of the HUD free (`--ridrs-hud-inset-bottom`), this fits into it.
+        // Bottom right, beside what a HUD centres at the bottom (the gauges, half a row of three
+        // 210 px dials wide).
         bottom: 16,
         right: 16,
-        maxWidth: 'calc(50% - 140px)',
-        maxHeight: 'calc(var(--ridrs-hud-inset-bottom) - 20px)',
+        maxWidth: 'calc(50% - 350px)',
+        maxHeight: 'calc(50% - 32px)',
         overflow: 'hidden',
         padding: '5px 10px',
         borderRadius: 'var(--ridrs-radius)',

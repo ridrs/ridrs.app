@@ -47,9 +47,14 @@
         "activity.state-changed",
         "activity.athlete",
         "physics.state",
-        "world.position"
+        "world.position",
+        "drivetrain.gear-changed",
+        "trainer.target-power"
       ],
-      "publish": []
+      "publish": [
+        "drivetrain.shift-requested",
+        "trainer.erg-requested"
+      ]
     },
     "state": [
       "app.language",

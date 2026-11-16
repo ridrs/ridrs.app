@@ -5,7 +5,10 @@ import {
   activityStateChangedEvent,
   athleteProfileState,
   DEFAULT_PROVIDER,
+  type DrivetrainGearChangedPayload,
   dataSourceState,
+  drivetrainGearChangedEvent,
+  drivetrainShiftRequestedEvent,
   type EventDefinition,
   type MetricReading,
   metricCadenceEvent,
@@ -13,6 +16,8 @@ import {
   metricPowerEvent,
   type PhysicsState,
   physicsStateEvent,
+  trainerErgRequestedEvent,
+  trainerTargetPowerEvent,
 } from '@ridrs/contracts';
 import { formatDecimal, localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
@@ -68,8 +73,84 @@ function useAthlete(ctx: UiContext) {
   return { ...profile, ftp: rideFtp ?? profile?.ftp };
 }
 
+/** + and - shift without the focus: `=` is + without Shift on many keyboards. */
+const PLUS_MINUS: Readonly<Record<string, 'up' | 'down'>> = { '+': 'up', '=': 'up', '-': 'down' };
+
+/** Where a typed + or - is text, not a ride control. */
+function isTextEntry(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLInputElement && target.type !== 'button') ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
 /**
- * The telemetry, a HUD element of its own: three round dials side by side at the top left.
+ * The virtual gear, and whether ERG is on, as the trainer reports them. In the app the gauges take the
+ * place of the gear widget and the target power widget, so they also take their keys: + and -
+ * anywhere shift the gear while ERG is off and change the target in ERG, and Up and Down on the
+ * gear in the cadence gauge shift. They only ask; a key another control took is left alone.
+ */
+function useTrainer(ctx: UiContext): {
+  readonly gear: DrivetrainGearChangedPayload | undefined;
+  readonly target: number | undefined;
+  readonly shift: (change: 'up' | 'down') => void;
+} {
+  const [gear, setGear] = useState<DrivetrainGearChangedPayload>();
+  const [target, setTarget] = useState<number>();
+  useEffect(
+    () => ctx.events.subscribe(drivetrainGearChangedEvent, ({ payload }) => setGear(payload)),
+    [ctx],
+  );
+  useEffect(
+    () =>
+      ctx.events.subscribe(trainerTargetPowerEvent, ({ payload }) => setTarget(payload.watts ?? undefined)),
+    [ctx],
+  );
+  const erg = target !== undefined;
+  const shifts = gear !== undefined && !erg;
+  useEffect(() => {
+    if (!shifts && !erg) {
+      return undefined;
+    }
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      const change = PLUS_MINUS[event.key];
+      if (
+        !change ||
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        isTextEntry(event.target)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      if (erg) {
+        ctx.events.publish(trainerErgRequestedEvent, { change });
+      } else {
+        ctx.events.publish(drivetrainShiftRequestedEvent, { change });
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [ctx, shifts, erg]);
+  return {
+    gear,
+    target,
+    shift: (change) => ctx.events.publish(drivetrainShiftRequestedEvent, { change }),
+  };
+}
+
+/** The gear as the gear widget's large line: its positions with a drivetrain, else its number. */
+function gearText(gear: DrivetrainGearChangedPayload): string {
+  return gear.front !== undefined && gear.rear !== undefined
+    ? `${gear.front}×${gear.rear}`
+    : String(gear.index);
+}
+
+/**
+ * The telemetry, a HUD element of its own: three round dials side by side at the bottom centre.
  * Only the gauges take pointer events.
  */
 function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
@@ -79,6 +160,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
   const power = useRideMetric(ctx, metricPowerEvent, true);
   const heartRate = useRideMetric(ctx, metricHeartRateEvent, true);
   const cadence = useRideMetric(ctx, metricCadenceEvent, false);
+  const trainer = useTrainer(ctx);
 
   const { ftp, powerZones, heartRateZones, lthr, maxHeartRate } = athlete;
   const scales = useMemo(
@@ -95,8 +177,9 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
       data-testid="gauges"
       style={{
         position: 'absolute',
-        top: 16,
-        left: 16,
+        bottom: 'var(--ridrs-hud-inset-bottom)',
+        left: '50%',
+        transform: 'translateX(-50%)',
         display: 'flex',
         gap: 12,
         pointerEvents: 'none',
@@ -110,6 +193,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         scale={scales.power}
         language={language}
         average={{ label: text.average, value: power.average }}
+        ftp={ftp}
         zoneName={text.zone}
       />
       <Gauge
@@ -129,6 +213,17 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         reading={cadence.reading}
         scale={scales.cadence}
         language={language}
+        {...(trainer.gear !== undefined && trainer.target === undefined
+          ? {
+              gear: {
+                label: text.gear,
+                text: gearText(trainer.gear),
+                index: trainer.gear.index,
+                count: trainer.gear.count,
+                onShift: trainer.shift,
+              },
+            }
+          : {})}
         zoneName={text.zone}
       />
     </div>
@@ -230,7 +325,7 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
 
 /**
  * The gauge HUD's layer: the `hud/widget` slot of the plain HUD in the lower corners, above the
- * ride's buttons (the screen keeps their room free with `--ridrs-hud-inset-bottom`), so every
+ * room the screen keeps at the bottom (`--ridrs-hud-inset-bottom`), so every
  * other widget keeps its place. It lets pointer events through; only the widgets take them.
  */
 function GaugeHudView({ ctx }: { readonly ctx: UiContext }) {

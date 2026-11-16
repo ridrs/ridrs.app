@@ -1,13 +1,16 @@
 @ui
 Feature: An alternative HUD shows power, heart rate and cadence as analogue gauges
   `ui-hud-gauges` takes the place of `ui-hud` on the activity screen: it offers the same
-  `hud/widget` extension point in the lower corners, above the ride's buttons, and adds two HUD
-  elements of its own: at the top left the telemetry, three round gauges like the dials of a car,
-  and at the top centre the ride's time, distance and speed. The time is the time ridden: the
+  `hud/widget` extension point in the lower corners and adds two HUD elements of its own: at the
+  bottom centre the telemetry, three round gauges like the dials of a car, and at the top centre
+  the ride's time, distance and speed. The ride's buttons are not part of the HUD: they lie over
+  it at the top left. The time is the time ridden: the
   physics counts its steps only while the ride runs. Power and heart rate also show their average
   over the ride; cadence shows its value only. The scale of each gauge is coloured by zone: power
   by the power zones of the athlete profile in watts of the FTP, heart rate by its heart rate
-  zones in bpm. Cadence has no zones in the profile and is coloured by fixed cadence bands.
+  zones in bpm. Cadence has no zones in the profile and is coloured by fixed cadence bands. The
+  scale lights up from its start to the current value; the power scale marks the FTP, and a gauge
+  with an average marks it on its scale too.
 
   The average counts every available reading while the ride runs; readings before the ride or
   while it is paused do not count, and a new ride starts from none.
@@ -24,12 +27,12 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     And the slot "hud/widget" contains the contributions "ui-widget-power-heart-rate-ratio/power-heart-rate-ratio" in this order
     And pointer events pass through the gauge HUD except on its gauges and widgets
 
-  Scenario: The telemetry sits at the top left, the ride at the top centre, the widgets above the ride's buttons
+  Scenario: The telemetry sits at the bottom centre, the ride at the top centre, the widgets in the lower corners
     When I press "Start ride"
     Then the gauges are shown in the order "power, heart-rate, cadence"
-    And the telemetry sits at the top left
+    And the telemetry sits at the bottom centre
     And the ride's time, distance and speed sit at the top centre
-    And the widgets of the HUD keep clear of the ride's buttons
+    And the widgets of the HUD sit in the lower corners
 
   Scenario: The top centre shows the time ridden, the distance and the speed
     Given I press "Start ride"
@@ -63,14 +66,24 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     And the cadence gauge shows "91" "rpm"
     And the heart-rate gauge shows "150" "bpm"
 
-  # Read from the trainer, about 1.5 m from a 15" screen: no words on the dials, only numbers.
-  Scenario: The gauges show large numbers without labels, the average among them
+  # Read from the trainer, about 1.5 m from a 15" screen: a large number at the centre, the unit
+  # and the average below it; the metric's name is spoken, not drawn.
+  Scenario: The gauges show the value large at the centre, the unit and the average below it
     Given I press "Start ride"
     When "test-device" publishes a power measurement of 200 W from device "trainer-1"
-    Then the power gauge shows no label
-    And the power gauge draws its value at least 46 units high on a dial of 200
-    And the power gauge draws its average at least 30 units high on a dial of 200
+    Then the power gauge does not draw its name "Power"
     And the power gauge is named "Power" for screen readers
+    And the power gauge draws its value at the centre of the dial
+    And the power gauge draws its value at least 50 units high on a dial of 200
+    And the power gauge draws its average at least 20 units high on a dial of 200
+    And the power gauge lights its scale up to 200
+    And the power gauge draws no needle
+
+  Scenario: The power gauge marks the FTP on its scale, the other gauges none
+    When I press "Start ride"
+    Then the power gauge marks the FTP at 250 on its scale
+    And the heart-rate gauge marks no FTP
+    And the cadence gauge marks no FTP
 
   # A metric takes a measurement only once per time: time passes between readings.
   @fake-timers
@@ -88,6 +101,9 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     Then the power gauge shows the average "150"
     And the heart-rate gauge shows the average "151"
     And the cadence gauge shows no average
+    And the power gauge marks its average at 150 on its scale
+    And the heart-rate gauge marks its average at 151 on its scale
+    And the cadence gauge marks no average on its scale
 
   @fake-timers
   Scenario: Readings before the ride and while it is paused do not count

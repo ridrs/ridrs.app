@@ -12,7 +12,10 @@ import { enableOverlayTitleBar } from './title-bar.ts';
  * Plugins that are bundled but not started in the app: the console output is for headless use;
  * the gauge HUD (`ui-hud-gauges`) takes the place of the plain HUD and shows power, heart rate,
  * cadence, speed, distance and the gradient itself, so the plain HUD and those widgets would
- * only repeat it.
+ * only repeat it. It also shows the virtual gear in its cadence gauge and shifts with the keys, in
+ * place of the gear widget, and takes the ERG target's keys; the target power is not shown (the
+ * dispatching widget that shows the gear or the target is not started; the target power plugin
+ * still gives the ERG button), nor is the power-to-heart-rate ratio.
  */
 const DISABLED_IN_APP = [
   'output-console',
@@ -23,6 +26,9 @@ const DISABLED_IN_APP = [
   'ui-widget-virtual-speed',
   'ui-widget-virtual-distance',
   'ui-widget-gradient',
+  'ui-widget-virtual-gear',
+  'ui-widget-erg-dispatch',
+  'ui-widget-power-heart-rate-ratio',
 ];
 
 async function main(): Promise<void> {

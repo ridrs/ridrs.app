@@ -11,6 +11,8 @@ export const en = {
   cadence: 'Cadence',
   /** Before the average of the ride. */
   average: 'avg',
+  /** The virtual gear, in the cadence gauge. */
+  gear: 'Gear',
   /** The name of a zone the profile leaves unnamed. */
   zone: (zone: number) => `Zone ${zone}`,
 };

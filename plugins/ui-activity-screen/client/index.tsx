@@ -22,16 +22,22 @@ const PAUSE = new URL('./assets/icons/pause.svg', import.meta.url).href;
 const RESUME = new URL('./assets/icons/play.svg', import.meta.url).href;
 const FINISH = new URL('./assets/icons/flag.svg', import.meta.url).href;
 
-/** The ride's buttons: round, side by side at the bottom centre. */
+/**
+ * The ride's buttons: round, side by side at the top left, over the HUD and apart from it. They
+ * stay below the window's own buttons, which the Mac app has over the page: as far down as the
+ * main screen's page head (`--ridrs-page-top`, 40 px in ui-main-screen, which is not around this
+ * screen).
+ */
 const BUTTON_SIZE = 56;
-const BUTTON_BOTTOM = 24;
+const BUTTON_TOP = 'var(--ridrs-page-top, 40px)';
+const BUTTON_LEFT = 16;
 const BUTTON_GAP = 16;
 
 /**
- * How much of the bottom a HUD keeps free for the ride's buttons, as the custom property
- * `--ridrs-hud-inset-bottom` on the HUD's slot: HUDs place their lower widgets above it.
+ * How much room a HUD keeps at the bottom, as the custom property `--ridrs-hud-inset-bottom` on
+ * the HUD's slot: HUDs place their lower widgets above it. The ride's buttons are not there.
  */
-const HUD_INSET_BOTTOM = BUTTON_BOTTOM + BUTTON_SIZE + 16;
+const HUD_INSET_BOTTOM = 16;
 
 /**
  * Drawn like the global actions of the main screen (`.ms-actions [data-action]`) where they stand
@@ -47,20 +53,13 @@ const CONTROLS_CSS = `
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 `;
 
-/** A left edge as an offset from the centre, e.g. `calc(50% - 64px)`. */
-function fromCentre(offset: number): string {
-  return offset < 0 ? `calc(50% - ${-offset}px)` : `calc(50% + ${offset}px)`;
-}
-
 /**
- * The left edges of the row Pause, the contributed controls, Finish ride: centred as a whole,
+ * The left edges of the row Pause, the contributed controls, Finish ride, from the left edge,
  * whatever number of controls there is.
  */
 function rowLayout(controls: number): { readonly pause: number; readonly controls: number; readonly finish: number } {
-  const count = controls + 2;
-  const start = -(count * BUTTON_SIZE + (count - 1) * BUTTON_GAP) / 2;
   const step = BUTTON_SIZE + BUTTON_GAP;
-  return { pause: start, controls: start + step, finish: start + (count - 1) * step };
+  return { pause: BUTTON_LEFT, controls: BUTTON_LEFT + step, finish: BUTTON_LEFT + (controls + 1) * step };
 }
 
 function controlStyle(left: number): CSSProperties {
@@ -69,8 +68,8 @@ function controlStyle(left: number): CSSProperties {
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
     borderRadius: '50%',
-    bottom: BUTTON_BOTTOM,
-    left: fromCentre(left),
+    top: BUTTON_TOP,
+    left,
     zIndex: Z_CONTROLS,
   };
 }
@@ -112,7 +111,7 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   const hud = useRef<HTMLDivElement>(null);
   const finish = useRef<HTMLButtonElement>(null);
   const controls = useRef<HTMLDivElement>(null);
-  // How many controls other plugins add between Pause and Finish ride: the row is centred on all.
+  // How many controls other plugins add between Pause and Finish ride: Finish ride comes after all.
   const [controlCount, setControlCount] = useState(0);
   const row = rowLayout(controlCount);
   const [paused, setPaused] = useState(false);
@@ -202,8 +201,8 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
       <style>{CONTROLS_CSS}</style>
       {/*
         Direct children like the HUD: one stacking context; Pause (or Resume), the controls of
-        other plugins (`activity/control`, such as ERG) and Finish ride side by side at the bottom
-        centre. They come first in reading order: the first arrow of a ride focuses Pause, not a
+        other plugins (`activity/control`, such as ERG) and Finish ride side by side at the top
+        left. They come first in reading order: the first arrow of a ride focuses Pause, not a
         control that changes the ride.
       */}
       {paused ? (
@@ -228,8 +227,8 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         data-testid="slot-activity-control"
         style={{
           position: 'absolute',
-          bottom: BUTTON_BOTTOM,
-          left: fromCentre(row.controls),
+          top: BUTTON_TOP,
+          left: row.controls,
           height: BUTTON_SIZE,
           display: 'flex',
           gap: BUTTON_GAP,

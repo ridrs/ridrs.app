@@ -162,9 +162,9 @@ export function bandAt(scale: Scale, value: number): Band | undefined {
   return scale.bands.find((band) => band.limit === undefined || value <= band.limit) ?? scale.bands.at(-1);
 }
 
-/** The gauge's sweep: 240°, open at the bottom, clockwise from the lower left. */
-export const START_ANGLE = 150;
-export const SWEEP = 240;
+/** The gauge's sweep: 250°, open at the bottom, clockwise from the lower left. */
+export const START_ANGLE = 145;
+export const SWEEP = 250;
 
 /** The angle of `value` on the scale in degrees (0° points right, clockwise), held at the ends. */
 export function angleOf(scale: Scale, value: number): number {

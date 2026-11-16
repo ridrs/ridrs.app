@@ -12,5 +12,6 @@ export const de: Messages = {
   gradient: 'Steigung',
   cadence: 'Trittfrequenz',
   average: 'Ø',
+  gear: 'Gang',
   zone: (zone: number) => `Zone ${zone}`,
 };
