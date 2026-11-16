@@ -37,8 +37,9 @@ export interface GaugeProps {
 }
 
 /**
- * One round dial, drawn like a ride card (the gradient, the light edge, the uppercase label): the
- * scale coloured by zone around a 240° sweep, a needle, the value and, for some, the average.
+ * One round dial, drawn like a ride card (the gradient, the light edge): the
+ * scale coloured by zone around a 240° sweep, a needle, the unit and large numbers for the value
+ * and, for some, the average; read from the trainer, so the label is spoken, not drawn.
  */
 export function Gauge({ kind, label, reading, unit, scale, language, average, zoneName }: GaugeProps) {
   const id = useId().replaceAll(':', '');
@@ -66,7 +67,7 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
       aria-label={spoken}
       style={{
         pointerEvents: 'auto',
-        width: 'clamp(104px, 10vw, 160px)',
+        width: 'clamp(120px, 13vw, 210px)',
         aspectRatio: '1',
         borderRadius: '50%',
         boxShadow: '0 10px 28px rgb(0 0 0 / .38)',
@@ -155,18 +156,17 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
             );
           })}
 
+        {/* No label: the unit under the hub tells the dials apart; the label is spoken only. */}
         <text
           x={C}
           y={124}
+          data-testid="unit"
           textAnchor="middle"
-          fontSize={9}
+          fontSize={12}
           fontWeight={500}
-          letterSpacing="1.4"
-          fill="var(--ridrs-text)"
-          opacity={0.9}
-          style={{ textTransform: 'uppercase' }}
+          fill="rgb(255 255 255 / .72)"
         >
-          {label}
+          {unit}
         </text>
 
         {/* The needle, swinging with a slight overshoot like a real one; resting while unavailable. */}
@@ -187,19 +187,24 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
         <circle cx={C} cy={C} r={8} fill="var(--ridrs-surface)" stroke="rgb(255 255 255 / .35)" strokeWidth={1.5} />
         <circle cx={C} cy={C} r={3} fill={accent} />
 
-        <text x={C} y={156} textAnchor="middle" fill="var(--ridrs-text)" style={{ textShadow: '0 1px 6px rgb(0 0 0 / .5)' }}>
-          <tspan data-testid="value" fontSize={30} fontWeight={500}>
-            {display.text}
-          </tspan>
-          <tspan dx={3} data-testid="unit" fontSize={12} fontWeight={500} fill="rgb(255 255 255 / .82)">
-            {unit}
-          </tspan>
+        {/* Large enough to read from the trainer; four digits shrink to stay clear of the scale. */}
+        <text
+          data-testid="value"
+          x={C}
+          y={161}
+          textAnchor="middle"
+          fontSize={display.text.length > 3 ? 40 : 48}
+          fontWeight={600}
+          fill="var(--ridrs-text)"
+          style={{ textShadow: '0 1px 6px rgb(0 0 0 / .5)' }}
+        >
+          {display.text}
         </text>
         {display.reason !== undefined ? (
           <text
             data-testid="reason"
             x={C}
-            y={176}
+            y={186}
             textAnchor="middle"
             fontSize={11}
             fill="rgb(255 255 255 / .7)"
@@ -207,13 +212,17 @@ export function Gauge({ kind, label, reading, unit, scale, language, average, zo
             {display.reason}
           </text>
         ) : average ? (
-          <text x={C} y={176} textAnchor="middle" fontSize={12} fill="rgb(255 255 255 / .82)">
-            <tspan fontSize={11} fontWeight={500} letterSpacing="1" fill="var(--ridrs-info)">
-              {average.label.toUpperCase()}
-            </tspan>
-            <tspan dx={4} data-testid="average" fontWeight={500}>
-              {averageText}
-            </tspan>
+          // The average without a label: smaller than the value, below it, in the info colour.
+          <text
+            data-testid="average"
+            x={C}
+            y={190}
+            textAnchor="middle"
+            fontSize={averageText.length > 3 ? 26 : 30}
+            fontWeight={600}
+            fill="var(--ridrs-info)"
+          >
+            {averageText}
           </text>
         ) : null}
       </svg>

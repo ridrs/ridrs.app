@@ -63,6 +63,15 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     And the cadence gauge shows "91" "rpm"
     And the heart-rate gauge shows "150" "bpm"
 
+  # Read from the trainer, about 1.5 m from a 15" screen: no words on the dials, only numbers.
+  Scenario: The gauges show large numbers without labels, the average among them
+    Given I press "Start ride"
+    When "test-device" publishes a power measurement of 200 W from device "trainer-1"
+    Then the power gauge shows no label
+    And the power gauge draws its value at least 46 units high on a dial of 200
+    And the power gauge draws its average at least 30 units high on a dial of 200
+    And the power gauge is named "Power" for screen readers
+
   # A metric takes a measurement only once per time: time passes between readings.
   @fake-timers
   Scenario: Power and heart rate show their average over the ride, cadence none

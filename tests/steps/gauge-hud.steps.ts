@@ -179,6 +179,33 @@ Then(
   },
 );
 
+Then('the {word} gauge shows no label', async function (this: RidrsWorld, kind: string) {
+  const element = await gauge(this, kind);
+  const drawn = element.querySelector('svg')?.textContent ?? '';
+  assert.doesNotMatch(drawn, /[A-Za-z]{3,}/, `the ${kind} gauge draws words: ${drawn}`);
+});
+
+Then(
+  'the {word} gauge draws its {word} at least {int} units high on a dial of 200',
+  async function (this: RidrsWorld, kind: string, part: string, size: number) {
+    const element = await gauge(this, kind);
+    const text = within(element).getByTestId(part);
+    assert.equal(element.querySelector('svg')?.getAttribute('viewBox'), '0 0 200 200');
+    assert.ok(
+      Number(text.getAttribute('font-size')) >= size,
+      `the ${part} is ${text.getAttribute('font-size')} units high`,
+    );
+  },
+);
+
+Then(
+  'the {word} gauge is named {string} for screen readers',
+  async function (this: RidrsWorld, kind: string, name: string) {
+    const element = await gauge(this, kind);
+    assert.match(element.getAttribute('aria-label') ?? '', new RegExp(`^${name} `));
+  },
+);
+
 Then('the {word} gauge shows no average', async function (this: RidrsWorld, kind: string) {
   const element = await gauge(this, kind);
   assert.equal(within(element).queryByTestId('average'), null);
