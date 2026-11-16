@@ -22,4 +22,8 @@ export const de: Messages = {
   done: 'Workout geschafft',
   starting: 'Mach dich bereit',
   barLabel: 'Restzeit im Schritt',
+  /** "+3 more": the steps after those listed. */
+  more: (count: number) => `+${count} weitere`,
+  totalLeft: 'Restzeit im Workout',
+  ribbonLabel: 'Die Schritte des Workouts',
 };

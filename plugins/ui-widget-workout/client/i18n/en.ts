@@ -21,6 +21,10 @@ export const en = {
   done: 'Workout done',
   starting: 'Get ready',
   barLabel: 'Time left in the step',
+  /** "+3 more": the steps after those listed. */
+  more: (count: number) => `+${count} more`,
+  totalLeft: 'Time left in the workout',
+  ribbonLabel: 'The steps of the workout',
 };
 
 export type Messages = typeof en;

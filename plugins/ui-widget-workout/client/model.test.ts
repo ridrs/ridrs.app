@@ -3,7 +3,20 @@
 import type { WorkoutEffort } from '@ridrs/contracts';
 import type { TimelineSegment } from '@ridrs/workout';
 import { describe, expect, it } from 'vitest';
-import { cadenceOf, clock, countdownAt, cueAt, effortOf, elapsedSeconds, rangeText, setOf } from './model.ts';
+import {
+  cadenceOf,
+  clock,
+  countdownAt,
+  cueAt,
+  effortBars,
+  effortLevel,
+  effortOf,
+  elapsedSeconds,
+  rangeText,
+  setOf,
+  vivid,
+  zoneColour,
+} from './model.ts';
 
 const watts = (low: number, high = low, end?: number): WorkoutEffort => ({
   kind: 'target',
@@ -130,5 +143,38 @@ describe('the time in the step', () => {
 
   it('never goes below the start', () => {
     expect(elapsedSeconds({ ...base, now: 0 })).toBe(0);
+  });
+});
+
+describe('how hard a step is', () => {
+  it('reads % FTP with an FTP, watts without one, and a ramp by its end', () => {
+    expect(effortLevel(watts(288), 250)).toEqual({ value: 115.2, percentFtp: 115.2, max: false });
+    expect(effortLevel(watts(288), undefined)).toEqual({ value: 288, percentFtp: undefined, max: false });
+    expect(effortLevel(watts(100, 100, 200), 250).percentFtp).toBe(80);
+    expect(effortLevel({ kind: 'max-effort' }, 250).max).toBe(true);
+    expect(effortLevel({ kind: 'free' }, 250).value).toBeUndefined();
+  });
+
+  it('gives each bar its length against the hardest step', () => {
+    const levels = [watts(288), watts(125)].map((effort) => effortLevel(effort, 250));
+    expect(effortBars(levels)).toEqual([100, 43]);
+    expect(effortBars([...levels, effortLevel({ kind: 'free' }, 250), effortLevel({ kind: 'max-effort' }, 250)])).toEqual([
+      100,
+      43,
+      undefined,
+      100,
+    ]);
+    expect(effortBars([effortLevel({ kind: 'free' }, 250)])).toEqual([undefined]);
+  });
+});
+
+describe('the colour of a zone', () => {
+  it('spreads seven zones over the ramp as the chart does', () => {
+    expect(zoneColour(1, 7)).toBe('#0a3aff');
+    expect(zoneColour(7, 7)).toBe('#8b49fa');
+  });
+
+  it('lights it in Display P3 at full brightness', () => {
+    expect(vivid('#0a3aff')).toBe('color(display-p3 0.039 0.227 1.000)');
   });
 });

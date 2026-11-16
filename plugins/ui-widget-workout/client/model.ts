@@ -150,3 +150,83 @@ export function elapsedSeconds(input: {
   const at = input.pausedAt ?? input.now;
   return Math.max(0, Math.floor((at - input.stepStartedAt - input.pausedMs) / 1000));
 }
+
+/** How hard a step is, for its bar and its zone. */
+export interface EffortLevel {
+  /** In the workout's own scale: % FTP with an FTP or a target in %, else watts. */
+  readonly value: number | undefined;
+  readonly percentFtp: number | undefined;
+  /** Max effort: as hard as the hardest step. */
+  readonly max: boolean;
+}
+
+/** The level of a step: the middle of its target where it ends (a ramp counts by its end). */
+export function effortLevel(effort: WorkoutEffort, ftp: number | undefined): EffortLevel {
+  if (effort.kind === 'max-effort') return { value: undefined, percentFtp: undefined, max: true };
+  if (effort.kind === 'free') return { value: undefined, percentFtp: undefined, max: false };
+  const { unit, start, end } = effort.primary;
+  const at = middle(end ?? start);
+  if (unit === 'watts') {
+    const percentFtp = ftp ? (at * 100) / ftp : undefined;
+    return { value: percentFtp ?? at, percentFtp, max: false };
+  }
+  if (unit === 'percent-ftp') return { value: at, percentFtp: at, max: false };
+  return { value: undefined, percentFtp: undefined, max: false };
+}
+
+/**
+ * The bar of each step in %, as long as it is hard against the hardest step of the workout
+ * (max effort is 100 %); undefined for a step without a level (free ride, heart rate).
+ */
+export function effortBars(levels: readonly EffortLevel[]): readonly (number | undefined)[] {
+  const values = levels.flatMap((level) => (level.value === undefined ? [] : [level.value]));
+  const hardest = values.length === 0 ? undefined : Math.max(...values);
+  return levels.map((level) => {
+    if (level.max) return 100;
+    if (level.value === undefined || !hardest) return undefined;
+    return Math.round((level.value * 100) / hardest);
+  });
+}
+
+/**
+ * The zone ramp of the workout chart (`ui-workout-chart/client/palette.ts`, dark theme), cool to
+ * hot, as the gauges keep it too. Plugins share no code, so the widget keeps its own copy; the
+ * HUD lies over a video and is always dark.
+ */
+const ZONE_COLOURS = [
+  '#0a3aff',
+  '#59a6cf',
+  '#0ffae3',
+  '#99db94',
+  '#f5ff3d',
+  '#d0a771',
+  '#f68c14',
+  '#fe2966',
+  '#ff70e0',
+  '#8b49fa',
+] as const;
+
+/** The colour of a 1-based zone, spreading `count` zones over the ramp as the chart does. */
+export function zoneColour(zone: number, count: number): string {
+  const slots = ZONE_COLOURS.length;
+  const index = Math.min(Math.max(Math.round(zone), 1), Math.max(count, 1)) - 1;
+  const slot =
+    count > slots
+      ? Math.min(index, slots - 1)
+      : count <= 1
+        ? 0
+        : Math.round((index * (slots - 1)) / (Math.min(count, slots) - 1));
+  return ZONE_COLOURS[slot] ?? ZONE_COLOURS[0];
+}
+
+/**
+ * A `#rrggbb` colour as the wide-gamut colour of the same coordinates in Display P3, at full
+ * brightness, as the gauges light their scale: more vivid on a P3 or HDR screen, the nearest
+ * colour on an sRGB one.
+ */
+export function vivid(hex: string): string {
+  const channels = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16) / 255);
+  const brightest = Math.max(...channels, 1e-6);
+  const [r, g, b] = channels.map((channel) => (channel / brightest).toFixed(3));
+  return `color(display-p3 ${r} ${g} ${b})`;
+}

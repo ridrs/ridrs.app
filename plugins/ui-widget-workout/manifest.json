@@ -13,13 +13,10 @@
     "contributions": [
       {
         "id": "workout",
-        "extensionPoint": "hud/widget",
+        "extensionPoint": "activity/hud",
         "export": "WorkoutWidget",
-        "order": 20
+        "order": 5
       }
-    ],
-    "uses": [
-      "ui.workout-chart"
     ],
     "events": {
       "subscribe": [
@@ -31,7 +28,9 @@
       "publish": []
     },
     "state": [
-      "app.language"
+      "app.language",
+      "athlete.profile",
+      "data.source"
     ]
   }
 }

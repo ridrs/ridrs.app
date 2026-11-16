@@ -380,21 +380,27 @@ The player starts **simple and robust**; refinement comes later.
 - **Bus and replay:** the player publishes `workout.step-changed { stepId, index, startedAt }` as a derived event. A replay gives the same targets at the same times. A skip is rider input and is recorded (rule 13).
 - **End:** ERG off, then a free ride (section 11).
 
-**HUD widget `ui-widget-workout`** (a contribution to `hud/widget`):
+**HUD widget `ui-widget-workout`** (a contribution to `activity/hud`, top left below the window's own buttons):
 
 ```
-┌─ VO2max 5×4 ────────────────────────── 3/5 ─┐
-│  NOW    4:00 at 115 %  288 W   95–105 rpm   │
-│         ███████████░░░░░░░  1:47 left       │
-│  NEXT   4:00 at 50 %   125 W                │
-│  ▁▂▃▅▅▂▅▅▂[▅]▂▅▅▂▅▅▂▁   ← ui.workout-chart  │
-│                    ▲ progress      (hud)    │
-└─────────────────────────────────────────────┘
+╭─ SWEET SPOT OVER-UNDERS ─────────── ◷ 35:40 ─╮
+│  ▃▃▃▅▅▆▂▂▅▅▆▂▂▅▅▆▂▂▇▁▇▁▇▁▇▁▃▃▃   ← ribbon     │
+│ ┃ NOW                                  1/3   │
+│ ┃ 270 W                          noch 0:40   │
+│ ┃ 108 % · 1:00                               │
+│ ┃ ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │
+│  NEXT  ▬▬▬▬▬▬       3:00   125 W   50 %      │
+│        ▬▬▬▬▬▬▬▬▬▬   5:00   225 W   90 %      │
+│        ▬▬▬▬▬▬▬▬▬▬▬▬ 1:00   270 W  108 %      │
+│  +12 more                                    │
+╰──────────────────────────────────────────────╯
 ```
 
-- **Shows:** the workout's name, the set or repeat ("3/5"), the current step with its target in % and W, the cadence target, the time left in the step with a bar, the next step, and a small chart with a progress mark.
-- **Reads** the workout and the step from the bus (`activity.state-changed`, `workout.step-changed`) and passes the progress on to `ui.workout-chart` (`variant: 'hud'`). Rendering reads, it never drives (rule 10).
-- **Brief notes:** the cues of the workout (text events) for their duration, and 3-2-1 before a step changes.
+- **Design:** the glass of the gauges, as a panel: their dark navy, light edge and shadow, and their light. The zone colours of the chart and the gauges are dimmed where something is coming and lit in Display P3 where the ride is, as a gauge's scale lights up to its value.
+- **Shows:** the workout's name and the time left in it; a ribbon of all its steps, each as wide as it lasts and as high as it is hard, lit up to where the ride is, a white mark over the current one; the current step glowing in its zone (a lit edge and tint): its watts large, % FTP, its length and the cadence target below, the set or repeat ("3/5"), the time left in it large with a bar; then the next four steps as a ladder, each with a bar as long as it is hard against the hardest step, fading downwards, and how many more follow.
+- **Zones:** % FTP of the step (its end for a ramp) in the power zones of the chosen athlete profile, Coggan's without one; without an FTP no zone, the gauges' neutral blue.
+- **Reads** the workout and the step from the bus (`activity.state-changed`, `workout.step-changed`). Rendering reads, it never drives (rule 10).
+- **Brief notes:** the cues of the workout (text events) for their duration, in the step's colour below it, and 3-2-1 large in place of the time left before a step changes.
 - Without a workout the widget does not show.
 
 **Not yet (later refinements):** intensity up and down, extending a step, smoothing the target or the trainer's ramp-up, a lap per step in the ride's FIT export, a score of how well the workout went in the debriefing.

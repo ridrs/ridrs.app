@@ -297,34 +297,122 @@ Then('the workout HUD is not shown', async function (this: RidrsWorld) {
   assert.equal(hud(this), null);
 });
 
-const chart = (world: RidrsWorld) =>
-  hud(world)?.querySelector<HTMLElement>('[data-testid="workout-chart"]') ?? null;
+const ribbon = (world: RidrsWorld) =>
+  hud(world)?.querySelector<HTMLElement>('[data-testid="workout-ribbon"]') ?? null;
 
 Then(
-  'the chart of the workout HUD is the variant {string} with its mark at {int} seconds',
-  async function (this: RidrsWorld, variant: string, seconds: number) {
+  'the ribbon of the workout HUD has {int} steps, each as long as it lasts',
+  async function (this: RidrsWorld, count: number) {
     await shown(this);
     await waitFor(() => {
-      const drawn = chart(this);
-      assert.ok(drawn, 'The HUD draws no chart');
-      assert.equal(drawn.dataset.variant, variant);
-      const mark = drawn.querySelector<HTMLElement>('[data-testid="workout-chart-progress"]');
-      assert.equal(mark?.dataset.seconds, String(seconds));
+      const steps = [...(ribbon(this)?.querySelectorAll<HTMLElement>('[data-ribbon-step]') ?? [])];
+      assert.equal(steps.length, count);
+      const lengths = segments('x').map((segment) => String(segment.durationSeconds));
+      // happy-dom has no layout: the length is the declared flex grow.
+      assert.deepEqual(
+        steps.map((step) => step.style.flexGrow),
+        lengths,
+      );
     });
   },
 );
 
 Then(
-  'the chart of the workout HUD highlights the step {string} at {int} seconds',
+  'the ribbon of the workout HUD is lit up to {int} seconds',
+  async function (this: RidrsWorld, seconds: number) {
+    await shown(this);
+    await waitFor(() => assert.equal(ribbon(this)?.dataset.seconds, String(seconds)));
+  },
+);
+
+Then(
+  'the ribbon of the workout HUD highlights the step {string} at {int} seconds',
   async function (this: RidrsWorld, stepId: string, seconds: number) {
     await waitFor(() => {
-      const current = chart(this)?.querySelector<HTMLElement>('[data-current]');
-      assert.ok(current, 'No step of the chart is highlighted');
+      const current = ribbon(this)?.querySelector<HTMLElement>('[data-current]');
+      assert.ok(current, 'No step of the ribbon is highlighted');
       assert.equal(current.dataset.stepId, stepId);
       assert.equal(current.dataset.startSeconds, String(seconds));
     });
   },
 );
+
+Then(
+  'the workout HUD shows the time left in the workout {string}',
+  async function (this: RidrsWorld, text: string) {
+    await sees(this, 'workout-total-left', text);
+  },
+);
+
+// happy-dom has no layout: the place is asserted on the declared position.
+Then(
+  "the workout HUD sits at the top left, below the window's own buttons",
+  async function (this: RidrsWorld) {
+    const widget = await shown(this);
+    assert.equal(widget.style.position, 'absolute');
+    assert.equal(widget.style.left, '16px');
+    assert.match(widget.style.top, /var\(--ridrs-page-top/);
+    assert.equal(widget.style.right, '');
+    assert.equal(widget.style.bottom, '');
+  },
+);
+
+const coming = (world: RidrsWorld) => [
+  ...(hud(world)?.querySelectorAll<HTMLElement>('[data-testid="workout-coming"] > li') ?? []),
+];
+
+Then(
+  'the workout HUD lists the coming steps {string}',
+  async function (this: RidrsWorld, stepsCsv: string) {
+    await shown(this);
+    await waitFor(() =>
+      assert.deepEqual(
+        coming(this).map((step) => plain(step.textContent)),
+        stepsCsv.split(',').map((step) => step.trim()),
+      ),
+    );
+  },
+);
+
+Then('the workout HUD says {string} below them', async function (this: RidrsWorld, text: string) {
+  await sees(this, 'workout-more', text);
+});
+
+Then(
+  'the bars of the coming steps are as long as they are hard: {string} %',
+  async function (this: RidrsWorld, percentsCsv: string) {
+    await waitFor(() =>
+      assert.deepEqual(
+        coming(this).map(
+          (step) => step.querySelector<HTMLElement>('[data-effort-bar]')?.style.width,
+        ),
+        percentsCsv.split(',').map((percent) => `${percent.trim()}%`),
+      ),
+    );
+  },
+);
+
+Then(
+  'the workout HUD shows the current step in zone {int}',
+  async function (this: RidrsWorld, zone: number) {
+    await shown(this);
+    await waitFor(() =>
+      assert.equal(
+        hud(this)?.querySelector<HTMLElement>('[data-testid="workout-step"]')?.dataset.zone,
+        String(zone),
+      ),
+    );
+  },
+);
+
+Then('the workout HUD shows the current step in no zone', async function (this: RidrsWorld) {
+  await shown(this);
+  await waitFor(() => {
+    const step = hud(this)?.querySelector<HTMLElement>('[data-testid="workout-step"]');
+    assert.ok(step, 'No current step');
+    assert.equal(step.dataset.zone, undefined);
+  });
+});
 
 Then('the workout HUD offers nothing to focus', async function (this: RidrsWorld) {
   const widget = await shown(this);

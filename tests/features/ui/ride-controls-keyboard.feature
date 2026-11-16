@@ -20,7 +20,7 @@ Feature: ERG and virtual gears with the keyboard alone
     And eventually the virtual gear widget shows "12"
 
   Scenario: The ERG button is the third round button, between Pause and Finish ride
-    Then the ride's buttons "Pause, ERG, Finish ride" are round and side by side at the top left
+    Then the ride's buttons "Pause, ERG, Finish ride" are round and side by side at the bottom right
     And the ERG button is not in the HUD
 
   Scenario: The first arrow of a ride focuses Pause

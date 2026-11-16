@@ -33,14 +33,12 @@ const RESUME = new URL('./assets/icons/play.svg', import.meta.url).href;
 const FINISH = new URL('./assets/icons/flag.svg', import.meta.url).href;
 
 /**
- * The ride's buttons: round, side by side at the top left, over the HUD and apart from it. They
- * stay below the window's own buttons, which the Mac app has over the page: as far down as the
- * main screen's page head (`--ridrs-page-top`, 40 px in ui-main-screen, which is not around this
- * screen).
+ * The ride's buttons: round, side by side at the bottom right, over the HUD. Finish ride is the
+ * one nearest the corner.
  */
 const BUTTON_SIZE = 56;
-const BUTTON_TOP = 'var(--ridrs-page-top, 40px)';
-const BUTTON_LEFT = 16;
+const BUTTON_BOTTOM = 16;
+const BUTTON_RIGHT = 16;
 const BUTTON_GAP = 16;
 
 /**
@@ -48,6 +46,12 @@ const BUTTON_GAP = 16;
  * the HUD's slot: HUDs place their lower widgets above it. The ride's buttons are not there.
  */
 const HUD_INSET_BOTTOM = 16;
+
+/**
+ * How much of the bottom right corner the ride's buttons take, as `--ridrs-hud-inset-bottom-right`
+ * on the HUD's slot: what a HUD shows in that corner stands on it, flush above the buttons.
+ */
+const HUD_INSET_BOTTOM_RIGHT = BUTTON_BOTTOM + BUTTON_SIZE + BUTTON_GAP;
 
 /**
  * Drawn like the global actions of the main screen (`.ms-actions [data-action]`) where they stand
@@ -86,22 +90,22 @@ const CONTROLS_CSS = `
 `;
 
 /**
- * The left edges of the row Pause, the contributed controls, Finish ride, from the left edge,
+ * The right edges of the row Pause, the contributed controls, Finish ride, from the right edge,
  * whatever number of controls there is.
  */
 function rowLayout(controls: number): { readonly pause: number; readonly controls: number; readonly finish: number } {
   const step = BUTTON_SIZE + BUTTON_GAP;
-  return { pause: BUTTON_LEFT, controls: BUTTON_LEFT + step, finish: BUTTON_LEFT + (controls + 1) * step };
+  return { pause: BUTTON_RIGHT + (controls + 1) * step, controls: BUTTON_RIGHT + step, finish: BUTTON_RIGHT };
 }
 
-function controlStyle(left: number): CSSProperties {
+function controlStyle(right: number): CSSProperties {
   return {
     position: 'absolute',
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
     borderRadius: '50%',
-    top: BUTTON_TOP,
-    left,
+    bottom: BUTTON_BOTTOM,
+    right,
     zIndex: Z_CONTROLS,
   };
 }
@@ -110,14 +114,14 @@ function controlStyle(left: number): CSSProperties {
 function Control({
   label,
   icon,
-  left,
+  right,
   testId,
   onPress,
   buttonRef,
 }: {
   readonly label: string;
   readonly icon: string;
-  readonly left: number;
+  readonly right: number;
   readonly testId: string;
   readonly onPress: () => void;
   readonly buttonRef?: Ref<HTMLButtonElement>;
@@ -130,7 +134,7 @@ function Control({
       data-testid={testId}
       aria-label={label}
       title={label}
-      style={controlStyle(left)}
+      style={controlStyle(right)}
       onClick={onPress}
     >
       <span className="as-control-icon" aria-hidden="true" style={{ '--icon': `url("${icon}")` } as CSSProperties} />
@@ -359,15 +363,15 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
       ) : null}
       {/*
         Direct children like the HUD: one stacking context; Pause (or Resume), the controls of
-        other plugins (`activity/control`, such as ERG) and Finish ride side by side at the top
-        left. They come first in reading order: the first arrow of a ride focuses Pause, not a
+        other plugins (`activity/control`, such as ERG) and Finish ride side by side at the bottom
+        right. They come first in reading order: the first arrow of a ride focuses Pause, not a
         control that changes the ride.
       */}
       {paused ? (
         <Control
           label="Resume"
           icon={RESUME}
-          left={row.pause}
+          right={row.pause}
           testId="resume-ride"
           onPress={() => ctx.events.publish(activityResumeRequestedEvent, {})}
         />
@@ -375,7 +379,7 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         <Control
           label="Pause"
           icon={PAUSE}
-          left={row.pause}
+          right={row.pause}
           testId="pause-ride"
           onPress={() => ctx.events.publish(activityPauseRequestedEvent, {})}
         />
@@ -385,8 +389,8 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         data-testid="slot-activity-control"
         style={{
           position: 'absolute',
-          top: BUTTON_TOP,
-          left: row.controls,
+          bottom: BUTTON_BOTTOM,
+          right: row.controls,
           height: BUTTON_SIZE,
           display: 'flex',
           gap: BUTTON_GAP,
@@ -397,7 +401,7 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         buttonRef={finish}
         label="Finish ride"
         icon={FINISH}
-        left={row.finish}
+        right={row.finish}
         testId="finish-ride"
         onPress={onFinish}
       />
@@ -416,6 +420,7 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
             zIndex: Z_HUD,
             pointerEvents: 'none',
             '--ridrs-hud-inset-bottom': `${HUD_INSET_BOTTOM}px`,
+            '--ridrs-hud-inset-bottom-right': `${HUD_INSET_BOTTOM_RIGHT}px`,
           } as CSSProperties
         }
       />

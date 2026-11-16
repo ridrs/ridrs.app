@@ -127,13 +127,14 @@ Then('the trainer debug HUD has nothing focusable', async function (this: RidrsW
 
 // happy-dom has no layout: the place is asserted on the declared position.
 Then(
-  'the trainer debug HUD sits at the bottom right, clear of the bottom centre',
+  "the trainer debug HUD sits at the bottom right, right above the ride's buttons",
   async function (this: RidrsWorld) {
     const view = this.uiViews[0];
     assert.ok(view, 'Expected the ridrs UI to be shown');
     const hud = await within(view.root).findByTestId('debug-trainer');
     assert.equal(hud.style.position, 'absolute');
-    assert.equal(hud.style.bottom, '16px');
+    // Above the corner the screen keeps for the ride's buttons, flush with their right edge.
+    assert.match(hud.style.bottom, /var\(--ridrs-hud-inset-bottom-right/);
     assert.equal(hud.style.right, '16px');
     assert.equal(hud.style.top, '');
     // Clear of the gauges, a row of three dials of at most 210 px centred at the bottom.
