@@ -20,7 +20,9 @@
       "subscribe": [
         "activity.state-changed"
       ],
-      "publish": []
+      "publish": [
+        "activity.finish-requested"
+      ]
     },
     "state": [
       "app.language",

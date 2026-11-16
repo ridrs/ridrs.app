@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  activityFinishRequestedEvent,
   activityStateChangedEvent,
   appLinkState,
   exportFitState,
@@ -26,6 +27,9 @@ const SERVICE = 'intervals.icu';
 /** The screens this plugin moves between. */
 const MAIN = 'main';
 const ACTIVITY = 'activity';
+/** Screens of other plugins the debriefing opens, when they are there (ADR 0098). */
+const SETTINGS = 'settings';
+const DEVICES = 'setup';
 
 /** The unified look (docs/design/unified), as tokens. Plugins share no code. */
 const COLORS = {
@@ -60,6 +64,9 @@ const CSS = `
 .db-button:hover { filter: brightness(1.2); }
 .db-button:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
 .db-button:disabled { opacity: .5; cursor: default; }
+.db-more { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid ${COLORS.line}; }
+.db-quiet { padding: 8px 18px; background: transparent; box-shadow: var(--ridrs-edge); color: ${COLORS.muted};
+  font-size: 14px; }
 .db-spin { display: inline-block; width: 14px; height: 14px; border-radius: 50%;
   border: 2px solid rgb(255 255 255 / .2); border-top-color: ${COLORS.cyan}; animation: db-spin 1s linear infinite; }
 @keyframes db-spin { to { transform: rotate(360deg); } }
@@ -108,6 +115,9 @@ function recordingOf(key: string, ride: RecordingRide): [string, Recording][] {
  */
 function useDebriefing(ctx: UiContext) {
   const [sessionId, setSessionId] = useState<string>();
+  // The ride is not ended yet: Finish ride paused it and opened the debriefing over it (ADR 0098).
+  const [open, setOpen] = useState(false);
+  const finished = useRef<string>(undefined);
   const [recordings, setRecordings] = useState<Readonly<Record<string, Recording>>>({});
   const [fits, setFits] = useState<Readonly<Record<string, string>>>({});
   const [uploads, setUploads] = useState<Readonly<Record<string, TrainingUpload>>>({});
@@ -116,10 +126,18 @@ function useDebriefing(ctx: UiContext) {
     const subscriptions = [
       ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
         if (payload.state === 'finished') {
+          finished.current = payload.sessionId;
           setSessionId(payload.sessionId);
+          setOpen(false);
         } else if (payload.state === 'running' || payload.state === 'paused') {
-          // A ride started elsewhere (a second window) leads into the ride.
-          ctx.navigate(ACTIVITY);
+          if (finished.current !== undefined && finished.current !== payload.sessionId) {
+            // A ride started elsewhere (a second window) leads into the ride.
+            ctx.navigate(ACTIVITY);
+          } else {
+            // The ride this debriefing was opened for, still going: Save or Delete end it.
+            setSessionId(payload.sessionId);
+            setOpen(true);
+          }
         } else {
           ctx.navigate(MAIN);
         }
@@ -146,6 +164,7 @@ function useDebriefing(ctx: UiContext) {
   }, [ctx]);
   return {
     sessionId,
+    open,
     recording: (sessionId && recordings[sessionId]) || ({ state: 'pending' } as const),
     fit: sessionId ? fits[sessionId] : undefined,
     upload: sessionId ? uploads[sessionId] : undefined,
@@ -156,7 +175,7 @@ function useDebriefing(ctx: UiContext) {
 function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);
-  const { sessionId, recording, fit, upload, account } = useDebriefing(ctx);
+  const { sessionId, open, recording, fit, upload, account } = useDebriefing(ctx);
   const save = useRef<HTMLButtonElement>(null);
   // How often Save (or Try again) was pressed: each attempt uploads once the FIT file is written.
   // The recording and its FIT file are written in the background: Save never waits for them.
@@ -168,15 +187,27 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
   const [refused, setRefused] = useState<string>();
   const connected = account?.state === 'connected';
 
-  // Back never throws a ride away or leaves it undecided: it offers Save, which Enter confirms.
-  useEffect(
-    () =>
-      ctx.onBack(() => {
-        setConfirmDelete(false);
-        save.current?.focus();
-      }),
-    [ctx],
-  );
+  // Ends the ride once, when Save or Delete decides it: the rider may still go back to it before.
+  const [ended, setEnded] = useState(false);
+  const endRide = () => {
+    if (open && !ended) {
+      setEnded(true);
+      ctx.events.publish(activityFinishRequestedEvent, {});
+    }
+  };
+  // Back goes back to a ride that is not ended, as Continue ride does. An ended ride is never
+  // thrown away or left undecided: Back offers Save, which Enter confirms. Either way it first
+  // leaves the question whether to delete.
+  const back = useRef(() => {});
+  back.current = () => {
+    if (confirmDelete || !open || ended) {
+      setConfirmDelete(false);
+      save.current?.focus();
+    } else {
+      ctx.leave();
+    }
+  };
+  useEffect(() => ctx.onBack(() => back.current()), [ctx]);
 
   useEffect(() => {
     if (attempt > requested.current && fit && sessionId) {
@@ -213,6 +244,7 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
   const onSave = () => {
     // Without an account, or with a recording that failed, there is nothing to upload: the ride
     // stays on this device. Otherwise the upload starts once the FIT file is there, now or soon.
+    endRide();
     if (!connected || recording.state === 'failed') {
       ctx.navigate(MAIN);
       return;
@@ -234,7 +266,11 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
     }
     ctx.navigate(MAIN);
   }, [ctx, deleting, decided, sessionId, recording.state]);
-  const onDelete = () => setDeleting(true);
+  const onDelete = () => {
+    endRide();
+    setDeleting(true);
+  };
+  const going = open && !ended;
 
   return (
     <main className="db-screen" data-testid="debriefing">
@@ -334,8 +370,27 @@ function DebriefingView({ ctx }: { readonly ctx: UiContext }) {
           >
             {text.delete}
           </button>
+          {going ? (
+            <button type="button" className="db-button" onClick={() => ctx.leave()}>
+              {text.continueRide}
+            </button>
+          ) : null}
         </div>
       )}
+      {ctx.hasScreen(SETTINGS) || ctx.hasScreen(DEVICES) ? (
+        <nav className="db-more" aria-label={text.more}>
+          {ctx.hasScreen(DEVICES) ? (
+            <button type="button" className="db-button db-quiet" onClick={() => ctx.navigate(DEVICES)}>
+              {text.devices}
+            </button>
+          ) : null}
+          {ctx.hasScreen(SETTINGS) ? (
+            <button type="button" className="db-button db-quiet" onClick={() => ctx.navigate(SETTINGS)}>
+              {text.settings}
+            </button>
+          ) : null}
+        </nav>
+      ) : null}
     </main>
   );
 }

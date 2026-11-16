@@ -7,16 +7,26 @@ import {
   activityStateChangedEvent,
 } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
-import { type CSSProperties, type Ref, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type Ref, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 /** Explicit stacking order of this screen's layers, bottom to top. */
 const Z_LANDSCAPE = 0;
 const Z_HUD = 1;
 const Z_CONTROLS = 2;
+const Z_DIALOG = 3;
 
-/** Another plugin's screen, there or not: the screen only knows its id. */
+/** Other plugins' screens, there or not: the screen only knows their ids. */
 const DEBRIEFING = 'debriefing';
+const SETTINGS = 'settings';
+const DEVICES = 'setup';
+
+/**
+ * The screens shown in a dialog over the ride (ADR 0098): the debriefing, and the settings and
+ * the devices the debriefing opens. They lead back to the debriefing, not to the ride.
+ */
+const DIALOGS = [DEBRIEFING, SETTINGS, DEVICES];
+const FROM_DEBRIEFING = new Set([SETTINGS, DEVICES]);
 
 const PAUSE = new URL('./assets/icons/pause.svg', import.meta.url).href;
 const RESUME = new URL('./assets/icons/play.svg', import.meta.url).href;
@@ -51,6 +61,28 @@ const CONTROLS_CSS = `
 .as-control:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
 .as-control-icon { width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
+/* A screen in a dialog over the ride (ADR 0098), drawn like the dialogs of the main screen. */
+.as-dialog { position: absolute; inset: 0; display: grid; place-items: center; padding: 40px;
+  background: rgb(4 8 16 / .66); backdrop-filter: blur(6px); }
+.as-dialog[hidden] { display: none; }
+.as-dialog-panel { position: relative; display: flex; flex-direction: column; width: min(960px, 100%);
+  max-height: 100%; overflow: hidden; border: 1px solid var(--ridrs-line); border-radius: var(--ridrs-radius-lg);
+  background: var(--ridrs-bg); box-shadow: var(--ridrs-edge), 0 24px 64px rgb(0 0 0 / .5); }
+.as-dialog-panel:focus { outline: none; }
+.as-dialog-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; overflow: auto; }
+.as-dialog-close { position: absolute; top: 16px; right: 16px; z-index: 1; width: 40px; height: 40px;
+  padding: 0; border: 0; box-shadow: var(--ridrs-edge); border-radius: 50%; background: var(--ridrs-card-quiet);
+  color: var(--ridrs-text); cursor: pointer; }
+.as-dialog-close:hover { background: var(--ridrs-surface-raised); }
+.as-dialog-close:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
+.as-dialog-close::before, .as-dialog-close::after { content: ""; position: absolute; top: 50%; left: 50%;
+  width: 16px; height: 2px; border-radius: 1px; background: currentColor; }
+.as-dialog-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.as-dialog-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+@media (max-width: 599px) {
+  .as-dialog { padding: 0; }
+  .as-dialog-panel { width: 100%; height: 100%; border: 0; border-radius: 0; }
+}
 `;
 
 /**
@@ -106,6 +138,59 @@ function Control({
   );
 }
 
+/**
+ * The dialog over the ride. While it is open the ride beneath it is inert, so the arrows stay in
+ * the dialog (AGENTS.md rule 12). It takes the focus unless the screen in it already took it (the
+ * debriefing focuses Save) and gives it back to Finish ride once it closes. The debriefing has its
+ * own way back to the ride (Continue ride); the settings and the devices get Close.
+ */
+function Dialog({
+  ctx,
+  screen,
+  container,
+  opener,
+}: {
+  readonly ctx: UiContext;
+  readonly screen: string | undefined;
+  readonly container: RefObject<HTMLDivElement | null>;
+  readonly opener: RefObject<HTMLButtonElement | null>;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  const open = screen !== undefined;
+  const closable = open && screen !== DEBRIEFING;
+  const wasOpen = useRef(false);
+  useLayoutEffect(() => {
+    const element = panel.current;
+    if (open && element && !element.contains(element.ownerDocument.activeElement)) {
+      element.focus();
+    } else if (!open && wasOpen.current && opener.current?.isConnected) {
+      opener.current.focus();
+    }
+    wasOpen.current = open;
+  }, [open, opener]);
+  return (
+    // The backdrop is a pointer's way out of the settings and the devices; keys leave with Back.
+    <div
+      className="as-dialog"
+      role="dialog"
+      aria-modal="true"
+      hidden={!open}
+      data-testid="activity-dialog"
+      style={{ zIndex: Z_DIALOG }}
+      onClick={(event) => {
+        if (closable && event.target === event.currentTarget) ctx.leave();
+      }}
+    >
+      <div ref={panel} className="as-dialog-panel" tabIndex={-1}>
+        {closable ? (
+          <button type="button" className="as-dialog-close" aria-label="Close" onClick={() => ctx.leave()} />
+        ) : null}
+        <div ref={container} className="as-dialog-body" />
+      </div>
+    </div>
+  );
+}
+
 function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   const landscape = useRef<HTMLDivElement>(null);
   const hud = useRef<HTMLDivElement>(null);
@@ -117,6 +202,12 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
   const [paused, setPaused] = useState(false);
   // The landscape of the ride's world; null for a free ride, undefined until the state is known.
   const [world, setWorld] = useState<string | null>();
+  const dialog = useRef<HTMLDivElement>(null);
+  // The screen in the dialog over the ride, if one is open.
+  const [over, setOver] = useState<string>();
+  const state = useRef<string>(undefined);
+  // Finish ride paused a running ride for its debriefing: going back to the ride resumes it.
+  const pausedForDebriefing = useRef(false);
 
   // Back never ends a ride by accident: it offers Finish ride, which Enter then confirms.
   useEffect(() => ctx.onBack(() => finish.current?.focus()), [ctx]);
@@ -153,9 +244,71 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
     return ctx.slot('activity/landscape', landscape.current, world ? { contribution: world } : undefined);
   }, [ctx, world]);
 
-  useEffect(
+  // The debriefing, and the settings and the devices it opens, float over the ride (ADR 0098).
+  // At commit, not after paint: Finish ride may be pressed before passive effects ran.
+  useLayoutEffect(
+    () =>
+      dialog.current
+        ? ctx.outlet(dialog.current, { screens: [], dialog: { container: dialog.current, screens: DIALOGS } })
+        : undefined,
+    [ctx],
+  );
+
+  // Leaving the settings or the devices leads back to the debriefing; leaving the debriefing
+  // leads back to the ride, which goes on if Finish ride paused it. A ride that is ended has no
+  // way back: it stays in its debriefing.
+  useLayoutEffect(() => {
+    let previous: string | undefined;
+    let fromDebriefing = false;
+    return ctx.onNavigated((screen, page) => {
+      const shown = screen !== page ? screen : undefined;
+      const before = previous;
+      previous = shown;
+      setOver(shown);
+      if (shown === DEBRIEFING) {
+        fromDebriefing = true;
+        return;
+      }
+      if (shown !== undefined) {
+        fromDebriefing &&= FROM_DEBRIEFING.has(shown);
+        return;
+      }
+      if (page !== 'activity') {
+        return;
+      }
+      const ended = state.current === 'finished' && ctx.hasScreen(DEBRIEFING);
+      if (ended || (fromDebriefing && before !== undefined && FROM_DEBRIEFING.has(before))) {
+        // After this navigation has been told to everyone.
+        queueMicrotask(() => ctx.navigate(DEBRIEFING));
+        return;
+      }
+      if (before === DEBRIEFING && pausedForDebriefing.current && state.current === 'paused') {
+        ctx.events.publish(activityResumeRequestedEvent, {});
+      }
+      pausedForDebriefing.current = false;
+      fromDebriefing = false;
+    });
+  }, [ctx]);
+
+  // Finish ride stops the ride where it is and asks what becomes of it: the debriefing ends it
+  // (Save or Delete) or leads back to it. Without a debriefing the ride ends at once.
+  const onFinish = () => {
+    if (!ctx.hasScreen(DEBRIEFING)) {
+      ctx.events.publish(activityFinishRequestedEvent, {});
+      return;
+    }
+    if (state.current === 'running') {
+      pausedForDebriefing.current = true;
+      ctx.events.publish(activityPauseRequestedEvent, {});
+    }
+    ctx.navigate(DEBRIEFING);
+  };
+
+  // At commit as well: Finish ride needs to know whether the ride runs.
+  useLayoutEffect(
     () =>
       ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
+        state.current = payload.state;
         // A paused ride stays here (ADR 0056); a finished one goes to its debriefing, where the
         // rider saves or deletes it, or back to the main screen without one.
         if (payload.state === 'paused' || payload.state === 'running') {
@@ -172,6 +325,12 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+      <style>{CONTROLS_CSS}</style>
+      {/*
+        The ride, inert beneath a dialog and hidden from assistive technology. Positioned without
+        a z-index, so its layers stay in the one stacking context of the screen.
+      */}
+      <div style={{ position: 'absolute', inset: 0 }} inert={over !== undefined} aria-hidden={over !== undefined || undefined}>
       {paused ? (
         <div
           data-testid="ride-paused"
@@ -198,7 +357,6 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
           Paused
         </div>
       ) : null}
-      <style>{CONTROLS_CSS}</style>
       {/*
         Direct children like the HUD: one stacking context; Pause (or Resume), the controls of
         other plugins (`activity/control`, such as ERG) and Finish ride side by side at the top
@@ -241,7 +399,7 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
         icon={FINISH}
         left={row.finish}
         testId="finish-ride"
-        onPress={() => ctx.events.publish(activityFinishRequestedEvent, {})}
+        onPress={onFinish}
       />
       <div
         data-testid="slot-activity-landscape"
@@ -261,6 +419,8 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
           } as CSSProperties
         }
       />
+      </div>
+      <Dialog ctx={ctx} screen={over} container={dialog} opener={finish} />
     </div>
   );
 }

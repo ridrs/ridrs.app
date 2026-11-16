@@ -32,4 +32,9 @@ export const de: Messages = {
   connect: 'intervals.icu verbinden',
   withoutUpload: 'Ohne Hochladen speichern',
   delete: 'Löschen',
+  continueRide: 'Weiterfahren',
+  devices: 'Geräte',
+  settings: 'Einstellungen',
+  /** The row of Devices and Settings. */
+  more: 'Mehr',
 };

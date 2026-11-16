@@ -30,6 +30,11 @@ export const en = {
   connect: 'Connect intervals.icu',
   withoutUpload: 'Save without upload',
   delete: 'Delete',
+  continueRide: 'Continue ride',
+  devices: 'Devices',
+  settings: 'Settings',
+  /** The row of Devices and Settings. */
+  more: 'More',
 };
 
 export type Messages = typeof en;
