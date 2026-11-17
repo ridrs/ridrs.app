@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { FRAME_PLAYER, type FrameDecoder, FramePlayer } from './frame-player.ts';
 import type { RangeReader, VideoIndex } from './video-index.ts';
+import { indexSource, VIDEO_SOURCE, type VideoSource } from './video-source.ts';
 
 /** 30 fps, a keyframe every 30 frames, 10 s; samples 100 bytes each, one after the other. */
 function video(frames = 300, gop = 30): VideoIndex {
@@ -33,7 +34,7 @@ function setup(index = video()) {
     reads.push([offset, length]);
     return new Uint8Array(length);
   };
-  const player = new FramePlayer<Frame>(index, read, (output) => {
+  const player = new FramePlayer<Frame>(indexSource(index, read), (output) => {
     const decoder: FrameDecoder = {
       decodeQueueSize: 0,
       configure: () => undefined,
@@ -151,7 +152,7 @@ describe('FramePlayer', () => {
     const { player, settle, reads } = setup();
     player.frameAt(0);
     await settle();
-    expect(reads[0]).toEqual([1000, FRAME_PLAYER.maxBatchSamples * 100]);
+    expect(reads[0]).toEqual([1000, VIDEO_SOURCE.maxBatchSamples * 100]);
   });
 
   it('shows the last frame beyond the end of the video', async () => {
@@ -163,7 +164,7 @@ describe('FramePlayer', () => {
 
   it('stops when a read fails', async () => {
     const index = video();
-    const player = new FramePlayer(index, async () => Promise.reject(new Error('gone')), () => ({
+    const player = new FramePlayer(indexSource(index, async () => Promise.reject(new Error('gone'))), () => ({
       decodeQueueSize: 0,
       configure: () => undefined,
       decode: () => undefined,
@@ -175,5 +176,90 @@ describe('FramePlayer', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(player.error).toBeInstanceOf(Error);
     expect(player.frameAt(0)).toBeUndefined();
+  });
+});
+
+describe('FramePlayer with a source whose keyframes must be read (Matroska)', () => {
+  /** The index source, but every keyframe lookup a read that resolves on a later task. */
+  function lazy(index = video()) {
+    const read: RangeReader = async (_offset, length) => new Uint8Array(length);
+    const eager = indexSource(index, read);
+    const lookups: number[] = [];
+    const source: VideoSource = {
+      ...eager,
+      keyframeAt: (time) => {
+        lookups.push(time);
+        return new Promise((resolve) => setTimeout(() => resolve(eager.keyframeAt(time) as number), 0));
+      },
+    };
+    return { source, lookups };
+  }
+
+  function play(source: VideoSource) {
+    const decoded: number[] = [];
+    const player = new FramePlayer<Frame>(source, (output) => ({
+      decodeQueueSize: 0,
+      configure: () => undefined,
+      decode: ({ timestamp }) => {
+        decoded.push(timestamp);
+        output({ timestamp, closed: false, close() {} });
+      },
+      flush: async () => undefined,
+      reset: () => {
+        decoded.length = 0;
+      },
+      close: () => undefined,
+    }));
+    return { player, decoded };
+  }
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('starts at the keyframe it looked up, once the lookup is answered', async () => {
+    const { source } = lazy();
+    const { player, decoded } = play(source);
+    expect(player.frameAt(2.5)).toBeUndefined();
+    await tick();
+    await tick();
+    expect(decoded[0]).toBe(2e6);
+    expect(seconds(player.frameAt(2.5))).toBeCloseTo(75 / 30, 5);
+  });
+
+  it('looks up no keyframe while the time stays within what was fed', async () => {
+    const { source, lookups } = lazy();
+    const { player } = play(source);
+    player.frameAt(0);
+    await tick();
+    await tick();
+    const before = lookups.length;
+    for (let t = 0; t <= 0.5; t += 1 / 60) {
+      player.frameAt(t);
+      await tick();
+    }
+    expect(lookups.length).toBe(before);
+    expect(player.restarts).toBe(1);
+  });
+
+  it('skips to the keyframe ahead when the time passes what was fed', async () => {
+    const { source } = lazy();
+    const { player, decoded } = play(source);
+    player.frameAt(0);
+    await tick();
+    await tick();
+    player.frameAt(6.3);
+    await tick();
+    await tick();
+    expect(player.restarts).toBe(2);
+    expect(decoded[0]).toBe(6e6);
+    expect(seconds(player.frameAt(6.3))).toBeCloseTo(189 / 30, 5);
+  });
+
+  it('stops when a lookup fails', async () => {
+    const { source } = lazy();
+    const { player } = play({ ...source, keyframeAt: () => Promise.reject(new Error('gone')) });
+    player.frameAt(1);
+    await tick();
+    expect(player.error).toBeInstanceOf(Error);
+    expect(player.frameAt(1)).toBeUndefined();
   });
 });

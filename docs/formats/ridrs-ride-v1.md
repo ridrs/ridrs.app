@@ -20,6 +20,7 @@ Col_de_la_Madone.ride
 ```
 
 - **The video entry is stored** (ZIP compression method 0), so it can be played by range straight from the ZIP. ZIP64 is fine. Every other entry may be stored or deflated.
+- **The video may come in any container ridrs reads** (ADR 0101): MP4, M4V or QuickTime (`.mp4`, `.m4v`, `.mov`, with the sample table anywhere, not fragmented) or Matroska and WebM (`.mkv`, `.webm`, with cues). Its codec must be one the platform's WebCodecs decodes: H.264, HEVC, VP9 or AV1. The control file names it with its own extension.
 - Paths in the control file are relative to the control file; the video, the track and the control file lie in one folder of the ZIP.
 - The picture is the one `<preview>` names, else the first of `preview.png`, `preview.jpg`, `<video>_preview.png` and `<video>_preview.jpg` next to the video, letters compared without case: the names Incyclist looks for. No other name is a picture.
 - The title is `<title>`, else `<name>`, else the file's name.

@@ -26,3 +26,4 @@ Setting `currentTime` every render frame is a seek every frame: not workable wit
 - Memory is bounded by the buffer (about 30 decoded 720p frames). Decoding at high speed costs CPU or the hardware decoder in proportion to the speed.
 - The selection and feeding logic is pure and tested with a fake decoder (Vitest); WebCodecs itself is not available in Node or happy-dom.
 - A file whose codec the platform cannot decode shows a message instead of a picture.
+- Matroska and WebM videos, which have no sample table, are read by their cues instead (ADR 0101); the frame player asks a video source for keyframes and samples, whatever the container.

@@ -20,7 +20,8 @@ import { loadDownloadedRoute, parseGpx, type VideoRoute } from './library.ts';
 import { buildVideoTime, VideoClock, type VideoTime } from './playback.ts';
 import { plausibleTrack, type Repair } from './plausible-track.ts';
 import type { Track } from './track.ts';
-import { httpRangeReader, readVideoIndex, type VideoIndex } from './video-index.ts';
+import { httpRangeReader } from './video-index.ts';
+import { openVideo, type VideoSource } from './video-source.ts';
 import { WorldPublisher } from './world-publisher.ts';
 
 /** The contribution id of the landscape in the manifest: a ride's world names it. */
@@ -41,11 +42,11 @@ type Loaded =
       readonly route: VideoRoute;
       readonly track: Track;
       readonly videoTime: VideoTime;
-      readonly video: VideoIndex;
+      readonly video: VideoSource;
     };
 
 /** The WebCodecs decoder configuration of a video. */
-const decoderConfig = (video: VideoIndex): VideoDecoderConfig => ({
+const decoderConfig = (video: VideoSource): VideoDecoderConfig => ({
   codec: video.codec,
   codedWidth: video.width,
   codedHeight: video.height,
@@ -54,7 +55,7 @@ const decoderConfig = (video: VideoIndex): VideoDecoderConfig => ({
 });
 
 /** A WebCodecs `VideoDecoder` for the frame player. */
-function webCodecsDecoder(video: VideoIndex) {
+function webCodecsDecoder(video: VideoSource) {
   return (output: (frame: VideoFrame) => void, error: (error: unknown) => void): FrameDecoder => {
     const decoder = new VideoDecoder({ output, error });
     const open = () => decoder.state !== 'closed';
@@ -75,14 +76,15 @@ function webCodecsDecoder(video: VideoIndex) {
 async function loadRoute(
   id: string,
   files: Readonly<Record<string, string>> | undefined,
-): Promise<{ route: VideoRoute; track: Track; repairs: readonly Repair[]; videoTime: VideoTime; video: VideoIndex }> {
+): Promise<{ route: VideoRoute; track: Track; repairs: readonly Repair[]; videoTime: VideoTime; video: VideoSource }> {
   if (!files) {
     throw new Error(`The route "${id}" is not downloaded`);
   }
   const route = await loadDownloadedRoute(id, files);
+  const read = httpRangeReader(route.videoUrl);
   const [{ track, repairs }, video] = await Promise.all([
     fetch(route.gpxUrl).then(async (response) => plausibleTrack(parseGpx(await response.text()))),
-    readVideoIndex(httpRangeReader(route.videoUrl)),
+    openVideo(read, read.size),
   ]);
   if (typeof VideoDecoder === 'undefined' || !(await VideoDecoder.isConfigSupported(decoderConfig(video))).supported) {
     throw new Error(`This system cannot decode ${video.codec} video`);
@@ -166,7 +168,7 @@ function useRoute(ctx: UiContext): { readonly id: string | undefined; readonly l
  * render clock it shows the video frame at the presented distance (ADR 0061) and tells the host
  * the terrain ahead and where the rider is, all from the route's GPX track.
  */
-function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTime: VideoTime, video: VideoIndex) {
+function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTime: VideoTime, video: VideoSource) {
   const canvas = useRef<HTMLCanvasElement>(null);
   /** A canvas of its own: once it has a WebGPU context it can have no 2D one (ADR 0091). */
   const hdrCanvas = useRef<HTMLCanvasElement>(null);
@@ -183,7 +185,7 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
         ctx.events.publish(uiTerrainObservedEvent, { ...window, samples: [...samples] }),
       position: (position) => ctx.events.publish(uiPositionObservedEvent, position),
     });
-    const player = new FramePlayer(video, httpRangeReader(route.videoUrl), webCodecsDecoder(video));
+    const player = new FramePlayer(video, webCodecsDecoder(video));
     const clock = new VideoClock(videoTime, (route.startFrame - 1) / route.framerate);
     skip.current = () => {
       clock.skip();
@@ -315,7 +317,7 @@ function VideoWorld({
   readonly route: VideoRoute;
   readonly track: Track;
   readonly videoTime: VideoTime;
-  readonly video: VideoIndex;
+  readonly video: VideoSource;
 }) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);

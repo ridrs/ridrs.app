@@ -38,8 +38,13 @@ fn empty(status: StatusCode) -> Response<Vec<u8>> {
 }
 
 fn content_type(path: &str) -> &'static str {
-    match path.rsplit('.').next() {
+    match path.rsplit('.').next().map(str::to_ascii_lowercase).as_deref() {
+        // A route's video comes in any container its control file names (ADR 0101).
         Some("mp4") => "video/mp4",
+        Some("m4v") => "video/x-m4v",
+        Some("mov") => "video/quicktime",
+        Some("mkv") => "video/x-matroska",
+        Some("webm") => "video/webm",
         Some("json") => "application/json",
         Some("gpx") => "application/gpx+xml",
         Some("jpg" | "jpeg") => "image/jpeg",
@@ -280,5 +285,15 @@ mod tests {
         assert_eq!(status("%2FUsers%2Fx"), StatusCode::FORBIDDEN);
         assert_eq!(status("videos%2Fmissing.mp4"), StatusCode::NOT_FOUND);
         assert_eq!(status("bad%zz"), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn names_the_type_of_every_video_container_whatever_the_case() {
+        assert_eq!(content_type("videos/a/Col.MP4"), "video/mp4");
+        assert_eq!(content_type("videos/a/Col.mov"), "video/quicktime");
+        assert_eq!(content_type("videos/a/Col.m4v"), "video/x-m4v");
+        assert_eq!(content_type("videos/a/Col.mkv"), "video/x-matroska");
+        assert_eq!(content_type("videos/a/Col.WebM"), "video/webm");
+        assert_eq!(content_type("videos/a/Col.xml"), "application/octet-stream");
     }
 }

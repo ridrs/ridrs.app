@@ -12,6 +12,8 @@ import {
 } from '@ridrs/contracts';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
 
+/** The containers a route's video comes in (ADR 0101). */
+const VIDEO_EXTENSION = /\.(mp4|m4v|mov|mkv|webm)$/i;
 const extensionOf = (name: string) => name.slice(name.lastIndexOf('.') + 1).toLowerCase();
 const peekable = (name: string) =>
   (PEEK_EXTENSIONS as readonly string[]).includes(extensionOf(name));
@@ -46,11 +48,7 @@ export async function withStoredVideo(bytes: Uint8Array): Promise<Uint8Array> {
   for (const entry of await reader.getEntries()) {
     if (entry.directory) continue;
     const data = new Uint8ArrayReader(await entry.getData(new Uint8ArrayWriter()));
-    await zip.add(
-      entry.filename,
-      data,
-      entry.filename.toLowerCase().endsWith('.mp4') ? { level: 0 } : {},
-    );
+    await zip.add(entry.filename, data, VIDEO_EXTENSION.test(entry.filename) ? { level: 0 } : {});
   }
   await reader.close();
   return zip.close();

@@ -40,6 +40,12 @@ export interface VideoColour {
 /** Fetches `length` bytes of the file from `offset`. */
 export type RangeReader = (offset: number, length: number) => Promise<Uint8Array>;
 
+/** A range reader over HTTP that knows the file's size once a read was answered. */
+export type HttpRangeReader = RangeReader & {
+  /** The file's size in bytes; infinite before the first answer. */
+  readonly size: () => number;
+};
+
 /** The total of a `206` from its `Content-Range: bytes a-b/total`. */
 const totalOf = (range: string | null) => Number(range?.split('/')[1] ?? Number.NaN);
 
@@ -49,9 +55,9 @@ const totalOf = (range: string | null) => Number(range?.split('/')[1] ?? Number.
  * The file's size, learnt from the first answer, keeps every later read within the file, so a
  * read at its end costs no request.
  */
-export function httpRangeReader(url: string): RangeReader {
+export function httpRangeReader(url: string): HttpRangeReader {
   let size = Number.POSITIVE_INFINITY;
-  return async (offset, length) => {
+  const read: RangeReader = async (offset, length) => {
     const parts: Uint8Array[] = [];
     let at = offset;
     while (at < Math.min(offset + length, size)) {
@@ -91,6 +97,7 @@ export function httpRangeReader(url: string): RangeReader {
     }, 0);
     return joined;
   };
+  return Object.assign(read, { size: () => size });
 }
 
 /** The file's top-level boxes, from their headers alone: the media data is never read. */
