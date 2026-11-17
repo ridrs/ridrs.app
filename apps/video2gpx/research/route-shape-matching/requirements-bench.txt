@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+-r requirements.txt
+# rsm.bench only; never imported by rsm.core. gpxpy: GPX parsing. dtaidistance: optional DTW comparison metric (its macOS wheel needs libomp, see rsm/bench/dtw.py)
+gpxpy==1.6.2
+dtaidistance==2.5.1

@@ -33,7 +33,7 @@ export default defineConfig({
       'plugins/**/*.test.ts',
       'tests/**/*.test.ts',
     ],
-    exclude: ['**/node_modules/**', '**/src-tauri/**'],
+    exclude: ['**/node_modules/**', '**/src-tauri/**', 'apps/video2gpx/**'],
     environment: 'node',
   },
 });

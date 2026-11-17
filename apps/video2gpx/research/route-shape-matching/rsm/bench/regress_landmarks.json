@@ -1,0 +1,24 @@
+{
+ "_doc": "Madone landmark truth: video second at which the camera passes the landmark (read from frames, FINDINGS 'Timing in town'). lon/lat = the point of the decoded centre line of work/menton_local/out at the arc used by work/fable_timing/eval_lm.py; the arcs after 2440 s were defined on an earlier path and are approximate (a few metres).",
+ "madone-start": [
+  {"name": "hairpin La Maura", "t": 1978, "lon": 7.468929, "lat": 43.784314},
+  {"name": "roundabout 40:57", "t": 2457, "lon": 7.488405, "lat": 43.77581},
+  {"name": "viaduct roundabout", "t": 2496, "lon": 7.491059, "lat": 43.77241},
+  {"name": "roundabout 41:56", "t": 2515.5, "lon": 7.49259, "lat": 43.771469},
+  {"name": "seafront left turn", "t": 2550, "lon": 7.494167, "lat": 43.770879},
+  {"name": "Rond-Point St-Roch", "t": 2715, "lon": 7.500953, "lat": 43.774191}
+ ],
+ "_doc_gotthard-start": "Gotthard start checkpoints (score 'checkpoints': distance of the route at second t to the point, hit within tol_m). t = video second of the passage read from frames at 1 s spacing (the clip has the same timestamps as the source video); lat/lon = OSM nodes of alps.osm.pbf (junction node, bridge or tunnel midpoint, roundabout centre). Tolerance 50 m at sharp junctions in town, 100 m where the point or the second is less sharp (car park, open road). The wrong alternative (Umfahrungsstrasse bypass) is 300-700 m from checkpoints 1-5.",
+ "gotthard-start": [
+  {"name": "station car park (parking aisle)", "t": 30, "lat": 46.63655, "lon": 8.59235, "tol_m": 100, "why": "0:20-0:37 car park beside the tracks, heading east; aisle way 297792083"},
+  {"name": "Bahnhofstrasse/Gotthardstrasse junction (right turn)", "t": 67, "lat": 46.637126, "lon": 8.594866, "tol_m": 50, "why": "painted circles, Zone sign, turning right 66-69"},
+  {"name": "Gotthardstrasse/Oberalpstrasse mini roundabout", "t": 102, "lat": 46.634792, "lon": 8.59638, "tol_m": 50, "why": "roundabout 99-103, Oberalppass sign left at 104, cobbles from 105"},
+  {"name": "Dorfbrücke (sharp right into the old town)", "t": 139, "lat": 46.633814, "lon": 8.597635, "tol_m": 50, "why": "bridge parapet 136-138, sharp right 139-142, The River House at 145"},
+  {"name": "Gotthardstrasse (Andermatt)/Umfahrungsstrasse junction (left)", "t": 253, "lat": 46.630521, "lon": 8.58686, "tol_m": 50, "why": "T junction 250-254, cars crossing, left turn 255-257"},
+  {"name": "crossroads at the farm with the silo (valley road)", "t": 293, "lat": 46.626409, "lon": 8.581026, "tol_m": 100, "why": "silo left 292, side roads both sides 293 (service x2)"},
+  {"name": "slip roads north of Hospental", "t": 336, "lat": 46.62226, "lon": 8.57331, "tol_m": 100, "why": "no-entry sign left 334, slip road right 335-337 (primary_link pair, midpoint)"},
+  {"name": "Hospental roundabout", "t": 379, "lat": 46.61755, "lon": 8.56654, "tol_m": 50, "why": "entry 377, circulating 378-380, exit 381 (Hospental-Kreisel)"},
+  {"name": "short tunnel above Hospental", "t": 445, "lat": 46.616435, "lon": 8.569373, "tol_m": 100, "why": "portal 443-444, inside 444-445 (way 239248738, midpoint)"},
+  {"name": "last right-hand bend before the long straight", "t": 500, "lat": 46.610286, "lon": 8.572024, "tol_m": 100, "why": "right bend along the rock 492-502, then the 600 m straight SW from 503"}
+ ]
+}

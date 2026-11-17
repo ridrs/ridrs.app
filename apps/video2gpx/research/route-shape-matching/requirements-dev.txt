@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+-r requirements-bench.txt
+pytest==9.2.0
+# test oracle for rsm.core.similarity only; production uses numpy/scipy
+scikit-image==0.26.0

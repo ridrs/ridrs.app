@@ -1,0 +1,5 @@
+{
+  "bundle": {
+    "resources": { "../build/sidecar/rsm-pipeline": "sidecar/rsm-pipeline" }
+  }
+}

@@ -1,0 +1,12 @@
+==============================================================================
+Native libraries inside the Python wheels (dynamic libraries, replaceable)
+==============================================================================
+GEOS (libgeos, libgeos_c) - GNU LGPL 2.1. Dynamically linked by shapely. Source: https://libgeos.org/ . The library files sit
+unmodified in the sidecar folder and can be replaced by another build of the same ABI.
+PROJ (libproj, proj.db) - MIT licence. Source: https://proj.org/ . proj.db contains EPSG data (EPSG terms of use).
+libosmium / protozero / expat / zlib / lz4 (inside osmium) - Boost Software License / BSD-2 / MIT / zlib terms; see the osmium
+licence text above and https://osmcode.org/libosmium/ .
+Python (PSF License 2.0) and its bundled libraries (OpenSSL under Apache-2.0 where present, libffi, expat, zlib, xz, bzip2,
+mpdecimal) - https://docs.python.org/3/license.html .
+PyInstaller bootloader - GPL-2.0-or-later with the PyInstaller exception for bundled applications (no restriction on the bundle).
+Apple Accelerate framework is a system component and not distributed.

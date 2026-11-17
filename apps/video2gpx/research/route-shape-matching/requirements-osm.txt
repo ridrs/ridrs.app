@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Phase 3 (rsm.network only; rsm.core must never import these). Installed together in one `pip install` on Python 3.14.6, arm64 macOS.
+-r requirements.txt
+osmnx==2.1.1          # MIT; graph construction/simplification (Overpass download kept as cross-check path)
+networkx==3.7         # BSD-3-Clause
+pyproj==3.8.0         # MIT; UTM projection
+geopandas==1.2.0      # BSD-3-Clause (osmnx dependency)
+pandas==3.1.1         # BSD-3-Clause (transitive)
+pyogrio==0.13.0       # MIT (transitive)
+requests==2.34.2      # Apache-2.0 (Nominatim request, osmnx)
+osmium==4.3.2         # pyosmium, BSD-2-Clause; reads a Geofabrik PBF in place
+matplotlib==3.11.2    # PSF-style licence; figures only

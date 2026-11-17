@@ -43,6 +43,7 @@
     "dist",
     "web",
     "experiments",
+    "apps/video2gpx",
     "apps/native/src-tauri",
     "apps/companion/src-tauri"
   ]

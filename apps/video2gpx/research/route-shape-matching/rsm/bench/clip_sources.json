@@ -1,0 +1,20 @@
+{
+ "_doc": "Source videos of the clip bench (rsm.bench.clips, development only). truth: gps = a Van Gestel track.gpx with video-aligned timestamps (speed and rotation are SECURED once the alignment check passes); open = no reference yet (speed and rotation still to be determined; note says what exists). full = an earlier run of the whole video (motion/, rotation/) used to choose the clip windows and to compare a clip with the same window of the full run; null = windows at fixed shares of the duration. bbox S,W,N,E only feeds the area status of the motion step. manual = windows added by hand (video seconds).",
+ "sources": [
+  {"id": "roanne", "video": "$V2G_TEST_DATA/vangestel/vallee-de-roanne/video.mp4", "truth": "gps", "gps": "vallee-de-roanne", "full": "work/regress/f4seed/roanne", "bbox": [44.50826, 4.98126, 44.86798, 5.48725]},
+  {"id": "pontaix", "video": "$V2G_TEST_DATA/vangestel/pontaix-chamaloc/video.mp4", "truth": "gps", "gps": "pontaix-chamaloc", "full": "work/regress/f4seed/pontaix", "bbox": [44.48085, 4.88413, 45.02044, 5.64393]},
+  {"id": "rousset", "video": "$V2G_TEST_DATA/vangestel/col-de-rousset/video.mp4", "truth": "gps", "gps": "col-de-rousset", "full": "work/regress/f4seed/rousset", "bbox": [44.532623, 4.971451, 45.148108, 5.839463]},
+  {"id": "grimone", "video": "$V2G_TEST_DATA/vangestel/col-de-grimone-1/video.mp4", "truth": "gps", "gps": "col-de-grimone-1", "full": "work/regress/f4seed/grimone", "bbox": [44.454889, 5.320997, 44.92819, 5.986771]},
+  {"id": "cdp", "video": "$V2G_TEST_DATA/vangestel/cdp-aucelon-roanne/video.mp4", "truth": "gps", "gps": "cdp-aucelon-roanne", "full": "work/regress/f4seed/cdp", "bbox": [44.37494, 4.96335, 44.91454, 5.72176]},
+  {"id": "pennes", "video": "$V2G_TEST_DATA/vangestel/col-de-pennes/video.mp4", "truth": "gps", "gps": "col-de-pennes", "full": "work/regress/f4seed/pennes", "bbox": [44.37494, 4.96335, 44.91454, 5.72176]},
+  {"id": "lahntal", "video": "$V2G_TEST_DATA/vangestel/lahntal-marburg/video.mp4", "truth": "gps", "gps": "lahntal-marburg", "full": null, "bbox": [50.59355, 8.27927, 51.13314, 9.13417]},
+  {"id": "marburg", "video": "$V2G_TEST_DATA/vangestel/marburg-lahntal/video.mp4", "truth": "gps", "gps": "marburg-lahntal", "full": null, "bbox": [50.59355, 8.27927, 51.13314, 9.13417]},
+  {"id": "amalfi", "video": "$RSM_VIDEOS/amalfi.mkv", "truth": "open", "note": "Strava GPX with timestamps (videos/amalfi-feedback), clock offset to the video not determined", "full": "work/regress/f4seed/amalfi", "bbox": [40.55, 14.30, 40.72, 14.80]},
+  {"id": "madone", "video": "$RSM_VIDEOS/madone.webm", "truth": "open", "note": "landmark times in regress_landmarks.json (positions, no speed)", "full": "work/regress/f4seed/madone-start", "bbox": [43.668212, 7.236359, 43.937996, 7.610166]},
+  {"id": "gotthard", "video": "$RSM_VIDEOS/gotthard.mp4", "truth": "open", "note": "checkpoints from frames in docs/GOTTHARD_DIAGNOSIS.md; vms fails on the valley road 4:22-5:36", "full": "~/Library/Application Support/org.video2gpx.app/projects/gotthard-pass-4k-hdr-famous-cobb-1794582288236/out", "full_until_s": 964, "bbox": [46.44336, 8.305832, 46.864369, 8.928852],
+   "manual": [{"t0": 230, "dur": 120, "cat": "valley", "why": "village exit and the valley road where the vms speed collapses (GOTTHARD_DIAGNOSIS)"}]},
+  {"id": "bavaria", "video": "$RSM_VIDEOS/bavaria.webm", "truth": "open", "note": "komoot plan (geometry only, no timestamps) in videos/mittenwald-feedback", "full": "work/bikepaths/new", "bbox": [47.270111, 10.834255, 47.720145, 11.868362]},
+  {"id": "clue", "video": "$RSM_VIDEOS/clue.mp4", "truth": "open", "note": "no reference", "full": "~/Library/Application Support/org.video2gpx.app/projects/clue-du-p-rour-4k-hdr-dramatic-j-1794581146915/out", "bbox": [44.08313, 6.087516, 44.352914, 6.46354]},
+  {"id": "cayolle", "video": "$RSM_VIDEOS/cayolle.mkv", "truth": "open", "note": "no reference, no pipeline run", "full": null, "bbox": [44.1, 6.6, 44.45, 6.9]}
+ ]
+}

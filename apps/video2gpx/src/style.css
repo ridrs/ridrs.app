@@ -1,0 +1,13 @@
+/* The stylesheet of the app: tokens, base, components, the app frame and the views (plan-ui section 5) */
+@import "./ui/tokens.css";
+@import "./ui/base.css";
+@import "./ui/components.css";
+@import "./ui/layout.css";
+@import "./ui/views.css";
+
+/* Ortsangaben (anchorPanel.ts): list under the timeline, orange dashed frames on the map */
+.anchors { border-top: 1px solid var(--c-border, #ddd); padding-top: 8px; margin-top: 8px; }
+.anchor-list { list-style: none; margin: 0; padding: 0; }
+.anchor-list li { gap: 8px; align-items: center; }
+.leaflet-tooltip.anchor-label { background: #ea580c; color: #fff; border: 0; font-weight: 600; padding: 1px 5px; }
+.leaflet-tooltip.anchor-label::before { display: none; }

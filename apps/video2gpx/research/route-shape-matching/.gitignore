@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+.venv/
+__pycache__/
+.pytest_cache/
+# Derived trajectories (from CC BY-NC-SA 4.0 footage) and scratch runs: never commit.
+work/
+# OSM cache (ODbL, experiment-internal; Phase 3)
+cache/
+osm_cache/
+*.mp4
+*.mkv
+*.webm
+*.jpg
+*.jpeg

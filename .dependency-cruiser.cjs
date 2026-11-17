@@ -512,6 +512,9 @@ module.exports = {
     doNotFollow: {
       path: 'node_modules',
     },
+    exclude: {
+      path: '^apps/video2gpx/',
+    },
     tsPreCompilationDeps: true,
     tsConfig: {
       fileName: 'tsconfig.json',

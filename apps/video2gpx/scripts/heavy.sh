@@ -1,0 +1,15 @@
+#!/bin/sh
+# Machine-wide lock for heavy jobs: only one at a time (see docs/README.md). Usage: scripts/heavy.sh <command...>
+# Waits for the lock, then runs the command under scripts/guard.sh. Stale locks (dead pid) are taken over.
+LOCK="${V2G_HEAVY_LOCK:-/tmp/video2gpx-heavy.lock}"
+while ! mkdir "$LOCK" 2>/dev/null; do
+  pid=$(cat "$LOCK/pid" 2>/dev/null)
+  if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then rm -rf "$LOCK"; continue; fi
+  sleep 5
+done
+echo $$ > "$LOCK/pid"
+# a run started from the app (user's job) also counts as heavy: wait until it is finished. The bundled sidecar is `rsm-pipeline run`, a dev app or
+# a manual run is `python -m rsm.pipeline run`; the bench runs single steps (`_step`) and is not matched.
+while pgrep -f "rsm-pipeline run|rsm\.pipeline run" >/dev/null 2>&1; do sleep 15; done
+trap 'rm -rf "$LOCK"' EXIT INT TERM
+"$(dirname "$0")/guard.sh" "$@"

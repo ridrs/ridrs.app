@@ -1,0 +1,7 @@
+# Runtime dependencies of rsm.pipeline (the packaged sidecar). Nothing else may be imported at runtime.
+numpy==2.5.4
+scipy==1.18.1
+opencv-python-headless==5.0.0.93
+osmium==4.3.2
+shapely==2.2.0
+pyproj==3.8.0

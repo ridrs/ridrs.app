@@ -16,6 +16,7 @@
       "!**/src-tauri/gen",
       "!web",
       "!experiments",
+      "!apps/video2gpx",
       "!**/assets/icons",
       "!**/*.generated.ts"
     ]
