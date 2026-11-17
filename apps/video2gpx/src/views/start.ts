@@ -8,6 +8,7 @@ import type { ImportTemplate, ProjectApp } from "../types";
 import { btn, codeWell, disclosure, field, menu, setBtnLabel, setSoftDisabled, isSoftDisabled, toneIcon, uid } from "../ui/components";
 import { icon } from "../ui/icons";
 import { debounce, el, fmtDay, fmtDur, fmtSize, isVideoPath } from "../util";
+import { revealLabel, thisComputer } from "../app/platform";
 
 const RESPONSIBILITY = "Die App lädt nichts von sich aus. Was der Befehl tut und ob du das Video verwenden darfst, liegt bei dir.";
 const RECENT = 6;
@@ -36,7 +37,7 @@ export function mountStart(root: HTMLElement) {
   listEl = el("ul", { class: "projlist" });
   root.append(el("div", { class: "page narrow" },
     el("h1", { class: "display" }, "Video rein, GPX raus"),
-    el("p", { class: "lead" }, "Ein Straßenvideo ohne GPS wird mit der OpenStreetMap-Karte abgeglichen. Heraus kommt eine GPX-Datei, deren Zeitstempel zum Video passen. Die Berechnung läuft auf diesem Mac."),
+    el("p", { class: "lead" }, `Ein Straßenvideo ohne GPS wird mit der OpenStreetMap-Karte abgeglichen. Heraus kommt eine GPX-Datei, deren Zeitstempel zum Video passen. Die Berechnung läuft auf ${thisComputer}.`),
     cardEl, el("section", { "aria-label": "Projekte" }, listHead, listEl)));
   for (const ev of ["projects", "run", "import"]) bus.on(ev, renderList);
   bus.on("templates", update); bus.on("env", update);
@@ -160,7 +161,7 @@ function row(p: ProjectApp): HTMLElement {
       el("span", { class: "proj-text" }, el("span", { class: "proj-name" }, projectTitle(p)), el("span", { class: "small muted" }, meta || "–")),
       el("span", { class: `proj-status ${st.tone}` }, toneIcon(st.tone), st.text),
       el("span", { class: "proj-date small muted" }, fmtDay(p.updated))),
-    menu(`Aktionen für ${projectTitle(p)}`, p.video ? [{ label: "Im Finder zeigen", icon: "folder" as const, onclick: () => void api.reveal(p.video!) }, ...items] : items));
+    menu(`Aktionen für ${projectTitle(p)}`, p.video ? [{ label: revealLabel, icon: "folder" as const, onclick: () => void api.reveal(p.video!) }, ...items] : items));
 }
 
 function renderList() {

@@ -6,6 +6,7 @@ import type { IncyclistDone, IncyclistInfo, IncyclistOptions, IncyclistProgress 
 import { banner, btn, field, progressBar, segmented, stepList, toneIcon } from "./ui/components";
 import { icon } from "./ui/icons";
 import { debounce, el, fmtBytes } from "./util";
+import { revealLabel } from "./app/platform";
 
 const STEP_LABELS = ["Höhendaten prüfen", "GPX mit Höhen", "Video vorbereiten", "ZIP schreiben"];
 const TECH = /^(?:[0-9]{3,4}p(?:[0-9]{2})?|[2-8]k(?:[0-9]{2})?|hdr(?:10\+?)?|uhd|fhd|hd|sdr|[0-9]{2,3}fps|fps|pov|asmr|dolby|vision|4k60|4k30)$/i;
@@ -230,7 +231,7 @@ export function incyclistCard(): { el: HTMLElement; build(): void; update(): voi
       resultBox.append(el("div", { class: "row ok-text" }, toneIcon("ok"), el("span", { class: "wrap-any" }, `${x.folder ? "Ordner" : "ZIP"} gespeichert: ${x.path}`)),
         el("div", { class: "small" }, [`Länge ${(x.length_m / 1000).toFixed(1).replace(".", ",")} km`, x.ascent_m !== null ? `Anstieg ${Math.round(x.ascent_m)} hm` : "ohne Höhen", fmtBytes(x.bytes), `Startbild ${x.start_frame}`].join(" · ")),
         x.note ? banner("warn", x.note) : "",
-        el("div", {}, btn("Im Finder zeigen", () => void api.reveal(x.path), { size: "sm", icon: "folder" })));
+        el("div", {}, btn(revealLabel, () => void api.reveal(x.path), { size: "sm", icon: "folder" })));
     }
   }
   bus.on("incyclist", update);

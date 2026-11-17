@@ -289,9 +289,44 @@ async fn geo_country(ctx: State<'_, Ctx>, lat: f64, lon: f64) -> R<Option<String
     tauri::async_runtime::spawn_blocking(move || geo::country(&c, lat, lon)).await.map_err(|e| e.to_string())?
 }
 
+/// Shows the file in the Finder (Mac) or the file manager (Linux: selected through the freedesktop FileManager1 interface, else
+/// its folder opened with xdg-open).
 #[tauri::command]
 fn reveal(path: String) -> R<()> {
-    std::process::Command::new("open").arg("-R").arg(path).status().map(|_| ()).map_err(|e| e.to_string())
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg("-R").arg(path).status().map(|_| ()).map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        use std::process::{Command, Stdio};
+        let p = std::path::Path::new(&path);
+        let uri = format!("file://{}", file_uri_path(&path));
+        let shown = Command::new("dbus-send")
+            .args(["--session", "--dest=org.freedesktop.FileManager1", "--type=method_call", "/org/freedesktop/FileManager1"])
+            .args(["org.freedesktop.FileManager1.ShowItems", &format!("array:string:{uri}"), "string:"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if shown {
+            return Ok(());
+        }
+        let dir = if p.is_dir() { p } else { p.parent().unwrap_or(p) };
+        Command::new("xdg-open").arg(dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+    }
+}
+
+/// The path part of a file:// URI: every byte outside the unreserved set and "/" percent-encoded.
+#[cfg(not(target_os = "macos"))]
+fn file_uri_path(path: &str) -> String {
+    path.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => (b as char).to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
 
 pub fn run() {

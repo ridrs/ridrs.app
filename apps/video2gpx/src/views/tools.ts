@@ -7,6 +7,7 @@ import { S, bus } from "../state";
 import type { EnvCheck, Settings, ToolCheck } from "../types";
 import { banner, btn, setBtnLabel, codeWell, disclosure, field, statusRow, type Tone } from "../ui/components";
 import { el } from "../util";
+import { isMac, thisComputer } from "../app/platform";
 
 let rowsEl: HTMLElement, installEl: HTMLElement, actionsEl: HTMLElement, root: HTMLElement;
 let checking = false;
@@ -27,7 +28,7 @@ export function mountTools(r: HTMLElement) {
   actionsEl = el("div", { class: "row end wrap" });
   r.append(el("div", { class: "page narrow" },
     el("h1", {}, "Werkzeuge"),
-    el("p", { class: "lead" }, "video2gpx bringt die Berechnung mit. Zum Lesen der Videos braucht es zwei Programme, die auf diesem Mac installiert sein müssen: ffmpeg und ffprobe. yt-dlp ist nur nötig, wenn eine deiner Import-Vorlagen es verwendet."),
+    el("p", { class: "lead" }, `video2gpx bringt die Berechnung mit. Zum Lesen der Videos braucht es zwei Programme, die auf ${thisComputer} installiert sein müssen: ffmpeg und ffprobe. yt-dlp ist nur nötig, wenn eine deiner Import-Vorlagen es verwendet.`),
     el("div", { class: "panel stack" }, rowsEl, installEl, actionsEl)));
   bus.on("env", render);
   // returning from the Terminal updates the list without a click
@@ -49,7 +50,7 @@ function pathFields(): HTMLElement {
   const s = { ...(S.settings as Settings) };
   const st = settingsOf(s);
   const mk = (key: "ffmpeg" | "ffprobe" | "ytdlp", label: string) => {
-    const inp = el("input", { type: "text", class: "mono", value: key === "ytdlp" ? st.ytdlp : s[key], placeholder: "leer = automatisch (PATH, Homebrew)", spellcheck: false,
+    const inp = el("input", { type: "text", class: "mono", value: key === "ytdlp" ? st.ytdlp : s[key], placeholder: "leer = automatisch (PATH und übliche Ordner)", spellcheck: false,
       onchange: async () => { (s as any)[key] = inp.value.trim(); await api.settingsSet(s); S.settings = { ...s }; void recheck(); } });
     return el("div", { class: "row" }, field(label, inp, undefined, "grow").el, btn("Wählen …", async () => { const p = await api.pickFile(`${label} wählen`); if (p) { inp.value = p; inp.dispatchEvent(new Event("change")); } }, { size: "sm" }));
   };
@@ -72,14 +73,21 @@ function render() {
   const needFf = !!e && (!e.ffmpeg.ok || !e.ffprobe.ok), needYt = !!e && !e.ytdlp?.ok;
   installEl.replaceChildren();
   if (e && (needFf || needYt)) {
-    const line = `brew install ${[needFf ? "ffmpeg" : null, needYt ? "yt-dlp" : null].filter(Boolean).join(" ")}`;
-    installEl.append(el("h2", {}, needFf ? "So installieren (Homebrew)" : "yt-dlp installieren (optional, Homebrew)"), codeWell(line, { label: "Befehl zum Installieren" }).el,
-      el("p", { class: "help" }, "Im Programm „Terminal“ einfügen und Eingabe drücken. Danach hier „Erneut prüfen“. video2gpx installiert nichts selbst."));
-    brewDisc ??= disclosure("Homebrew ist nicht installiert?", el("p", {}, "Homebrew ist ein Paketmanager für den Mac. Die Anleitung steht auf dieser Seite (die App öffnet sie nicht selbst):"), codeWell("https://brew.sh", { label: "Adresse von Homebrew" }).el);
-    if (e.brew && !e.brew.ok) brewDisc.open = true;
-    installEl.append(brewDisc);
+    // The Mac uses Homebrew; elsewhere the backend names the system's package manager (older backends send no `os`: Mac).
+    const mac = !e.os || e.os === "macos";
+    const cmd = mac ? "brew install" : e.install_cmd;
+    const pkgs = [needFf ? "ffmpeg" : null, needYt ? "yt-dlp" : null].filter(Boolean).join(" ");
+    const via = mac ? " (Homebrew)" : "";
+    installEl.append(el("h2", {}, needFf ? `So installieren${via}` : `yt-dlp installieren (optional${mac ? ", Homebrew" : ""})`),
+      cmd ? codeWell(`${cmd} ${pkgs}`, { label: "Befehl zum Installieren" }).el : el("p", {}, `Bitte ${pkgs} mit dem Paketmanager des Systems installieren.`),
+      el("p", { class: "help" }, `Im ${mac ? "Programm „Terminal“" : "Terminal"} einfügen und Eingabe drücken. Danach hier „Erneut prüfen“. video2gpx installiert nichts selbst.`));
+    if (mac) {
+      brewDisc ??= disclosure("Homebrew ist nicht installiert?", el("p", {}, "Homebrew ist ein Paketmanager für den Mac. Die Anleitung steht auf dieser Seite (die App öffnet sie nicht selbst):"), codeWell("https://brew.sh", { label: "Adresse von Homebrew" }).el);
+      if (e.brew && !e.brew.ok) brewDisc.open = true;
+      installEl.append(brewDisc);
+    }
   }
-  pathsDisc ??= disclosure("Ohne Homebrew: Pfad selbst angeben", pathFields());
+  pathsDisc ??= disclosure(isMac ? "Ohne Homebrew: Pfad selbst angeben" : "Pfad selbst angeben", pathFields());
   installEl.append(pathsDisc);
   if (e && !toolsReady(e) && pipeOk) installEl.prepend(banner("warn", "Ohne ffmpeg und ffprobe kann nichts berechnet werden. Vorhandene Projekte lassen sich öffnen und als GPX exportieren."));
   againBtn ??= btn("Erneut prüfen", () => void recheck());

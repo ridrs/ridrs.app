@@ -7,6 +7,7 @@ import { S, bus, toast } from "../state";
 import type { ImportTemplate, Settings, ToolId } from "../types";
 import { banner, btn, codeWell, disclosure, field, segmented, statusRow, toneIcon, uid } from "../ui/components";
 import { debounce, el } from "../util";
+import { isMac } from "../app/platform";
 
 const RESPONSIBILITY = "Die App lädt nichts von sich aus. Was der Befehl tut und ob du das Video verwenden darfst, liegt bei dir.";
 const SAMPLE = { url: "https://example.org/video", path: "/Users/ich/Movies/fahrt.mp4", any: "https://example.org/video" };
@@ -178,7 +179,7 @@ function renderAbout() {
       el("dt", {}, "Berechnung"), el("dd", {}, p ? `${p.mode === "sidecar" ? "eingebaut" : "externes Python (Entwicklermodus)"} · Version ${p.version ?? "unbekannt"}` : "wird geprüft …"),
       el("dt", {}, "Code-Hash"), el("dd", { class: "mono" }, p?.code_hash ?? "–"),
       el("dt", {}, "Datenordner"), el("dd", { class: "mono wrap-any" }, e?.data_dir ?? "–")),
-    el("div", { class: "row wrap" }, btn("Datenordner im Finder zeigen", () => void api.reveal(e?.data_dir ?? ""), { size: "sm", icon: "folder", disabled: !e })),
+    el("div", { class: "row wrap" }, btn(isMac ? "Datenordner im Finder zeigen" : "Datenordner im Dateimanager zeigen", () => void api.reveal(e?.data_dir ?? ""), { size: "sm", icon: "folder", disabled: !e })),
     !e || (e.python.ok && e.rsm.ok) ? el("p", { class: "help" }, "Kartendaten © OpenStreetMap-Mitwirkende (ODbL). Höhendaten: Copernicus DEM GLO-30, wo geladen zusätzlich nationale und regionale Geländemodelle (IGN, INGV, Südtirol, swisstopo, BEV, Bayern, Hessen, NRW, NASADEM; Liste unter Kartendaten › Höhendaten). Lizenzen der mitgelieferten Bibliotheken: THIRD-PARTY-NOTICES im Programmpaket.")
       : banner("bad", "Die Berechnung ist nicht verfügbar. Einzelheiten unter Werkzeuge."));
 }

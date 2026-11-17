@@ -89,6 +89,10 @@ export interface EnvCheck {
   ytdlp?: ToolCheck;
   /** Homebrew itself, to choose the install hint (ok: brew found) */
   brew?: ToolCheck;
+  /** Rust std::env::consts::OS ("macos", "linux"); optional: an older backend does not send it */
+  os?: string;
+  /** the install command of this system without package names ("brew install", "sudo apt install"), null if none is known */
+  install_cmd?: string | null;
 }
 
 export interface VideoProbe {

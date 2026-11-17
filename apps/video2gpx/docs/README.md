@@ -5,7 +5,7 @@ Everything about the product, the project and the research is in this folder (`a
 ## Folder layout
 
 ```
-apps/video2gpx/                    the product: macOS Tauri app (standalone build)
+apps/video2gpx/                    the product: Tauri app for macOS, runs on Linux (standalone build)
 ├── README.md                      app overview, setup, development, build, tests, architecture
 ├── PACKAGING.md                   bundled pipeline (PyInstaller sidecar), ffmpeg, size, signing
 ├── docs/

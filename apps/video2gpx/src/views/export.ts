@@ -5,6 +5,7 @@ import { incyclistCard } from "../incyclist";
 import { S, bus, saveCur, toast } from "../state";
 import { banner, btn, field } from "../ui/components";
 import { debounce, el, fmtBytes, fromLocalInput, toLocalInput } from "../util";
+import { revealLabel } from "../app/platform";
 
 let root: HTMLElement, eleIn: HTMLInputElement, warn: HTMLElement, startIn: HTMLInputElement, fromFile: HTMLButtonElement, gpxInfo: HTMLElement, gpxRes: HTMLElement;
 let inc: ReturnType<typeof incyclistCard>;
@@ -25,7 +26,7 @@ export function mountExport(mainEl: HTMLElement) {
     el("div", { class: "cards" },
       el("section", { class: "panel stack card", "aria-labelledby": "gpx-h" }, el("h2", { id: "gpx-h" }, "GPX"), gpxInfo,
         el("label", { class: "row small" }, eleIn, "mit Höhen (aus dem Höhenprofil)"),
-        el("div", { class: "row wrap" }, btn("GPX speichern …", () => void exportGpx(), { kind: "primary", icon: "download", attrs: { "data-primary": "" } }), btn("Im Finder zeigen", () => S.result && void api.reveal(S.result.gpx), { icon: "folder" })), gpxRes),
+        el("div", { class: "row wrap" }, btn("GPX speichern …", () => void exportGpx(), { kind: "primary", icon: "download", attrs: { "data-primary": "" } }), btn(revealLabel, () => S.result && void api.reveal(S.result.gpx), { icon: "folder" })), gpxRes),
       inc.el));
   mainEl.append(root);
   bus.on("stage", (s: string | null) => { root.hidden = s !== "export"; if (s === "export") show(); });
@@ -67,7 +68,7 @@ async function exportGpx() {
   try {
     gpxRes.textContent = eleIn.checked ? "Speichere mit Höhen …" : "Speichere …";
     const res = await api.gpxExport(cur.app.id, dest, eleIn.checked);
-    gpxRes.replaceChildren(el("span", { class: "ok-text" }, `Gespeichert: ${dest} (${Math.round(res.bytes / 1024)} kB, ${res.ele ? "mit" : "ohne"} Höhen)`), " ", btn("Im Finder zeigen", () => void api.reveal(dest), { size: "sm" }));
+    gpxRes.replaceChildren(el("span", { class: "ok-text" }, `Gespeichert: ${dest} (${Math.round(res.bytes / 1024)} kB, ${res.ele ? "mit" : "ohne"} Höhen)`), " ", btn(revealLabel, () => void api.reveal(dest), { size: "sm" }));
     if (res.note) gpxRes.append(el("div", { class: "warn-text" }, res.note));
   }
   catch (e) { gpxRes.textContent = ""; toast(String(e), "error"); }

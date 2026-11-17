@@ -1,6 +1,6 @@
 # video2gpx (Beta)
 
-A macOS desktop app (Tauri 2) that turns a **road video without GPS** into a **GPX file whose timestamps match the video**.
+A desktop app (Tauri 2) for macOS, also runnable on Linux ([see below](#linux)), that turns a **road video without GPS** into a **GPX file whose timestamps match the video**.
 It packages the research pipeline `rsm.pipeline` of `research/route-shape-matching` (see its `APP_SPEC.md` and
 `PIPELINE_CLI.md`). The UI is in German. Matching is offline; only the map display (OSM raster tiles), the place search
 (Nominatim) and the optional map download (Geofabrik) use the network, each only on the user's action.
@@ -37,6 +37,33 @@ Requirements: macOS 11+, Rust (rustup), Node 20+, pnpm, and for the pipeline the
 ```sh
 pnpm install
 ```
+
+## Linux
+
+The app runs on Linux in developer mode: the pipeline runs from the research venv, not the bundled sidecar (the sidecar build
+script is macOS only). Tested on Ubuntu 26.04 (x86_64, X11, WebKitGTK 2.52) from a fresh clone.
+
+```sh
+# 1. System libraries for Tauri (WebKitGTK) and GStreamer plugins for the video panel (Debian/Ubuntu names)
+sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
+  libxdo-dev gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav ffmpeg python3.14-venv
+# 2. Rust and pnpm (no sudo)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && . "$HOME/.cargo/env"
+npm install -g --prefix ~/.local pnpm@10        # ~/.local/bin must be on PATH
+# 3. Start (from apps/video2gpx): creates research/route-shape-matching/.venv on the first run, turns developer mode on
+./dev.sh
+```
+
+- The first start compiles the Rust side (about 4 minutes); later starts take seconds.
+- Settings and projects live in `~/.local/share/org.video2gpx.app/` (on the Mac: `~/Library/Application Support/org.video2gpx.app/`).
+- Another Python 3.14 than `python3.14` on the PATH: `PYTHON=/path/to/python3.14 ./dev.sh`.
+- yt-dlp is optional; a current one comes from `pipx install yt-dlp` (`~/.local/bin` is searched).
+- "Im Dateimanager zeigen" selects the file through the freedesktop `FileManager1` D-Bus interface (Nautilus, Dolphin, Thunar, ...)
+  and otherwise opens its folder with `xdg-open`.
+- `libEGL warning: ... Permission denied` on a remote desktop or VM without GPU access is harmless: WebKitGTK renders in software.
+  If the window stays blank or white, start with `WEBKIT_DISABLE_DMABUF_RENDERER=1 ./dev.sh`.
+- The UI unit tests (`pnpm test:ui`) need Node 22.18 or newer (type stripping); the app itself runs with Node 20.
+- Not done on Linux: a packaged build with the bundled sidecar (`.deb`/AppImage) and the memory guard `scripts/guard.sh`.
 
 ## Development
 

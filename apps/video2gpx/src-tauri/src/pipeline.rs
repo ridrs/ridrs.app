@@ -109,9 +109,9 @@ fn tool_check(name: &str, found: Option<PathBuf>, setting: &str, required: bool)
         let message = if !setting.trim().is_empty() {
             format!("{name} nicht gefunden: {} ist keine ausführbare Datei. Bitte den Pfad in den Einstellungen korrigieren oder leeren.", setting.trim())
         } else if required {
-            format!("{name} nicht gefunden. Bitte installieren (brew install ffmpeg) oder den Pfad in den Einstellungen setzen.")
+            format!("{name} nicht gefunden. Bitte installieren ({}) oder den Pfad in den Einstellungen setzen.", settings::install_hint("ffmpeg"))
         } else {
-            format!("{name} nicht gefunden (optional). Installieren zum Beispiel mit: brew install {name}")
+            format!("{name} nicht gefunden (optional). Installieren zum Beispiel mit: {}", settings::install_hint(name))
         };
         return json!({"ok": false, "path": setting, "message": message, "required": required});
     };
@@ -119,7 +119,7 @@ fn tool_check(name: &str, found: Option<PathBuf>, setting: &str, required: bool)
     match settings::tool_version(&p, name) {
         Some(v) => {
             if (name == "ffmpeg" || name == "ffprobe") && settings::major_version(&v).map(|m| m < 6).unwrap_or(false) {
-                t["warning"] = json!(format!("{name} {v} ist alt. Empfohlen ist Version 6 oder neuer (brew upgrade ffmpeg)."));
+                t["warning"] = json!(format!("{name} {v} ist alt. Empfohlen ist Version 6 oder neuer."));
             }
             t["version"] = json!(v);
         }
@@ -183,6 +183,8 @@ pub fn env_check(ctx: &Ctx) -> Value {
         "ffprobe": tool_check("ffprobe", settings::ffprobe(&s), &s.ffprobe, true),
         "ytdlp": tool_check("yt-dlp", settings::ytdlp(&s), &s.ytdlp, false),
         "brew": brew,
+        "os": std::env::consts::OS,
+        "install_cmd": settings::install_cmd(),
         "data_dir": ctx.data_dir, "cache_dir": ctx.cache_dir(),
     })
 }
@@ -422,7 +424,7 @@ mod tests {
     #[test]
     fn tool_checks_of_the_environment() {
         let t = tool_check("ffmpeg", None, "", true);
-        assert!(t["ok"] == json!(false) && t["required"] == json!(true) && t["message"].as_str().unwrap().contains("brew install ffmpeg"));
+        assert!(t["ok"] == json!(false) && t["required"] == json!(true) && t["message"].as_str().unwrap().contains(&settings::install_hint("ffmpeg")));
         let t = tool_check("yt-dlp", None, "", false);
         assert!(t["ok"] == json!(false) && t["required"] == json!(false) && t["message"].as_str().unwrap().contains("optional"));
         let t = tool_check("yt-dlp", None, "/x/yt-dlp", false);

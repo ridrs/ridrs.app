@@ -235,6 +235,26 @@ pub fn brew() -> Option<PathBuf> {
     find_tool("", "brew")
 }
 
+/// The command that installs packages on this system, without the package names ("brew install", "sudo apt install", ...):
+/// Homebrew on the Mac, else the first package manager found on Linux. None when none is known.
+pub fn install_cmd() -> Option<&'static str> {
+    if cfg!(target_os = "macos") {
+        return Some("brew install");
+    }
+    [("apt", "sudo apt install"), ("dnf", "sudo dnf install"), ("pacman", "sudo pacman -S"), ("zypper", "sudo zypper install")]
+        .into_iter()
+        .find(|(bin, _)| find_in("", bin, &search_dirs()).is_some())
+        .map(|(_, cmd)| cmd)
+}
+
+/// "brew install ffmpeg" or the like for this system, or a generic sentence when no package manager is known.
+pub fn install_hint(pkg: &str) -> String {
+    match install_cmd() {
+        Some(c) => format!("{c} {pkg}"),
+        None => format!("{pkg} mit dem Paketmanager des Systems"),
+    }
+}
+
 /// The version out of the first line of `ffmpeg -version` ("ffmpeg version 7.1.1 Copyright ...") or `yt-dlp --version` ("2026.10.22").
 pub fn parse_version(name: &str, output: &str) -> Option<String> {
     let line = output.lines().find(|l| !l.trim().is_empty())?.trim();
