@@ -6,6 +6,7 @@ import type { Messages } from './en.ts';
 export const de: Messages = {
   km: (km: string) => `${km} km`,
   complete: 'Route geschafft',
+  skipIntro: 'Intro überspringen',
   loading: 'Video wird geladen…',
   cannotShow: (reason: string) => `Das Video kann nicht gezeigt werden: ${reason}`,
 };

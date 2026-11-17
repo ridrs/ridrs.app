@@ -303,6 +303,21 @@ When(
   },
 );
 
+When('the rider skips the intro after {float} s', function (this: RidrsWorld, seconds: number) {
+  const current = scenario(this);
+  assert.ok(current.clock, 'Expected the video to play');
+  current.clock.skip();
+  show(this, seconds, 0);
+});
+
+Then('the intro plays', function (this: RidrsWorld) {
+  assert.equal(scenario(this).clock?.intro, true);
+});
+
+Then('no intro plays', function (this: RidrsWorld) {
+  assert.equal(scenario(this).clock?.intro, false);
+});
+
 function shown(world: RidrsWorld): number {
   const { shown: time } = scenario(world);
   assert.ok(time !== undefined, 'Expected the video to show a frame');

@@ -4,7 +4,9 @@ Feature: The video plays up to the route's start while the rider gets ready
   video from its first frame as soon as it is loaded and holds at the route's start until the
   rider rolls. Once the rider rolls, the picture follows the distance from the route's start,
   wherever the lead-in was. The rider rolls with their first pedal stroke, the same barrier that
-  starts the ride's time and keeps the rider from rolling down a descent.
+  starts the ride's time and keeps the rider from rolling down a descent. While the lead-in plays,
+  the intro, the rider can skip it with "Skip intro" at the bottom left: the video jumps to the
+  route's start and holds there until the rider rolls.
 
   Background:
     Given a track filmed with a point every second at 20 km/h for 120 s
@@ -17,11 +19,29 @@ Feature: The video plays up to the route's start while the rider gets ready
   Scenario: The lead-in holds at the route's start until the rider rolls
     When the video has played 30 s with the rider at the start
     Then the video shows the time 20 s
+    And no intro plays
+
+  Scenario: The intro plays while the lead-in runs
+    When the video has played 5 s with the rider at the start
+    Then the intro plays
+
+  Scenario: Skipping the intro shows the route's start at once
+    Given the video has played 5 s with the rider at the start
+    When the rider skips the intro after 6 s
+    Then the video shows the time 20 s
+    And no intro plays
+
+  Scenario: After skipping the intro the video holds at the route's start until the rider rolls
+    Given the video has played 5 s with the rider at the start
+    And the rider skips the intro after 6 s
+    When the rider has rolled 1 m after 40 s
+    Then the video shows a time between 20 s and 20.5 s
 
   Scenario: Pedalling during the lead-in plays from the route's start
     Given the video has played 5 s with the rider at the start
     When the rider has rolled 1 m after 6 s
     Then the video shows a time between 20 s and 20.5 s
+    And no intro plays
 
   Scenario: Once rolled, the picture stays on the route, also where the rider stands
     Given the video has played 5 s with the rider at the start
@@ -36,8 +56,10 @@ Feature: The video plays up to the route's start while the rider gets ready
   Scenario: Before the ride's first state the video shows its first frame
     When the video has played 5 s before the ride's first state
     Then the video shows the time 0 s
+    And no intro plays
 
   Scenario: A route that starts at the video's first frame has no lead-in
     Given the track starts 0 s into the video
     When the video has played 5 s with the rider at the start
     Then the video shows the time 0 s
+    And no intro plays

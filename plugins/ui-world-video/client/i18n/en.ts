@@ -4,6 +4,7 @@
 export const en = {
   km: (km: string) => `${km} km`,
   complete: 'Route complete',
+  skipIntro: 'Skip intro',
   loading: 'Loading the video…',
   cannotShow: (reason: string) => `The video cannot be shown: ${reason}`,
 };

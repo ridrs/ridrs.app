@@ -172,6 +172,9 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
   const hdrCanvas = useRef<HTMLCanvasElement>(null);
   const [finished, setFinished] = useState(false);
   const [hdr, setHdr] = useState(false);
+  const [intro, setIntro] = useState(false);
+  /** "Skip intro" of the clock of the current video; a no-op before it exists. */
+  const skip = useRef<() => void>(() => {});
 
   useEffect(() => {
     const presentation = createPhysicsPresentation(ctx.events);
@@ -182,6 +185,10 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
     });
     const player = new FramePlayer(video, httpRangeReader(route.videoUrl), webCodecsDecoder(video));
     const clock = new VideoClock(videoTime, (route.startFrame - 1) / route.framerate);
+    skip.current = () => {
+      clock.skip();
+      setIntro(false);
+    };
     let ride: string | undefined;
     /** The presented distance of this ride; undefined before its first presented state. */
     let distance: number | undefined;
@@ -231,6 +238,7 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
       }
       // A route later in its video plays up to its start until the rider rolls (VideoClock).
       const time = clock.at(frame.time, distance);
+      setIntro(clock.intro);
       const picture = player.frameAt(time);
       const element = renderer ? hdrCanvas.current : canvas.current;
       if (picture && picture !== drawn && element) {
@@ -259,6 +267,7 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
     });
     return () => {
       disposed = true;
+      skip.current = () => {};
       stopFrames();
       stopWatching();
       presentation.dispose();
@@ -267,7 +276,7 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
     };
   }, [ctx, route, track, videoTime, video]);
 
-  return { canvas, hdrCanvas, hdr, finished };
+  return { canvas, hdrCanvas, hdr, finished, intro, skipIntro: () => skip.current() };
 }
 
 const OVERLAY = {
@@ -281,6 +290,19 @@ const OVERLAY = {
   font: '500 16px var(--ridrs-font-text)',
   pointerEvents: 'none',
 } as const;
+
+/**
+ * "Skip intro" at the bottom left while the lead-in plays: a pill of glass like the ride's own
+ * buttons, reachable with the arrows and Enter like them (AGENTS.md, rule 12).
+ */
+const SKIP_INTRO_CSS = `
+.vw-skip-intro { position: absolute; left: 16px; bottom: 16px; height: 56px; padding: 0 24px;
+  border: 0; border-radius: 28px; background: var(--ridrs-card-quiet);
+  box-shadow: var(--ridrs-edge), var(--ridrs-shadow); color: var(--ridrs-text);
+  font: 600 16px var(--ridrs-font-text); cursor: pointer; transition: filter var(--ridrs-ease); }
+.vw-skip-intro:hover { filter: brightness(1.25); }
+.vw-skip-intro:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
+`;
 
 function VideoWorld({
   ctx,
@@ -297,7 +319,7 @@ function VideoWorld({
 }) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);
-  const { canvas, hdrCanvas, hdr, finished } = useVideoWorld(ctx, route, track, videoTime, video);
+  const { canvas, hdrCanvas, hdr, finished, intro, skipIntro } = useVideoWorld(ctx, route, track, videoTime, video);
   const shown = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } as const;
   return (
     <div data-testid="video-world" data-route={route.id} style={{ position: 'absolute', inset: 0, background: '#000' }}>
@@ -319,6 +341,14 @@ function VideoWorld({
       <div style={{ ...OVERLAY, top: 16 }}>
         {route.title} · {text.km(localizeNumber((track.length / 1000).toFixed(1), language))}
       </div>
+      {intro ? (
+        <>
+          <style>{SKIP_INTRO_CSS}</style>
+          <button type="button" className="vw-skip-intro" data-testid="skip-intro" onClick={skipIntro}>
+            {text.skipIntro}
+          </button>
+        </>
+      ) : null}
       {finished ? (
         <div data-testid="route-finished" style={{ ...OVERLAY, top: '40%', fontSize: 32 }}>
           {text.complete}
