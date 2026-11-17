@@ -6,7 +6,9 @@ import {
   metricCadenceCapability,
   metricHeartRateCapability,
   metricPowerCapability,
+  physicsMotionCapability,
   physicsStateBatchEvent,
+  physicsStateEvent,
   type TaskId,
   type TemporalSeriesReader,
   trainerTargetPowerEvent,
@@ -15,6 +17,9 @@ import {
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
 import { type ConditionUnit, type Progress, type StepBegan, WorkoutRun } from './player.ts';
+
+/** ms of one physics step: the ride's time is `STEP_MS · (step - timeFromStep)`. */
+const STEP_MS = 10;
 
 /** ms between two looks at the workout: ramps follow every second of ridden time. */
 const TICK_MS = 1000;
@@ -34,6 +39,12 @@ interface Ride {
   workAt: number;
 }
 
+/** A ride whose workout waits for the ride to roll. */
+interface Waiting {
+  readonly sessionId: string;
+  readonly run: WorkoutRun;
+}
+
 /**
  * The workout player (structured-workouts.md, section 11a): rides the workout of the activity
  * state on the ridden time of `ctx.clock`, so a pause holds it, and a replay and a continued ride
@@ -43,6 +54,11 @@ interface Ride {
  * "Next step", so a replay computes it again and compares it. A step without an ERG target leaves
  * ERG, and the trainer rides on the gradient of the route; so does the end of the workout
  * (`workout.finished`). It says where it is in `workout.step-changed`.
+ *
+ * The workout starts with the ride's time: with a motion that waits at the ride's start for its
+ * world and the rider's first pedal stroke (`rolling: false`, the video's lead-in), the workout
+ * holds, without a target, until a `physics.state` of the ride rolls, and then begins at the
+ * step the ride's time counts from (`timeFromStep`). Without a motion it begins at once.
  */
 export default definePlugin({
   start(ctx) {
@@ -51,9 +67,12 @@ export default definePlugin({
       bpm: ctx.temporal.reader(metricHeartRateCapability),
       rpm: ctx.temporal.reader(metricCadenceCapability),
     };
+    /** Whether the ride has a motion, which reports when the ride rolls. */
+    const hasMotion = ctx.capabilities.find(physicsMotionCapability) !== undefined;
     /** The ERG target in force, by whoever set it last. */
     let target: number | null = null;
     let ride: Ride | undefined;
+    let waiting: Waiting | undefined;
 
     ctx.events.subscribe(trainerTargetPowerEvent, ({ payload }) => {
       target = payload.watts;
@@ -103,9 +122,16 @@ export default definePlugin({
       }
     };
 
-    /** Publishes what a look at the workout found: the steps that began, then the target. */
-    const apply = (current: Ride, began: readonly StepBegan[], progress: Progress): void => {
-      const at = ctx.clock.now();
+    /**
+     * Publishes what a look at the workout found: the steps that began, then the target. `at` is
+     * when they began; the first step began when the ride's time began.
+     */
+    const apply = (
+      current: Ride,
+      began: readonly StepBegan[],
+      progress: Progress,
+      at = ctx.clock.now(),
+    ): void => {
       for (const step of began) {
         ctx.events.publish(workoutStepChangedEvent, { ...step, startedAt: at });
       }
@@ -113,7 +139,7 @@ export default definePlugin({
       if (run.finished) {
         setTarget(null);
         stop(current);
-        ctx.events.publish(workoutFinishedEvent, { at });
+        ctx.events.publish(workoutFinishedEvent, { at: ctx.clock.now() });
         ride = undefined;
         return;
       }
@@ -139,23 +165,37 @@ export default definePlugin({
       });
     };
 
-    const begin = (sessionId: string, run: WorkoutRun): void => {
+    /**
+     * Begins the workout at `from`, when the ride's time began: now, or a little before, at the
+     * step of the `physics.state` that said the ride rolls. The workout counts from there.
+     */
+    const begin = (sessionId: string, run: WorkoutRun, from: number): void => {
+      waiting = undefined;
       const current: Ride = {
         sessionId,
         run,
         ridden: 0,
-        since: ctx.clock.now(),
+        since: from,
         distance: 0,
         work: 0,
-        workAt: 0,
+        workAt: ctx.clock.now() - from,
       };
       ride = current;
-      const progress = progressOf(current);
-      apply(current, run.begin(progress), progress);
+      const progress: Progress = { ...progressOf(current), ridden: 0, distance: 0, work: 0 };
+      apply(current, run.begin(progress), progress, from);
       if (ride === current) {
         schedule(current);
       }
     };
+
+    ctx.events.subscribe(physicsStateEvent, ({ payload }) => {
+      const wait = waiting;
+      if (!wait || payload.sessionId !== wait.sessionId || payload.rolling === false) {
+        return;
+      }
+      const from = payload.at - (payload.step - (payload.timeFromStep ?? 0)) * STEP_MS;
+      begin(wait.sessionId, wait.run, Math.min(ctx.clock.now(), from));
+    });
 
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
       if (payload.state === 'running' && payload.resumedAt === undefined) {
@@ -163,10 +203,22 @@ export default definePlugin({
           stop(ride);
           ride = undefined;
         }
+        waiting = undefined;
         if (payload.workout) {
-          begin(payload.sessionId, new WorkoutRun(payload.workout.workout));
+          const run = new WorkoutRun(payload.workout.workout);
+          if (hasMotion) {
+            waiting = { sessionId: payload.sessionId, run };
+          } else {
+            begin(payload.sessionId, run, ctx.clock.now());
+          }
         }
         return;
+      }
+      if (
+        payload.state === 'idle' ||
+        (payload.state === 'finished' && waiting?.sessionId === payload.sessionId)
+      ) {
+        waiting = undefined;
       }
       const current = ride;
       if (!current || payload.state === 'idle' || payload.sessionId !== current.sessionId) {

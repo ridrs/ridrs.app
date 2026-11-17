@@ -6,7 +6,8 @@ Feature: The workout player on a ride with the physics, a route and the recorder
   and the gradient is 0 % beyond its end (the world says so, as the video world does), the
   workout goes on to its end and then a free ride follows at 0 %. Continuing an interrupted ride
   goes on at the same step, "Next step" is recorded rider input, and a replay gives the same
-  targets and steps at the same times.
+  targets and steps at the same times. The workout starts with the ride's time, at the rider's
+  first pedal stroke: while the ride waits at its start (the video's lead-in), it holds.
 
   Background:
     Given the workout player rides with the ridrs physics plugins, the trainer load, the recorder and the memory storage
@@ -15,6 +16,15 @@ Feature: The workout player on a ride with the physics, a route and the recorder
       | 20 s     | 200 W          |
       | 10 s     | 150 W to 250 W |
       | 10 s     | free ride      |
+
+  Scenario: The workout starts with the ride's time, at the rider's first pedal stroke
+    Given the host has started
+    When the rider starts a ride with the workout "Short"
+    And "test-device" delivers only power 10 W every 0.25 s for 5 seconds
+    And "test-device" delivers only power 200 W every 0.25 s for 45 more seconds
+    Then the workout player set no target power between "+0 s" and "+5 s"
+    And the workout's steps began at "0 s, 20 s, 30 s" of the ride's time
+    And the workout finished at "40 s" of the ride's time
 
   Scenario: A distance step ends by the virtual distance
     Given the workout "Bridge" for the workout player:

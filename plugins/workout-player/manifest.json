@@ -5,6 +5,6 @@
   "types": ["control"],
   "provides": [],
   "requires": [],
-  "optionalRequires": ["metric.power", "metric.heart-rate", "metric.cadence"],
+  "optionalRequires": ["physics.motion", "metric.power", "metric.heart-rate", "metric.cadence"],
   "entry": "index.ts"
 }

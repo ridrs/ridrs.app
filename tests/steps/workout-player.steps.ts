@@ -11,8 +11,10 @@ import {
   DEFAULT_PROVIDER,
   type EventEnvelope,
   type PhysicsSample,
+  type PhysicsState,
   type PhysicsStateBatch,
   physicsStateBatchEvent,
+  physicsStateEvent,
   type RideWorkout,
   type TrainerTargetPowerPayload,
   trainerErgRequestedEvent,
@@ -316,17 +318,62 @@ Then(
 Then("the workout's steps began at {string}", function (this: RidrsWorld, list: string) {
   const expected = list.split(',').map((text) => sinceStart(this, text));
   const changes = stepChanges(this);
+  const began = changes.map((e) => (e.payload as WorkoutStepChangedPayload).startedAt);
   assert.deepEqual(
-    changes.map((e) => e.timestamp),
+    began,
     expected,
-    `Steps began at ${changes.map((e) => label(this, e.timestamp)).join(', ')}`,
+    `Steps began at ${began.map((at) => label(this, at)).join(', ')}`,
   );
   changes.forEach((e, index) => {
     const payload = e.payload as WorkoutStepChangedPayload;
     assert.equal(payload.index, index);
-    assert.equal(payload.startedAt, e.timestamp);
+    // The first step goes out with the physics state that said the ride rolls, at most one
+    // state (250 ms) after the ride's time began; every later step at the moment it began.
+    const late = e.timestamp - payload.startedAt;
+    assert.ok(
+      index === 0 ? late >= 0 && late <= 250 : late === 0,
+      `Step ${index} went out ${late} ms late`,
+    );
   });
 });
+
+/** Epoch ms the ride's time counts from: its first pedal stroke (`timeFromStep`). */
+function rideTimeZero(world: RidrsWorld): number {
+  const state = tappedOfType(world, physicsStateEvent.id)
+    .map((e) => e.payload as PhysicsState)
+    .findLast((s) => s.rolling === true);
+  assert.ok(state, 'Expected the ride to roll');
+  return state.at - (state.step - (state.timeFromStep ?? 0)) * 10;
+}
+
+/** "0 s, 20 s": seconds of the ride's time, in ms. */
+const rideSeconds = (list: string) =>
+  list.split(',').map((text) => {
+    const match = /^(\d+(?:\.\d+)?) s$/.exec(text.trim());
+    assert.ok(match, `Unrecognized time "${text}", expected e.g. "20 s"`);
+    return Math.round(Number(match[1]) * 1000);
+  });
+
+Then(
+  "the workout's steps began at {string} of the ride's time",
+  function (this: RidrsWorld, list: string) {
+    const zero = rideTimeZero(this);
+    assert.deepEqual(
+      stepChanges(this).map((e) => (e.payload as WorkoutStepChangedPayload).startedAt - zero),
+      rideSeconds(list),
+    );
+  },
+);
+
+Then(
+  "the workout finished at {string} of the ride's time",
+  function (this: RidrsWorld, text: string) {
+    const finished = tappedOfType(this, workoutFinishedEvent.id);
+    assert.equal(finished.length, 1, `${finished.length} "workout.finished" events`);
+    const at = (finished[0]?.payload as { at: number } | undefined)?.at ?? Number.NaN;
+    assert.deepEqual([at - rideTimeZero(this)], rideSeconds(text));
+  },
+);
 
 Then("the workout's steps began {int} times", function (this: RidrsWorld, count: number) {
   assert.equal(stepChanges(this).length, count);
