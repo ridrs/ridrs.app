@@ -184,6 +184,12 @@ Then('the weight reads {string}', async function (this: RidrsWorld, value: strin
   );
 });
 
+Then('the maximum heart rate reads {string}', async function (this: RidrsWorld, value: string) {
+  await waitFor(() =>
+    assert.equal(within(shownScreen(this)).getByTestId('max-heart-rate').textContent, value),
+  );
+});
+
 Then('the button {string} is disabled', async function (this: RidrsWorld, name: string) {
   await waitFor(() =>
     assert.equal(

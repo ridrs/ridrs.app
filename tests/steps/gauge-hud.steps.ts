@@ -327,6 +327,14 @@ Then(
 );
 
 Then(
+  "the {word} gauge's scale ends at {int}",
+  async function (this: RidrsWorld, kind: string, max: number) {
+    const element = await gauge(this, kind);
+    await eventually(this, () => assert.equal(element.dataset.max, String(max)));
+  },
+);
+
+Then(
   'the {word} gauge marks zone {int}',
   async function (this: RidrsWorld, kind: string, zone: number) {
     const element = await gauge(this, kind);

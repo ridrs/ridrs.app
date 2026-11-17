@@ -163,8 +163,10 @@ export function powerScale(ftp: number | undefined, zones: PowerZones | undefine
 }
 
 /**
- * The heart rate gauge: from a round number below the first bound to one above the last bound or
- * the maximum heart rate, coloured by the heart rate zones (bpm; Friel's of the LTHR by default).
+ * The heart rate gauge: from a round number below the first bound to the maximum heart rate
+ * rounded up to the next 10 bpm, else to a round number above the last bound; coloured by the heart
+ * rate zones (bpm; Friel's of the LTHR by default). A scale that ends at the maximum heart rate
+ * starts low enough for its end to be a major, labelled tick.
  */
 export function heartRateScale(
   zones: HeartRateZones | undefined,
@@ -178,8 +180,15 @@ export function heartRateScale(
   if (used === undefined || first === undefined || top === undefined) {
     return { min: 60, max: 200, major: 20, minor: 5, bands: [] };
   }
-  const min = Math.floor((first * 0.75) / 10) * 10;
-  const reach = Math.max(maxHeartRate ?? 0, top + 10);
+  const low = Math.floor((first * 0.75) / 10) * 10;
+  const end = maxHeartRate === undefined ? undefined : Math.ceil(maxHeartRate / 10) * 10;
+  if (end !== undefined && end > low) {
+    const major = niceStep(end - low);
+    const min = Math.max(0, end - Math.ceil((end - low) / major) * major);
+    return { min, max: end, major, minor: minorOf(major), bands: bandsOf(used, identity, min, end) };
+  }
+  const min = low;
+  const reach = top + 10;
   const major = niceStep(reach - min);
   const max = min + Math.ceil((reach - min) / major) * major;
   return { min, max, major, minor: minorOf(major), bands: bandsOf(used, identity, min, max) };

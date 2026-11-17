@@ -13,6 +13,7 @@ export const en = {
   discard: 'Discard',
   unsaved: 'Not saved yet.',
   weight: 'Weight',
+  maxHeartRate: 'Max HR',
   weeklyGoal: 'Weekly goal',
   thisDevice: 'ridrs (this device)',
   wattsPerKg: (ratio: string) => `${ratio} W/kg.`,

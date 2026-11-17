@@ -57,8 +57,23 @@ describe('heartRateScale', () => {
     expect(scale.bands).toHaveLength(7);
   });
 
-  it('reaches the maximum heart rate', () => {
-    expect(heartRateScale(undefined, 170, 205).max).toBeGreaterThanOrEqual(205);
+  it.each([
+    [187, 190],
+    [190, 190],
+    [201, 210],
+  ])('ends at the maximum heart rate %i rounded up to the next 10: %i', (maxHeartRate, end) => {
+    expect(heartRateScale(undefined, 170, maxHeartRate).max).toBe(end);
+  });
+
+  it('labels the end of a scale set by the maximum heart rate with a major tick', () => {
+    const scale = heartRateScale(undefined, 170, 187);
+    expect((scale.max - scale.min) % scale.major).toBe(0);
+    expect(ticksOf(scale).at(-1)).toEqual({ value: 190, major: true });
+    expect(scale.min).toBeLessThanOrEqual(100);
+  });
+
+  it('keeps its own end without a maximum heart rate', () => {
+    expect(heartRateScale(undefined, 170, undefined).max).toBe(200);
   });
 
   it('is neutral without zones and LTHR', () => {

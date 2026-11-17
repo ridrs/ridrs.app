@@ -1,8 +1,8 @@
 @ui @training
 Feature: The Me area writes the athlete profile to intervals.icu
   With intervals.icu chosen as the source of the athlete profile (ADR 0075), a change of the
-  weight in Me is written to today's wellness record, and a change of the FTP to the Ride settings,
-  into the field the FTP was read from: the indoor FTP where one is set, else the FTP. The weight
+  weight in Me is written to today's wellness record, and a change of the FTP or the maximum heart
+  rate to the Ride settings, the FTP into the field it was read from: the indoor FTP where one is set, else the FTP. The weight
   of the athlete is never written. A write is refused, never queued: when intervals.icu cannot be
   reached, or the token lacks the scope (403, the rider connects again), the old value stays.
 
@@ -53,6 +53,20 @@ Feature: The Me area writes the athlete profile to intervals.icu
       | ftp | 255 |
     And the FTP reads "255 W"
     And the latest athlete handed to the next ride is from "intervals.icu" with an FTP of 255 W and a weight of 72 kg
+
+  Scenario: Me shows the maximum heart rate of intervals.icu, and a new one is written to the Ride settings
+    When I press "Profile"
+    Then the maximum heart rate reads "185 bpm"
+    When I press "Raise Max HR"
+    And I press "Raise Max HR"
+    And I press "Save"
+    Then intervals.icu received "PUT /api/v1/athlete/0/sport-settings/Ride" with the body:
+      | max_hr | 187 |
+    And the maximum heart rate reads "187 bpm"
+    When ridrs restarted
+    And I reload the UI
+    And I press "Profile"
+    Then the maximum heart rate reads "187 bpm"
 
   Scenario: Where an indoor FTP is set, it is the one written
     Given intervals.icu keeps an indoor FTP of 240 W

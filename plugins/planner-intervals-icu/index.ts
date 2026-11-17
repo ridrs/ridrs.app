@@ -819,8 +819,9 @@ async function send(
 }
 
 /**
- * Writes a change of the profile: the weight to today's wellness record, the FTP and the zones to
- * the Ride settings (the FTP into the field it was read from; ADR 0082). `icu_weight` is never
+ * Writes a change of the profile: the weight to today's wellness record, the FTP, the maximum heart
+ * rate (`max_hr`) and the zones to the Ride settings (the FTP into the field it was read from; ADR
+ * 0082). `icu_weight` is never
  * written. A value the profile already has is not sent (ADR 0078): at most two requests, none for
  * no change.
  */
@@ -842,6 +843,9 @@ async function writeProfile(
   const change = {
     ...(asked.weight !== undefined && asked.weight !== current?.weight ? { weight: asked.weight } : {}),
     ...(asked.ftp !== undefined && asked.ftp !== current?.ftp ? { ftp: asked.ftp } : {}),
+    ...(asked.maxHeartRate !== undefined && asked.maxHeartRate !== current?.maxHeartRate
+      ? { maxHeartRate: asked.maxHeartRate }
+      : {}),
     ...zones,
   };
   if (change.weight !== undefined) {
@@ -852,12 +856,13 @@ async function writeProfile(
       return sent;
     }
   }
-  if (change.ftp !== undefined || Object.keys(zones).length > 0) {
+  if (change.ftp !== undefined || change.maxHeartRate !== undefined || Object.keys(zones).length > 0) {
     // The open last heart rate zone goes back with the bound intervals.icu had for it, else the
     // maximum heart rate; 220 bpm only when neither is known.
     const top = held.heartRateTop ?? current?.maxHeartRate ?? 220;
     const sent = await send(env, 'profile-write', 'PUT', '/api/v1/athlete/0/sport-settings/Ride', {
       ...(change.ftp !== undefined ? { [held.ftpField]: change.ftp } : {}),
+      ...(change.maxHeartRate !== undefined ? { max_hr: change.maxHeartRate } : {}),
       ...zoneSettings(zones, top),
     });
     if (!sent.ok) {

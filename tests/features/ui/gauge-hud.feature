@@ -146,6 +146,21 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     Then the heart-rate gauge has 7 zones on its scale
     And zone 2 of the heart-rate gauge runs from 138 to 151
 
+  # The rider's maximum heart rate is where the dial ends, rounded up to the next 10 bpm.
+  Scenario Outline: The heart rate scale ends at the maximum heart rate, rounded up to the next 10
+    Given the athlete profile on this device holds an FTP of 250 W, an LTHR of 170 bpm and a maximum heart rate of <max> bpm
+    And ridrs restarted
+    And I reload the UI
+    When I press "Start ride"
+    Then the heart-rate gauge's scale ends at <end>
+    And zone 2 of the heart-rate gauge runs from 138 to 151
+
+    Examples:
+      | max | end |
+      | 187 | 190 |
+      | 190 | 190 |
+      | 201 | 210 |
+
   Scenario: The gauge marks the zone of the current value
     Given I press "Start ride"
     When "test-device" publishes a power measurement of 240 W from device "trainer-1"

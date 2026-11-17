@@ -15,6 +15,7 @@ export const de: Messages = {
   discard: 'Verwerfen',
   unsaved: 'Noch nicht gespeichert.',
   weight: 'Gewicht',
+  maxHeartRate: 'Max. HF',
   weeklyGoal: 'Wochenziel',
   thisDevice: 'ridrs (dieses Gerät)',
   wattsPerKg: (ratio: string) => `${ratio} W/kg.`,

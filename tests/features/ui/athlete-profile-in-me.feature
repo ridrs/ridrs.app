@@ -1,6 +1,6 @@
 @ui
 Feature: The Me area shows and changes the chosen source's athlete profile
-  FTP and weight in the Me area are the chosen data source's (ADR 0075), not a preview of the
+  FTP, weight and maximum heart rate in the Me area are the chosen data source's (ADR 0075), not a preview of the
   area: they are read from the profile of the source and changed through "athlete.profile.update",
   which the host routes to the provider. A change is kept at once, handed to the next ride and
   still there when ridrs restarts. Values the Me area kept in its own preview document before the
@@ -34,6 +34,20 @@ Feature: The Me area shows and changes the chosen source's athlete profile
     Then the FTP reads "205 W"
     And the weight reads "76.0 kg"
     And the user settings hold the file "config/user/profile-local/athlete.json"
+
+  Scenario: The maximum heart rate is changed in steps of 1 bpm and kept
+    When I press "Profile"
+    Then the maximum heart rate reads "–"
+    When I press "Raise Max HR"
+    Then the maximum heart rate reads "186 bpm"
+    When I press "Lower Max HR"
+    And I press "Lower Max HR"
+    Then the maximum heart rate reads "184 bpm"
+    And the athlete profile on this device keeps a maximum heart rate of 184 bpm
+    When ridrs restarted
+    And I reload the UI
+    And I press "Profile"
+    Then the maximum heart rate reads "184 bpm"
 
   Scenario: Me's old FTP and weight are handed to the profile once
     Given the Me area kept an FTP of 230 W and a weight of 80.5 kg before the athlete profile existed
@@ -88,6 +102,7 @@ Feature: The Me area shows and changes the chosen source's athlete profile
     And the weight reads "90.0 kg"
     And the button "Raise FTP" is disabled
     And the button "Lower Weight" is disabled
+    And the button "Raise Max HR" is disabled
     And the page says "Fixture cloud cannot be changed here."
 
   Scenario: A source that cannot be read shows no values

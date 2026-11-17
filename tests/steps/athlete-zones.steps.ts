@@ -112,6 +112,13 @@ Given(
 );
 
 Given(
+  'the athlete profile on this device holds an FTP of {int} W, an LTHR of {int} bpm and a maximum heart rate of {int} bpm',
+  async function (this: RidrsWorld, ftp: number, lthr: number, maxHeartRate: number) {
+    await keepAthlete(this, { ftp, lthr, maxHeartRate });
+  },
+);
+
+Given(
   'the athlete profile on this device holds an LTHR of {int} bpm only',
   async function (this: RidrsWorld, lthr: number) {
     await keepAthlete(this, { lthr });

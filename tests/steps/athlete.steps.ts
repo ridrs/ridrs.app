@@ -11,6 +11,7 @@ import {
   athleteProfileUpdateService,
   dataSelectService,
 } from '@ridrs/contracts';
+import { waitFor } from '@testing-library/dom';
 import { ATHLETE_DOCUMENT, type AthleteDocument } from '../../plugins/profile-local/athlete.ts';
 import { DATA_SOURCES_DOCUMENT } from '../../plugins/ui-settings/data-sources.ts';
 import type { RidrsWorld } from '../support/world.ts';
@@ -56,6 +57,20 @@ Given('the test data source is unavailable', function (this: RidrsWorld) {
 Given('the test data source is offline', function (this: RidrsWorld) {
   configureFixture({ status: 'offline' });
 });
+
+Then(
+  'the athlete profile on this device keeps a maximum heart rate of {int} bpm',
+  async function (this: RidrsWorld, maxHeartRate: number) {
+    await waitFor(() => {
+      const file = this.settingsFiles.files.get(ATHLETE_PATH);
+      assert.ok(file, 'Expected the athlete profile on this device to be kept');
+      const { value } = JSON.parse(new TextDecoder().decode(file)) as {
+        value: Partial<AthleteDocument>;
+      };
+      assert.equal(value.maxHeartRate, maxHeartRate);
+    });
+  },
+);
 
 Given(
   'the athlete profile on this device holds a weight of {float} kg',

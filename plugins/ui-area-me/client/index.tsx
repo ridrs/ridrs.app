@@ -66,20 +66,25 @@ const useMe = userDocument(
 type Zones = NonNullable<AthleteProfile['powerZones']>;
 type ZoneField = 'powerZones' | 'heartRateZones';
 const ZONE_FIELDS: readonly ZoneField[] = ['powerZones', 'heartRateZones'];
+/** The values of the profile changed in steps. */
+const STEPPED = ['ftp', 'weight', 'maxHeartRate'] as const;
+type Stepped = (typeof STEPPED)[number];
 interface Draft {
   ftp?: number;
   weight?: number;
+  maxHeartRate?: number;
   powerZones?: Zones;
   heartRateZones?: Zones;
 }
 const sameZones = (a: Zones | undefined, b: Zones | undefined) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Where the first step of an unset FTP or weight starts. */
+/** Where the first step of an unset FTP, weight or maximum heart rate starts. */
 const FIRST_FTP = 200;
 const FIRST_WEIGHT = 75;
+const FIRST_MAX_HEART_RATE = 185;
 
 /**
- * The athlete profile of the chosen data source (ADR 0075): its FTP and weight, whether it can be
+ * The athlete profile of the chosen data source (ADR 0075): its FTP, weight and maximum heart rate, whether it can be
  * changed, and a call that changes them through `athlete.profile.update`, which the host routes to
  * the provider. A step starts from the value last asked for while the source has not shown it yet
  * (two quick steps are two steps); a refused change says why and leaves the old value.
@@ -100,7 +105,7 @@ function useAthleteProfile(ctx: UiContext) {
   const asked = useRef<Draft>({});
   // The source shows what was asked for: the value is its own again.
   useEffect(() => {
-    for (const name of ['ftp', 'weight'] as const) {
+    for (const name of STEPPED) {
       if (source?.data?.[name] === asked.current[name]) {
         delete asked.current[name];
       }
@@ -121,22 +126,26 @@ function useAthleteProfile(ctx: UiContext) {
       },
     );
   };
-  const update = (change: { ftp?: number; weight?: number }) => {
+  const update = (change: Partial<Record<Stepped, number>>) => {
     if (!remote) {
       void send(change);
       return;
     }
     setDraft((open) => {
       const next = { ...open, ...change };
-      for (const name of ['ftp', 'weight'] as const) {
+      for (const name of STEPPED) {
         if (next[name] === source?.data?.[name]) delete next[name];
       }
       return next;
     });
   };
   const changed: Draft = {
-    ...(draft.ftp !== undefined && draft.ftp !== source?.data?.ftp ? { ftp: draft.ftp } : {}),
-    ...(draft.weight !== undefined && draft.weight !== source?.data?.weight ? { weight: draft.weight } : {}),
+    ...Object.fromEntries(
+      STEPPED.filter((name) => draft[name] !== undefined && draft[name] !== source?.data?.[name]).map((name) => [
+        name,
+        draft[name],
+      ]),
+    ),
     ...Object.fromEntries(
       ZONE_FIELDS.filter((name) => draft[name] !== undefined && !sameZones(draft[name], source?.data?.[name])).map(
         (name) => [name, draft[name]],
@@ -172,7 +181,7 @@ function useAthleteProfile(ctx: UiContext) {
       setRefusal(undefined);
     },
     /** The value to show and to step from. */
-    current: (name: 'ftp' | 'weight') => draft[name] ?? asked.current[name] ?? source?.data?.[name],
+    current: (name: Stepped) => draft[name] ?? asked.current[name] ?? source?.data?.[name],
   };
 }
 
@@ -222,7 +231,7 @@ function Stepper({
   );
 }
 
-/** What an unset FTP or weight shows. */
+/** What an unset FTP, weight or maximum heart rate shows. */
 const NOT_SET = '–';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -259,6 +268,7 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
   });
   const ftp = current('ftp');
   const weight = current('weight');
+  const maxHeartRate = current('maxHeartRate');
   // Only a source known to be read only holds the buttons back: before it is known, they work.
   const readOnly = source !== undefined && !source.writable;
   const sourceName = source?.provider === DEFAULT_PROVIDER ? text.thisDevice : source?.label;
@@ -286,6 +296,16 @@ function MeAreaView({ ctx }: { readonly ctx: UiContext }) {
           value={weight === undefined ? NOT_SET : `${localizeNumber(weight.toFixed(1), language)} kg`}
           disabled={readOnly}
           onStep={(d) => update({ weight: clamp((current('weight') ?? FIRST_WEIGHT) + 0.5 * d, 30, 200) })}
+        />
+        <Stepper
+          ctx={ctx}
+          name={text.maxHeartRate}
+          testId="max-heart-rate"
+          value={maxHeartRate === undefined ? NOT_SET : `${maxHeartRate} bpm`}
+          disabled={readOnly}
+          onStep={(d) =>
+            update({ maxHeartRate: clamp((current('maxHeartRate') ?? FIRST_MAX_HEART_RATE) + d, 100, 230) })
+          }
         />
         <Stepper
           ctx={ctx}
