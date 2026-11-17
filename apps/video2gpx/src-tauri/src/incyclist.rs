@@ -667,7 +667,7 @@ fn mbps_for(h: u64) -> f64 {
 }
 
 /// The ladder of the plan (section 4): MP4 with a Chromium codec is copied, other containers with such a codec are remuxed,
-/// everything else (and SDR conversion, smaller resolution) is re-encoded with VideoToolbox HEVC.
+/// everything else (and SDR conversion, smaller resolution) is re-encoded to HEVC (VideoToolbox on macOS, x265 elsewhere).
 pub fn plan_video(v: &VideoInfo, o: &ExportOptions) -> VideoPlan {
     if !o.convert {
         let ext = video_ext(&v.path);
@@ -757,6 +757,9 @@ pub fn hdr_to_sdr_cube(hlg: bool) -> String {
     s
 }
 
+/// HEVC encoder for re-encoding: Apple's VideoToolbox on macOS, x265 (software) elsewhere
+const HEVC_ENCODER: &str = if cfg!(target_os = "macos") { "hevc_videotoolbox" } else { "libx265" };
+
 pub fn ffmpeg_args(v: &VideoInfo, o: &ExportOptions, plan: &VideoPlan, dest: &Path, lut: Option<&Path>) -> Vec<String> {
     let mut a: Vec<String> = ["-hide_banner", "-nostats", "-loglevel", "error", "-y", "-i", &v.path, "-map", "0:v:0"].iter().map(|s| s.to_string()).collect();
     if v.audio.is_some() && !o.drop_audio {
@@ -776,7 +779,11 @@ pub fn ffmpeg_args(v: &VideoInfo, o: &ExportOptions, plan: &VideoPlan, dest: &Pa
             a.extend(["-vf".to_string(), vf.join(",")]);
         }
         let mb = mbps_for(plan.out_height);
-        a.extend(["-c:v", "hevc_videotoolbox", "-tag:v", "hvc1", "-fps_mode", "passthrough"].map(String::from));
+        a.extend(["-c:v", HEVC_ENCODER].map(String::from));
+        if !cfg!(target_os = "macos") {
+            a.extend(["-preset", "fast"].map(String::from));
+        }
+        a.extend(["-tag:v", "hvc1", "-fps_mode", "passthrough"].map(String::from));
         a.extend(["-b:v".to_string(), format!("{mb:.0}M"), "-maxrate".to_string(), format!("{:.0}M", mb * 1.5), "-bufsize".to_string(), format!("{:.0}M", mb * 2.0)]);
         if o.sdr && v.hdr {
             a.extend(["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709"].map(String::from));
@@ -1026,7 +1033,7 @@ pub fn liesmich(title: &str, name: &str, video_file: &str, summary: &Value, plan
         }
     }
     if enc {
-        s += "- Video neu kodiert mit FFmpeg (https://ffmpeg.org, LGPL) und dem Apple-VideoToolbox-Encoder.\n";
+        s += if cfg!(target_os = "macos") { "- Video neu kodiert mit FFmpeg (https://ffmpeg.org, LGPL) und dem Apple-VideoToolbox-Encoder.\n" } else { "- Video neu kodiert mit FFmpeg (https://ffmpeg.org) und x265 (https://x265.org, GPL).\n" };
     }
     s += "\nDie Rechte am Video bleiben bei seiner Urheberin oder seinem Urheber";
     if let Some(src) = source {
@@ -1044,7 +1051,7 @@ pub fn liesmich(title: &str, name: &str, video_file: &str, summary: &Value, plan
         }
     }
     if enc {
-        s += "- Video re-encoded with FFmpeg (https://ffmpeg.org, LGPL) and Apple's VideoToolbox encoder.\n";
+        s += if cfg!(target_os = "macos") { "- Video re-encoded with FFmpeg (https://ffmpeg.org, LGPL) and Apple's VideoToolbox encoder.\n" } else { "- Video re-encoded with FFmpeg (https://ffmpeg.org) and x265 (https://x265.org, GPL).\n" };
     }
     s += "\nThe rights to the video stay with its author";
     if let Some(src) = source {
@@ -1436,7 +1443,7 @@ mod tests {
         assert!(a.contains("-c:v copy") && a.contains("-an") && a.contains("+faststart") && !a.contains("0:a:0"));
         let o2 = ExportOptions { sdr: true, max_height: Some(1440), ..o.clone() };
         let a2 = ffmpeg_args(&v, &o2, &plan_video(&v, &o2), Path::new("/t/x.mp4"), Some(Path::new("/t/l.cube"))).join(" ");
-        assert!(a2.contains("hevc_videotoolbox") && a2.contains("-fps_mode passthrough") && a2.contains("lut3d=file='/t/l.cube'") && a2.contains("scale=-2:1440"));
+        assert!(a2.contains(&format!("-c:v {HEVC_ENCODER}")) && a2.contains("-fps_mode passthrough") && a2.contains("lut3d=file='/t/l.cube'") && a2.contains("scale=-2:1440"));
     }
 
     #[test]

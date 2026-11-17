@@ -29,7 +29,8 @@ def ffprobe_bin() -> str:
 
 
 def hwaccel_enabled() -> bool:
-    return os.environ.get("RSM_HWACCEL", "1") != "0"
+    """VideoToolbox decoding: on by default on macOS only (it does not exist elsewhere); RSM_HWACCEL=0/1 overrides."""
+    return os.environ.get("RSM_HWACCEL", "1" if sys.platform == "darwin" else "0") != "0"
 
 
 def data_dir(out: Path) -> Path:

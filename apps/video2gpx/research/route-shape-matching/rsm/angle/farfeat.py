@@ -18,6 +18,8 @@ from pathlib import Path
 
 import numpy as np
 
+from rsm.pipeline.common import hwaccel_enabled
+
 from . import rotflow
 
 LK = dict(winSize=(21, 21), maxLevel=4)
@@ -71,7 +73,7 @@ def read_frames(path: str, info: dict, height: int, start: float, duration: floa
     """Grey frames of `height` rows from `start` for `duration` s: yields (index from start, array)."""
     width = round(info['width'] * height / info['height'] / 2) * 2
     cmd = ['ffmpeg', '-v', 'error', '-nostdin']
-    if hwaccel:
+    if hwaccel and hwaccel_enabled():
         cmd += ['-hwaccel', 'videotoolbox']
     cmd += ['-ss', f'{start:.3f}', '-i', path, '-t', f'{duration:.3f}', '-an', '-vf', f'scale={width}:{height}:flags=area,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']
     size = width * height

@@ -48,7 +48,7 @@ export const incyclistRunning = () => inc.running;
 const fmtMin = (s: number) => (s < 90 ? `ca. ${Math.max(1, Math.round(s))} s` : `ca. ${Math.round(s / 60)} Min.`);
 function planText(info: IncyclistInfo): string {
   const p = info.plan;
-  const what = p.mode === "original" ? "wird als Originaldatei übernommen, ohne Umwandlung" : p.mode === "copy" ? "wird unverändert übernommen" : p.mode === "remux" ? `wird umverpackt (${p.reasons.join(", ")})` : `wird neu kodiert (${p.reasons.join(", ")}, HEVC über VideoToolbox)`;
+  const what = p.mode === "original" ? "wird als Originaldatei übernommen, ohne Umwandlung" : p.mode === "copy" ? "wird unverändert übernommen" : p.mode === "remux" ? `wird umverpackt (${p.reasons.join(", ")})` : `wird neu kodiert (${p.reasons.join(", ")}, HEVC)`;
   return `Video ${what} · ${fmtBytes(p.est_bytes)} · ${fmtMin(p.est_seconds)}`;
 }
 

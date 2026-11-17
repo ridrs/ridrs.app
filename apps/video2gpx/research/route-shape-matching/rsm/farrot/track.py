@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from rsm.angle import farfeat, videos
+from rsm.pipeline.common import hwaccel_enabled
 
 from . import model
 
@@ -34,7 +35,7 @@ def ffmpeg_frames(path: str, info: dict, height: int, first_frame: int, n_frames
     width = round(info["width"] * height / info["height"] / 2) * 2
     ss = max(0.0, (first_frame - 0.5) / info["fps"])
     cmd = ["ffmpeg", "-v", "error", "-nostdin"]
-    cmd += ["-hwaccel", "videotoolbox"] if hwaccel else ["-threads", str(threads)]
+    cmd += ["-hwaccel", "videotoolbox"] if (hwaccel and hwaccel_enabled()) else ["-threads", str(threads)]
     cmd += ["-ss", f"{ss:.4f}", "-i", path, "-an", "-vf", f"select='not(mod(n\\,{k}))',scale={width}:{height}:flags=area,format=gray", "-fps_mode", "passthrough",
             "-frames:v", str(n_frames), "-f", "rawvideo", "-pix_fmt", "gray", "-"]
     size = width * height

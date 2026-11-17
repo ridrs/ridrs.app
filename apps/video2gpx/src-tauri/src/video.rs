@@ -118,8 +118,10 @@ pub fn frames(ctx: &Ctx, project: &str, path: &str, step: f64, hdr: bool) -> Res
     }
     let start = times.last().map(|t| t + step - 0.02);
     let k0 = times.len();
-    let mut err = run_frames(&ff, path, &dir, &pfile, step, hdr, start, k0, true, &mut times);
-    if err.is_some() && times.len() == k0 && count_frames(&dir) == k0 {
+    // VideoToolbox exists on macOS only; elsewhere decode in software straight away
+    let hw = cfg!(target_os = "macos");
+    let mut err = run_frames(&ff, path, &dir, &pfile, step, hdr, start, k0, hw, &mut times);
+    if hw && err.is_some() && times.len() == k0 && count_frames(&dir) == k0 {
         // nothing new came out: maybe the hardware decoder does not take this codec, try in software
         if let Some(e) = &err {
             eprintln!("video_frames: hardware decoding failed ({e}), retrying in software");
