@@ -189,6 +189,9 @@ export function Gauge({
         aspectRatio: '1',
         borderRadius: '50%',
         boxSizing: 'border-box',
+        // Square by the aspect ratio alone: its automatic minimum height (the content's) would let
+        // the dial grow taller than wide, an ellipse with the scale off its centre.
+        minHeight: 0,
         border: '1px solid rgb(255 255 255 / .16)',
         // Glass: the scenery shows through, blurred, darker towards the rim.
         backgroundColor: 'rgb(11 18 32 / .58)',
@@ -211,7 +214,8 @@ export function Gauge({
         aria-hidden="true"
         overflow="visible"
         // On an HDR screen the canvas over it shows the same drawing, brighter.
-        style={{ overflow: 'visible', opacity: hdr ? 0 : 1 }}
+        // A block: inline, it would sit on a text line and add the line's descent below it.
+        style={{ display: 'block', overflow: 'visible', opacity: hdr ? 0 : 1 }}
       >
 
         {/* The zones, dimmed; the scale lights up from its start to the value. */}

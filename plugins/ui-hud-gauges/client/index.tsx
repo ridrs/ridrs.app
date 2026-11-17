@@ -181,6 +181,8 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
+        // Not stretched: a stretched gauge sizes its dial from the row, and the row from the dial.
+        alignItems: 'flex-end',
         gap: 12,
         pointerEvents: 'none',
       }}
