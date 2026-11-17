@@ -57,8 +57,7 @@ export function WorkoutDetailsView({
       return () => {
         for (const stop of stops) stop();
         handle.current = undefined;
-        // After this commit: the provider's React root cannot be unmounted while this one commits.
-        queueMicrotask(() => details.release());
+        details.release();
       };
     } catch (error) {
       ctx.logger.warn(`The workout details could not be shown: ${String(error)}`);

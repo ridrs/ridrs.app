@@ -126,10 +126,9 @@ function useDrawing<I>(
     if (!container) return undefined;
     const made = drawn.current(container, latest.current);
     drawing.current = made;
-    // The drawing is a React root of its own: released right after this root commits, not during.
     return () => {
       drawing.current = undefined;
-      queueMicrotask(() => made.release());
+      made.release();
     };
   }, []);
   useEffect(() => drawing.current?.update(input), [input]);

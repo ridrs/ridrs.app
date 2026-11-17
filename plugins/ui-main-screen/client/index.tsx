@@ -140,10 +140,9 @@ function useSlot(ctx: UiContext, point: string, contribution: string | undefined
     if (!container.current || !contribution) {
       return undefined;
     }
-    const release = ctx.slot(point, container.current, { contribution });
-    // The contribution may be a React root of its own; unmounting it while this root commits
-    // (the tiles leave for a framed screen) races, so it is released right after.
-    return () => queueMicrotask(release);
+    // The shell tears the contribution down after this root's commit (its own React root races
+    // otherwise).
+    return ctx.slot(point, container.current, { contribution });
   }, [ctx, point, contribution]);
   return container;
 }

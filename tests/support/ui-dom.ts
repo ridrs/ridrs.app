@@ -20,7 +20,44 @@ Before({ tags: '@ui' }, function (this: RidrsWorld) {
     configure({ asyncUtilTimeout: 5000 });
   }
   this.uiEnabled = true;
+  watchUnmountRaces();
 });
+
+/**
+ * React roots of UI components unmounted while another root renders: React logs the race, finishes
+ * the unmount later and then finds its nodes gone (`removeChild`, `NotFoundError`). The native app
+ * logged dozens of them after a start (2026-11-13); no scenario may provoke one.
+ */
+const unmountRaces: string[] = [];
+const RACE = /synchronously unmount a root|NotFoundError|removeChild/;
+let stopWatchingRaces: (() => void) | undefined;
+
+function textOf(value: unknown): string {
+  return value instanceof Error ? `${value.name}: ${value.message}` : String(value);
+}
+
+function watchUnmountRaces(): void {
+  unmountRaces.length = 0;
+  const { error } = console;
+  console.error = (...args: unknown[]) => {
+    const text = args.map(textOf).join(' ');
+    if (RACE.test(text)) {
+      unmountRaces.push(text);
+    }
+    error.apply(console, args);
+  };
+  const onError = (event: ErrorEvent) => {
+    const text = textOf(event.error ?? event.message);
+    if (RACE.test(text)) {
+      unmountRaces.push(text);
+    }
+  };
+  window.addEventListener('error', onError);
+  stopWatchingRaces = () => {
+    console.error = error;
+    window.removeEventListener('error', onError);
+  };
+}
 
 // Defined after the general After hook, so it runs before it: views are unmounted while the DOM
 // still exists and React finishes the work their unmounting scheduled.
@@ -30,6 +67,13 @@ After({ tags: '@ui' }, async function (this: RidrsWorld) {
   document.body.replaceChildren();
   // Scenarios may resize the window; the next one starts at happy-dom's default width again.
   happyDom().setViewport({ width: 1024, height: 768 });
+  stopWatchingRaces?.();
+  stopWatchingRaces = undefined;
+  if (unmountRaces.length > 0) {
+    throw new Error(
+      `React unmounted a root while rendering (${unmountRaces.length}x):\n${[...new Set(unmountRaces)].join('\n')}`,
+    );
+  }
 });
 
 AfterAll(async () => {

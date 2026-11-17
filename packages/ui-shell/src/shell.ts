@@ -374,12 +374,18 @@ export function mountShell(
         for (const release of [...owned]) {
           release();
         }
-        try {
-          cleanup?.();
-        } catch (error) {
-          logger.error(`UI component "${labelOf(entry)}" failed to clean up: ${String(error)}`);
-        }
-        container.replaceChildren();
+        // Its own teardown runs after a microtask: a component is often unmounted from inside
+        // another one's render or teardown (a React root releasing a slot in an effect's cleanup),
+        // where a React root of its own could not unmount at once and would find its nodes gone
+        // later. What it obtained through its context is released above, at once.
+        queueMicrotask(() => {
+          try {
+            cleanup?.();
+          } catch (error) {
+            logger.error(`UI component "${labelOf(entry)}" failed to clean up: ${String(error)}`);
+          }
+          container.replaceChildren();
+        });
       },
     };
   };
@@ -428,10 +434,13 @@ export function mountShell(
     };
   };
 
-  /** Mounts the capability's provider into the rendering's container, which it empties first. */
+  /**
+   * Mounts the capability's provider into the rendering's container, which it empties first: once
+   * its module is there, so after the teardown of the provider before it.
+   */
   const mountProvider = (rendering: Rendering, entry: Provider) => {
-    rendering.container.replaceChildren();
     const handle = mountComponent(entry, rendering.container, (component, ctx) => {
+      rendering.container.replaceChildren();
       let live = true;
       const emit = (event: string, payload: unknown) => {
         if (live) {
@@ -447,7 +456,9 @@ export function mountShell(
       rendering.instance = instance;
       return () => {
         live = false;
-        rendering.instance = undefined;
+        if (rendering.instance === instance) {
+          rendering.instance = undefined;
+        }
         instance.release();
       };
     });
@@ -504,9 +515,12 @@ export function mountShell(
       mountProvider(rendering, entry);
     }
     if (was !== (entry !== undefined)) {
-      for (const listener of [...rendering.listeners]) {
-        listener(entry !== undefined);
-      }
+      // After the provider's teardown, which empties the container: the consumer may fill it.
+      queueMicrotask(() => {
+        for (const listener of [...rendering.listeners]) {
+          listener(entry !== undefined);
+        }
+      });
     }
   };
 

@@ -131,8 +131,7 @@ function EditorPlace({
     ];
     return () => {
       for (const stop of stops) stop();
-      // After this commit: the provider's React root cannot be unmounted while this one commits.
-      queueMicrotask(() => editor.release());
+      editor.release();
     };
   }, [ctx, subject]);
   return (
@@ -176,8 +175,7 @@ function ExportPlace({
     const stops = [exporter.onAvailability(setAvailable), exporter.on('closed', () => latest.current())];
     return () => {
       for (const stop of stops) stop();
-      // After this commit: the provider's React root cannot be unmounted while this one commits.
-      queueMicrotask(() => exporter.release());
+      exporter.release();
     };
   }, [ctx, subject]);
   return (

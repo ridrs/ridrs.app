@@ -59,8 +59,7 @@ export const WorkoutChart: UiCapabilityComponent<typeof workoutChartCapability> 
       draw(next);
     },
     release() {
-      // Released from inside a render of the consumer: unmount once that is done.
-      queueMicrotask(() => root.unmount());
+      root.unmount();
     },
   };
 };

@@ -897,6 +897,5 @@ export const WorkoutEditor: UiCapabilityComponent<typeof workoutEditorCapability
       />,
     );
   draw(input);
-  // Released from inside a render of the consumer: unmount once that is done.
-  return { update: draw, release: () => queueMicrotask(() => root.unmount()) };
+  return { update: draw, release: () => root.unmount() };
 };

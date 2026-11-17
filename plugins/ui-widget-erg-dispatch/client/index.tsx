@@ -22,10 +22,7 @@ function ErgDispatchView({ ctx }: { readonly ctx: UiContext }) {
     if (!container.current) {
       return undefined;
     }
-    const release = ctx.slot(erg ? 'hud/erg-on' : 'hud/erg-off', container.current);
-    // The widget is a React root of its own: unmounting it while this root commits races, so it
-    // is released right after.
-    return () => queueMicrotask(release);
+    return ctx.slot(erg ? 'hud/erg-on' : 'hud/erg-off', container.current);
   }, [ctx, erg]);
   return <div ref={container} data-testid="erg-dispatch" data-erg={erg} style={{ display: 'contents' }} />;
 }
