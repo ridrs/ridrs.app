@@ -263,7 +263,7 @@ export interface InspectSeries {
 }
 /** Rust inspect_series: the series (cached or made now), or why not */
 export interface InspectSeriesLoad { ready: boolean; reason?: string; error?: string; series?: InspectSeries; cached?: boolean }
-/** a tracked point of the overlay: x, y (px of the analysis frame, 360 rows), flow dx, dy (px), 1 = inlier */
+/** a tracked point of the overlay: x, y (px of the analysis frame, 360 rows), flow dx, dy (px), code: 1 = inlier, 0 = outlier, 2 = passing traffic the speed ignores (motion only) */
 export type FramePoint = [number, number, number, number, number];
 export interface FrameStoredRow { [column: string]: string }
 export interface FrameMotion {
@@ -271,6 +271,10 @@ export interface FrameMotion {
   source: string; row: FrameStoredRow; stored: FrameStoredRow | null; agree: boolean; diff?: Record<string, [string, string]>;
   fit: null | { inliers: number; rms: number | null; s: number; yaw_px: number | null; pitch_px: number | null; roll: number; speed_ms: number | null; yaw_deg_s: number | null; pitch_deg_s: number | null };
   decoded?: number; error?: string;
+  /** passing traffic (decisions A17 / A18): replaced = a road candidate replaced the fit, rejected = the pair gives no speed (gating), kept = candidates checked, plain fit used */
+  traffic?: null | { state: "replaced" | "rejected" | "kept"; pick: number | null; candidates: number; rms: number | null; road_s?: number; plain_s?: number; n_traffic?: number };
+  /** the plain fit a road candidate replaced */
+  plain_fit?: { inliers: number; rms: number | null; s: number; speed_ms: number | null };
 }
 export interface FrameBand {
   band: number; end: number | null; ok: boolean; why: string; n_pts: number; n_inl: number; points: FramePoint[]; usable: boolean; agree: boolean;

@@ -134,11 +134,15 @@ export function frame(t: number, what: string): InspectFrame {
   const pair = Math.round(t * 30 + 0.5);
   const bad = SC.analyse === "bad" && Math.floor(t / 10) % 4 === 3;
   if (parts.includes("motion")) {
-    const pts = motionPoints(t, yawDeg), inl = pts.filter((p) => p[4]).length;
+    const pts = motionPoints(t, yawDeg), inl = pts.filter((p) => p[4] === 1).length;
+    const traffic = Math.floor(t / 10) % 4 === 1;                   // an overtaking car on the left: its points are ignored (code 2)
+    if (traffic) for (let i = 0; i < 40; i++) pts.push([r(150 + 90 * Math.abs(noise(i, 31)), 1), r(250 + 80 * Math.abs(noise(i, 32)), 1), r(-2.4 + 0.1 * noise(i, 33), 2), r(-1.5 + 0.1 * noise(i, 34), 2), 2]);
     const row = { frame: String(pair), time: ((pair - 0.5) / 30).toFixed(4), corners: "160", tracked: String(pts.length), inliers: String(inl), rms_px: "0.4521", s: "3.1e-04", c: "0", yaw: "0.12", pitch: "0.02", roll: "1e-4", diff: "5.2", rel_speed: "1.9e-02" };
     out.motion = {
       pair, t: r((pair - 0.5) / 30, 4), width: W, height: H, horizon: HORIZON, roi: [166, 349], polygon: ROAD, points: pts, corners: 160, tracked: pts.length, source: "gefiltert", row,
       stored: bad ? { ...row, inliers: String(inl - 7), yaw: "0.31" } : row, agree: !bad, diff: bad ? { inliers: [String(inl), String(inl - 7)], yaw: ["0.12", "0.31"] } : undefined,
+      traffic: traffic ? { state: "replaced", pick: 2, candidates: 3, rms: 0.31, road_s: 3.1e-4, plain_s: 1.1e-4, n_traffic: 40 } : null,
+      plain_fit: traffic ? { inliers: inl + 40, rms: 2.1, s: 1.1e-4, speed_ms: 3.2 } : undefined,
       fit: { inliers: inl, rms: 0.452, s: 3.1e-4, yaw_px: 0.12, pitch_px: 0.02, roll: 1e-4, speed_ms: S.speed_vms[i] ?? 9, yaw_deg_s: r(yawDeg, 2), pitch_deg_s: S.pitch[i] },
     };
   }

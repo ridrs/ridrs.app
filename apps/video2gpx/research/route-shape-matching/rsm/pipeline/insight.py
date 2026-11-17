@@ -470,6 +470,46 @@ def _polygon(mask) -> list[list[float]]:
     return [[int(x), int(y)] for x, y in ap.reshape(-1, 2)]
 
 
+#: point code of the motion overlay: 0 outlier, 1 carries the road fit, 2 passing traffic the speed ignores (decisions A17 / A18)
+TRAFFIC = 2
+
+
+def traffic_points(mid, flow, cx: float, cy: float, yh: float, scale: float, plain_inl, stored: dict | None, max_rms: float):
+    """the point codes of one pair as the pipeline USES it, and what happened to it (None: plain road pair, the fit is what the step used).
+    `replaced`: a road candidate replaced the fit (pick >= 1); its points are the road, the points of the rejected plain fit and of the
+    candidates that move at another speed are the traffic. `rejected`: the stored fit is above the gate's rms limit, the pair gives no speed
+    (bridged or split by gating); every point that carried the fit is ignored."""
+    from .vmsx import motion as vm
+    plain = np.asarray(plain_inl, bool)
+    codes = plain.astype(int)
+    if stored is None:
+        return codes, None
+    alts = vm.parse_alts(stored.get("alts", ""))
+    pick = stored.get("pick", "")
+    try:
+        rms = float(stored.get("rms_px") or "nan")
+    except ValueError:
+        rms = float("nan")
+    info = dict(pick=int(pick) if pick.lstrip("-").isdigit() else None, candidates=max(0, len(alts) - 1), rms=_num(rms, 3))
+    thr = vm.ALT_THR * scale
+    if info["pick"] is not None and 1 <= info["pick"] < len(alts):
+        road_p = alts[info["pick"]][0]
+        road = vm.near_fit(mid, flow, cx, cy, yh, road_p, thr)
+        other = plain & ~road
+        for p, _, _ in alts[1:]:
+            if abs(p[0] - road_p[0]) > vm.ALT_TOL * max(abs(road_p[0]), 1e-9):
+                other |= vm.near_fit(mid, flow, cx, cy, yh, p, thr) & ~road
+        codes = np.where(road, 1, np.where(other, TRAFFIC, 0))
+        info.update(state="replaced", road_s=float(road_p[0]), plain_s=float(alts[0][0][0]))
+    if np.isfinite(rms) and rms > max_rms:
+        codes = np.where(codes != 0, TRAFFIC, 0)
+        info["state"] = "rejected"
+    if "state" not in info:
+        return codes, None if not alts else dict(info, state="kept")
+    info["n_traffic"] = int((codes == TRAFFIC).sum())
+    return codes, info
+
+
 def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
     """the vms pair at video time t: the points the road-flow fit saw (inlier or outlier), the fit, and the csv row the step stored for it"""
     from .vmsx import motion as vm
@@ -514,9 +554,13 @@ def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
         corners, mid, flow = tracker.track(*raw)
         fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
         used = "roh"
-    pts = [[round(float(a), 1), round(float(b), 1), round(float(c), 2), round(float(e), 2), int(fit.inliers[i]) if fit is not None else 0] for i, ((a, b), (c, e)) in enumerate(zip(mid, flow))]
     stored = _stored_row(d / "motion" / "motion.csv", idx)
     cols = vm.COLUMNS
+    from rsm.odometry.gating import GateParams
+    st = dict(zip(cols, stored)) if stored is not None and len(stored) == len(cols) else None
+    plain_inl = fit.inliers if fit is not None else np.zeros(len(mid), bool)
+    codes, traffic = traffic_points(mid, flow, width / 2, H / 2, horizon, tracker.scale, plain_inl, st, GateParams().max_rms_px)
+    pts = [[round(float(a), 1), round(float(b), 1), round(float(c), 2), round(float(e), 2), int(codes[i])] for i, ((a, b), (c, e)) in enumerate(zip(mid, flow))]
     mine = [str(x) for x in row]
     if stored is not None and len(stored) == len(cols) and "pick" in cols:
         k = cols.index("pick")
@@ -528,9 +572,15 @@ def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
     kappa_s, f_eff, _ = (lambda r: (r["kappa"], r["f_eff"], r["ok"]))(_route_info(d))
     res = dict(pair=idx, t=_num(t_pair, 4), width=width, height=H, horizon=_num(horizon, 1), roi=[top, bottom], polygon=_polygon(tracker.mask), points=pts, corners=int(corners), tracked=int(len(mid)),
                source=used, row=dict(zip(cols, mine)), stored=None if stored is None else dict(zip(cols, stored)), agree=bool(same))
+    res["traffic"] = traffic
     if fit is not None:
         s_, c_, a_, b_, r_ = (float(x) for x in fit.params[:5])
-        res["fit"] = dict(inliers=int(fit.inliers.sum()), rms=_num(fit.rms, 3), s=s_, yaw_px=_num(a_, 4), pitch_px=_num(b_, 4), roll=r_,
+        n_inl, rms_ = int(fit.inliers.sum()), fit.rms
+        if traffic is not None and traffic.get("pick") and traffic["pick"] >= 1:     # the road candidate the step used, not the plain fit it replaced
+            p_, n_inl, rms_ = vm.parse_alts(st["alts"])[traffic["pick"]]
+            s_, c_, a_, b_, r_ = (float(x) for x in p_[:5])
+            res["plain_fit"] = dict(inliers=int(fit.inliers.sum()), rms=_num(fit.rms, 3), s=float(fit.params[0]), speed_ms=_num(kappa_s * C.F360 * 1.1 * float(fit.params[0]) / dt, 2))
+        res["fit"] = dict(inliers=int(n_inl), rms=_num(rms_, 3), s=s_, yaw_px=_num(a_, 4), pitch_px=_num(b_, 4), roll=r_,
                           speed_ms=_num(kappa_s * C.F360 * 1.1 * s_ / dt, 2), yaw_deg_s=_num(np.degrees(a_ * fps / f_eff), 2), pitch_deg_s=_num(np.degrees(b_ * fps / f_eff), 2))
     else:
         res["fit"] = None

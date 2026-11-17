@@ -76,7 +76,7 @@ scrubs, and while playing every 2–3 s (debounced, one call at a time).
 ### A4. The view
 
 - **Video** with an overlay canvas exactly on top of the picture (letterbox-aware). Toggles: "Bewegung" (flow vectors, inliers green /
-  outliers red, horizon) and "Rotation" (far features, band lines, a yaw-rate arrow). They are off by default and remembered in
+  outliers red, passing traffic the speed ignores magenta, dashed and crossed out (A17 / A18), horizon) and "Rotation" (far features, band lines, a yaw-rate arrow). They are off by default and remembered in
   `localStorage`. A small legend explains the values of the frame.
 - **Charts** (canvas, the code of `elevationChart.ts` reused or generalised):
   1. Kurvenradius: video vs map, as signed curvature (a radius axis is unreadable near straights) with a radius scale as labels.

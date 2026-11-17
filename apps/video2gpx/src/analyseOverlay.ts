@@ -1,11 +1,11 @@
 // The overlay of the Analyse stage: a canvas exactly on the picture of the video (letterbox-aware) that draws what the pipeline tracked at the current time.
-// "Bewegung": road points of the vms pair (inliers green, outliers red), their flow, the road area and the horizon row. "Rotation": the far features of the
+// "Bewegung": road points of the vms pair (inliers green, outliers red, passing traffic the speed ignores magenta and dashed), their flow, the road area and the horizon row. "Rotation": the far features of the
 // far-feature window (inliers cyan, outliers orange), the band rows and a yaw-rate arrow. Coordinates come in px of the analysis frame (360 rows).
 import { de, letterbox, toPicture, type Rect } from "./analyseStats";
 import type { FrameBand, InspectFrame } from "./types";
 import { el } from "./util";
 
-export const COL = { inlier: "#3ddc84", outlier: "#ff5a4d", farIn: "#4dd0ff", farOut: "#ffb020", horizon: "#ffe14d", band: "#7fdcff", area: "rgba(255,255,255,.55)" };
+export const COL = { inlier: "#3ddc84", outlier: "#ff5a4d", traffic: "#ff4dd8", farIn: "#4dd0ff", farOut: "#ffb020", horizon: "#ffe14d", band: "#7fdcff", area: "rgba(255,255,255,.55)" };
 /** arrows show the flow of one frame pair (motion) or of one window of k frames (rotation) enlarged by this factor */
 export const GAIN = { motion: 14, rotation: 3 };
 
@@ -64,8 +64,11 @@ export class Overlay {
 }
 
 function dot(c: CanvasRenderingContext2D, x: number, y: number, r: number, col: string) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = col; c.fill(); }
-function arrow(c: CanvasRenderingContext2D, x: number, y: number, dx: number, dy: number, col: string, w: number) {
-  c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x, y); c.lineTo(x + dx, y + dy); c.stroke();
+function arrow(c: CanvasRenderingContext2D, x: number, y: number, dx: number, dy: number, col: string, w: number, dash: number[] = []) {
+  c.setLineDash(dash); c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x, y); c.lineTo(x + dx, y + dy); c.stroke(); c.setLineDash([]);
+}
+function cross(c: CanvasRenderingContext2D, x: number, y: number, r: number, col: string) {
+  c.strokeStyle = col; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x - r, y - r); c.lineTo(x + r, y + r); c.moveTo(x - r, y + r); c.lineTo(x + r, y - r); c.stroke();
 }
 function label(c: CanvasRenderingContext2D, t: string, x: number, y: number, col: string, align: CanvasTextAlign = "left") {
   c.font = "600 11px system-ui, sans-serif"; c.textAlign = align; c.textBaseline = "bottom";
@@ -87,15 +90,23 @@ function drawMotion(c: CanvasRenderingContext2D, pic: Rect, f: InspectFrame) {
   hline(c, pic, hy, COL.horizon, [8, 5]);
   label(c, "Horizont (Bewegung)", pic.x + 6, hy - 3, COL.horizon);
   for (const [x, y, dx, dy, inl] of m.points) {                    // outliers first, so the inliers lie on top
-    if (inl) continue;
+    if (inl !== 0) continue;
     const [px, py] = toPicture(pic, fw, fh, x, y);
     arrow(c, px, py, dx * k * GAIN.motion, dy * k * GAIN.motion, COL.outlier, 1.1); dot(c, px, py, 2, COL.outlier);
   }
+  for (const [x, y, dx, dy, inl] of m.points) {                    // passing traffic: tracked, but the speed ignores it (dashed, crossed out)
+    if (inl !== 2) continue;
+    const [px, py] = toPicture(pic, fw, fh, x, y);
+    arrow(c, px, py, dx * k * GAIN.motion, dy * k * GAIN.motion, COL.traffic, 1.5, [4, 3]); cross(c, px, py, 3, COL.traffic);
+  }
   for (const [x, y, dx, dy, inl] of m.points) {
-    if (!inl) continue;
+    if (inl !== 1) continue;
     const [px, py] = toPicture(pic, fw, fh, x, y);
     arrow(c, px, py, dx * k * GAIN.motion, dy * k * GAIN.motion, COL.inlier, 1.5); dot(c, px, py, 2.4, COL.inlier);
   }
+  const tr = m.traffic;
+  if (tr && (tr.state === "replaced" || tr.state === "rejected"))
+    label(c, tr.state === "rejected" ? "Verkehr: Bildpaar ignoriert" : "Verkehr erkannt: magenta ignoriert", pic.x + 6, pic.y + 18, COL.traffic);
 }
 
 /** the band whose points are drawn: the one the series uses, else the first with a fit, else the widest */

@@ -322,6 +322,27 @@ def _alt_text(p, inl: int, rms: float) -> str:
     return f'{p[0]:.4e} {p[1]:.4e} {p[2]:.4f} {p[3]:.4f} {p[4]:.3e} {inl} {rms:.4f}'
 
 
+def parse_alts(text: str) -> list[tuple[np.ndarray, int, float]]:
+    """the column `alts` back as [(params s c a b r, inliers, rms)]: the plain fit first, then the candidates (`pick` indexes this list)"""
+    out = []
+    for x in (text or '').split(';'):
+        f = x.split()
+        if len(f) == 7:
+            out.append((np.array([float(v) for v in f[:5]]), int(f[5]), float(f[6])))
+    return out
+
+
+def near_fit(mid: np.ndarray, flow: np.ndarray, cx: float, cy: float, yh: float, p: np.ndarray, thr: float) -> np.ndarray:
+    """bool per point: its flow is within the fixed distance thr of the model flow of the parameters p (s c a b r, as in `alts`)"""
+    if len(mid) == 0:
+        return np.zeros(0, bool)
+    a, n = _flow_design(mid, flow, cx, cy, yh)
+    q = np.zeros(a.shape[1])
+    q[:5] = p[:5]
+    f = a @ q
+    return np.hypot(flow[:, 0] - f[:n], flow[:, 1] - f[n:]) < thr
+
+
 class Destatic:
     """the DESTATIC pre-filter, stateful over consecutive frames: 128 + gain x (frame - exponential running mean over ~tau frames)"""
 

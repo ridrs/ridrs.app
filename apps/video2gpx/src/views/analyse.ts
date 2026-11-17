@@ -41,11 +41,11 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement) {
     cbs[k] = c;
     return el("label", { class: "check an-sw" }, c, sample, el("span", {}, text));
   };
-  const dotSw = (col: string, col2: string) => el("span", { class: "an-swatch", "aria-hidden": "true" }, el("i", { style: `background:${col}` }), el("i", { style: `background:${col2}` }));
+  const dotSw = (...cols: string[]) => el("span", { class: "an-swatch", "aria-hidden": "true" }, ...cols.map((col) => el("i", { style: `background:${col}` })));
   ovBox = el("section", { class: "panel stack", "aria-labelledby": "an-ov-h" },
     el("div", { class: "row wrap between" }, el("h3", { id: "an-ov-h" }, "Overlay auf dem Video"),
-      el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)))),
-    el("p", { class: "small muted" }, `Die Punkte werden für das Bild unter dem Zeiger neu verfolgt (mit den Parametern der Berechnung, ohne ein Ergebnis zu ändern); das dauert etwa eine Sekunde. Bewegung: Straßenpunkte der Bildbewegung, grün = zählt für Tempo und Gierrate (Inlier), rot = verworfen, Pfeil = Verschiebung zum nächsten Bild (${GAIN.motion}-fach), gestrichelt das Straßenfeld, gelb der Horizont. Rotation: Fernmerkmale über dem Horizont, cyan = Inlier, orange = verworfen, Pfeil = Verschiebung im Fenster (${GAIN.rotation}-fach), gepunktet die Bänder, oben die Gierrate. Beim Abspielen wird alle ${TICK_MS / 1000} s aktualisiert.`),
+      el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)))),
+    el("p", { class: "small muted" }, `Die Punkte werden für das Bild unter dem Zeiger neu verfolgt (mit den Parametern der Berechnung, ohne ein Ergebnis zu ändern); das dauert etwa eine Sekunde. Bewegung: Straßenpunkte der Bildbewegung, grün = zählt für Tempo und Gierrate (Inlier), rot = verworfen, magenta gestrichelt und durchgekreuzt = vorbeifahrender Verkehr, vom Tempo ignoriert, Pfeil = Verschiebung zum nächsten Bild (${GAIN.motion}-fach), gestrichelt das Straßenfeld, gelb der Horizont. Rotation: Fernmerkmale über dem Horizont, cyan = Inlier, orange = verworfen, Pfeil = Verschiebung im Fenster (${GAIN.rotation}-fach), gepunktet die Bänder, oben die Gierrate. Beim Abspielen wird alle ${TICK_MS / 1000} s aktualisiert.`),
     frameInfo);
   legendEl = el("div", { class: "elev-legend", role: "group", "aria-label": "Spuren der Diagramme" });
   rangeEl = el("span", { class: "small muted tnum" });
@@ -187,6 +187,11 @@ function frameLines(f: InspectFrame): HTMLElement[] {
       const fit = m.fit;
       out.push(frameLine("Bewegung", `Bildpaar ${m.pair} bei ${fmtClock(m.t)}: ${fit ? `${fit.inliers} von ${m.tracked} Punkten tragen die Bewegung, rms ${de(fit.rms ?? 0, 2)} px` : `kein Fit (${m.tracked} Punkte verfolgt)`}${fit?.yaw_deg_s != null ? `, Gierrate ${de(fit.yaw_deg_s, 1)} °/s` : ""}${fit?.pitch_deg_s != null ? `, Nicken ${de(fit.pitch_deg_s, 1)} °/s` : ""}${fit?.speed_ms != null ? `, Tempo ${de(fit.speed_ms, 1)} m/s` : ""}${m.source === "roh" ? " (ungefiltertes Bild)" : ""}`,
         m.stored ? m.agree : undefined, m.diff ? `Abweichende Spalten: ${Object.keys(m.diff).join(", ")}. Mögliche Gründe: andere Pipeline-Version als bei der Berechnung, oder ein Video mit unregelmäßigen Zeitstempeln.` : undefined));
+      const tr = m.traffic, pf = m.plain_fit;
+      if (tr?.state === "replaced")
+        out.push(frameLine("Verkehr", `Ein Fahrzeug hat den Fit verfälscht${pf?.speed_ms != null ? ` (er las ${de(pf.speed_ms, 1)} m/s, rms ${de(pf.rms ?? 0, 2)} px)` : ""}. Verwendet wird der Straßen-Kandidat ${tr.pick} von ${tr.candidates}; ${tr.n_traffic ?? 0} Punkte (magenta) sind ignoriert.`));
+      else if (tr?.state === "rejected")
+        out.push(frameLine("Verkehr", `${tr.pick === -1 ? "Kein Straßen-Kandidat passt zum Tempo davor und danach" : "Der Fit ist zu ungenau für ein Tempo"} (rms ${de(tr.rms ?? 0, 2)} px): dieses Bildpaar gibt kein Tempo, alle ${tr.n_traffic ?? 0} Punkte (magenta) sind ignoriert. Kurze Läufe solcher Paare werden überbrückt.`));
     }
   }
   if (r) {

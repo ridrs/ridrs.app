@@ -90,3 +90,40 @@ def test_pick_leaves_an_old_csv_alone(tmp_path):
     before = f.read_bytes()
     assert M.pick_alternatives(str(f)) == dict(candidates=0)
     assert f.read_bytes() == before
+
+
+def _stored(fit, cands, pick, rms):
+    alts = ";".join([M._alt_text(fit.params, int(fit.inliers.sum()), fit.rms)] + [M._alt_text(p, k, e) for p, k, e in cands])
+    return dict(alts=alts, pick=str(pick), rms_px=f"{rms:.4f}")
+
+
+def test_overlay_marks_the_vehicle_as_ignored_traffic_when_a_candidate_replaced_the_fit():
+    from rsm.pipeline.insight import TRAFFIC, traffic_points
+    mid, flow, s_true = scene()
+    fit = M.fit_fixed_horizon(mid, flow, W / 2, H / 2, HZ, M.MIN_RESIDUAL)
+    cands = M.candidates(mid, flow, W / 2, H / 2, HZ, 1.0, seed=7)
+    k = 1 + min(range(len(cands)), key=lambda j: abs(cands[j][0][0] / s_true - 1))
+    codes, info = traffic_points(mid, flow, W / 2, H / 2, HZ, 1.0, fit.inliers, _stored(fit, cands, k, cands[k - 1][2]), 0.8)
+    assert info["state"] == "replaced" and info["pick"] == k and info["n_traffic"] == int((codes == TRAFFIC).sum())
+    road, car = codes[:40], codes[40:]
+    assert (road == 1).mean() > 0.9                       # the road carries the speed
+    assert (car == TRAFFIC).mean() > 0.9                  # the vehicle is marked as ignored traffic, not as road and not as a plain outlier
+
+
+def test_overlay_marks_every_fit_point_ignored_when_the_pair_is_rejected():
+    from rsm.pipeline.insight import TRAFFIC, traffic_points
+    mid, flow, _ = scene()
+    fit = M.fit_fixed_horizon(mid, flow, W / 2, H / 2, HZ, M.MIN_RESIDUAL)
+    cands = M.candidates(mid, flow, W / 2, H / 2, HZ, 1.0, seed=7)
+    codes, info = traffic_points(mid, flow, W / 2, H / 2, HZ, 1.0, fit.inliers, _stored(fit, cands, -1, fit.rms), 0.8)
+    assert info["state"] == "rejected" and set(codes.tolist()) <= {0, TRAFFIC}
+    assert (codes == TRAFFIC).sum() == int(fit.inliers.sum())
+
+
+def test_overlay_leaves_a_plain_road_pair_alone():
+    from rsm.pipeline.insight import traffic_points
+    mid, flow, _ = scene(n_car=0)
+    fit = M.fit_fixed_horizon(mid, flow, W / 2, H / 2, HZ, M.MIN_RESIDUAL)
+    codes, info = traffic_points(mid, flow, W / 2, H / 2, HZ, 1.0, fit.inliers, dict(alts="", pick="", rms_px=f"{fit.rms:.4f}"), 0.8)
+    assert info is None and codes.tolist() == fit.inliers.astype(int).tolist()
+    assert traffic_points(mid, flow, W / 2, H / 2, HZ, 1.0, fit.inliers, None, 0.8)[1] is None
