@@ -4,7 +4,7 @@ import type { MetricReading } from '@ridrs/contracts';
 import { describeMetricReading, formatDecimal } from '@ridrs/ui-sdk';
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createHdrLayer, HDR_MARGIN, type HdrLayer } from './hdr-layer.ts';
-import { angleOf, bandNear, dimmed, lit, type Scale, ticksOf } from './model.ts';
+import { angleOf, bandNear, dimmed, drawsOnHdrCanvas, lit, type Scale, ticksOf } from './model.ts';
 
 /** The dial is drawn on 200 × 200 units, its centre at (C, C). */
 const C = 100;
@@ -73,6 +73,8 @@ export interface GaugeProps {
   readonly unit: string;
   readonly scale: Scale;
   readonly language: Parameters<typeof describeMetricReading>[1];
+  /** A screenshot is taken: the SVG shows, not the HDR canvas (ADR 0102). */
+  readonly capturing?: boolean;
   /** The ride's average; absent: the gauge shows none. */
   readonly average?: { readonly label: string; readonly value: number | undefined };
   /** The FTP, marked on the scale; absent: no mark. */
@@ -107,6 +109,7 @@ export function Gauge({
   unit,
   scale,
   language,
+  capturing = false,
   average,
   ftp,
   gear,
@@ -117,6 +120,7 @@ export function Gauge({
   const svg = useRef<SVGSVGElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [hdr, setHdr] = useState<HdrLayer>();
+  const onHdr = drawsOnHdrCanvas(hdr !== undefined, capturing);
   const display = describeMetricReading(reading, language);
   const value = reading?.status === 'available' ? reading.value : undefined;
   const band = value === undefined ? undefined : bandNear(scale, value, shownZone.current);
@@ -215,7 +219,7 @@ export function Gauge({
         overflow="visible"
         // On an HDR screen the canvas over it shows the same drawing, brighter.
         // A block: inline, it would sit on a text line and add the line's descent below it.
-        style={{ display: 'block', overflow: 'visible', opacity: hdr ? 0 : 1 }}
+        style={{ display: 'block', overflow: 'visible', opacity: onHdr ? 0 : 1 }}
       >
 
         {/* The zones, dimmed; the scale lights up from its start to the value. */}
@@ -412,7 +416,7 @@ export function Gauge({
           width: `${100 + (HDR_MARGIN / 100) * 100}%`,
           height: `${100 + (HDR_MARGIN / 100) * 100}%`,
           pointerEvents: 'none',
-          display: hdr ? 'block' : 'none',
+          display: onHdr ? 'block' : 'none',
         }}
       />
       {gear ? (

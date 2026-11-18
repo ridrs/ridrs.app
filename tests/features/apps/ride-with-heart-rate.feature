@@ -49,6 +49,6 @@ Feature: Ride with a trainer and a heart-rate sensor
     And I press "Start ride"
     And I start a free ride in the briefing
     Then the slot "hud/widget" contains the contributions "ui-widget-power/power, ui-widget-cadence/cadence, ui-widget-heart-rate/heart-rate, ui-widget-power-heart-rate-ratio/power-heart-rate-ratio, ui-widget-virtual-speed/virtual-speed, ui-widget-virtual-distance/virtual-distance, ui-widget-gradient/gradient, ui-widget-erg-dispatch/erg-dispatch" in this order
-    And the slot "activity/control" contains the contributions "ui-widget-target-power/erg" in this order
+    And the slot "activity/control" contains the contributions "ui-widget-target-power/erg, ui-ride-screenshot/screenshot" in this order
     When I close the ridrs app
     Then the app reported no lifecycle problems

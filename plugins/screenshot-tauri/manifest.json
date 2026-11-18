@@ -1,0 +1,15 @@
+{
+  "id": "screenshot-tauri",
+  "name": "Ride Screenshots (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": [],
+  "requires": ["storage.app-files"],
+  "entry": "index.ts",
+  "state": {
+    "owns": ["ride.screenshot-capture"]
+  },
+  "services": {
+    "provides": ["ride.screenshot"]
+  }
+}

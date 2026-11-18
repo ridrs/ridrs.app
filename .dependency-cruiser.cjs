@@ -334,7 +334,7 @@ module.exports = {
       severity: 'error',
       from: {
         pathNot:
-          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri|storage-files-tauri|files-save-tauri|storage-secrets-tauri|net-http-tauri|net-websocket-tauri|auth-sign-in-tauri|storage-media-tauri|data-fetch-tauri|data-archive-tauri|data-pick-tauri|data-drop-tauri)/|apps/(native|companion)/|packages/testing/)',
+          '^(packages/ble-tauri/|plugins/(transport-ble-tauri|bridge-connector-tauri|storage-files-tauri|files-save-tauri|storage-secrets-tauri|net-http-tauri|net-websocket-tauri|auth-sign-in-tauri|storage-media-tauri|data-fetch-tauri|data-archive-tauri|data-pick-tauri|data-drop-tauri|screenshot-tauri)/|apps/(native|companion)/|packages/testing/)',
       },
       to: { path: '(@tauri-apps|@fabianlars/tauri-plugin-oauth)' },
     },

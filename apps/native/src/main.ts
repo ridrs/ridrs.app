@@ -6,7 +6,7 @@ import { suppressBrowserChrome } from './browser-chrome.ts';
 import { bundledPlugins } from './bundled-plugins.ts';
 import { startRidrsApp } from './compose.ts';
 import { androidBackButton, createKeepAwake, ensureBluetoothPermission } from './platform.ts';
-import { enableOverlayTitleBar } from './title-bar.ts';
+import { enableOverlayTitleBar, hasOverlayTitleBar } from './title-bar.ts';
 
 /**
  * Plugins that are bundled but not started in the app: the console output is for headless use;
@@ -31,6 +31,13 @@ const DISABLED_IN_APP = [
   'ui-widget-power-heart-rate-ratio',
 ];
 
+/**
+ * The rider's screenshot of a ride takes the native snapshot of the web view, which only the Mac
+ * app has so far (ADR 0102): elsewhere neither the button nor its service is started. The Mac
+ * desktop app is the one with the overlay title bar.
+ */
+const SCREENSHOTS = ['screenshot-tauri', 'ui-ride-screenshot'];
+
 async function main(): Promise<void> {
   const logger = createConsoleLogger({ app: 'ridrs-native' });
   const root = document.getElementById('ridrs');
@@ -54,7 +61,7 @@ async function main(): Promise<void> {
     sources: [createBundledPluginSource(bundledPlugins)],
     root,
     logger,
-    disabledPlugins: DISABLED_IN_APP,
+    disabledPlugins: hasOverlayTitleBar() ? DISABLED_IN_APP : [...DISABLED_IN_APP, ...SCREENSHOTS],
     platform: {
       ridrsVersion: __RIDRS_VERSION__,
       runtime: 'tauri',

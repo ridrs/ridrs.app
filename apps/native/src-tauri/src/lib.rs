@@ -6,6 +6,9 @@ mod debug_snapshot;
 mod keep_awake;
 mod media_drop;
 mod media_pick;
+mod ride_screenshot;
+#[cfg(target_os = "macos")]
+mod web_snapshot;
 
 use ridrs_ble::commands as ble;
 use ridrs_bridge::client as bridge;
@@ -97,6 +100,7 @@ pub fn run() {
             #[cfg(all(debug_assertions, target_os = "macos"))]
             debug_snapshot::debug_snapshot,
             keep_awake::keep_awake,
+            ride_screenshot::ride_screenshot,
             app_files::app_file_replace,
             app_files::app_file_sync,
             secrets::secret_get,

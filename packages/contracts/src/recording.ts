@@ -189,3 +189,27 @@ export const recordingDeleteService = defineService('recording.delete', {
   response: done,
   keyedBy: recordingRideState,
 });
+
+/**
+ * The rider takes a screenshot of the ride (ADR 0102): a picture of the window as it is, kept
+ * with the ride's recordings and named after the ride's start (`startedAt` of
+ * `activity.state-changed`). An app command: nothing of it is recorded. Answers with the file's
+ * path in the app files once it is written.
+ */
+export const rideScreenshotService = defineService('ride.screenshot', {
+  request: z.object({ startedAt: z.number() }).strict(),
+  response: z.object({ file: z.string().min(1) }).strict(),
+});
+
+/**
+ * Present (key `window`) while a screenshot of the ride is taken (ADR 0102); owner
+ * `screenshot-tauri`. The native snapshot cannot draw a see-through WebGPU canvas, so while it
+ * is present the UI draws such canvases another way: the gauges show their SVG.
+ */
+export const rideScreenshotCaptureState = defineState(
+  'ride.screenshot-capture',
+  z.object({}).strict(),
+);
+
+/** The one key of `ride.screenshot-capture`. */
+export const RIDE_SCREENSHOT_CAPTURE_KEY = 'window';

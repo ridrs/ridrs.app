@@ -262,7 +262,7 @@ export const licenseData: LicenseData = {
       "name": "Lucide icons (lucide-static)",
       "version": "1.55.0",
       "license": "ISC AND MIT",
-      "purpose": "SVG icons copied into plugins/ui-devices/client/assets/icons (license there; trash-2 derives from Feather, MIT)",
+      "purpose": "SVG icons copied into the client/assets/icons folders of the UI plugins, such as plugins/ui-devices/client/assets/icons (license there; trash-2 derives from Feather, MIT)",
       "texts": [
         "ee35498e6684"
       ]

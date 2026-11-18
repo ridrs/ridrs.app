@@ -1,0 +1,10 @@
+{
+  "id": "fixture-ride-screenshot",
+  "name": "Ride Screenshots (fixture)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "services": { "provides": ["ride.screenshot"] }
+}

@@ -16,6 +16,7 @@ import {
   metricPowerEvent,
   type PhysicsState,
   physicsStateEvent,
+  rideScreenshotCaptureState,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
 } from '@ridrs/contracts';
@@ -161,6 +162,8 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
   const heartRate = useRideMetric(ctx, metricHeartRateEvent, true);
   const cadence = useRideMetric(ctx, metricCadenceEvent, false);
   const trainer = useTrainer(ctx);
+  // While a screenshot is taken the gauges show their SVG (ADR 0102).
+  const capturing = useStateEntries(ctx, rideScreenshotCaptureState).size > 0;
 
   const { ftp, powerZones, heartRateZones, lthr, maxHeartRate } = athlete;
   const scales = useMemo(
@@ -193,6 +196,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         unit="W"
         reading={power.reading}
         scale={scales.power}
+        capturing={capturing}
         language={language}
         average={{ label: text.average, value: power.average }}
         ftp={ftp}
@@ -204,6 +208,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         unit="bpm"
         reading={heartRate.reading}
         scale={scales.heartRate}
+        capturing={capturing}
         language={language}
         average={{ label: text.average, value: heartRate.average }}
         zoneName={text.zone}
@@ -214,6 +219,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         unit="rpm"
         reading={cadence.reading}
         scale={scales.cadence}
+        capturing={capturing}
         language={language}
         {...(trainer.gear !== undefined && trainer.target === undefined
           ? {

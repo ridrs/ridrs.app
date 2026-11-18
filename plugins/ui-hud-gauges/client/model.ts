@@ -324,3 +324,12 @@ export function formatDuration(seconds: number): string {
   const rest = String(whole % 60).padStart(2, '0');
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`;
 }
+
+/**
+ * Whether the HDR canvas shows the dial (ADR 0099): only where there is one, and not while a
+ * screenshot is taken, since the native snapshot fills a see-through WebGPU canvas with black
+ * (ADR 0102). Otherwise the SVG shows itself.
+ */
+export function drawsOnHdrCanvas(hasHdrLayer: boolean, capturing: boolean): boolean {
+  return hasHdrLayer && !capturing;
+}

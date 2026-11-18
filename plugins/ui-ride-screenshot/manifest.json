@@ -1,0 +1,33 @@
+{
+  "id": "ui-ride-screenshot",
+  "name": "Ride Screenshot Button",
+  "version": "0.1.0",
+  "types": [
+    "ui"
+  ],
+  "provides": [],
+  "requires": [],
+  "entry": "index.ts",
+  "ui": {
+    "client": "client/index.tsx",
+    "contributions": [
+      {
+        "id": "screenshot",
+        "extensionPoint": "activity/control",
+        "export": "ScreenshotButton",
+        "order": 1
+      }
+    ],
+    "events": {
+      "subscribe": [
+        "activity.state-changed"
+      ]
+    },
+    "state": [
+      "app.language"
+    ],
+    "calls": [
+      "ride.screenshot"
+    ]
+  }
+}

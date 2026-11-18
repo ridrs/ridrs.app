@@ -8,6 +8,7 @@ import {
   bandNear,
   CADENCE_COLOURS,
   dimmed,
+  drawsOnHdrCanvas,
   LIT_LIGHTNESS,
   lit,
   TRACK_LIGHTNESS,
@@ -192,5 +193,15 @@ describe('bandNear', () => {
     expect(bandNear(scale, 193, 2)?.zone).toBe(3);
     expect(bandNear(scale, 180, 3)?.zone).toBe(2);
     expect(bandNear(scale, 400, 1)?.zone).toBe(7);
+  });
+});
+
+describe('drawsOnHdrCanvas', () => {
+  it('shows the dial on the HDR canvas only with one and while no screenshot is taken', () => {
+    expect(drawsOnHdrCanvas(true, false)).toBe(true);
+    // The snapshot fills a see-through WebGPU canvas with black: the SVG shows instead.
+    expect(drawsOnHdrCanvas(true, true)).toBe(false);
+    expect(drawsOnHdrCanvas(false, false)).toBe(false);
+    expect(drawsOnHdrCanvas(false, true)).toBe(false);
   });
 });

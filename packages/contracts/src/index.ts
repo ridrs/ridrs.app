@@ -418,6 +418,7 @@ export {
   type RecordingRide,
   type RecordingSnapshot,
   type RecoverableRide,
+  RIDE_SCREENSHOT_CAPTURE_KEY,
   recordedEnvelopeSchema,
   recordingContinueService,
   recordingDeleteService,
@@ -432,6 +433,8 @@ export {
   recordingRideState,
   recordingSnapshotSchema,
   recoverableRideSchema,
+  rideScreenshotCaptureState,
+  rideScreenshotService,
 } from './recording.ts';
 export {
   type RouteImport,

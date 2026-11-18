@@ -75,6 +75,7 @@
         "plugins/auth-*/**",
         "plugins/net-*/**",
         "plugins/storage-*/**",
+        "plugins/screenshot-*/**",
         "plugins/recording-*/**",
         "plugins/export-*/**",
         "plugins/ui-*/**",

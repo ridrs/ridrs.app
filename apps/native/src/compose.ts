@@ -93,6 +93,8 @@ import {
   recordingRideState,
   rideBriefingSetService,
   rideBriefingState,
+  rideScreenshotCaptureState,
+  rideScreenshotService,
   routeCancelService,
   routeFetchService,
   routeImportPreviewService,
@@ -247,6 +249,7 @@ const STATES: readonly StateDefinition[] = [
   trainingLibraryState,
   trainingUploadState,
   appLinkState,
+  rideScreenshotCaptureState,
 ];
 
 /** Every service the host knows (ADR 0068): provided and called beside the bus. */
@@ -268,6 +271,7 @@ const SERVICES: readonly ServiceDefinition[] = [
   recordingContinueService,
   recordingFinishService,
   recordingDeleteService,
+  rideScreenshotService,
   routeRemoveService,
   fileDropCancelService,
   fileDropImportService,

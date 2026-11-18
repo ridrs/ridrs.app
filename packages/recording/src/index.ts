@@ -13,6 +13,8 @@ export {
   RECORDINGS_DIRECTORY,
   recordingName,
   recordingPath,
+  SCREENSHOT_EXTENSION,
+  screenshotPath,
 } from './files.ts';
 export { type CommittedJournal, committedJournal } from './journal.ts';
 export {

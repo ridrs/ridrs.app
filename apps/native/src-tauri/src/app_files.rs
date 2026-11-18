@@ -17,7 +17,7 @@ const REPLACEABLE: &[&str] = &["recordings", "training", "config"];
 const SYNCABLE: &[&str] = &["recordings"];
 
 /// `path` below `allowed`, without `.`, `..`, empty segments or backslashes.
-fn resolve(app: &AppHandle, path: &str, allowed: &[&str]) -> Result<PathBuf, String> {
+pub(crate) fn resolve(app: &AppHandle, path: &str, allowed: &[&str]) -> Result<PathBuf, String> {
     let segments: Vec<&str> = path.split('/').collect();
     let valid = segments.len() > 1
         && !path.contains('\\')

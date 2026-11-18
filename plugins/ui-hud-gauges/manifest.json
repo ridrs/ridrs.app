@@ -60,6 +60,7 @@
       "app.language",
       "athlete.profile",
       "data.source",
+      "ride.screenshot-capture",
       "route.offer"
     ]
   }
