@@ -182,7 +182,7 @@ def refine_islands(d: Path, P: dict, W, g, E, route: dict, vehicle: str, st, tra
             Ex = np.union1d(Ex, HI.corridor_edges(gx, allE, [srch_xy[a:b + 1], loc_xy[a:b + 1]], C.LOCAL_EXT_BUF_M))
         if len(Ex) == 0:
             continue
-        Gp = grid.build(gx, Ex, h=h, sm=10.0 * k, edge_cost=cost_of(Ex))
+        Gp = grid.build(gx, Ex, h=h, sm=10.0 * k, edge_cost=cost_of(Ex), **C.UTURN)
         try:
             grid.check_budget(Gp.N, b - a + 1, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=False)
         except MemoryError:
@@ -283,7 +283,7 @@ def refine_islands(d: Path, P: dict, W, g, E, route: dict, vehicle: str, st, tra
     # --- final decode on the union grid with the islands and the chosen hypotheses as anchors
     Ef = np.union1d(HI.corridor_edges(gx, allE[np.isin(hw_all, list(loc_cls))], [sxy, loc_xy], C.LOCAL_BUF_M), np.unique(np.concatenate(part_edges)))
     cost = cost_of(Ef)
-    Gf = grid.build(gx, Ef, h=h, sm=10.0 * k, edge_cost=cost)
+    Gf = grid.build(gx, Ef, h=h, sm=10.0 * k, edge_cost=cost, **C.UTURN)
     grid.check_budget(Gf.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True)
     pref = dp.prepare(Gf, par)
     nbf = lambda xy: np.hypot(Gf.xy[:, 0] - xy[0], Gf.xy[:, 1] - xy[1]) <= R

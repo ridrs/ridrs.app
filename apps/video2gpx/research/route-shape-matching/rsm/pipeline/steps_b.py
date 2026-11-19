@@ -302,7 +302,7 @@ def load_map(d: Path, name: str):
 
 
 def grid_for(g, E, k):
-    return grid.build(g, E, h=C.H * k, sm=10.0 * k)
+    return grid.build(g, E, h=C.H * k, sm=10.0 * k, **C.UTURN)
 
 
 def _job(a):

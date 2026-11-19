@@ -29,6 +29,16 @@ F_GRID = tuple(float(x) for x in F_LO * (F_HI / F_LO) ** (np.arange(N_F) / (N_F 
 K_GRID = tuple(float(x) for x in K_LO * (K_HI / K_LO) ** (np.arange(N_K) / (N_K - 1)))
 H = 30.0                 # nominal step; one cell = H * kappa m
 D0 = 30.0
+# U-turns at nodes (2026-11-19, fix R1): the HMM grid (rsm.hmm.grid.build) charged its U-turn penalty (pen_uturn, 7 nats) only on the reverse twin edge of the
+# same OSM way; a reversal through a node onto ANOTHER way (the opposite one-way carriageway, a link, a junction triangle) was free, and the decode looped there to
+# absorb surplus distance (Nice-Monaco 17:46 / 39:26 / 47:31 / 56:45, 326-509 deg of path turn where the video turns <= 100 deg). Now every node transition whose
+# bearing (last / first UTURN_SPAN_M m of the two edges, so a short kink at the node end does not decide) changes by more than UTURN_NODE_DEG pays the same penalty.
+# 150 deg: carriageway reversals measure 160-180 deg (Quai des Etats-Unis slip road -> opposite carriageway: 169 deg); a sharp but real junction turn is rarely above 135.
+# On the Nice-Monaco map 3.0 % of the non-twin node transitions are above 150 deg (4.5 % above 135, 1.3 % above 160). Real U-turns stay possible: the penalty
+# is a cost the heading emission overcomes when the video really turns (Larvotto 1:10:32, Monte-Carlo Bay 1:14:45; test case monaco-larvotto-uturns).
+UTURN_NODE_DEG = 150.0
+UTURN_SPAN_M = 12.0
+UTURN = dict(uturn_deg=UTURN_NODE_DEG, uturn_span=UTURN_SPAN_M)   # keyword arguments of every grid.build in the pipeline
 REFINE_K = (0.87, 0.93, 1.0, 1.075, 1.15)   # local refinement of the decoded (kappa, f_eff): factors on the coarse best
 REFINE_F = (0.92, 1.0, 1.09)
 

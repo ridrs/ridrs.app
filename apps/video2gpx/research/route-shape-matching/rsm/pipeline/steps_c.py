@@ -428,7 +428,7 @@ def refine(d: Path, P: dict, W: Worker):
     ctx.extra["fine"] = fine_profile(csv)        # per-pair odometry distance over time: shapes the distance inside a step in the fusion (shaped_D)
     k = route["kappa"]
     G = grid.build(g, E, h=route.get("h", C.H * k), sm=10.0 * k,
-                   edge_cost=L.minor_cost(g, E, veh) if route.get("local") else None)
+                   edge_cost=L.minor_cost(g, E, veh) if route.get("local") else None, **C.UTURN)
     assert G.N == len(cell_edge)
     par = dp.Par(a_ang=route["a_ang"], kappa=k)
     pre = dp.prepare(G, par)

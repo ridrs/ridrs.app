@@ -4,7 +4,10 @@
 Cell = (directed edge, index along it). An edge of length L gets n = max(1, round(L / h)) cells of length L / n. Per cell: centre xy, road heading
 (Gaussian-smoothed along its own edge, sigma `sm` m, on the unwrapped heading), cell length.
 Advance entries (k = 1..K): src -> dst reached after k cells along the road. At the last cell of an edge the walk continues onto EVERY out-edge of the
-end node; the reverse twin edge (a U-turn, same way, returning to the start node) carries a penalty `pen_uturn` (nats). An entry carries
+end node; the reverse twin edge (a U-turn, same way, returning to the start node) carries a penalty `pen_uturn` (nats). With `uturn_deg` set, every other
+node transition whose bearing reverses (end bearing of the incoming edge vs start bearing of the outgoing edge, each over the last / first `uturn_span` m of
+the geometry, differ by more than `uturn_deg`) is a U-turn as well and carries the same penalty: a reversal onto the opposite one-way carriageway, a link or
+through a junction triangle is otherwise free. An entry carries
   D     metres from src centre to dst centre along the path
   dphi  road heading change src -> dst (sum of the wrapped one-cell increments, so hairpins above 180 deg survive)
   w     path penalty (U-turns)
@@ -134,10 +137,26 @@ def _group(k, src, dst, D, dp, w, n_cells) -> Group:
                  bs[st2].astype(np.int32) if len(bs) else np.zeros(0, np.int32), blk2, o2, first)
 
 
+def end_bearings(g: NetGraph, edges: np.ndarray, span: float):
+    """-> (b0, b1) rad: bearing of the first `span` m of every edge (start -> point at span) and of its last `span` m (point at L - span -> end); short edges: chord"""
+    b0 = np.empty(len(edges)); b1 = np.empty(len(edges))
+    for j, e in enumerate(edges):
+        p = g.geom(int(e))
+        c = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(p, axis=0).T))])
+        L = c[-1]
+        a = min(span, L)
+        x0, y0 = np.interp(a, c, p[:, 0]), np.interp(a, c, p[:, 1])
+        x1, y1 = np.interp(L - a, c, p[:, 0]), np.interp(L - a, c, p[:, 1])
+        b0[j] = np.arctan2(y0 - p[0, 1], x0 - p[0, 0])
+        b1[j] = np.arctan2(p[-1, 1] - y1, p[-1, 0] - x1)
+    return b0, b1
+
+
 def build(g: NetGraph, edges: np.ndarray | None = None, h: float = 30.0, sm: float = 10.0, K: int = 3, pen_uturn: float = 7.0, uturns: bool = True, zero: bool = True, dmax: float | None = None,
-          edge_cost: np.ndarray | None = None) -> Grid:
+          edge_cost: np.ndarray | None = None, uturn_deg: float | None = None, uturn_span: float = 12.0) -> Grid:
     """edge_cost (optional, one value per entry of `edges`): log cost in nats per metre of entering / moving along a cell of that edge (a road-class prior).
-    CELL_COST_HOOK (when set): a cost per cell in nats per metre on top of it (the distance to the route hint)."""
+    CELL_COST_HOOK (when set): a cost per cell in nats per metre on top of it (the distance to the route hint).
+    uturn_deg (optional): node transitions that reverse the bearing by more than this are U-turns (pen_uturn, or dropped with uturns=False); None = twin only"""
     edges = np.arange(g.n_edges) if edges is None else np.asarray(edges, np.int64)
     Ee = len(edges)
     L = np.asarray(g.edge_len)[edges]
@@ -167,10 +186,15 @@ def build(g: NetGraph, edges: np.ndarray | None = None, h: float = 30.0, sm: flo
     last = estart[1:] - 1
     first_cell = estart[:-1]
     ss, dd, ww = [], [], []
+    if uturn_deg is not None:
+        b0, b1 = end_bearings(g, edges, uturn_span)
+        rev_cos = np.cos(np.deg2rad(uturn_deg))
     for j in range(Ee):
         lo, hi = np.searchsorted(nodes_sorted, [ev[j], ev[j] + 1])
         for jj in order[lo:hi]:
             twin = (ev[jj] == eu[j]) and (way[jj] == way[j])
+            if not twin and uturn_deg is not None:
+                twin = np.cos(b0[jj] - b1[j]) < rev_cos  # bearing reverses through the node
             if twin and not uturns:
                 continue
             ss.append(last[j]); dd.append(first_cell[jj]); ww.append(-pen_uturn if twin else 0.0)

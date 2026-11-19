@@ -150,3 +150,27 @@ def test_uturn_is_penalised_but_possible():
     G2 = grid.build(g, None, h=30.0, uturns=True)
     assert G2.groups[1].n > G.groups[1].n
     assert G2.groups[1].w.min() < 0 and G.groups[1].w.min() == 0
+
+
+def test_reversal_onto_another_way_at_a_node_is_a_uturn():
+    """fix R1: a reversal through a node onto a DIFFERENT way (opposite carriageway, link) pays pen_uturn when uturn_deg is set; a 90 deg turn stays free"""
+    # way 0: east to the node (100, 0); way 1: back west on a parallel carriageway 4 m north (bearing ~157 deg over its first 12 m); way 2: north
+    g = make_graph([[(0.0, 0.0), (100.0, 0.0)], [(100.0, 0.0), (98.0, 4.0), (0.0, 4.0)], [(100.0, 0.0), (100.0, 100.0)]])
+
+    def w(G, a, b):
+        k1 = G.groups[1]
+        m = (k1.src == G.estart[a + 1] - 1) & (k1.dst == G.estart[b])
+        assert m.sum() == 1
+        return float(k1.w[m][0])
+
+    old = grid.build(g, None, h=10.0)
+    assert w(old, 0, 2) == 0.0 and w(old, 0, 4) == 0.0        # before: the reversal onto way 1 was free
+    new = grid.build(g, None, h=10.0, pen_uturn=7.0, uturn_deg=150.0, uturn_span=12.0)
+    assert w(new, 0, 2) == pytest.approx(-7.0)                 # reversal onto the other carriageway: a U-turn
+    assert w(new, 0, 4) == 0.0                                 # left turn north: free
+    assert w(new, 0, 1) == pytest.approx(-7.0)                 # the twin keeps its penalty
+    nou = grid.build(g, None, h=10.0, uturns=False, uturn_deg=150.0)
+    k1 = nou.groups[1]
+    assert not np.any((k1.src == nou.estart[1] - 1) & (k1.dst == nou.estart[2]))   # uturns=False drops it like the twin
+    b0, b1 = grid.end_bearings(g, np.array([0, 2]), 12.0)
+    assert np.rad2deg(b1[0]) == pytest.approx(0.0, abs=1e-6) and 150.0 < np.rad2deg(b0[1]) < 165.0

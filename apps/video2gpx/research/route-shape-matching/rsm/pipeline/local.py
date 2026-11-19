@@ -114,7 +114,7 @@ def local_pass(d: Path, P: dict, W: Worker, g, E, tracks, route: dict, vehicle: 
     st = OF.build(tracks, str(d / "motion" / "motion.csv"), d0=C.LOCAL_D0, measure_gaps=True)[0] if C.ODO_FAIL_ON else T.steps_of(tracks, d0=C.LOCAL_D0, gap_nom=gap_nom)
     h = C.LOCAL_D0 * k
     cost = minor_cost(gl, Ec, vehicle)
-    G = grid.build(gl, Ec, h=h, sm=10.0 * k, edge_cost=cost)
+    G = grid.build(gl, Ec, h=h, sm=10.0 * k, edge_cost=cost, **C.UTURN)
     grid.check_budget(G.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True)
     par = dataclasses.replace(dp.Par(), a_ang=float(route["a_ang"]), kappa=k)
     pre = dp.prepare(G, par)
@@ -180,7 +180,7 @@ def local_pass(d: Path, P: dict, W: Worker, g, E, tracks, route: dict, vehicle: 
     info["prior_decided"] = []
     if cost is not None and np.any(cost > 0):
         progress(0.95, "prior check")
-        r0 = dp.viterbi(dp.prepare(grid.build(gl, Ec, h=h, sm=10.0 * k), par), st, backptr=True, start_ok=sm, end_ok=em, step_ok=step_ok)
+        r0 = dp.viterbi(dp.prepare(grid.build(gl, Ec, h=h, sm=10.0 * k, **C.UTURN), par), st, backptr=True, start_ok=sm, end_ok=em, step_ok=step_ok)
         if r0["cell_path"] is not None and np.isfinite(r0["score"]):
             _, cells0 = decode_route(G, st, r0["cell_path"])
             info["prior_decided"] = prior_decided(gl, G, Ec, t, cells, cells0, same_m=C.PRIOR_DECIDED_SAME_M)
