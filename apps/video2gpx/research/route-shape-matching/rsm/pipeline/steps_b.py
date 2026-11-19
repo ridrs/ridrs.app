@@ -401,7 +401,7 @@ def scan_full(pres_or_gen, st, on_done=None, g=None, cons=None, kg=None):
 
 def prepared_gen(g, E, kg=None):
     for k in (C.K_GRID if kg is None else kg):
-        yield dp.prepare(grid_for(g, E, k), dp.Par(kappa=k))
+        yield dp.prepare(grid_for(g, E, k), dp.Par(kappa=k, **C.UTURN_PAR))
 
 
 def base_k_grid(vehicle: str | None) -> tuple:
@@ -501,7 +501,7 @@ def _scan(g, E, st, cons, tick, cell_ok=None, kg0=None):
         tick.total += len(fv) * len(kv)
         out = np.full((len(fv), len(kv)), np.nan)
         for j, k in enumerate(kv):
-            pre = dp.prepare(grid_for(g, E, k), dp.Par(kappa=k))
+            pre = dp.prepare(grid_for(g, E, k), dp.Par(kappa=k, **C.UTURN_PAR))
             out[:, j] = scan_kappa(pre, st, k, fv, tick, masks=frame_masks(g, pre.grid, cons) if cons else None)
         return out
 
@@ -513,7 +513,7 @@ def _refine_at(g, E, st, cons, s0: float, f0: float, k0: float, tick):
     best = (s0, f0, k0)
     for kr in C.REFINE_K:
         k = k0 * kr
-        pre = dp.prepare(grid_for(g, E, k), dp.Par(kappa=k))
+        pre = dp.prepare(grid_for(g, E, k), dp.Par(kappa=k, **C.UTURN_PAR))
         fv = [f0 * x for x in C.REFINE_F]
         sc = scan_kappa(pre, st, k, fv, tick, masks=frame_masks(g, pre.grid, cons) if cons else None)
         for f, s_ in zip(fv, sc):
@@ -526,7 +526,7 @@ def _decode_at(P: dict, W: Worker, g, E, st, cons, f_eff: float, kappa: float):
     """decode (Viterbi with back pointers) and posterior (forward-backward) at one calibration. -> the decode part of the result dict, or None if infeasible"""
     W.progress(88.0, "decode", force=True)
     G = grid_for(g, E, kappa)
-    par = dataclasses.replace(dp.Par(), a_ang=C.F_REF / f_eff, kappa=kappa)
+    par = dataclasses.replace(dp.Par(**C.UTURN_PAR), a_ang=C.F_REF / f_eff, kappa=kappa)
     pre = dp.prepare(G, par)
     sm, em = frame_masks(g, G, cons)
     grid.check_budget(G.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True)

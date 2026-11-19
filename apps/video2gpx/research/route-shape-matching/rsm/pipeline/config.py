@@ -42,6 +42,17 @@ D0 = 30.0
 UTURN_NODE_DEG = 120.0
 UTURN_SPAN_M = 12.0
 UTURN = dict(uturn_deg=UTURN_NODE_DEG, uturn_span=UTURN_SPAN_M)   # keyword arguments of every grid.build in the pipeline
+# U-turn without a video reversal (2026-11-19, fix R1 round 2): with the node rule alone the decode moved the surplus into a twin-edge U-turn loop on the
+# straight Basse Corniche (48:17, 2 x 7 nats; video yaw there ~0, frame-checked). Every false loop had a video turn <= 100 deg, every real U-turn ~180 deg.
+# So a U-turn (twin edge or node reversal) costs UTURN_NOVIDEO_PEN nats MORE wherever the video heading range within +-UTURN_VIDEO_WIN_M nominal metres of the
+# step stays below UTURN_VIDEO_DEG (rsm.hmm_cal.dp.ut_cost). 135 deg: halfway between 90 (a plain turn) and 180, tolerates an angle scale off by 25 %;
+# 60 m nominal (about 50 map m): the decoded U-turn may sit a few steps from the video's turn; a U-turn at a standstill adds no distance, so its heading falls
+# in the window. A window with a step without heading is unknown and gets no extra cost. 20 nats: about the gain of the 48:17 loop over the straight road
+# (two reversals: 2 x 27 nats), still small against the heading evidence of a real U-turn.
+UTURN_NOVIDEO_PEN = 20.0
+UTURN_VIDEO_DEG = 135.0
+UTURN_VIDEO_WIN_M = 60.0
+UTURN_PAR = dict(ut_extra=UTURN_NOVIDEO_PEN, ut_video_deg=UTURN_VIDEO_DEG, ut_win_m=UTURN_VIDEO_WIN_M)   # rsm.hmm_cal.dp.Par fields of every pipeline decode
 REFINE_K = (0.87, 0.93, 1.0, 1.075, 1.15)   # local refinement of the decoded (kappa, f_eff): factors on the coarse best
 REFINE_F = (0.92, 1.0, 1.09)
 

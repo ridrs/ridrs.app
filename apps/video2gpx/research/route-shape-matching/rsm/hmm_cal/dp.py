@@ -36,6 +36,12 @@ class Par:
     rel: float = 0.2
     sv: float = np.radians(4.5)         # vms increment noise (rad), scaled by a_ang in the emission scale: sd_e^2 = (a sv)^2 + sig0^2 + (beta dphi)^2
     slot_bits: int = 10  # COPY of rsm.hmm.dp: 16-bit backpointers (group << 10 | slot) because K = 7 gives in-degrees above 63
+    # U-turn without a video reversal (fix R1, rsm.pipeline.config UTURN_PAR): an entry whose path contains a U-turn (grid Group.ut) costs ut_extra nats MORE at
+    # step j when the video heading range (max - min of the cumulative a * dth) over the steps within +-ut_win_m nominal metres of step j stays below
+    # ut_video_deg. A window with a step without heading (NaN dth) is unknown: no extra cost. ut_extra 0 = off (the model before).
+    ut_extra: float = 0.0
+    ut_video_deg: float = 135.0
+    ut_win_m: float = 60.0
 
 
 class Prepared:
@@ -60,8 +66,44 @@ class Prepared:
         self.floor = par.floor_frac * grid.h
 
 
+def ut_cost(par: Par, st: Steps) -> np.ndarray:
+    """(T,) extra U-turn cost (nats, >= 0) of every step: par.ut_extra where the video does not reverse around the step, else 0"""
+    out = np.zeros(st.T, np.float32)
+    if par.ut_extra <= 0 or st.T < 2:
+        return out
+    dth = np.asarray(st.dth, np.float64).copy()
+    dth[0] = 0.0
+    nan = np.isnan(dth); nan[0] = False
+    H = np.concatenate([[0.0], np.cumsum(np.where(nan, 0.0, par.a_ang * dth))])   # heading BEFORE step i is H[i], after it H[i + 1]
+    mu = np.asarray(st.mu, np.float64).copy(); mu[0] = 0.0
+    x = np.cumsum(mu)                                                         # nominal metres at the end of step i
+    xc = x - 0.5 * mu
+    lo = np.searchsorted(x, xc - par.ut_win_m, side="left")
+    hi = np.searchsorted(x, xc + par.ut_win_m, side="right")
+    cn = np.concatenate([[0], np.cumsum(nan)])
+    thr = np.radians(par.ut_video_deg)
+    for j in range(1, st.T):
+        a, b = max(int(lo[j]), 1), min(max(int(hi[j]), j + 1), st.T)          # steps a..b-1 (always includes j)
+        if cn[b] - cn[a] > 0:
+            continue
+        seg = H[a:b + 1]
+        if seg.max() - seg.min() < thr:
+            out[j] = par.ut_extra
+    return out
+
+
 def _step_terms(pre: Prepared, st: Steps, j: int):
+    """-> (mu, sd, dth) of step j. Also sets pre._ute (the extra U-turn cost of this step, see ut_cost) for the _cand calls that follow (every caller,
+    rsm.pipeline.steps_c and rsm.refine.post included, calls _step_terms(j) right before the _cand calls of step j)"""
     par = pre.par
+    if par.ut_extra > 0:
+        c = getattr(pre, "_ute_cache", None)
+        if c is None or c[0] is not st:
+            c = (st, ut_cost(par, st))
+            pre._ute_cache = c
+        pre._ute = float(c[1][j])
+    else:
+        pre._ute = 0.0
     mu = par.kappa * st.mu[j] * (1.0 + par.b_speed * max(st.v[j] - 3.0, 0.0))
     sd = np.sqrt((max(par.rel, st.rel[j]) * mu) ** 2 + pre.floor ** 2)
     dth = None if np.isnan(st.dth[j]) else np.float32(par.a_ang * st.dth[j])
@@ -75,6 +117,9 @@ def _cand(pre: Prepared, gi: int, mu: float, sd: float, dth, a_src: np.ndarray, 
     z = (D - np.float32(mu)) / np.float32(sd)
     lt = -0.5 * z * z - np.float32(np.log(sd))
     lt += w
+    ute = getattr(pre, "_ute", 0.0)
+    if ute > 0:
+        lt -= np.float32(ute) * (gr.ut if view == "f" else gr.b_ut)
     if dth is not None:
         ls, is2 = pre.ls[gi], pre.is2[gi]
         if view != "f":

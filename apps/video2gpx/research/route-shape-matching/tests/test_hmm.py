@@ -174,3 +174,27 @@ def test_reversal_onto_another_way_at_a_node_is_a_uturn():
     assert not np.any((k1.src == nou.estart[1] - 1) & (k1.dst == nou.estart[2]))   # uturns=False drops it like the twin
     b0, b1 = grid.end_bearings(g, np.array([0, 2]), 12.0)
     assert np.rad2deg(b1[0]) == pytest.approx(0.0, abs=1e-6) and 150.0 < np.rad2deg(b0[1]) < 165.0
+
+
+def test_uturn_flag_and_cost_without_video_reversal():
+    """fix R1 round 2: entries through a U-turn are flagged (Group.ut); hmm_cal.dp.ut_cost charges them only where the video does not reverse"""
+    from rsm.hmm.seq import Steps
+    from rsm.hmm_cal import dp as cdp
+    g = make_graph([[(0.0, 0.0), (100.0, 0.0)], [(100.0, 0.0), (98.0, 4.0), (0.0, 4.0)], [(100.0, 0.0), (100.0, 100.0)]])
+    G = grid.build(g, None, h=10.0, uturn_deg=120.0)
+    assert G.groups[1].ut.any()
+    for gr in G.groups[1:]:
+        assert gr.ut.any() or gr.n == 0 or gr.k > 1
+        assert np.array_equal(np.sort(gr.ut[gr.border].astype(int)), np.sort(gr.b_ut.astype(int)))
+        assert np.all(gr.w[gr.ut] < 0)                      # every flagged entry carries the U-turn penalty
+    T = 41
+    straight = Steps(t=np.arange(T, dtype=float), dth=np.r_[np.nan, np.zeros(T - 1)], mu=np.r_[0.0, np.full(T - 1, 15.0)], rel=np.full(T, 0.2),
+                     v=np.full(T, 5.0), gap=np.zeros(T, bool), seg=np.zeros(T, int), d0=15.0)
+    par = cdp.Par(ut_extra=20.0, ut_video_deg=135.0, ut_win_m=60.0)
+    assert np.all(cdp.ut_cost(par, straight)[1:] == 20.0)
+    dth = straight.dth.copy(); dth[20] = np.pi                   # a real reversal at step 20
+    c = cdp.ut_cost(par, straight.copy(dth=dth))
+    assert c[20] == 0.0 and c[17] == 0.0 and c[1] == 20.0 and c[-1] == 20.0
+    dth[30] = np.nan                                             # no heading: unknown, no extra cost
+    assert cdp.ut_cost(par, straight.copy(dth=dth))[30] == 0.0
+    assert np.all(cdp.ut_cost(cdp.Par(), straight) == 0.0)       # off by default

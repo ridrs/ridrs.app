@@ -11,6 +11,7 @@ through a junction triangle is otherwise free. An entry carries
   D     metres from src centre to dst centre along the path
   dphi  road heading change src -> dst (sum of the wrapped one-cell increments, so hairpins above 180 deg survive)
   w     path penalty (U-turns)
+  ut    the path contains a U-turn (twin edge, or a node reversal with `uturn_deg`): rsm.hmm_cal.dp can add a per-step cost when the video does not turn
 Entries of one k are stored twice: sorted by dst (forward pass / Viterbi) and sorted by src (backward pass).
 """
 from __future__ import annotations
@@ -53,6 +54,8 @@ class Group:
     b_blk: np.ndarray = None
     border: np.ndarray = None  # permutation dst-sorted -> src-sorted
     first: np.ndarray = None  # (n_cells,) index of the dst block of every cell in `starts` or -1
+    ut: np.ndarray = None      # bool, the entry's path contains a U-turn (dst-sorted)
+    b_ut: np.ndarray = None    # the same, src-sorted
     d_min: float = 0.0
     d_max: float = 0.0
 
@@ -101,16 +104,16 @@ def _edge_cells(g: NetGraph, e: int, n: int, sm: float):
     return uc, x, y, np.interp(uc, u, hs)
 
 
-def _join(a_src, a_dst, a_D, a_dp, a_w, e1, n_cells):
+def _join(a_src, a_dst, a_D, a_dp, a_w, a_ut, e1, n_cells):
     """extend level-k entries by one level-1 step (CSR join on dst == src)"""
-    s1, d1, D1, dp1, w1 = e1
+    s1, d1, D1, dp1, w1, ut1 = e1
     indptr = np.concatenate([[0], np.cumsum(np.bincount(s1, minlength=n_cells))])
     cnt = indptr[a_dst + 1] - indptr[a_dst]
     rep = np.repeat(np.arange(len(a_src)), cnt)
     if len(rep) == 0:
-        return (np.zeros(0, np.int32),) * 2 + (np.zeros(0, np.float32),) * 3
+        return (np.zeros(0, np.int32),) * 2 + (np.zeros(0, np.float32),) * 3 + (np.zeros(0, bool),)
     pos = np.arange(len(rep)) - np.repeat(np.cumsum(cnt) - cnt, cnt) + indptr[a_dst[rep]]
-    return (a_src[rep], d1[pos], (a_D[rep] + D1[pos]).astype(np.float32), (a_dp[rep] + dp1[pos]).astype(np.float32), (a_w[rep] + w1[pos]).astype(np.float32))
+    return (a_src[rep], d1[pos], (a_D[rep] + D1[pos]).astype(np.float32), (a_dp[rep] + dp1[pos]).astype(np.float32), (a_w[rep] + w1[pos]).astype(np.float32), a_ut[rep] | ut1[pos])
 
 
 def _prune(e, dmax):
@@ -118,9 +121,9 @@ def _prune(e, dmax):
     return tuple(a[m] for a in e)
 
 
-def _group(k, src, dst, D, dp, w, n_cells) -> Group:
+def _group(k, src, dst, D, dp, w, ut, n_cells) -> Group:
     o = np.lexsort((src, dst))
-    src, dst, D, dp, w = src[o], dst[o], D[o], dp[o], w[o]
+    src, dst, D, dp, w, ut = src[o], dst[o], D[o], dp[o], w[o], ut[o]
     ch = np.flatnonzero(np.diff(dst) != 0) + 1
     starts = np.concatenate([[0], ch]).astype(np.int64) if len(dst) else np.zeros(0, np.int64)
     blk = (np.cumsum(np.isin(np.arange(len(dst)), starts)) - 1).astype(np.int32) if len(dst) else np.zeros(0, np.int32)
@@ -134,7 +137,7 @@ def _group(k, src, dst, D, dp, w, n_cells) -> Group:
     blk2 = (np.cumsum(np.isin(np.arange(len(bs)), st2)) - 1).astype(np.int32) if len(bs) else np.zeros(0, np.int32)
     return Group(k, src.astype(np.int32), dst.astype(np.int32), D.astype(np.float32), dp.astype(np.float32), w.astype(np.float32), starts, ud, blk,
                  bs.astype(np.int32), bd.astype(np.int32), bD.astype(np.float32), bdp.astype(np.float32), bw.astype(np.float32), st2,
-                 bs[st2].astype(np.int32) if len(bs) else np.zeros(0, np.int32), blk2, o2, first)
+                 bs[st2].astype(np.int32) if len(bs) else np.zeros(0, np.int32), blk2, o2, first, ut.astype(bool), ut[o2].astype(bool))
 
 
 def end_bearings(g: NetGraph, edges: np.ndarray, span: float):
@@ -176,7 +179,7 @@ def build(g: NetGraph, edges: np.ndarray | None = None, h: float = 30.0, sm: flo
     # level-1 entries
     s_l, d_l, D_l, dp_l, w_l = [], [], [], [], []
     inner = np.flatnonzero(cell_i < n[cell_ei] - 1)
-    s_l.append(inner); d_l.append(inner + 1)
+    s_l.append(inner); d_l.append(inner + 1); u_l = [np.zeros(len(inner), bool)]
     D_l.append(0.5 * (ell[inner] + ell[inner + 1])); dp_l.append(wrap(phi[inner + 1] - phi[inner])); w_l.append(np.zeros(len(inner)))
     # edge ends
     node_start = {}
@@ -185,7 +188,7 @@ def build(g: NetGraph, edges: np.ndarray | None = None, h: float = 30.0, sm: flo
     nodes_sorted = eu[order]
     last = estart[1:] - 1
     first_cell = estart[:-1]
-    ss, dd, ww = [], [], []
+    ss, dd, ww, uu = [], [], [], []
     if uturn_deg is not None:
         b0, b1 = end_bearings(g, edges, uturn_span)
         rev_cos = np.cos(np.deg2rad(uturn_deg))
@@ -197,24 +200,24 @@ def build(g: NetGraph, edges: np.ndarray | None = None, h: float = 30.0, sm: flo
                 twin = np.cos(b0[jj] - b1[j]) < rev_cos  # bearing reverses through the node
             if twin and not uturns:
                 continue
-            ss.append(last[j]); dd.append(first_cell[jj]); ww.append(-pen_uturn if twin else 0.0)
+            ss.append(last[j]); dd.append(first_cell[jj]); ww.append(-pen_uturn if twin else 0.0); uu.append(bool(twin))
     ss = np.array(ss, np.int64); dd = np.array(dd, np.int64)
     s_l.append(ss); d_l.append(dd)
-    D_l.append(0.5 * (ell[ss] + ell[dd])); dp_l.append(wrap(phi[dd] - phi[ss])); w_l.append(np.array(ww, float))
+    D_l.append(0.5 * (ell[ss] + ell[dd])); dp_l.append(wrap(phi[dd] - phi[ss])); w_l.append(np.array(ww, float)); u_l.append(np.array(uu, bool))
     e1 = (np.concatenate(s_l).astype(np.int32), np.concatenate(d_l).astype(np.int32), np.concatenate(D_l).astype(np.float32),
-          np.concatenate(dp_l).astype(np.float32), np.concatenate(w_l).astype(np.float32))
+          np.concatenate(dp_l).astype(np.float32), np.concatenate(w_l).astype(np.float32), np.concatenate(u_l).astype(bool))
     cell_cost = CELL_COST_HOOK(g, xy) if CELL_COST_HOOK is not None else None
     if edge_cost is not None or cell_cost is not None:
         c = np.zeros(N) if edge_cost is None else np.asarray(edge_cost, np.float64)[cell_ei]
         if cell_cost is not None:
             c = c + np.asarray(cell_cost, np.float64)
-        e1 = e1[:4] + ((e1[4] - c[e1[1]] * e1[2]).astype(np.float32),)
+        e1 = e1[:4] + ((e1[4] - c[e1[1]] * e1[2]).astype(np.float32),) + e1[5:]
     o = np.argsort(e1[0], kind="stable")  # CSR join needs level-1 entries sorted by src
     e1 = tuple(a[o] for a in e1)
     G = Grid(h, edges, edges[cell_ei], cell_ei, cell_i, ell, off, xy, phi, estart, [], g)
     if zero:  # k = 0: stay in the cell (stops in gap steps, advance slower than one cell per step)
         ar = np.arange(N, dtype=np.int32)
-        G.groups.append(_group(0, ar, ar, np.zeros(N, np.float32), np.zeros(N, np.float32), np.zeros(N, np.float32), N))
+        G.groups.append(_group(0, ar, ar, np.zeros(N, np.float32), np.zeros(N, np.float32), np.zeros(N, np.float32), np.zeros(N, bool), N))
     dmax = 2.4 * h if dmax is None else dmax  # entries longer than this never matter for steps of about h metres (6 sd away): static pruning, not beam pruning
     e1 = _prune(e1, dmax)  # stays sorted by src
     cur = e1

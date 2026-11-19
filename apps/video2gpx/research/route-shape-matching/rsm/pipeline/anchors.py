@@ -209,7 +209,7 @@ def ensure(W, g, E, st, cons=None):
     from . import config as C
     from .steps_b import frame_masks, grid_for
     G = grid_for(g, E, 1.0)
-    pre = dp.prepare(G, dataclasses.replace(dp.Par(), a_ang=C.F_REF / float(np.median(C.F_GRID)), kappa=1.0))
+    pre = dp.prepare(G, dataclasses.replace(dp.Par(**C.UTURN_PAR), a_ang=C.F_REF / float(np.median(C.F_GRID)), kappa=1.0))
     sm, em = frame_masks(g, G, cons) if cons else (None, None)
     allv = list(_ACTIVE)
 

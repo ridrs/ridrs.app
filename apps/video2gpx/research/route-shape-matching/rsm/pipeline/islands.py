@@ -164,7 +164,7 @@ def refine_islands(d: Path, P: dict, W, g, E, route: dict, vehicle: str, st, tra
     def cost_of(Ex):
         return L.class_cost(gx, Ex, vehicle, ext=True)
     h = C.LOCAL_D0 * k
-    par = dataclasses.replace(dp.Par(), a_ang=a_ang, kappa=k)
+    par = dataclasses.replace(dp.Par(**C.UTURN_PAR), a_ang=a_ang, kappa=k)
     R = C.LOCAL_ACCEPT_R_M
     choice_xy = {}                        # step -> position the final decode must be near
     uncertain = []

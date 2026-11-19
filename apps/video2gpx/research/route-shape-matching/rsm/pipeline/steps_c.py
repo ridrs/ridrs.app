@@ -430,7 +430,7 @@ def refine(d: Path, P: dict, W: Worker):
     G = grid.build(g, E, h=route.get("h", C.H * k), sm=10.0 * k,
                    edge_cost=L.minor_cost(g, E, veh) if route.get("local") else None, **C.UTURN)
     assert G.N == len(cell_edge)
-    par = dp.Par(a_ang=route["a_ang"], kappa=k)
+    par = dp.Par(a_ang=route["a_ang"], kappa=k, **C.UTURN_PAR)
     pre = dp.prepare(G, par)
     s_full = np.interp(st.t, ctx.t_step, ctx.s_vit)
     cb = PathMoments(ctx.path, cell_edge, cell_off, s_full)
