@@ -33,10 +33,13 @@ D0 = 30.0
 # same OSM way; a reversal through a node onto ANOTHER way (the opposite one-way carriageway, a link, a junction triangle) was free, and the decode looped there to
 # absorb surplus distance (Nice-Monaco 17:46 / 39:26 / 47:31 / 56:45, 326-509 deg of path turn where the video turns <= 100 deg). Now every node transition whose
 # bearing (last / first UTURN_SPAN_M m of the two edges, so a short kink at the node end does not decide) changes by more than UTURN_NODE_DEG pays the same penalty.
-# 150 deg: carriageway reversals measure 160-180 deg (Quai des Etats-Unis slip road -> opposite carriageway: 169 deg); a sharp but real junction turn is rarely above 135.
-# On the Nice-Monaco map 3.0 % of the non-twin node transitions are above 150 deg (4.5 % above 135, 1.3 % above 160). Real U-turns stay possible: the penalty
-# is a cost the heading emission overcomes when the video really turns (Larvotto 1:10:32, Monte-Carlo Bay 1:14:45; test case monaco-larvotto-uturns).
-UTURN_NODE_DEG = 150.0
+# 120 deg (PROVISIONAL, one video): a carriageway reversal measures 160-180 deg (Quai des Etats-Unis slip road -> opposite carriageway: 169 deg), but the loops at
+# 39:26 and 56:45 go through junction triangles / split carriageways in two node turns of 122-146 deg each, which 150 deg does not catch (test r1-4aa1f66: 2 of 4
+# windows fixed at 150, all 4 at 120). On the Nice-Monaco map 6.0 % of the non-twin node transitions are above 120 deg (3.0 % above 150); the decoded route of the
+# baseline run crossed no node above 120 deg outside the four false loops. Real U-turns stay possible: the penalty is a cost the heading emission overcomes when
+# the video really turns (Larvotto 1:10:32, Monte-Carlo Bay 1:14:45; test case monaco-larvotto-uturns). KNOWN SIDE EFFECT (DECISIONS A31): the surplus odometry
+# distance the loops absorbed goes elsewhere (along-track slides, a twin U-turn at 48:17).
+UTURN_NODE_DEG = 120.0
 UTURN_SPAN_M = 12.0
 UTURN = dict(uturn_deg=UTURN_NODE_DEG, uturn_span=UTURN_SPAN_M)   # keyword arguments of every grid.build in the pipeline
 REFINE_K = (0.87, 0.93, 1.0, 1.075, 1.15)   # local refinement of the decoded (kappa, f_eff): factors on the coarse best
