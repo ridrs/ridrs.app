@@ -37,8 +37,8 @@ D0 = 30.0
 # 39:26 and 56:45 go through junction triangles / split carriageways in two node turns of 122-146 deg each, which 150 deg does not catch (test r1-4aa1f66: 2 of 4
 # windows fixed at 150, all 4 at 120). On the Nice-Monaco map 6.0 % of the non-twin node transitions are above 120 deg (3.0 % above 150); the decoded route of the
 # baseline run crossed no node above 120 deg outside the four false loops. Real U-turns stay possible: the penalty is a cost the heading emission overcomes when
-# the video really turns (Larvotto 1:10:32, Monte-Carlo Bay 1:14:45; test case monaco-larvotto-uturns). KNOWN SIDE EFFECT (DECISIONS A31): the surplus odometry
-# distance the loops absorbed goes elsewhere (along-track slides, a twin U-turn at 48:17).
+# the video really turns (Larvotto 1:10:32, Monte-Carlo Bay 1:14:45; test case monaco-larvotto-uturns). Alone it moved the timing elsewhere and made a twin U-turn
+# loop at 48:17; UTURN_NOVIDEO_PEN below removes that loop (DECISIONS A31).
 UTURN_NODE_DEG = 120.0
 UTURN_SPAN_M = 12.0
 UTURN = dict(uturn_deg=UTURN_NODE_DEG, uturn_span=UTURN_SPAN_M)   # keyword arguments of every grid.build in the pipeline
