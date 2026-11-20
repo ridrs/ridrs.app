@@ -4,12 +4,14 @@
     scripts/heavy.sh .venv/bin/python -m rsm.bench.stages make [--only roanne,gotthard]   # T4: motion + rotation of the full sources, then freeze
     .venv/bin/python -m rsm.bench.stages check [--verify-source]                         # fresh / stale / missing per stage (exit 1 if not all fresh)
     .venv/bin/python -m rsm.bench.stages rekey --reason "..."                             # new keys without T4, for a change shown to change no result
+    scripts/heavy.sh .venv/bin/python -m rsm.bench.stages reinterp [--only pontaix]      # motion + rotation again from the stored extraction (minutes)
     .venv/bin/python -m rsm.bench.stages truth                                            # copy the truth files of the sources to test-data/truth/ (T4, also done by make)
 
 A stage is the contract between the image side and the route side: motion/ and rotation/ of one whole source video (rotation/ includes the sure
 standstills), plus stage.json (source sha256, window, params, horizon, step keys of motion and rotation by the source hash, frozen.json hash, GPS
 clock alignment for the Van Gestel rides, timings). The route tests (T2) read stages, never the video; a stage whose keys differ from the current
-code is stale, and T4 (`make`) rebuilds it. The sources and their truth come from clip_sources.json; motion and rotation run as
+code is stale, and T4 (`make`) rebuilds it; a stage that holds its extraction (extract/, docs/CONCEPT_extraction.md phase 4) and whose extraction
+is still current only needs `reinterp` after an interpretation change (status `reinterpret`). The sources and their truth come from clip_sources.json; motion and rotation run as
 `python -m rsm.pipeline _step` workers (rsm.bench.regress.run_case) in work/stages/<id>/, which is removed after the freeze.
 
 The truth files (the Van Gestel track.gpx, the verified Pontaix track) are copied by `truth` from sources/ to test-data/truth/ under the same relative
@@ -90,6 +92,9 @@ def freeze(sid: str, work: Path, src: Path, sources: Path, P: dict, out_root: Pa
     out.mkdir(parents=True)
     for sub in IMAGE_STEPS:
         shutil.copytree(Path(work) / sub, out / sub)
+    has_extract = (Path(work) / "extract" / "extract.json").exists()
+    if has_extract:                                    # the motion step's extraction (docs/CONCEPT_extraction.md phase 4): re-interpretable without T4
+        shutil.copytree(Path(work) / "extract", out / "extract")
     mj = json.loads((Path(work) / "motion" / "summary.json").read_text())           # duration_s, fps, horizon of the motion step
     sha = sha256(Path(src))
     fz = json.loads((Path(root) / "rsm" / "pipeline" / "frozen.json").read_text())
@@ -103,6 +108,7 @@ def freeze(sid: str, work: Path, src: Path, sources: Path, P: dict, out_root: Pa
                  frozen=dict(code_hash=fz.get("code_hash"), version=fz.get("version")),
                  horizon=mj.get("horizon"),
                  gps_align=gps_align,
+                 extract=extract_identity(sha, root=root) if has_extract else None,
                  made=dict(date=time.strftime("%Y-%m-%dT%H:%M:%S"), host=socket.gethostname(), seconds=secs))
     (out / "stage.json").write_text(json.dumps(stage, indent=1, default=float) + "\n")
     return out
@@ -130,14 +136,73 @@ def truth(sources: Path = SOURCES, out: Path = TRUTH, log=print) -> list[str]:
     return done
 
 
+#: the code that shapes the stored extraction beyond extract.VERSION and extract.params() (the decode and the extraction itself); vmsx.motion is
+#: left out on purpose (it holds the interpretation; its Destatic and LK settings are in params()), so a change of the destatic filter's code
+#: needs extract.VERSION raised
+EXTRACT_CODE = ("rsm/pipeline/vmsx/extract.py", "rsm/pipeline/vmsx/decode.py")
+
+
+def extract_identity(sha: str, root: Path = ROOT) -> dict:
+    """what the stored extraction of a stage depends on: the source (sha256), the extraction's version, settings and height, the OpenCV build,
+    and the source of its code under root"""
+    import cv2
+
+    from rsm.pipeline import config as PC
+    from rsm.pipeline.vmsx import extract as EX
+    code = hashlib.sha256(b"".join((Path(root) / f).read_bytes() for f in EXTRACT_CODE)).hexdigest()[:16]
+    return json.loads(json.dumps(dict(version=EX.VERSION, params=EX.params(), height=int(PC.VMS["height"]), opencv=cv2.__version__, code=code, sha256=sha)))
+
+
 def status(d: Path, root: Path = ROOT) -> str:
-    """fresh (keys equal the current code's), stale, or missing"""
+    """fresh (keys equal the current code's); reinterpret (keys differ, the stored extraction is current: `reinterp` rebuilds motion/ and rotation/
+    in minutes); stale (T4); missing"""
     f = Path(d) / "stage.json"
     if not f.exists():
         return "missing"
     s = json.loads(f.read_text())
     P = dict(s["params"], video=str(SOURCES / s["source"]["path"]))
-    return "fresh" if SC.step_keys(root, P, IMAGE_STEPS, video_sig=s["source"]["sha256"]) == s["code"] else "stale"
+    if SC.step_keys(root, P, IMAGE_STEPS, video_sig=s["source"]["sha256"]) == s["code"]:
+        return "fresh"
+    if s.get("extract") and (Path(d) / "extract" / "extract.json").exists() and s["extract"] == extract_identity(s["source"]["sha256"], root=root):
+        return "reinterpret"
+    return "stale"
+
+
+def reinterp(sid: str, root: Path = ROOT, out_root: Path = STAGES, log=print) -> Path:
+    """the image side of a stage again from its stored extraction (no full decode; the pixel probes read short windows of the source), then freeze:
+    for a stage whose status is `reinterpret`"""
+    from rsm.pipeline import config as PC, steps_a as SA
+
+    from . import regress as R
+    sd = Path(out_root) / sid
+    s = json.loads((sd / "stage.json").read_text())
+    if not (s.get("extract") and (sd / "extract" / "extract.json").exists() and s["extract"] == extract_identity(s["source"]["sha256"], root=root)):
+        raise RuntimeError(f"stage {sid}: its extraction is missing or made by other extraction code: run T4 (rsm.bench.stages make --only {sid})")
+    c = case(sid)
+    P = params(c)
+    src = Path(P["video"])
+    if not src.exists():
+        raise FileNotFoundError(src)
+    work = WORK / sid
+    t0 = time.time()
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
+    shutil.copytree(sd / "extract", work / "extract")
+    mf = work / "extract" / "extract.json"
+    m = json.loads(mf.read_text())
+    m["key"] = SA.extract_key(str(src), PC.VMS["height"])      # the same extraction (source hash checked above), keyed for this run's video path
+    mf.write_text(json.dumps(m, indent=1))
+    R.run_case(dict(name=f"stage-{sid}"), "stages", root, None, None, log, d=work, P=P, until="rotation", cache=False)
+    ga = gps_align(c, work / "motion" / "motion.csv") if c.get("truth") == "gps" else s.get("gps_align")
+    out = freeze(sid, work, src, SOURCES, P, out_root, root=root, gps_align=ga)
+    st = json.loads((out / "stage.json").read_text())
+    st["made"]["reinterpreted"] = dict(date=st["made"]["date"], extracted=s["made"].get("extracted", s["made"]["date"]))
+    st["made"]["extracted"] = st["made"]["reinterpreted"]["extracted"]
+    (out / "stage.json").write_text(json.dumps(st, indent=1, default=float) + "\n")
+    shutil.rmtree(work)
+    log(f"{sid}: re-interpreted in {time.time() - t0:.0f} s -> {out}")
+    return out
 
 
 def rekey(sid: str, reason: str, root: Path = ROOT, out_root: Path = STAGES) -> dict:
@@ -185,6 +250,8 @@ def main(argv=None) -> int:
     rk = sub.add_parser("rekey", help="new step keys without T4, for a change shown to leave the image results as they are")
     rk.add_argument("--only", default=None, help="comma-separated stage ids (default: all of STAGE_IDS)")
     rk.add_argument("--reason", required=True, help="the change and how it was shown to leave motion/ and rotation/ unchanged")
+    ri = sub.add_parser("reinterp", help="motion and rotation again from the stored extraction of the stages whose status is reinterpret (minutes, no T4)")
+    ri.add_argument("--only", default=None, help="comma-separated stage ids (default: every stage whose status is reinterpret)")
     sub.add_parser("truth", help="copy the truth files of the sources to test-data/truth/")
     ch = sub.add_parser("check")
     ch.add_argument("--verify-source", action="store_true", help="also hash the source videos (slow) and compare with stage.json")
@@ -204,6 +271,17 @@ def main(argv=None) -> int:
                 print(f"{sid}: FAILED {type(e).__name__}: {e}", flush=True)
                 failed.append(sid)
         print("failed: " + ", ".join(failed) if failed else "all stages frozen")
+        return 1 if failed else 0
+    if a.cmd == "reinterp":
+        todo = a.only.split(",") if a.only else [sid for sid in STAGE_IDS if status(STAGES / sid) == "reinterpret"]
+        failed = []
+        for sid in todo:
+            try:
+                reinterp(sid)
+            except Exception as e:                       # as make: report at the end
+                print(f"{sid}: FAILED {type(e).__name__}: {e}", flush=True)
+                failed.append(sid)
+        print("failed: " + ", ".join(failed) if failed else f"{len(todo)} stages re-interpreted")
         return 1 if failed else 0
     if a.cmd == "rekey":
         for sid in ids:

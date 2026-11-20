@@ -26,6 +26,7 @@ STEP_ENTRY = dict(motion=["rsm.pipeline.steps_a"], rotation=["rsm.pipeline.steps
 EXCLUDE = dict(motion=("rsm.network", "rsm.pipeline.osm"), rotation=("rsm.network", "rsm.pipeline.osm"))
 VIDEO_ONLY = ("motion", "rotation")
 ROOT_FILES = dict(gpx=("project.json", "route.gpx", "route_points.json"))   # files a step writes next to its directory
+ROOT_DIRS = dict(motion=("extract",))         # directories a step writes next to its own (the extraction, which the rotation step reads too)
 _CFG = re.compile(r"\b(?:C|config)\.([A-Z][A-Z0-9_]*)\b")
 VERSION = "stepcache1"
 
@@ -137,6 +138,11 @@ def fetch(cache: Path, case: str, sid: str, key: str, d: Path) -> bool:
     for f in ROOT_FILES.get(sid, ()):
         if (e / "_root" / f).exists():
             shutil.copy2(e / "_root" / f, d / f)
+    for x in ROOT_DIRS.get(sid, ()):
+        if (d / x).exists():
+            shutil.rmtree(d / x)
+        if (e / "_root" / x).is_dir():
+            shutil.copytree(e / "_root" / x, d / x)
     return True
 
 
@@ -152,6 +158,9 @@ def store(cache: Path, case: str, sid: str, key: str, d: Path, note: str = "") -
         if (d / f).exists():
             (tmp / "_root").mkdir(exist_ok=True)
             shutil.copy2(d / f, tmp / "_root" / f)
+    for x in ROOT_DIRS.get(sid, ()):
+        if (d / x).is_dir():
+            shutil.copytree(d / x, tmp / "_root" / x)
     (tmp / "origin.json").write_text(json.dumps(dict(run_dir=str(d), note=note)))
     if e.exists():
         shutil.rmtree(e)

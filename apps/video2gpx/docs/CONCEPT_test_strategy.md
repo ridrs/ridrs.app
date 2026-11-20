@@ -64,6 +64,11 @@ reconstruction experiment and are not used by video2gpx tests.
 
 T4 is not a test: it produces the inputs of T2. It is the only place that still reads whole videos.
 
+Since the extraction (2026-11-20, docs/CONCEPT_extraction.md phase 4) a stage also holds `extract/`, the stored points of the whole source. After
+a change to the interpretation of the image side (the horizon, the fits, the gate, traffic, the far bands, A21-A25 and the like) its status is
+`reinterpret`, and `rsm.bench.stages reinterp` rebuilds `motion/` and `rotation/` of every such stage from the stored points in minutes instead of
+the 5-6 h of T4. T4 is left for a change of the extraction itself (decode, destatic filter, grid, tracker, OpenCV).
+
 ### Layout of `test-data/` (git-ignored, never committed)
 
 ```
@@ -76,6 +81,7 @@ test-data/
   clips/<id>/clip.mp4               short clips, 20-75 s
   clips/<id>/clip.json              source id, t0, duration, class (secured / open), what it tests, expected values
   stages/<case>/motion/ rotation/   frozen image results of the full sources (standstills in rotation/)
+  stages/<case>/extract/            the stored points of the full source (docs/CONCEPT_extraction.md; reinterp rebuilds motion/ rotation/ from it)
   stages/<case>/stage.json          code hash of the image side, sha256 of the source, parameters, horizon, GPS alignment
   truth/vangestel/<route>/          the truth files of the sources (track.gpx, the verified Pontaix track), copied by `rsm.bench.stages truth`
   osm/ dem/                         as today; later cut per case
@@ -149,7 +155,8 @@ stages/<case>/
 | `frozen` | `code_hash` and `version` of `frozen.json` at the time |
 | `horizon` | the horizon of `motion.json` (for clips, B) |
 | `gps_align` | for GPS cases: the clock offset per window (what `work/vangestel/align_<name>.json` held), else null |
-| `made` | date, machine, seconds per step |
+| `extract` | the stored extraction (`extract/`, 2026-11-20): source sha256, `extract.VERSION`, `params()`, height, OpenCV version, hash of the extraction code; null for a stage without one |
+| `made` | date, machine, seconds per step; `extracted` and `reinterpreted` after `reinterp` |
 
 T2 recomputes `code` for the current code. A difference marks the case **stale** (failed, with the hint "run T4"), never passed.
 

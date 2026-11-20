@@ -68,7 +68,14 @@ route side run on them (T3 with the motion and band fits injected).
    points. Measured (whole pipeline from the video, cache off): Pontaix heading error 30 / 60 / 120 s today 7.2 / 9.9 / 15.6°, now 6.8 / 8.8 /
    12.0°; Pontaix along median / p90 today 18.4 / 34.0 m, now 18.3 / 37.6 m; Gotthard 10/10 checkpoints, max 55 m today, 33 m now. The p90 of
    Pontaix is 3.6 m worse (the scale scan lands on kappa 0.988 instead of 1.062: Phase 0 already showed this sensitivity); open.
-4. **Test strategy**: stages hold `extract/`; T4 = extraction only; an interpretation change re-interprets the stages; clips extract themselves.
+4. **Test strategy** (built 2026-11-20): a stage holds `extract/` next to `motion/` and `rotation/`, and `stage.json` names it (`extract`: source
+   sha256, `extract.VERSION`, `params()`, height, OpenCV, a hash of `vmsx/extract.py` and `vmsx/decode.py`). `rsm.bench.stages check` reports
+   a fourth status, **reinterpret**: the step keys differ but the stored extraction is current, so `rsm.bench.stages reinterp [--only ids]`
+   rebuilds `motion/` and `rotation/` from it (no full decode; the pixel probes read short windows of the source, which must be present) and
+   freezes again; only `stale` asks for T4 (`make`, which now also freezes the extraction). T2 names the fast way for a reinterpretable stage.
+   The bench's step cache and `copy_step` keep `extract/` with the motion step (otherwise a cached motion step sends the rotation step back to
+   the video, with other band fits for the same keys; the rotation step warns when that happens). Clips and the long videos extract themselves
+   in their run. The stages of today hold no extraction yet: the one re-baseline T4 of phase 5 makes them.
 5. **Re-baseline**: one T4, T1-T3, Pontaix against the verified track (E1), the maintainer's check in the app. The inline image pass is removed
    after one release (rule 8).
 

@@ -110,6 +110,11 @@ def copy_step(src: Path, dst: Path, sid: str) -> bool:
     if (dst / sid).exists():
         shutil.rmtree(dst / sid)
     shutil.copytree(src / sid, dst / sid)
+    for x in SC.ROOT_DIRS.get(sid, ()):                   # the motion step's extraction goes with it (the rotation step reads it)
+        if (dst / x).exists():
+            shutil.rmtree(dst / x)
+        if (src / x).is_dir():
+            shutil.copytree(src / x, dst / x)
     (dst / "steps").mkdir(exist_ok=True)
     shutil.copy2(src / "steps" / f"{sid}.done.json", dst / "steps" / f"{sid}.done.json")
     return True
@@ -192,6 +197,9 @@ def stage_in(c: dict, d: Path, P: dict, code: Path, log=print) -> dict:
     from . import stagecut as SK, stages as ST
     sd = ST.STAGES / c["stage"]
     st = ST.status(sd, root=code)
+    if st == "reinterpret":
+        raise RuntimeError(f"stage {c['stage']} is reinterpret: its extraction is current, re-interpret it (minutes): "
+                           f"scripts/heavy.sh .venv/bin/python -m rsm.bench.stages reinterp --only {c['stage']}")
     if st != "fresh":
         raise RuntimeError(f"stage {c['stage']} is {st}: run T4 (scripts/heavy.sh .venv/bin/python -m rsm.bench.stages make --only {c['stage']})")
     s = json.loads((sd / "stage.json").read_text())

@@ -292,6 +292,8 @@ def rotation(d: Path, P: dict, W: Worker):
                                   on_progress=lambda n, total, phase: W.progress(95.0 * n / max(total, 1), phase))
         source = "extract"
     else:
+        if mj.get("extract"):
+            W.log("warn", "rotation: the motion step's extraction is missing or another one (run/extract/); the far bands are tracked in the video")
         _G.update(video=P["video"], info=info, k=k, H=360, f=C.F_FAR, p=p, horizon=hz, min_inl=F["min_inl"], band_step=F["band_step"], n_bands=F["n_bands"])
         procs = min(C.MAX_WORKERS, len(chunks))
         res = []
