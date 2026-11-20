@@ -107,7 +107,7 @@ export function initMapPanel(root: HTMLElement) {
 
   bus.on("project", (app: ProjectApp | null) => void onProject(app));
   bus.on("result", drawRoute);
-  bus.on("time", (t: number) => { const pts = S.result?.points; if (pts && routeVisible()) { const p = pointAt(pts, t); placeMarker(p); followMarker(p); } });
+  bus.on("time", (t: number) => { lastT = t; const pts = S.result?.points; if (pts && routeVisible()) { const p = pointAt(pts, t); placeMarker(p); followMarker(p); } });
   bus.on("run", drawFrames);
   // after a window resize or a change of stage Leaflet must learn the new size (the frames are not tied to the view)
   let lastW = 0;
@@ -198,12 +198,30 @@ export const mapTools = {
   focusSearch() { searchInput.focus(); },
 };
 
+/** whether the map pans along with the position during playback (remembered) */
+const FOLLOW_KEY = "v2g.mapFollow";
+let follow = true;
+try { follow = localStorage.getItem(FOLLOW_KEY) !== "0"; } catch { /* private mode */ }
+let followBox: HTMLElement | null = null;
+let lastT = 0;
+function followToggle(): HTMLElement {
+  if (followBox) return followBox;
+  const cb = el("input", { type: "checkbox", checked: follow, onchange: () => {
+    follow = cb.checked;
+    try { localStorage.setItem(FOLLOW_KEY, follow ? "1" : "0"); } catch { /* private mode */ }
+    const pts = S.result?.points;
+    if (follow && pts && routeVisible()) followMarker(pointAt(pts, lastT));
+  } });
+  followBox = el("label", { class: "check map-follow" }, cb, el("span", {}, "Karte folgt der Position"));
+  return followBox;
+}
+
 function renderLegend() {
   legendEl.replaceChildren();
   const sw = (cls: string, color: string, label: string) => el("span", { class: "lg" }, el("i", { class: `sw ${cls}`, style: `--c:${color}` }), label);
   legendEl.append(
     sw("box", FRAME_STYLE.search.color, "Suchrahmen"), sw("box", FRAME_STYLE.start.color, "Start"), sw("box", FRAME_STYLE.end.color, "Ende"),
-    sw("dash", HINT_COLOR, "Vermutete Strecke (Hinweis)"), sw("line", CONF_COLORS.high, "Route des Ergebnisses"));
+    sw("dash", HINT_COLOR, "Vermutete Strecke (Hinweis)"), sw("line", CONF_COLORS.high, "Route des Ergebnisses"), followToggle());
 }
 
 // ---------- route hint ----------
@@ -407,7 +425,7 @@ function placeMarker(p: RoutePoint) {
 }
 
 function followMarker(p: RoutePoint) {
-  if (!map.getBounds().pad(-0.15).contains([p.lat, p.lon])) {
+  if (follow && !map.getBounds().pad(-0.15).contains([p.lat, p.lon])) {
     markProgrammatic(1000);
     map.panTo([p.lat, p.lon], { animate: true, duration: 0.4 });
   }

@@ -100,6 +100,7 @@
 .map-note { position: absolute; z-index: 1000; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-2); padding: var(--sp-3) var(--sp-4); text-align: center; display: flex; flex-direction: column; gap: var(--sp-2); box-shadow: var(--shadow-2); max-width: 80%; }
 .maplegend { display: flex; flex-wrap: wrap; gap: 4px 14px; font: var(--t-small); color: var(--c-text-2); }
 .maplegend .lg { display: inline-flex; align-items: center; gap: 5px; }
+.maplegend .map-follow { color: var(--c-text); gap: 6px; }
 .sw { display: inline-block; width: 16px; height: 10px; flex: none; }
 .sw.box { border: 2px solid var(--c); border-radius: 2px; background: transparent; box-shadow: inset 0 0 0 10px rgba(127,127,127,.12); }
 .sw.dash { height: 0; border-top: 2.5px dashed var(--c); }
