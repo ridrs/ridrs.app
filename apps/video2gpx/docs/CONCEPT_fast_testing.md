@@ -125,6 +125,9 @@ All development-only, under `research/route-shape-matching/rsm/bench/` (not froz
 
 ### D. Clip bench for motion and rotation (`clips.py`, `clip_sources.json`)
 
+> Replaced on 2026-11-19 by T1 of [CONCEPT_test_strategy.md](CONCEPT_test_strategy.md) (block B, step 3): a fixed list `clip_set.json`, clips by stream
+> copy in `test-data/clips/`, scored against the frozen stages. The text below describes the earlier bench.
+
 - 14 source videos, 44 clips of 75 s (Gotthard valley 120 s), chosen automatically from the full runs (`turns`, `fast`, `weak`, `typical`;
   without a full run 25 / 50 / 75 %). List: `work/clips/clips.json`; clips: `work/clips/<id>/clip.mkv` (640 x 360 grey, x264 crf 8, about 100 MB).
 - Classes: **secured** (Van Gestel GPS, aligned: alignment file or yaw-rate correlation ≥ 0.7 over the clip) and **open** (no reference yet:

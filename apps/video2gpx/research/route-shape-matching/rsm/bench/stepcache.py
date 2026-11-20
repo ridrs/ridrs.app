@@ -79,6 +79,10 @@ def _config_names(src: str) -> set[str]:
     return names
 
 
+def _file_hash(p) -> str | None:
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()[:16] if Path(p).exists() else None
+
+
 def step_keys(root: Path, P: dict, steps: list[str], video_sig=None) -> dict:
     """{step: key} for the code under `root` (the directory that holds the rsm package) and the case params P. `video_sig` replaces the
     signature of the video file (path, size, mtime), for example by its sha256 for a frozen stage (rsm.bench.stages) whose source may move."""
@@ -103,7 +107,9 @@ def step_keys(root: Path, P: dict, steps: list[str], video_sig=None) -> dict:
             if m != "rsm.pipeline.config":
                 files[m] = hashlib.sha256(src.encode()).hexdigest()[:16]
         vals = {n: repr(cfg[n]) for n in sorted(names) if n in cfg}
-        params = dict(video=p_all["video"]) if sid in VIDEO_ONLY else p_all
+        params = (dict(video=p_all["video"], **({"calibration": _file_hash(P["calibration"])} if P.get("calibration") else {}),
+                       **({"frame0": int(P["frame0"])} if P.get("frame0") else {}))
+                  if sid in VIDEO_ONLY else p_all)
         h = hashlib.sha256(json.dumps([prev, sid, files, vals, params], sort_keys=True, default=str).encode()).hexdigest()[:16]
         out[sid] = prev = h
     return out

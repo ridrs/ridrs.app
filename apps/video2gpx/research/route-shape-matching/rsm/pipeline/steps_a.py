@@ -33,10 +33,15 @@ def motion(d: Path, P: dict, W: Worker):
     def cb(n, total, phase):
         W.progress(0.0 if phase == "horizon" else 100.0 * n / max(total, 1), phase)
 
+    # P["calibration"] (test bench only: a clip of a source, docs/CONCEPT_test_strategy.md B): the motion.json of the whole source, whose horizon
+    # calibration is used instead of calibrating on the few seconds of the clip
+    # and P["frame0"]: the index of the clip's first frame in the source, which seeds the traffic candidate fits as in the whole source
+    cal = jload(Path(P["calibration"]))["horizon_calibration"] if P.get("calibration") else None
+    s0 = int(P.get("frame0") or 0)
     if C.MOTION_PARALLEL and C.VMS["step"] == 1:
-        stats = vm.analyse_parallel(P["video"], str(csv), height=C.VMS["height"], workers=R.policy()["workers"], on_progress=cb, log=W.log)
+        stats = vm.analyse_parallel(P["video"], str(csv), height=C.VMS["height"], workers=R.policy()["workers"], on_progress=cb, log=W.log, calibration=cal, seed0=s0)
     else:
-        stats = vm.analyse(P["video"], str(csv), height=C.VMS["height"], step=C.VMS["step"], on_progress=cb)
+        stats = vm.analyse(P["video"], str(csv), height=C.VMS["height"], step=C.VMS["step"], on_progress=cb, calibration=cal, seed0=s0)
     jdump(out / "motion.json", stats)
     p = load_pairs(str(csv))
     if C.CUT_ON:                         # scene-cut candidates from the pairs just analysed (no extra decode); the rotation step adds its cue and decides

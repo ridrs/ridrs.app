@@ -193,10 +193,10 @@ T2 recomputes `code` for the current code. A difference marks the case **stale**
 
 | id | window | why | truth |
 |---|---|---|---|
-| `roanne-10m` | Vallée de Roanne 0:00-10:00 | a GPS ride, the e2e default today (full run in `runs/`) | coarse GPS, cut to the window (place only) |
+| `pontaix-10m` | Pontaix-Chamaloc 0:00-10:00 | the one ride with verified truth: timed scores of the whole pipeline (D6) | the verified track, cut to the window (video time) |
 | `gotthard-start` | Gotthard 480p 0:00-9:48 | the only case with an odometry failure, a disputed start and scene cuts; exercises `odofail.py`, the local pass, islands and the verdict | 10 checkpoints (`regress_landmarks.json`) |
 
-- `e2e.rs` reads `long/roanne-10m/` instead of the full Roanne video (`RSM_E2E_VIDEO`); `runs/vallee-de-roanne` is rebuilt from the 10 minutes.
+- `e2e.rs` reads `long/pontaix-10m/` instead of the full Roanne video (`RSM_E2E_VIDEO`); `runs/` gets the finished run of the 10 minutes.
 - Both run the whole pipeline (motion to gpx) and are the only check that the two halves still fit together. The frozen stages of both are
   compared with what T3 produced (parity of the contract).
 - `gotthard-start` was cut from the HDR 1080p version before; the checkpoints are times and stay valid, but the expected verdict must be confirmed
@@ -261,9 +261,29 @@ the YouTube link, the licence note and the truth that exists.
    `test-data/stages/<id>/`; `check [--verify-source]` reports fresh / stale / missing). The sources and their truth come from `clip_sources.json`
    (ids `roanne`, `pontaix`, `rousset`, `grimone`, `cdp`, `pennes`, `lahntal`, `marburg`, `madone`, `amalfi`, `gotthard`, `bavaria`).
    `stepcache.step_keys` takes the source sha256 in place of the file signature (`video_sig`). Tests: `tests/test_stages.py`.
-3. **Clips (B):** cutter by stream copy, horizon option, about 20 clips, T1 as pytest marker `clips`; the clip bench reads them.
+3. **Clips (B):** cutter by stream copy, horizon option, about 20 clips, T1 as pytest marker `clips`; the clip bench reads them. Built 2026-11-19:
+   - `rsm/bench/clip_set.json` (committed) lists 21 clips of 30-75 s (561 MB): 6 Pontaix (typical, curves, sharp turns, traffic, one with its own
+     horizon calibration), 3 typical coarse-GPS rides, 2 hairpins, 2 known odometry failures (Lahntal, Gotthard valley), 4 cut clips (Gotthard
+     intro with standstills, Gotthard sun flash without a cut, Amalfi's edited intro, a Bavaria cut), 2 standstills, 2 traffic. Chosen from the
+     frozen stages (most heading change, closest to the median, most traffic candidates, detected standstills and cuts). Cayolle has no stage and no
+     clip.
+   - `rsm.bench.clips cut [--again]` copies the coded frames from the keyframe at or before the wanted start into `test-data/clips/<id>/` and checks
+     that the clip's first decoded frame equals the source frame (on Gotthard, with B-frames, a seek just after a keyframe fell back one GOP, about
+     6 s: the cut now aims between two keyframes). `clip.json` holds the exact start in source seconds.
+   - Horizon option: the motion step takes `P["calibration"]` (the `motion.json` of the source's stage) and uses its horizon calibration instead of
+     calibrating on the clip (`vmsx.motion.analyse_parallel(calibration=...)`); `stepcache.step_keys` keys motion and rotation by it. Without the
+     option the image side is unchanged (Gotthard rebuilt and compared, then the 12 stages rekeyed: `rsm.bench.stages rekey --reason`).
+   - Seed of the traffic candidates: the candidate fits of a disturbed pair are random samples seeded by the pair index. In a clip that index
+     counts from the clip's first frame, so a clip drew other candidates than the whole video, picked other fits, and on Bavaria the cut at
+     521.5 s was not confirmed (the inliers around it differed). The motion step now takes `P["frame0"]` (the clip's first frame in the source)
+     and seeds with the source index (`vmsx.motion.pair_row(seed0=...)`); with it the per-second speed of every clip correlates 0.99-1.00 with
+     its stage window and the speed ratio is 1.00.
+   - Scores: parity against the stage window for every clip (`vs_full_v_corr`, `vs_full_v_ratio`, `vs_full_yaw_corr`), the fine metrics against
+     the verified track on Pontaix only, and events (`cut_at`, `still`: none missed, none false). Bounds per clip (`checks`) from the first run.
+   - T1: `tests/test_t1_clips.py`, marker `clips`, deselected by default (`pytest.ini`); `scripts/heavy.sh .venv/bin/python -m pytest -m clips`.
+     T0: `tests/test_clips.py` (cut on a synthetic video, events, checks, keys, verified reference).
 4. **Route on stages (C):** `regress.py --stages`, short route cases, T2.
-5. **Long videos (D):** cut `roanne-10m` and `gotthard-start`, repoint `e2e.rs`, rebuild `runs/`, T3.
+5. **Long videos (D):** cut `pontaix-10m` and `gotthard-start`, repoint `e2e.rs`, rebuild `runs/`, T3.
 6. **Clean up:** no test reads `sources/` any more (a T0 test checks that no test or case path points into it); `sources/` stays for T4 (D1).
 
 ## 5. Data and time
@@ -294,7 +314,7 @@ the YouTube link, the licence note and the truth that exists.
 |---|---|---|
 | D1 | Keep the full sources (about 90 GB) in `test-data/sources/` after step 6? Without them T4 cannot rebuild the stages after an image-side change. | keep them; tests never read them |
 | D2 | App projects whose video moves: leave them broken, relink them in the app, or leave a symlink at the old place? | relink the few you still need; no symlinks |
-| D3 | The two long videos: `roanne-10m` and `gotthard-start` (480p)? Alternative to Gotthard: Madone 0:00-10:00 (4K, landmarks, no odometry failure). | Roanne + Gotthard |
+| D3 | The two long videos: `roanne-10m` and `gotthard-start` (480p)? Alternative to Gotthard: Madone 0:00-10:00 (4K, landmarks, no odometry failure). | decided 2026-11-19 (left to Claude by the maintainer): Pontaix + Gotthard |
 | D4 | Clips by stream copy (source pixels, about 18-85 MB per 30 s) instead of the bench's grey re-encode? | stream copy |
 | D5 | The removal list of step 0a, including the loss of the Clue cut test. | as listed |
-| D6 | Long video 1: `roanne-10m` (coarse GPS, today's e2e default) or `pontaix-10m` (verified truth, timed scores possible)? | `pontaix-10m` |
+| D6 | Long video 1: `roanne-10m` (coarse GPS, today's e2e default) or `pontaix-10m` (verified truth, timed scores possible)? | decided 2026-11-19 (left to Claude): `pontaix-10m` |

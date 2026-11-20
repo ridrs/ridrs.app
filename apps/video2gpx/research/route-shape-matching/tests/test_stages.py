@@ -81,3 +81,17 @@ def test_the_stage_list_names_existing_sources():
         c = ST.case(sid)
         assert c["video"].startswith("$V2G_TEST_DATA/sources/") or c["video"].startswith("$RSM_VIDEOS/"), c
         assert len(c["bbox"]) == 4
+
+
+def test_rekey_gives_a_stale_stage_the_current_keys_and_keeps_the_old(tmp_path):
+    code = _copy_code(tmp_path)
+    src = _source(tmp_path)
+    out = ST.freeze("x", _run_dir(tmp_path), src, tmp_path / "sources", dict(P, video=str(src)), tmp_path / "stages", root=code)
+    old = json.loads((out / "stage.json").read_text())["code"]
+    f = code / "rsm" / "pipeline" / "standstill.py"
+    f.write_text(f.read_text() + "\n# a comment\n")
+    assert ST.status(out, root=code) == "stale"
+    s = ST.rekey("x", "a comment only", root=code, out_root=tmp_path / "stages")
+    assert ST.status(out, root=code) == "fresh"
+    assert s["rekeyed"][0]["old"] == old and s["rekeyed"][0]["reason"] == "a comment only"
+    assert len(ST.rekey("x", "again", root=code, out_root=tmp_path / "stages")["rekeyed"]) == 1     # nothing to do: no second entry

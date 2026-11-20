@@ -3,6 +3,7 @@
 
     scripts/heavy.sh .venv/bin/python -m rsm.bench.stages make [--only roanne,gotthard]   # T4: motion + rotation of the full sources, then freeze
     .venv/bin/python -m rsm.bench.stages check [--verify-source]                         # fresh / stale / missing per stage (exit 1 if not all fresh)
+    .venv/bin/python -m rsm.bench.stages rekey --reason "..."                             # new keys without T4, for a change shown to change no result
 
 A stage is the contract between the image side and the route side: motion/ and rotation/ of one whole source video (rotation/ includes the sure
 standstills), plus stage.json (source sha256, window, params, horizon, step keys of motion and rotation by the source hash, frozen.json hash, GPS
@@ -112,6 +113,20 @@ def status(d: Path, root: Path = ROOT) -> str:
     return "fresh" if SC.step_keys(root, P, IMAGE_STEPS, video_sig=s["source"]["sha256"]) == s["code"] else "stale"
 
 
+def rekey(sid: str, reason: str, root: Path = ROOT, out_root: Path = STAGES) -> dict:
+    """give a stale stage the step keys of the current code without running T4, for a change that leaves motion/ and rotation/ as they are (a
+    pass-through option, a comment); `reason` names the change and how that was shown, and stage.json keeps the old keys in `rekeyed`"""
+    f = Path(out_root) / sid / "stage.json"
+    s = json.loads(f.read_text())
+    P = dict(s["params"], video=str(SOURCES / s["source"]["path"]))
+    new = SC.step_keys(root, P, IMAGE_STEPS, video_sig=s["source"]["sha256"])
+    if new != s["code"]:
+        s.setdefault("rekeyed", []).append(dict(date=time.strftime("%Y-%m-%dT%H:%M:%S"), old=s["code"], reason=reason))
+        s["code"] = new
+        f.write_text(json.dumps(s, indent=1, default=float) + "\n")
+    return s
+
+
 def make(sid: str, root: Path = ROOT, out_root: Path = STAGES, log=print, reuse_work: bool = False) -> Path:
     """T4 for one source: motion + rotation of the whole video with the code under root, then freeze. reuse_work: freeze a finished
     work/stages/<id>/ of an earlier make (after a failed freeze) instead of running the steps again"""
@@ -140,6 +155,9 @@ def main(argv=None) -> int:
     m = sub.add_parser("make")
     m.add_argument("--only", default=None, help="comma-separated stage ids (default: all of STAGE_IDS)")
     m.add_argument("--reuse-work", action="store_true", help="freeze a finished work/stages/<id>/ instead of running motion and rotation again")
+    rk = sub.add_parser("rekey", help="new step keys without T4, for a change shown to leave the image results as they are")
+    rk.add_argument("--only", default=None, help="comma-separated stage ids (default: all of STAGE_IDS)")
+    rk.add_argument("--reason", required=True, help="the change and how it was shown to leave motion/ and rotation/ unchanged")
     ch = sub.add_parser("check")
     ch.add_argument("--verify-source", action="store_true", help="also hash the source videos (slow) and compare with stage.json")
     ch.add_argument("--only", default=None, help="comma-separated stage ids (default: all of STAGE_IDS)")
@@ -155,6 +173,10 @@ def main(argv=None) -> int:
                 failed.append(sid)
         print("failed: " + ", ".join(failed) if failed else "all stages frozen")
         return 1 if failed else 0
+    if a.cmd == "rekey":
+        for sid in ids:
+            print(f"{sid:10s} {'rekeyed' if rekey(sid, a.reason).get('rekeyed') else 'unchanged'}")
+        return 0
     bad = 0
     for sid in ids:
         st = status(STAGES / sid)

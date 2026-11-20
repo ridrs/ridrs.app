@@ -19,19 +19,30 @@ _PT = re.compile(r'<trkpt lat="([-\d.]+)" lon="([-\d.]+)">(.*?)</trkpt>', re.S)
 
 
 def load_gpx(name: str):
-    txt = (ROOT / name / "track.gpx").read_text()
+    """the Van Gestel track of a ride: lat, lon, GPS seconds since its first point"""
+    lat, lon, tt = read_gpx(ROOT / name / "track.gpx")
+    return lat, lon, tt - tt[0]
+
+
+def read_gpx(path: Path):
+    """lat, lon, POSIX seconds of every track point of a GPX file"""
+    txt = Path(path).read_text()
     lat, lon, tt = [], [], []
     for m in _PT.finditer(txt):
         lat.append(float(m.group(1)))
         lon.append(float(m.group(2)))
         tt.append(datetime.fromisoformat(re.search(r"<time>([^<]+)</time>", m.group(3)).group(1).replace("Z", "+00:00")).timestamp())
-    return np.array(lat), np.array(lon), np.array(tt) - tt[0]
+    return np.array(lat), np.array(lon), np.array(tt)
 
 
 def gps_base(name: str, crs: str, step: float = 1.0, sm: float = 2.0) -> dict:
     """GPS curve in the CRS `crs` on a 1 m grid: s, theta (unwrapped heading), tg (GPS seconds), x, y (2 m Gaussian)"""
+    return curve(*load_gpx(name), crs, step, sm)
+
+
+def curve(lat, lon, t, crs: str, step: float = 1.0, sm: float = 2.0) -> dict:
+    """a track (lat, lon, seconds t) in the CRS `crs` on a 1 m grid: s, theta (unwrapped heading), tg (t at s), x, y (2 m Gaussian)"""
     from pyproj import Transformer
-    lat, lon, t = load_gpx(name)
     x, y = Transformer.from_crs(4326, crs, always_xy=True).transform(lon, lat)
     x, y = np.asarray(x), np.asarray(y)
     d = np.concatenate([[0], np.cumsum(np.hypot(np.diff(x), np.diff(y)))])

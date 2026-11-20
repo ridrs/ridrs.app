@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""development tools of the bench (docs/CONCEPT_fast_testing.md): step cache keys, scan memo, clip window choice"""
+"""development tools of the bench (docs/CONCEPT_fast_testing.md): step cache keys, scan memo"""
 import shutil
 from pathlib import Path
 
 import numpy as np
 
-from rsm.bench import clips as CL, stepcache as SC
+from rsm.bench import stepcache as SC
 
 ROOT = Path(__file__).resolve().parents[1]
 P = dict(video=__file__, bbox=dict(south=0, west=0, north=1, east=1), pbf="", vehicle="auto")
@@ -55,15 +55,6 @@ def test_store_and_fetch_round_trip(tmp_path):
     e = tmp_path / "other"
     assert SC.fetch(tmp_path / "cache", "c", "refine", "k", e) and (e / "refine" / "x.txt").read_text() == "1"
     assert not SC.fetch(tmp_path / "cache", "c", "refine", "other-key", e)
-
-
-def test_clip_windows_are_apart_and_cover_the_categories():
-    rows = [dict(t0=float(t), usable=1.0 if t != 300 else 0.4, speed=5.0 + (t == 900) * 5, turn=1.0 + (t == 600) * 9) for t in range(60, 1500, 15)]
-    picks = CL._pick(rows)
-    cats = dict(picks)
-    assert cats["turns"] == 600 and cats["fast"] == 900 and cats["weak"] == 300 and "typical" in cats
-    t = sorted(t for _, t in picks)
-    assert np.all(np.diff(t) >= CL.DUR)
 
 
 def test_checkpoint_score_measures_the_distance_at_the_checkpoint_second(tmp_path):

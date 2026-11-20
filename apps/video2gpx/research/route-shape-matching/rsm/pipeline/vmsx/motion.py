@@ -356,8 +356,9 @@ class Destatic:
 
 
 def pair_row(tracker: Tracker, prev: np.ndarray, frame: np.ndarray, idx: int, t: float, horizon: float, min_res: float, dt: float, width: int, height: int,
-             raw: tuple[np.ndarray, np.ndarray] | None = None) -> list:
-    """The csv row (COLUMNS) of one frame pair. `prev` / `frame` are the frames the fit tracks (destatic-filtered in `analyse`); `raw` = the plain pair:
+             raw: tuple[np.ndarray, np.ndarray] | None = None, seed0: int = 0) -> list:
+    """The csv row (COLUMNS) of one frame pair. `seed0` + `idx` seeds the candidate fits: a clip of a video passes the index of its first frame in
+    the video, so a pair gets the candidates it gets in the whole video. `prev` / `frame` are the frames the fit tracks (destatic-filtered in `analyse`); `raw` = the plain pair:
     the frame difference (`diff`, scene cuts) comes from it, and the fit falls back to it when the filtered pair gives none."""
     ra, rb = raw if raw is not None else (prev, frame)
     small_a = ra[::4, ::4].astype(np.int16)
@@ -373,7 +374,7 @@ def pair_row(tracker: Tracker, prev: np.ndarray, frame: np.ndarray, idx: int, t:
     s, c, a, b, r = fit.params[:5]
     alts = ''
     if ALT_TRIGGER > 0 and fit.rms > ALT_TRIGGER * tracker.scale:
-        cands = candidates(mid, flow, width / 2, height / 2, horizon, tracker.scale, seed=int(idx))
+        cands = candidates(mid, flow, width / 2, height / 2, horizon, tracker.scale, seed=int(idx) + int(seed0))
         if cands:
             alts = ';'.join([_alt_text(fit.params, int(fit.inliers.sum()), fit.rms)] + [_alt_text(p, k, e) for p, k, e in cands])
     return [
@@ -460,9 +461,10 @@ def analyse(
     road_width: float | None = ROAD_WIDTH,
     on_progress=None,
     calibration: dict | None = None,
+    seed0: int = 0,
 ) -> dict:
     """Write one row per analysed frame pair to `out_csv`; return run statistics. `calibration`: a result of `calibrate_horizon` for this video and
-    height, used instead of calibrating again (with `horizon` None)."""
+    height, used instead of calibrating again (with `horizon` None). `seed0`: see `pair_row` (0 for a whole video)."""
     info = probe(path)
     width = round(info.width * height / info.height / 2) * 2
     t0 = time.perf_counter()
@@ -494,7 +496,7 @@ def analyse(
             if prev is not None:
                 # Time of the pair: the middle between its two frames, s into the video.
                 t = start + (idx - step / 2) / info.fps
-                w.writerow(pair_row(tracker, prev_f, frame_f, idx, t, horizon, min_res, dt, width, height, raw=(prev, frame) if filt is not None else None))
+                w.writerow(pair_row(tracker, prev_f, frame_f, idx, t, horizon, min_res, dt, width, height, raw=(prev, frame) if filt is not None else None, seed0=seed0))
                 n += 1
                 if on_progress is not None and n % 60 == 0:
                     now = time.perf_counter()
@@ -581,7 +583,8 @@ def _par_chunk(job: tuple[dict, int, int | None]) -> dict:
             frame_f = filt(frame) if filt is not None else frame
             if prev is not None and j > a:
                 t = (j - 0.5) / info.fps          # = start + (idx - step / 2) / fps of `analyse` with start 0, step 1
-                w.writerow(pair_row(tracker, prev_f, frame_f, j, t, X['horizon'], X['min_res'], X['dt'], width, height, raw=(prev, frame) if filt is not None else None))
+                w.writerow(pair_row(tracker, prev_f, frame_f, j, t, X['horizon'], X['min_res'], X['dt'], width, height, raw=(prev, frame) if filt is not None else None,
+                                    seed0=X['seed0']))
                 n += 1
             prev, prev_f = frame, frame_f
             if b is not None and j >= b:
@@ -594,10 +597,10 @@ def _par_chunk(job: tuple[dict, int, int | None]) -> dict:
 
 
 def analyse_parallel(path: str, out_csv: str, height: int = 360, workers: int = 4, chunk_s: float = CHUNK_S, hwaccel: bool = True,
-                     on_progress=None, log=None) -> dict:
+                     on_progress=None, log=None, calibration: dict | None = None, seed0: int = 0) -> dict:
     """`analyse` of the whole video (step 1, start 0, calibrated horizon) with the pairs spread over `workers` processes. The csv is byte-identical:
     each chunk is checked against its neighbour (WARM_FRAMES + 1 overlap frames by hash, last frame index). If the stream timing is irregular or a
-    check fails, the sequential `analyse` runs instead (same calibration) and `parallel.fallback` says why."""
+    check fails, the sequential `analyse` runs instead (same calibration) and `parallel.fallback` says why. `calibration`, `seed0`: as in `analyse`."""
     log = log or (lambda level, msg: None)
     info = probe(path)
     width = round(info.width * height / info.height / 2) * 2
@@ -613,14 +616,14 @@ def analyse_parallel(path: str, out_csv: str, height: int = 360, workers: int = 
     mpc = mp.get_context('fork')
     _STOP = mpc.Event()
     with mpc.Pool(max(1, workers), initializer=_worker_init) as pool:
-        cal = calibrate_horizon(path, height, hwaccel=hwaccel, pool=pool)
+        cal = calibration if calibration is not None else calibrate_horizon(path, height, hwaccel=hwaccel, pool=pool)
         t_cal = time.perf_counter() - t0
         horizon = cal['horizon']
         top = int(max(height * 0.45, horizon + BELOW_HORIZON * height))
         bottom = height - round(ABOVE_BOTTOM * height)
         if why is None:
             ctx = dict(path=path, info=info, height=height, width=width, hwaccel=hwaccel, top=top, bottom=bottom, horizon=horizon, road_width=ROAD_WIDTH,
-                        min_res=MIN_RESIDUAL * height / 360, dt=1 / info.fps)
+                        min_res=MIN_RESIDUAL * height / 360, dt=1 / info.fps, seed0=int(seed0))
             done: dict[int, dict] = {}
             nxt, pairs, last_cb = 0, 0, 0.0
             tmp = out_csv + '.part'
@@ -659,7 +662,7 @@ def analyse_parallel(path: str, out_csv: str, height: int = 360, workers: int = 
     _STOP = None
     if why is not None:
         log('warn', f'motion: parallel analysis not used ({why}); sequential analysis')
-        st = analyse(path, out_csv, height=height, step=1, hwaccel=hwaccel, on_progress=on_progress, calibration=cal)
+        st = analyse(path, out_csv, height=height, step=1, hwaccel=hwaccel, on_progress=on_progress, calibration=cal, seed0=seed0)
         st['calibration_seconds'] = t_cal
         st['seconds'] += t_cal
         st['parallel'] = dict(workers=1, fallback=why)
