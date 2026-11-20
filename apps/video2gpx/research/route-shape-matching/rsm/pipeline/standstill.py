@@ -10,7 +10,8 @@ Candidates are cheap to find from the stored series (vms speed below STILL_GATE_
 (about 20-45 s per video hour on Amalfi). Long candidate runs are tested densely near their ends and sparsely inside; where two neighbouring samples
 disagree, every window between them is tested (a stop inside a run whose ends still creep).
 
-Result: route_search/standstill.json, spans [t0, t1) of SURE standstill. Every route-side step treats them as measured (zero distance, far-only heading),
+Result: rotation/standstill.json, spans [t0, t1) of SURE standstill, written at the end of the rotation step (the image side: the route side never
+reads the video). Every route-side step treats them as measured (zero distance, far-only heading),
 and the fusion holds the position there (steps_c.fuse). A measurement gap (odofail failure, cut, darkness) is something else and stays free.
 """
 from __future__ import annotations
@@ -179,7 +180,7 @@ def _blocks(ts) -> list[np.ndarray]:
 
 
 def detect(d: Path, video: str, progress=None) -> dict:
-    """decode the candidate windows, test them, write route_search/standstill.json -> its content"""
+    """decode the candidate windows, test them, write rotation/standstill.json -> its content"""
     from .vmsx.decode import frames, probe
     d = Path(d)
     t0 = time.time()
@@ -212,14 +213,14 @@ def detect(d: Path, video: str, progress=None) -> dict:
     res = dict(version=VERSION, spans=sp, n_candidates=int(sum(len(r) for r, _ in runs)), n_runs=len(runs), n_tested=len(rows), seconds=round(time.time() - t0, 1),
                params=dict(gate_rel=C.STILL_GATE_REL, gate_far=C.STILL_GATE_FAR, base_s=C.STILL_BASE_S, thr_px=C.STILL_THR_PX, all=C.STILL_ALL, up=C.STILL_UP,
                            min_s=C.STILL_MIN_S), windows=rows)
-    (d / "route_search").mkdir(exist_ok=True)
-    (d / "route_search" / "standstill.json").write_text(json.dumps(res, indent=1))
+    (d / "rotation").mkdir(exist_ok=True)
+    (d / "rotation" / "standstill.json").write_text(json.dumps(res, indent=1))
     return res
 
 
 def load_spans(d: Path) -> list[tuple[float, float]]:
     """the sure spans of project d ([] when switched off or not detected yet)"""
-    f = Path(d) / "route_search" / "standstill.json"
+    f = Path(d) / "rotation" / "standstill.json"
     if not C.STILL_ON or not f.exists():
         return []
     return [(float(a), float(b)) for a, b in json.loads(f.read_text())["spans"]]

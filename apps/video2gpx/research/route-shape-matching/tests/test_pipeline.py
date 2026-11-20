@@ -1548,3 +1548,87 @@ def test_retime_writes_the_gpx_raster(tmp_path):
     ns = {"g": "http://www.topografix.com/GPX/1/1"}
     tx = [t.text for t in ET.parse(tmp_path / "route.gpx").getroot().findall(".//g:trkpt/g:time", ns)]
     assert tx == ["2000-01-01T00:00:00Z", "2000-01-01T00:00:00.200Z", "2000-01-01T00:00:00.400Z", "2000-01-01T00:00:00.600Z"]
+
+
+# ------------------------------------------------------------------ contract: the route side never reads the video (docs/CONCEPT_test_strategy.md, A)
+ROUTE_STEPS = ("map_step", "route_search", "plausibility", "refine", "gpx_step")
+
+
+def _no_video(monkeypatch):
+    """every way the pipeline decodes a video raises"""
+    import cv2
+    from rsm.pipeline import cuts as K
+    from rsm.pipeline.vmsx import decode as DEC
+
+    def boom(*a, **k):
+        raise AssertionError("a route-side step read the video")
+    for mod, name in ((DEC, "frames"), (DEC, "probe"), (K, "grey_frames"), (K, "probe"), (cv2, "VideoCapture")):
+        if hasattr(mod, name):
+            monkeypatch.setattr(mod, name, boom)
+
+
+def test_route_search_runs_without_the_video(tmp_path, monkeypatch):
+    """with a finished image side (motion.json present, standstills in rotation/) and a video path that does not exist, route_search reads no frame"""
+    from rsm.pipeline import steps_b
+    _no_video(monkeypatch)
+    monkeypatch.setattr(steps_b, "_search", lambda d, P, W, g, E, st, cons, label="scan": dict(
+        step_t=np.arange(3.0), step_cell=np.arange(3), f_eff=400.0, kappa=1.2, a_ang=1.1, score=-1.0, score_per_km=-1.0, km=1.0,
+        surface=dict(interior_f=True, interior_kappa=True, best_minus_median=9.0), conf_mean=0.99, conf_below_half=0.0, edge_share=0.0,
+        _ll=np.array([[5.0, 45.0]] * 3), _xy=np.zeros((3, 2)), post=None))
+    monkeypatch.setattr(steps_b.T, "steps_of", lambda tr: type("S", (), {"km": 1.0})())
+    monkeypatch.setattr(steps_b, "load_map", lambda d, n: (None, np.arange(3)))
+    import pickle
+    for k in ("rotation", "motion", "map"):
+        (tmp_path / k).mkdir()
+    pickle.dump([], open(tmp_path / "rotation" / "tracks.pkl", "wb"))
+    (tmp_path / "motion" / "motion.json").write_text(json.dumps(dict(horizon=170.0)))
+    (tmp_path / "motion" / "summary.json").write_text(json.dumps(dict(usable_share=1.0)))
+    (tmp_path / "rotation" / "summary.json").write_text(json.dumps(dict(features=dict(yaw_ratio=1.0))))
+    (tmp_path / "rotation" / "vehicle.json").write_text(json.dumps(dict(requested="bike", effective="bike")))
+    (tmp_path / "rotation" / "standstill.json").write_text(json.dumps(dict(version=2, spans=[])))
+
+    class W:
+        def progress(self, *a, **k): pass
+        def log(self, level, msg): pass
+        def status(self, sig, lev, val, msg): pass
+    out = steps_b.route_search(tmp_path, dict(bbox=dict(south=44.0, west=4.0, north=45.0, east=5.0), video=str(tmp_path / "missing.mp4")), W())
+    assert out["edge_set"] == "real"
+    assert (tmp_path / "rotation" / "standstill.json").exists()          # the image side's result stays; route_search does not own it
+
+
+def test_route_side_modules_call_no_decoder():
+    """the modules of the route-side steps call no video decoder (P["video"] may still name the result, as gpx_step does with the file stem)"""
+    import inspect
+    from rsm.pipeline import odofail, steps_b, steps_c, steps_d
+    assert all(hasattr(m, n) for m in (steps_b, steps_c, steps_d) for n in ROUTE_STEPS if n in vars(m)) and \
+        {n for m in (steps_b, steps_c, steps_d) for n in ROUTE_STEPS if n in vars(m)} == set(ROUTE_STEPS)
+    for m in (steps_b, steps_c, steps_d, odofail):
+        src = inspect.getsource(m)
+        for tok in ("vmsx.decode", "frames(", "probe(", "VideoCapture", "grey_frames", "SS.detect", "veto_same_scene", "ffmpeg"):
+            assert tok not in src, (m.__name__, tok)
+
+
+def test_standstill_is_part_of_the_rotation_step(tmp_path, monkeypatch):
+    """steps_a.standstill: detection with the video into rotation/standstill.json; a stale file goes when the detection does not run"""
+    from rsm.pipeline import steps_a
+    (tmp_path / "rotation").mkdir(); (tmp_path / "motion").mkdir()
+    (tmp_path / "motion" / "motion.json").write_text("{}")
+    seen = []
+
+    def fake_detect(d, video, progress=None):
+        seen.append(video)
+        (Path(d) / "rotation" / "standstill.json").write_text(json.dumps(dict(spans=[[1.0, 4.0]])))
+        return dict(spans=[[1.0, 4.0]], n_candidates=1, n_runs=1, n_tested=1, seconds=0.0)
+    monkeypatch.setattr(steps_a.SS, "detect", fake_detect)
+
+    class W:
+        ev = []
+        def progress(self, *a, **k): pass
+        def log(self, level, msg): pass
+        def status(self, sig, lev, val, msg): self.ev.append(sig)
+    w = W()
+    steps_a.standstill(tmp_path, dict(video="/v.mp4"), w)
+    assert seen == ["/v.mp4"] and "standstill" in w.ev
+    assert json.loads((tmp_path / "rotation" / "standstill.json").read_text())["spans"] == [[1.0, 4.0]]
+    steps_a.standstill(tmp_path, dict(), w)                               # no video: nothing detected, no stale result left
+    assert not (tmp_path / "rotation" / "standstill.json").exists()

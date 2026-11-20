@@ -180,7 +180,7 @@ def far_heading_of(csv: str | None):
 
 
 def still_spans_of(csv: str | None) -> list[tuple[float, float]]:
-    """sure standstill spans of the project (route_search/standstill.json next to motion/motion.csv), [] if none"""
+    """sure standstill spans of the project (rotation/standstill.json next to motion/motion.csv), [] if none"""
     if csv is None or not C.STILL_ON:
         return []
     return SS.load_spans(Path(csv).parent.parent)

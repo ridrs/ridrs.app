@@ -67,10 +67,10 @@ def test_plan_and_spans():
 
 
 def _project(tmp_path, still, phantom=(30.0, 40.0)):
-    """motion.csv at 10 Hz, 3 nominal m/s, phantom speed inside `phantom` (passing traffic), and route_search/standstill.json"""
+    """motion.csv at 10 Hz, 3 nominal m/s, phantom speed inside `phantom` (passing traffic), and rotation/standstill.json"""
     d = tmp_path / "out"
     (d / "motion").mkdir(parents=True)
-    (d / "route_search").mkdir()
+    (d / "rotation").mkdir()
     dt = 0.1
     t = np.arange(dt / 2, 80.0, dt)
     k = C.F360 * OF.CAMERA_HEIGHT_M
@@ -79,7 +79,7 @@ def _project(tmp_path, still, phantom=(30.0, 40.0)):
     rows = ["frame,time,corners,tracked,inliers,rms_px,s,c,yaw,pitch,roll,diff,rel_speed"]
     rows += [f"{i + 1},{x:.4f},200,190,180,0.1,{v:.6e},0,0,0,0,3.0,{v / dt:.6e}" for i, (x, v) in enumerate(zip(t, s))]
     (d / "motion" / "motion.csv").write_text("\n".join(rows) + "\n")
-    (d / "route_search" / "standstill.json").write_text(json.dumps(dict(version=1, spans=still)))
+    (d / "rotation" / "standstill.json").write_text(json.dumps(dict(version=1, spans=still)))
     s_cum = np.concatenate([[0.0], np.cumsum(s * k)])
     t_e = np.concatenate([[0.0], t + dt / 2])
     grid = np.arange(0.0, s_cum[-1], 4.0)
@@ -98,7 +98,7 @@ def test_route_steps_measure_a_sure_standstill_as_zero(tmp_path):
     assert info["still"] == [[30.0, 40.0]]
     g = st.gap & (st.t > 30.0) & (st.t <= 41.0)
     assert g.any() and st.mu[g].sum() < 8.0
-    (d / "route_search" / "standstill.json").write_text(json.dumps(dict(version=1, spans=[])))
+    (d / "rotation" / "standstill.json").write_text(json.dumps(dict(version=1, spans=[])))
     st0, _ = OF.build(tracks, csv, d0=4.0)                     # without the span: the phantom distance stays (9 m nominal)
     m0 = (st0.t > 30.0) & (st0.t <= 40.0)
     assert st0.mu[m0].sum() >= 8.0

@@ -292,7 +292,7 @@ CUT_SAME_SHARE = 0.2
 CUT_SAME_WIN_S = 0.12       # frames decoded +- this around the cut; the jump pair is the largest frame difference in it
 CUT_SAME_H = 270            # rows of the decoded grey frames (width 16:9 x this)
 
-# --- sure standstill (standstill.py, work/standstill): the camera stands while other vehicles pass. Detected at the start of route_search, used by every
+# --- sure standstill (standstill.py, work/standstill): the camera stands while other vehicles pass. Detected at the end of rotation, used by every
 # route-side step (odofail.build: the tracks are split there, the gap gets a measured ~0 distance and far-only heading) and by the fusion of refine (the position
 # is HELD inside a span: no distance, no measurements). PROVISIONAL: thresholds from 306 labelled windows of four videos (Amalfi, Verdon, Gotthard, Bavaria),
 # P 0.94 / R 0.98, no held-out video yet.

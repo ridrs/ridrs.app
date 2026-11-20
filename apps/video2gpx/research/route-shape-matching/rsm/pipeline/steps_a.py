@@ -18,7 +18,7 @@ from rsm.farrot import model, series as fser
 from rsm.odometry import gating, heading
 from rsm.odometry.vms_csv import load_pairs
 
-from . import config as C, cuts as K, osm, resources as R, tracks as T
+from . import config as C, cuts as K, osm, resources as R, standstill as SS, tracks as T
 from .common import Worker, ffmpeg_bin, ffprobe_bin, hwaccel_enabled, jdump, jload
 from .vmsx import motion as vm
 from .vmsx.decode import probe
@@ -243,6 +243,24 @@ def rotation(d: Path, P: dict, W: Worker):
     return rotation_series(d, P, W, meta)
 
 
+def standstill(d: Path, P: dict, W: Worker):
+    """sure standstills (standstill.py) from the motion and rotation results and the video: rotation/standstill.json. Part of the image side, so that
+    no route-side step reads the video."""
+    f = d / "rotation" / "standstill.json"
+    if f.exists():
+        f.unlink()                               # never a stale result of an earlier run
+    if not (C.STILL_ON and P.get("video") and (d / "motion" / "motion.json").exists()):
+        return
+    ss = SS.detect(d, P["video"], lambda x: W.progress(97.0 + 2.0 * min(1.0, x), "standstill"))
+    mm = lambda t: f"{int(t) // 60}:{int(t) % 60:02d}"
+    if ss["spans"]:
+        W.status("standstill", "good", float(sum(b - a for a, b in ss["spans"])), f"the camera stands in {len(ss['spans'])} places although the picture moves "
+                 "(passing traffic): " + ", ".join(f"{mm(a)}-{mm(b)}" for a, b in ss["spans"][:6]) + (f" and {len(ss['spans']) - 6} more" if len(ss["spans"]) > 6 else "")
+                 + "; there the position is held")
+    W.log("info", f"standstill test: {ss['n_candidates']} candidate windows in {ss['n_runs']} runs, {ss['n_tested']} tested, {len(ss['spans'])} sure spans, "
+                  f"{ss['seconds']:.0f} s")
+
+
 def rotation_series(d: Path, P: dict, W: Worker, meta: dict | None = None):
     """second half of the rotation step, from the far-feature windows (rotation/win_video_base.npz) on: series, tracks, scene cuts, vehicle guess.
     `meta`: the windows' meta as the first half made it (None: as stored in the npz)."""
@@ -259,6 +277,7 @@ def rotation_series(d: Path, P: dict, W: Worker, meta: dict | None = None):
     pickle.dump(tr, open(out / "tracks.pkl", "wb"))
     cut_sp = [(float(c.get("t_first", c["t"])), float(c.get("t_last", c["t"]))) for c in jload(out / "cuts.json")["cuts"]] if (C.CUT_ON and (out / "cuts.json").exists()) else []
     T.save_far_heading(out / "far_heading.npz", T.far_heading(S, cut_sp))     # far-only heading for the vms speed gaps (odofail.build, ROT_BRIDGE_ON)
+    standstill(d, P, W)
     st = T.steps_of(tr)
     yn = T.yaw_noise(tr)
     ratio = yn / C.BIKE_YAW_NOISE

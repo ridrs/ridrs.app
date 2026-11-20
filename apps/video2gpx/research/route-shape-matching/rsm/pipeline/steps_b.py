@@ -15,7 +15,7 @@ from rsm.hmm import grid, seq
 from rsm.hmm_cal import dp
 from rsm.network.graph import NetGraph
 
-from . import anchors as AN, calib as CB, config as C, hints as HI, odofail as OF, osm, standstill as SS, tracks as T, verdict as V
+from . import anchors as AN, calib as CB, config as C, hints as HI, odofail as OF, osm, tracks as T, verdict as V
 from .common import Worker, data_dir, file_sig, jdump, jload, sha
 
 
@@ -639,18 +639,6 @@ def route_search(d: Path, P: dict, W: Worker):
     out = d / "route_search"
     out.mkdir(exist_ok=True)
     tr = pickle.load(open(d / "rotation" / "tracks.pkl", "rb"))
-    f_still = out / "standstill.json"
-    if f_still.exists():
-        f_still.unlink()                         # never a stale result of an earlier run
-    if C.STILL_ON and P.get("video") and (d / "motion" / "motion.json").exists():   # sure standstills first: every route-side step reads them (odofail.build, standstill.py)
-        ss = SS.detect(d, P["video"], lambda f: W.progress(min(1.0, f), "standstill"))
-        mm = lambda t: f"{int(t) // 60}:{int(t) % 60:02d}"
-        if ss["spans"]:
-            W.status("standstill", "good", float(sum(b - a for a, b in ss["spans"])), f"the camera stands in {len(ss['spans'])} places although the picture moves "
-                     "(passing traffic): " + ", ".join(f"{mm(a)}-{mm(b)}" for a, b in ss["spans"][:6]) + (f" and {len(ss['spans']) - 6} more" if len(ss["spans"]) > 6 else "")
-                     + "; there the position is held")
-        W.log("info", f"standstill test: {ss['n_candidates']} candidate windows in {ss['n_runs']} runs, {ss['n_tested']} tested, {len(ss['spans'])} sure spans, "
-                      f"{ss['seconds']:.0f} s")
     st, odo = OF.build(tr, str(d / "motion" / "motion.csv"))
     if odo["spans"]:
         mm = lambda t: f"{int(t) // 60}:{int(t) % 60:02d}"

@@ -75,7 +75,7 @@ test-data/
   long/<id>/case.json               window in the source, bbox, pbf, truth (track.gpx cut to the window, or checkpoints)
   clips/<id>/clip.mp4               short clips, 20-75 s
   clips/<id>/clip.json              source id, t0, duration, class (secured / open), what it tests, expected values
-  stages/<case>/motion/ rotation/ standstill/   frozen image results of the full sources
+  stages/<case>/motion/ rotation/   frozen image results of the full sources (standstills in rotation/)
   stages/<case>/stage.json          code hash of the image side, sha256 of the source, parameters, horizon, GPS alignment
   osm/ dem/                         as today; later cut per case
   runs/                             finished runs for the app e2e (as today)
@@ -85,16 +85,48 @@ test-data/
 
 ## 3. Building blocks
 
-### A. The contract between image analysis and route
+### A. The contract between image analysis and route (built 2026-11-19, step 1)
 
-- The image side writes `motion/`, `rotation/` and, new, `standstill/`. The route side reads only these plus the map. That is the contract and
-  the format of `stages/`.
-- **Move the standstill detection to the image side** (end of `rotation`, or its own step after it). Its frame decoding then runs once with the
-  other decodes, and `route_search` no longer needs the video. Byte-identical results for a video are the acceptance test.
-- **Guard:** a T0 test runs `map` to `gpx` on a small frozen stage with `P["video"]` pointing at a path that does not exist. Any new video access
-  on the route side fails it.
-- `stage.json` records the code hash of the image side (the step-cache keys of `motion` / `rotation` / `standstill` from `stepcache.py`). T2
-  compares it with the current code: on a difference the case is reported **stale** (failed, with the hint "run T4"), never silently passed.
+- The image side (`motion`, `rotation`) writes `motion/` and `rotation/`; the sure standstills are part of it now (`rotation/standstill.json`).
+  The route side (`map`, `route_search`, `plausibility`, `refine`, `gpx`) reads only these plus the map and the DEM. That is the contract and
+  the content of `stages/`.
+- **Standstill detection moved to the image side:** `steps_a.standstill` runs at the end of the rotation step (after `far_heading.npz`, which
+  its candidates need) and writes `rotation/standstill.json`; `route_search` no longer decodes frames. The `STILL_*` parameters moved from the
+  route_search key to the rotation key (`cli.py`), so an existing project reruns rotation once on resume. The status `standstill` now comes with
+  the rotation step.
+- **Guards (T0, `tests/test_pipeline.py`):** `test_route_search_runs_without_the_video` runs route_search with a finished image side, a video path
+  that does not exist and every decoder patched to fail; `test_route_side_modules_call_no_decoder` checks that `steps_b`, `steps_c`, `steps_d`
+  and `odofail` call no decoder; `test_standstill_is_part_of_the_rotation_step`. All three fail on the code before step 1.
+  `gpx_step` still uses `P["video"]` for the name of the result (the file stem), which reads no frame.
+- **Same results (checked 2026-11-19):** the app project of Gotthard 480p (3 sure standstills) rerun from `rotation` with the code before and after
+  step 1: all 42 result files equal except timings, step hashes, the pipeline hash in `route.gpx`, and the `standstill` status, which now sits on
+  the rotation step. `route_search` took 8.8 s instead of 17.0 s; the detection moved into rotation (76 s instead of 70 s).
+
+**Format of a frozen stage** (`test-data/stages/<case>/`, written by T4 in step 2):
+
+```
+stages/<case>/
+  motion/    motion.csv  motion.json  summary.json  cuts.json
+  rotation/  win_video_base.npz  tracks.pkl  far_heading.npz  cuts.json  vehicle.json  summary.json  standstill.json
+  stage.json
+```
+
+`stage.json`:
+
+| field | content |
+|---|---|
+| `version` | 1 |
+| `case` | case id, as in `regress_cases.json` |
+| `source` | `{"id", "path"}` relative to `test-data/sources/`, `"sha256"` of the video file, `"duration_s"`, `"fps"` |
+| `window` | `[t0, t1]` video seconds the stage covers (whole video: `[0, duration]`) |
+| `params` | the case params the image side reads (`vehicle`, `intro_end`, bbox for the area status) |
+| `code` | `{"motion": key, "rotation": key}`: the step-cache keys of `stepcache.step_keys`, computed with the video signature replaced by the source sha256, so a moved source keeps its keys |
+| `frozen` | `code_hash` and `version` of `frozen.json` at the time |
+| `horizon` | the horizon of `motion.json` (for clips, B) |
+| `gps_align` | for GPS cases: the clock offset per window (what `work/vangestel/align_<name>.json` held), else null |
+| `made` | date, machine, seconds per step |
+
+T2 recomputes `code` for the current code. A difference marks the case **stale** (failed, with the hint "run T4"), never passed.
 
 ### B. Clips for the image analysis (T1)
 
@@ -122,7 +154,7 @@ test-data/
 
 ### C. Route tests on frozen stages (T2)
 
-- `regress.py` gets a mode `--stages`: the case starts at `map` with `motion/`, `rotation/`, `standstill/` copied (or cloned with `cp -c`) from
+- `regress.py` gets a mode `--stages`: the case starts at `map` with `motion/` and `rotation/` copied (or cloned with `cp -c`) from
   `stages/<case>/`. Step cache and scan memo work as before.
 - **Short route cases** cut from the frozen stages (window t0-t1 of the track series, no video): the hard spots, with checkpoints or the GPS as
   truth, 1-3 min each. Start list: Gotthard start 0:00-9:48 (odometry failure, village vs. bypass; 10 checkpoints exist), Rousset end (last 940 s
@@ -196,7 +228,7 @@ the YouTube link, the licence note and the truth that exists.
 
 ### Steps 1-6
 
-1. **Contract (A):** standstill to the image side, guard test, `stage.json` format. Byte-identical results on Roanne.
+1. **Contract (A):** standstill to the image side, guard tests, `stage.json` format; route results identical to before (done 2026-11-19).
 2. **T4 once:** frozen stages for all sources with truth (8 Van Gestel, Madone, Amalfi, Gotthard, Bavaria; about 5-6 h in the background through
    `scripts/heavy.sh`) and the GPS alignments again.
 3. **Clips (B):** cutter by stream copy, horizon option, about 20 clips, T1 as pytest marker `clips`; the clip bench reads them.
