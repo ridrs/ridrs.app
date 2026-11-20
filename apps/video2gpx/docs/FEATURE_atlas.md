@@ -50,7 +50,7 @@ result never pass a new one; only the free note for the atlas is kept.
 | Ergebnis | `confident` | `uncertain` with a note; `no_route` never |
 | Abdeckung | ≥ 90 % of the driving seconds between start and end (sure standstills do not count) have a measured position (not in a gap, not extrapolated), and no run without one is longer than 60 s | with a note |
 | Übereinstimmung mit der Atlas-Route | median distance of the driving line to the atlas route ≤ 50 m (600 evenly spread points, as the atlas computes it) | not blocking: shown only, because the atlas route may be the wrong one |
-| Schnitte | the scene cuts between start and end are listed; each piece between them is ticked as checked in the Analyse stage (no cuts: green) | with a note |
+| Schnitte | the scene cuts between start and end are listed; each piece between them is ticked as checked in the Analyse stage (no cuts: green). A jump the scene detection missed (below) is named in the detail and in `value.jumps` (`[{t, m}]`), not blocking | with a note |
 | Anfang und Ende | `t_start` / `t_end` set, inside the decoded route; default: the first and last decoded second after the intro ("Aus dem Ergebnis") | never |
 | Angesehen | ticks: the start, a hairpin or junction, and the end played against the map | with a note |
 
@@ -64,6 +64,9 @@ verdict_basis, confidence_mean, coverage, route_km, qc`.
   points left out; `c`: `[[lon, lat]]` on the driving line, 6 decimals; `e`: heights from the current elevation profile (P13/P17) by arc
   length, only when the profile is current and covers every point.
 - `cuts`: the scene-cut times inside the span (the atlas allows a position jump only there); `standstills`: `[[t0, t1]]` of the sure standstills.
+  A step faster than 252 km/h (`MAX_SPEED_MS`, the atlas's limit, measured on the rounded payload points) with no detected cut within 1 s
+  is a cut the scene detection missed: `jumpCuts` adds a cut at the middle of the step, so the atlas accepts the file. The card shows a
+  warning with the time, distance and speed of each such jump, to check in the video; a jump that is not a cut is a wrong position there.
 - `qc`: `{checks: [{id, ok, blocking, overridden, note, value}], note, checked_by: null}`; the atlas fills `checked_by` from the uploader's identity.
 
 The atlas side (validation, storage, level 2, Prüfmodus, "Route aus video2gpx übernehmen") is described in the plan and in

@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildPayload, coverageOf, cutPieces, defaultSpan, freshQc, qcFor, resultSig, jobPlan, jobVehicle, parseJob, payloadName, qcChecks, qcReady, routeAgreement, YTDLP_480P, type AtlasQcState } from "../../src/atlas.ts";
+import { buildPayload, coverageOf, cutPieces, jumpCuts, MAX_SPEED_MS, defaultSpan, freshQc, qcFor, resultSig, jobPlan, jobVehicle, parseJob, payloadName, qcChecks, qcReady, routeAgreement, YTDLP_480P, type AtlasQcState } from "../../src/atlas.ts";
 import { exampleEleAt, exampleHint, examplePoints, exampleRun, exampleStandstills, exampleState } from "./example.ts";
 
 const fx = (n: string) => readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8");
@@ -134,6 +134,47 @@ test("payload of the example result is exactly the shared example payload", () =
   const open = { ...state, viewed: { start: false, turn: false, end: false } };
   assert.throws(() => buildPayload({ job, ...exampleRun, points: examplePoints, standstills: exampleStandstills, cutTimes: [], state: open, items: checks(open) }), /Prüfliste/);
   assert.equal(freshQc(examplePoints, null).viewed.start, false);
+});
+
+// A video with a cut the scene detection missed: the position jumps 155 m in one second (like 4NgYtX5PiVo at 166 s). ridrs Scenic refuses
+// a speed over 252 km/h unless a cut lies within 1 s, so the payload marks the jump as a cut, and the checklist value names it for the hint.
+const JUMP_M = 155;
+const LON_PER_M = 1 / (111320 * Math.cos(Math.PI / 4));
+const withJump = examplePoints.map((p) => (p.t >= 31 ? { ...p, lon: Math.round((p.lon + JUMP_M * LON_PER_M) * 1e7) / 1e7 } : p));
+const speedsOk = (t: number[], c: [number, number][], cuts: number[]) => t.every((x, i) => {
+  if (!i) return true;
+  const k = Math.cos(((c[i - 1][1] + c[i][1]) / 2) * Math.PI / 180);
+  const v = Math.hypot((c[i][0] - c[i - 1][0]) * k, c[i][1] - c[i - 1][1]) * 111320 / (x - t[i - 1]);
+  return v <= MAX_SPEED_MS || cuts.some((y) => y >= t[i - 1] - 1 && y <= x + 1);
+});
+
+test("a jump faster than 252 km/h without a detected cut is marked as a cut in the payload", () => {
+  assert.equal(MAX_SPEED_MS, 70, "the same limit as the ridrs Scenic upload check");
+  const state = exampleState();
+  const found = jumpCuts(withJump, [], 5, 145);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].t, 30.5, "between the two seconds");
+  assert.deepEqual([found[0].from, found[0].to], [30, 31]);
+  assert.ok(Math.abs(found[0].m - (JUMP_M + 10)) < 1, `${found[0].m} m`);
+  const p = buildPayload({ job, ...exampleRun, points: withJump, standstills: exampleStandstills, cutTimes: [], state, items: checks(state, { points: withJump }) });
+  assert.deepEqual(p.cuts, [30.5]);
+  assert.ok(speedsOk(p.t, p.c, p.cuts), "ridrs Scenic accepts every step");
+  assert.ok(!speedsOk(p.t, p.c, []), "without the cut it would refuse the file");
+  // detected cuts come first; a jump next to a detected cut adds nothing
+  assert.deepEqual(jumpCuts(withJump, [31.4], 5, 145), []);
+  assert.deepEqual(buildPayload({ job, ...exampleRun, points: withJump, standstills: exampleStandstills, cutTimes: [31.4, 90], state,
+    items: checks({ ...state, cuts_checked: [5, 31.4, 90] }, { points: withJump, cutTimes: [31.4, 90] }) }).cuts, [31.4, 90]);
+  // outside the span, or at normal speed, nothing is marked
+  assert.deepEqual(jumpCuts(withJump, [], 40, 145), []);
+  assert.deepEqual(jumpCuts(examplePoints, [], 5, 145), []);
+});
+
+test("the checklist names a jump marked as a cut, so the export page can show it; without one the value is unchanged", () => {
+  const it = byId(checks(exampleState(), { points: withJump }), "cuts");
+  assert.equal(it.ok, true, "a hint, not a blocking item");
+  assert.deepEqual((it.value as { jumps: unknown }).jumps, [{ t: 30.5, m: 165 }]);
+  assert.match(it.detail, /1 Sprung ohne erkannten Schnitt als Schnitt eingetragen/);
+  assert.deepEqual(byId(checks(exampleState()), "cuts").value, { times: [], checked: [] }, "the shared example payload stays as it is");
 });
 
 test("the 480p import template of the plan (offered as text only, P2)", () => {

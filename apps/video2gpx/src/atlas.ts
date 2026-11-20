@@ -42,6 +42,8 @@ export const MIN_COVERAGE = 0.9;
 export const MAX_GAP_S = 60;
 /** route agreement: shown green up to this median distance, never blocking */
 export const ROUTE_AGREE_M = 50;
+/** fastest plausible step between two points (m/s, 252 km/h): ridrs Scenic refuses a faster one unless a cut lies within 1 s of it */
+export const MAX_SPEED_MS = 70;
 const AGREEMENT_SAMPLES = 600;
 const M_PER_DEG = 111320;
 
@@ -174,6 +176,20 @@ export function cutPieces(cutTimes: number[], t0: number, t1: number): [number, 
   return edges.slice(1).map((b, i) => [edges[i], b]);
 }
 
+/** a step faster than MAX_SPEED_MS with no detected cut within 1 s: a cut the scene detection missed, marked at the middle of the step */
+export interface JumpCut { t: number; from: number; to: number; m: number }
+const nearCut = (cuts: number[], a: number, b: number) => cuts.some((x) => x >= a - 1 && x <= b + 1);
+/** the jumps of the payload track between t0 and t1 (the points rounded as the payload writes them, measured as ridrs Scenic measures) */
+export function jumpCuts(points: AtlasPoint[], cutTimes: number[], t0: number, t1: number): JumpCut[] {
+  const pts = payloadPoints(points, t0, t1).map((p) => ({ t: r(p.t, 3), c: [r(p.lon, 6), r(p.lat, 6)] as [number, number] }));
+  const out: JumpCut[] = [];
+  for (let k = 1; k < pts.length; k++) {
+    const a = pts[k - 1], b = pts[k], m = distM(a.c, b.c);
+    if (m / (b.t - a.t) > MAX_SPEED_MS && !nearCut(cutTimes, a.t, b.t)) out.push({ t: r((a.t + b.t) / 2, 3), from: a.t, to: b.t, m: Math.round(m) });
+  }
+  return out;
+}
+
 export interface QcInput {
   verdict: Verdict; points: AtlasPoint[]; standstills: [number, number][]; cutTimes: number[]; hintLines: [number, number][][] | null;
   /** with an atlas route (job.route_gpx) */
@@ -204,6 +220,8 @@ export function qcChecks(q: QcInput): QcItem[] {
   const cov = coverageOf(pts, q.standstills);
   const agree = routeAgreement(pts.map((p) => [p.lon, p.lat]), q.hasRoute ? q.hintLines : null);
   const pieces = spanOk ? cutPieces(q.cutTimes, t0!, t1!) : [];
+  const jumps = spanOk ? jumpCuts(q.points, q.cutTimes, t0!, t1!) : [];
+  const jumpText = jumps.length ? `; ${jumps.length === 1 ? "1 Sprung" : `${jumps.length} Sprünge`} ohne erkannten Schnitt als Schnitt eingetragen` : "";
   const v = st.viewed;
   const item = (id: AtlasCheckId, label: string, ok: boolean, value: unknown, detail: string, o: { blocking?: boolean; overridable?: boolean } = {}): QcItem => {
     const blocking = o.blocking ?? true, overridable = (o.overridable ?? true) && blocking;
@@ -220,8 +238,9 @@ export function qcChecks(q: QcInput): QcItem[] {
       !q.hasRoute ? "keine Scenic-Route" : agree ? `Median ${agree.median_m.toFixed(1).replace(".", ",")} m, höchstens ${Math.round(agree.max_m)} m (Hinweis, kein Ausschlussgrund: die Scenic-Route kann die falsche sein)` : "–",
       { blocking: false }),
     item("cuts", "Schnitte", spanOk && (pieces.length === 1 || pieces.every(([a]) => st.cuts_checked.includes(a))),
-      { times: pieces.slice(1).map(([a]) => a), checked: st.cuts_checked.filter((a) => pieces.length > 1 && pieces.some(([b]) => b === a)) },
-      !spanOk ? "erst Anfang und Ende setzen" : pieces.length === 1 ? "keine Schnitte" : `${pieces.length - 1} Schnitte, ${pieces.length} Stücke: jedes in der Analyse prüfen`),
+      { times: pieces.slice(1).map(([a]) => a), checked: st.cuts_checked.filter((a) => pieces.length > 1 && pieces.some(([b]) => b === a)),
+        ...(jumps.length ? { jumps: jumps.map(({ t, m }) => ({ t, m })) } : {}) },
+      (!spanOk ? "erst Anfang und Ende setzen" : pieces.length === 1 ? "keine Schnitte" : `${pieces.length - 1} Schnitte, ${pieces.length} Stücke: jedes in der Analyse prüfen`) + jumpText),
     item("intro_outro", "Anfang und Ende", !!spanOk, { t_start: t0, t_end: t1 },
       spanOk ? `erste Fahrsekunde ${fmtS(t0!)}, letzte ${fmtS(t1!)}` : "Anfang und Ende der Fahrt im Ergebnis liegen nicht innerhalb der Route", { overridable: false }),
     item("viewed", "Angesehen", v.start && v.turn && v.end, { ...v }, "Anfang, eine Kehre oder Kreuzung und das Ende gegen die Karte abgespielt"),
@@ -267,7 +286,8 @@ export function buildPayload(i: PayloadInput): AtlasPayload {
     video_id: i.job.video_id, pipeline_hash: i.pipeline_hash, app_version: i.app_version, vehicle: i.vehicle, offset_m: i.offset_m,
     t: pts.map((p) => r(p.t, 3)), c, ...(e ? { e } : {}),
     t_start: t0, t_end: t1,
-    cuts: i.cutTimes.filter((x) => x > t0 && x < t1).map((x) => r(x, 3)),
+    // the detected cuts and the jumps marked as cuts (jumpCuts), in time order
+    cuts: [...i.cutTimes.filter((x) => x > t0 && x < t1).map((x) => r(x, 3)), ...jumpCuts(i.points, i.cutTimes, t0, t1).map((j) => j.t)].sort((a, b) => a - b),
     standstills: i.standstills.filter(([a, b]) => b >= t0 && a <= t1).map(([a, b]) => [r(a, 3), r(b, 3)] as [number, number]),
     verdict: i.verdict, verdict_basis: i.verdict_basis,
     confidence_mean: r(pts.reduce((s, p) => s + p.confidence, 0) / pts.length, 3), coverage: cov.share, route_km: r(km / 1000, 2),

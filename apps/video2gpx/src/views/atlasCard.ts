@@ -4,7 +4,7 @@
 import { api } from "../api";
 import { revealLabel } from "../app/platform";
 import { routePath } from "../app/router";
-import { buildPayload, freshQc, payloadName, qcChecks, qcFor, qcReady, type AtlasCheckId, type AtlasQcState, type QcItem } from "../atlas";
+import { buildPayload, freshQc, jumpCuts, payloadName, qcChecks, qcFor, qcReady, type AtlasCheckId, type AtlasQcState, type QcItem } from "../atlas";
 import { E, profileCurrent } from "../elevation";
 import { zAt } from "../ridePanel";
 import { S, saveCur, toast } from "../state";
@@ -17,7 +17,7 @@ const parseT = (v: string): number | null => { const p = v.trim().replace(",", "
 
 export function atlasCard(): { el: HTMLElement; build(): void } {
   const root = el("section", { class: "panel stack card", "aria-labelledby": "atlas-h", hidden: true });
-  let list: HTMLUListElement, saveBtn: HTMLButtonElement, res: HTMLElement, t0In: HTMLInputElement, t1In: HTMLInputElement, note: HTMLTextAreaElement;
+  let list: HTMLUListElement, jumpHint: HTMLElement, saveBtn: HTMLButtonElement, res: HTMLElement, t0In: HTMLInputElement, t1In: HTMLInputElement, note: HTMLTextAreaElement;
   const persist = debounce(() => void saveCur({}), 400);
 
   const state = (): AtlasQcState | null => {
@@ -71,11 +71,26 @@ export function atlasCard(): { el: HTMLElement; build(): void } {
     const f = document.activeElement as HTMLInputElement | null, fid = f && list.contains(f) ? f.closest("li")?.getAttribute("data-check") : null, pos = f?.selectionStart ?? null;
     list.replaceChildren(...its.map((it) => row(it, st)));
     if (fid) { const n = list.querySelector<HTMLInputElement>(`li[data-check="${fid}"] input[type=text]`); if (n) { n.focus(); if (pos != null) n.setSelectionRange(pos, pos); } }
+    renderJumps(st);
     const ready = qcReady(its);
     saveBtn.disabled = !ready;
     saveBtn.title = ready ? "" : "Erst alle Punkte grün oder mit Notiz übergehen";
   }
   const renderSoon = debounce(render, 250);
+
+  /** the hint of jumpCuts: steps too fast for a drive where no cut was detected go into the file as cuts; the user checks them in the video */
+  function renderJumps(st: AtlasQcState) {
+    const r = S.result!, t0 = st.t_start, t1 = st.t_end;
+    const jumps = t0 != null && t1 != null && t0 < t1 ? jumpCuts(r.points, r.cut_times, t0, t1) : [];
+    jumpHint.hidden = !jumps.length;
+    if (!jumps.length) { jumpHint.replaceChildren(); return; }
+    const one = jumps.length === 1;
+    const at = jumps.map((j) => `${fmt(j.from)} (${j.m} m in ${Math.round((j.to - j.from) * 10) / 10} s, ${Math.round((j.m / (j.to - j.from)) * 3.6)} km/h)`).join(", ");
+    jumpHint.replaceChildren(banner("warn",
+      el("p", {}, el("b", {}, one ? "Sprung ohne erkannten Schnitt" : `${jumps.length} Sprünge ohne erkannten Schnitt`), ` bei ${at}. `,
+        `video2gpx trägt ${one ? "dort einen Schnitt" : "dort jeweils einen Schnitt"} ein, damit ridrs Scenic die Datei annimmt. Im Video prüfen, ob dort wirklich geschnitten ist; sonst stimmt die Position an ${one ? "dieser Stelle" : "diesen Stellen"} nicht.`),
+      el("a", { class: "small", href: routePath.project(S.cur!.app.id, "analyse") }, "Zur Analyse")));
+  }
 
   async function write() {
     const cur = S.cur, r = S.result, st = state();
@@ -111,13 +126,14 @@ export function atlasCard(): { el: HTMLElement; build(): void } {
     note = el("textarea", { rows: 2, "aria-label": "Notiz für ridrs Scenic", oninput: () => { st.note = note.value; persist(); } });
     note.value = st.note;
     list = el("ul", { class: "checks", "aria-label": "Prüfliste für ridrs Scenic" });
+    jumpHint = el("div", { "aria-live": "polite", hidden: true });
     saveBtn = btn("Für ridrs Scenic speichern …", () => void write(), { kind: "primary", icon: "download" });
     res = el("div", { class: "small", "aria-live": "polite" });
     root.replaceChildren(el("h2", { id: "atlas-h" }, "ridrs Scenic"),
       el("p", { class: "small muted" }, `Für ${job.title ?? job.video_id} (${job.video_id}) in ridrs Scenic. Jeder Punkt muss grün sein oder mit einer Notiz übergangen werden; die Übereinstimmung mit der Scenic-Route ist nur ein Hinweis.`),
       ...(job.route_gpx ? [] : [banner("info", "ridrs Scenic hat für dieses Video keine Route: die Linie von video2gpx kann dort die erste werden.")]),
       el("div", { class: "row wrap end-align" }, field("Erste Fahrsekunde", t0In).el, field("Letzte Fahrsekunde", t1In).el, reset),
-      list, field("Notiz für ridrs Scenic (optional)", note).el,
+      jumpHint, list, field("Notiz für ridrs Scenic (optional)", note).el,
       el("div", { class: "row wrap" }, saveBtn), res);
     render();
   }
