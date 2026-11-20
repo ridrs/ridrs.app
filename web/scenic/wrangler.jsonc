@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+{
+  // ridrs Scenic: static site + API worker + D1 (CLOUDFLARE-KONZEPT.md, section 4), served under ridrs.app/scenic.
+  "name": "ridrs-scenic",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    // The build writes everything to dist/scenic/, so assets are found at /scenic/… (BASE_PATH below).
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // API and admin run through the worker: it strips the base and checks the Access identity before serving the admin page.
+    // Route lines, GPX and sync tracks too: the worker serves them only for videos published in the admin (src/worker.js VISIBLE).
+    "run_worker_first": ["/", "/scenic", "/scenic/api/*", "/scenic/admin", "/scenic/admin/*", "/scenic/lines.json", "/scenic/gpx/*", "/scenic/sync/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ridrs-scenic",
+      // Placeholder for local development. Replace with the id from `wrangler d1 create ridrs-scenic` before deploying.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Preview images (concept 2.9). Locally wrangler dev keeps them in .wrangler/state (no account needed).
+  "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "ridrs-scenic-images" }],
+  "vars": {
+    // Path of the site on ridrs.app; must match the folder the build writes (scripts/build.mjs, BASE).
+    "BASE_PATH": "/scenic",
+    // Admin (concept 3.5): Cloudflare Access team and the AUD tag of the Access application for /scenic/admin and
+    // /scenic/api/admin/*. Without both, every admin request is 403. Local development: ADMIN_DEV_EMAIL in .dev.vars (README "Admin").
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+  // Daily YouTube Data API refresh (30-day rule, concept 4.4). Key: `wrangler secret put YOUTUBE_API_KEY`.
+  "triggers": { "crons": ["17 3 * * *"] },
+  "observability": { "enabled": true }
+}

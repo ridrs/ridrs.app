@@ -1,0 +1,34 @@
+{
+  "video_id": "V2Gexample1",
+  "url": "https://www.youtube.com/watch?v=V2Gexample1",
+  "title": "Testfahrt Colle",
+  "channel": "Testkanal",
+  "duration_s": 150,
+  "fps": 30,
+  "country": "IT",
+  "vehicle": "car",
+  "route_gpx": "https://ridrs.example.org/scenic/gpx/V2Gexample1.gpx",
+  "route_level": 4,
+  "bbox": {
+    "south": 44.97305,
+    "west": 6.961887,
+    "north": 45.02695,
+    "east": 7.057169
+  },
+  "start_bbox": {
+    "south": 44.997305,
+    "west": 6.996188,
+    "north": 45.002695,
+    "east": 7.003812
+  },
+  "end_bbox": {
+    "south": 44.997305,
+    "west": 7.015244,
+    "north": 45.002695,
+    "east": 7.022868
+  },
+  "scenic": {
+    "base": "https://ridrs.example.org/scenic",
+    "video_id": "V2Gexample1"
+  }
+}

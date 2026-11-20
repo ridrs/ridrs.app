@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Redaktion · ridrs Scenic</title>
+  <meta name="theme-color" content="#07090e">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../vendor/maplibre-gl/maplibre-gl.css">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="./admin.css">
+</head>
+<body class="admin">
+  <header class="adm-head">
+    <a class="brand" href="./" title="Redaktion"><img src="../ridrs-logo.svg" alt="ridrs"><span>Redaktion</span></a>
+    <nav class="tabs" aria-label="Bereiche">
+      <a href="#videos" data-tab="videos">Videos</a>
+      <a href="#collections" data-tab="collections">Sammlungen</a>
+      <a href="#optout" data-tab="optout">Opt-out</a>
+      <a href="#log" data-tab="log">Protokoll</a>
+    </nav>
+    <span id="me" class="meta"></span>
+    <a class="meta" href="../" target="_blank" rel="noopener">Öffentliche Seite</a>
+  </header>
+  <main id="view"><p class="meta pad">Lade …</p></main>
+  <p id="toast" role="status" aria-live="polite" hidden></p>
+  <script type="module" src="./admin.js"></script>
+</body>
+</html>

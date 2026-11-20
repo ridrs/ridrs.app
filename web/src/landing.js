@@ -471,6 +471,7 @@ export const landingPage = `<!DOCTYPE html>
     <div class="container">
       <a class="logo" href="/"><img src="/logo.svg" width="1774" height="335" alt="ridrs"></a>
       <nav class="site-nav" aria-label="Main">
+        <a href="/scenic/">Scenic</a>
         <a class="optional" href="#screens">Screens</a>
         <a class="optional" href="#features">Features</a>
         <a class="optional" href="#build">Build it</a>
@@ -695,6 +696,7 @@ export const landingPage = `<!DOCTYPE html>
     <div class="container">
       <div class="mark"><img src="/favicon.svg" width="463" height="265" alt="">ridrs 0.1.0 &middot; AGPL-3.0-or-later</div>
       <nav aria-label="Footer">
+        <a href="/scenic/">Scenic</a>
         <a href="https://github.com/ridrs/ridrs.app">Source</a>
         <a href="https://github.com/ridrs/ridrs.app/issues">Issues</a>
         <a href="https://github.com/ridrs/ridrs.app/blob/main/LICENSING.md">Licensing</a>

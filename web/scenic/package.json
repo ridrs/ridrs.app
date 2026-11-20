@@ -1,0 +1,26 @@
+{
+  "name": "ridrs-scenic-web",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "import": "node scripts/import.mjs",
+    "migrate:local": "node scripts/wrangler.mjs d1 migrations apply ridrs-scenic --local",
+    "publish:initial": "node scripts/wrangler.mjs d1 execute ridrs-scenic --file scripts/publish-initial.sql --yes",
+    "dev": "pnpm build && node scripts/wrangler.mjs dev --port 8788",
+    "dev:site": "pnpm build && node scripts/wrangler.mjs dev -c ../wrangler.toml -c wrangler.jsonc --port 8787 --local-upstream localhost:8787",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@fontsource/chakra-petch": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/plus-jakarta-sans": "5.3.0",
+    "fflate": "0.8.2",
+    "maplibre-gl": "6.15.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  }
+}

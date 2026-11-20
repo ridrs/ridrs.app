@@ -14,6 +14,11 @@ custom_domain = true
 pattern = "www.ridrs.app"
 custom_domain = true
 
+# ridrs Scenic (web/scenic) is its own Worker; src/router.js hands /scenic/* to it. Deploy ridrs-scenic first.
+[[services]]
+binding = "SCENIC"
+service = "ridrs-scenic"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "ridrs-mailbox-intervals"

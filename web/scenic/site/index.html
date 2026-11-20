@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ridrs Scenic</title>
+  <!-- Texts in English (fallback) and data-i18n keys: site/i18n.js switches to the browser language on load. -->
+  <meta name="description" content="Map of first-person driving videos with routes, video quality and localization accuracy." data-i18n-attr="content:meta.description">
+  <meta name="theme-color" content="#07090e">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/maplibre-gl/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="map" role="application" aria-label="Map of all driving videos" data-i18n-attr="aria-label:map.aria"></div>
+
+  <form id="search" role="search" onsubmit="return false">
+    <div class="bar">
+      <a class="brand" href="./" title="ridrs Scenic"><img src="ridrs-logo.svg" alt="ridrs"><span>Scenic</span></a>
+      <input id="q" type="search" placeholder="Search pass, place, region or channel" aria-label="Search" autocomplete="off"
+        data-i18n-attr="placeholder:search.placeholder;aria-label:search.aria"
+        role="combobox" aria-expanded="false" aria-controls="suggest" aria-autocomplete="list">
+      <button id="filter-toggle" type="button" aria-expanded="false" aria-controls="filters" title="Filters" data-i18n-attr="title:filter.button"><span data-i18n="filter.button">Filters</span><span id="filter-n" aria-label="active filters" data-i18n-attr="aria-label:filter.active_aria"></span></button>
+    </div>
+    <ul id="suggest" role="listbox" hidden></ul>
+    <div id="quick" class="chiprow" role="group" aria-label="Quick filters" data-i18n-attr="aria-label:quick.aria"></div>
+    <div id="active" class="chiprow" aria-label="Active filters" data-i18n-attr="aria-label:active.aria"></div>
+    <div id="filters" role="region" aria-label="Filters" data-i18n-attr="aria-label:filters.aria" hidden></div>
+  </form>
+
+  <dialog id="detail" aria-labelledby="detail-title">
+    <button class="close" type="button" aria-label="Close" data-i18n-attr="aria-label:dialog.close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div id="detail-body"></div>
+  </dialog>
+
+  <!-- Bottom bar: credits and legal links (left), video count (centre), legend (right); one grid, so nothing overlaps -->
+  <div id="bottombar">
+    <footer class="mapfoot">
+      <p class="credits">© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · © <a href="https://openmaptiles.org" target="_blank" rel="noopener">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></p>
+      <nav class="legal" aria-label="Legal" data-i18n-attr="aria-label:foot.legal_aria"><a href="lizenz.html" data-i18n="foot.license">License &amp; sources</a> · <a href="datenschutz.html" data-i18n="foot.privacy">Privacy</a> · <a href="impressum.html" data-i18n="foot.imprint">Legal notice</a> · <span data-i18n="foot.not_youtube">Not affiliated with YouTube</span>
+        · <select id="lang" class="lang" aria-label="Language" data-i18n-attr="aria-label:foot.language"></select></nav>
+    </footer>
+    <p id="summary" aria-live="polite"></p>
+    <details id="legend" open><summary data-i18n="legend.title">Localization</summary><div id="legend-items"></div></details>
+  </div>
+  <p id="notice" role="status" hidden></p>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -23,7 +23,11 @@ npm run dev
 wrangler dev
 ```
 
+That starts ridrs.app alone; `/scenic` then answers 503. To run it together with ridrs Scenic (`web/scenic`, its own Worker behind the Service Binding `SCENIC`), start both from `web/scenic` with `pnpm dev:site`: http://localhost:8787/ is the landing page, http://localhost:8787/scenic/ is Scenic. See [scenic/README.md](scenic/README.md).
+
 ## Manual Deployment
+
+Deploy ridrs Scenic (`web/scenic`, `npx wrangler deploy` there) before the first deploy with the `SCENIC` Service Binding, so the bound Worker exists.
 
 From the `web` directory:
 ```bash

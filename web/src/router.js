@@ -50,8 +50,13 @@ function allow(request, method, fn) {
 }
 
 export async function route(request, rawEnv) {
-  const env = withHub(rawEnv);
   const { pathname } = new URL(request.url);
+  // ridrs Scenic (web/scenic) is its own Worker: everything under /scenic goes to it unchanged.
+  if (pathname === "/scenic" || pathname.startsWith("/scenic/")) {
+    if (!rawEnv?.SCENIC) return new Response("ridrs Scenic is not available here.", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
+    return rawEnv.SCENIC.fetch(request);
+  }
+  const env = withHub(rawEnv);
   try {
     if (pathname === "/intervals/oauth/callback") return await handleOAuthCallback(request);
     if (pathname === "/intervals/oauth/result") return await handleOAuthResult(request, env);
