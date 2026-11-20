@@ -21,7 +21,7 @@ from rsm.odometry.turns import TurnParams, detect_turns
 
 from .qdef import TurnRec
 
-ROOT = Path(__file__).resolve().parents[4] / "test-data" / "vangestel"  # Van Gestel rides, git-ignored (docs/README.md)
+ROOT = Path(__file__).resolve().parents[4] / "test-data" / "sources" / "vangestel"  # Van Gestel rides, git-ignored (docs/README.md)
 ALIGN = Path(__file__).resolve().parents[2] / "work" / "vangestel"
 _PT = re.compile(r'<trkpt lat="([-\d.]+)" lon="([-\d.]+)">(.*?)</trkpt>', re.S)
 

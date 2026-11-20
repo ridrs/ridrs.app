@@ -18,6 +18,8 @@ apps/video2gpx/                    the product: Tauri app for macOS, runs on Lin
 │   ├── FEATURE_analysis_insight.md the Analyse stage (Part A implemented; choices in "Implementation notes (Part A)"; Part B live preview planned)
 │   ├── FEATURE_elevation_stage.md elevation as its own stage "Höhe" (implemented; choices in "Implementation notes")
 │   ├── FEATURE_atlas.md           POV Drive Atlas round trip: job file in, checklist "Atlas", <id>.atlas.json out (implemented, P21)
+│   ├── CONCEPT_fast_testing.md    step cache, scan memo, probes, clip bench (built 2026-11-13)
+│   ├── CONCEPT_test_strategy.md   clips for the image analysis, frozen stages for the route, two 10 min videos (concept)
 │   ├── BAVARIA_DIAGNOSIS.md       why the Bavaria video failed; fixes F1-F5
 │   ├── ELEVATION_ANALYSIS.md, DEM_STUDY.md  elevation noise root cause; better elevation models
 │   ├── ELEVATION_STRATEGY.md      regional DEM sources (registry, licences) and the robust road-height estimator (P17)
@@ -44,8 +46,7 @@ Some research code reads the two optional folders by relative path (`../road-rec
 |---|---|
 | App data: projects, settings, OSM pbf, DEM tiles, cache | `~/Library/Application Support/org.video2gpx.app/` (`projects/`, `settings.json`, `osm/`, `dem/`, `cache/`) |
 | Release app | `src-tauri/target/release/bundle/macos/video2gpx.app` (ad-hoc signed, not notarised) |
-| Sample videos without GPS (development only) | your own folder; the bench reads paths from `rsm/bench/regress_cases.json`, `~` and `$RSM_VIDEOS` are expanded |
-| Test material (git-ignored `test-data/` in this app; Van Gestel material is CC BY-NC-SA) | `vangestel/<route>/` the Van Gestel rides (`video.mp4`, `track.gpx`), a copy of the Ridrs Van Gestel source folder; `osm/rhone-alpes.osm.pbf`; `runs/vallee-de-roanne/` a finished pipeline run; `dem/` Copernicus and regional DEM tiles; `road-reconstruction/routes/` camera poses of Pennes and Menglonnais. The tests and the benches read it by default; the GPX of the realdata tests come from `plugins/video-source-vangestel/catalog/` |
+| Test material (git-ignored `test-data/` in this app; Van Gestel material is CC BY-NC-SA, the other videos are third-party downloads for private use) | `sources/` all full videos, one folder per source with a `source.json` (origin, licence, truth): `sources/vangestel/<route>/` the Van Gestel rides (`video.mp4`, `track.gpx`), a copy of the Ridrs Van Gestel source folder, and `sources/<id>/video.<ext>` for Gotthard, Cayolle, Madone, Amalfi, Bavaria, Nice-Monaco, Verdon (2), Switzerland valley (`$RSM_VIDEOS` defaults to `sources/`; the bench reads paths from `rsm/bench/regress_cases.json` and `clip_sources.json`, `~`, `$V2G_TEST_DATA` and `$RSM_VIDEOS` are expanded); see [CONCEPT_test_strategy.md](CONCEPT_test_strategy.md); `osm/rhone-alpes.osm.pbf`; `runs/vallee-de-roanne/` a finished pipeline run; `dem/` Copernicus and regional DEM tiles; `road-reconstruction/routes/` camera poses of Pennes and Menglonnais. The tests and the benches read it by default; the GPX of the realdata tests come from `plugins/video-source-vangestel/catalog/` |
 | OSM extracts | `~/Library/Application Support/org.video2gpx.app/osm/` (downloaded by the app from Geofabrik) |
 
 Fill `test-data/` before running the e2e and realdata tests (APFS clones with `cp -c` cost no disk space). No videos, GPS tracks or video-derived data are committed; `test-data/` and `research/*/work/` are git-ignored.

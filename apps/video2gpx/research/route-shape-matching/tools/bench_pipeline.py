@@ -31,10 +31,10 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parents[1]
-VG = Path(__file__).resolve().parents[3] / "test-data" / "vangestel"  # Van Gestel rides, git-ignored (docs/README.md)
+VG = Path(__file__).resolve().parents[3] / "test-data" / "sources" / "vangestel"  # Van Gestel rides, git-ignored (docs/README.md)
 ROANNE = dict(video=str(VG / "vallee-de-roanne/video.mp4"), bbox="44.50826,4.98126,44.86798,5.48725",
               pbf=str(Path(os.environ.get("RSM_OSM_DIR", "~/rsm-data/osm")).expanduser() / "rhone-alpes.osm.pbf"))
-MADONE_DIR = Path(os.environ.get("RSM_VIDEOS", "~/rsm-data/videos")).expanduser()
+MADONE_DIR = Path(os.environ.get("RSM_VIDEOS", str(Path(__file__).resolve().parents[3] / "test-data" / "sources"))).expanduser() / "madone"
 ANALYSIS = ("motion", "rotation")
 L1_TOL = 1e-3
 
@@ -142,12 +142,12 @@ def case(name: str) -> dict:
     if name == "clip":
         return dict(ROANNE, video=str(make_clip(HERE / "work/bench/roanne_300s.mp4")))
     if name == "madone":
-        v = sorted(MADONE_DIR.glob("Route du Col de la Madone*.webm"))
+        v = sorted(MADONE_DIR.glob("video.webm"))
         if not v:
             raise SystemExit(f"no Madone video in {MADONE_DIR}")
         return dict(video=str(v[0]), bbox="43.70,7.33,43.85,7.55", pbf=ROANNE["pbf"], until="rotation")
     if name == "madone-clip":
-        v = sorted(MADONE_DIR.glob("Route du Col de la Madone*.webm"))
+        v = sorted(MADONE_DIR.glob("video.webm"))
         if not v:
             raise SystemExit(f"no Madone video in {MADONE_DIR}")
         return dict(video=str(make_clip(HERE / "work/bench/madone_300s.webm", src=str(v[0]))), bbox="43.70,7.33,43.85,7.55", pbf=ROANNE["pbf"], until="rotation")

@@ -38,7 +38,7 @@ OVERLAY = ["rsm/pipeline/" + f for f in ("steps_b.py", "steps_c.py", "steps_d.py
 
 
 # development data (see docs/README.md): test-data/ of this app (git-ignored), other videos and OSM extracts
-for _k, _d in (("V2G_TEST_DATA", str(Path(__file__).resolve().parents[4] / "test-data")), ("RSM_VIDEOS", "~/rsm-data/videos"), ("RSM_OSM_DIR", "~/rsm-data/osm")):
+for _k, _d in (("V2G_TEST_DATA", str(Path(__file__).resolve().parents[4] / "test-data")), ("RSM_VIDEOS", str(Path(__file__).resolve().parents[4] / "test-data" / "sources")), ("RSM_OSM_DIR", "~/rsm-data/osm")):
     os.environ.setdefault(_k, os.path.expanduser(_d))
 
 

@@ -1,7 +1,7 @@
 //! End-to-end harness for the Rust command layer (the same functions the Tauri commands call), against the real
 //! pipeline. Run explicitly (they need the research venv, ffmpeg, the Roanne video and the rhone-alpes extract):
-//! The paths come from the environment at build time: RSM_E2E_VIDEO (default: test-data/vangestel/vallee-de-roanne/video.mp4), RSM_E2E_PBF (a
-//! Rhône-Alpes extract); defaults are in the git-ignored test-data/ (vangestel/, osm/, runs/vallee-de-roanne, dem/).
+//! The paths come from the environment at build time: RSM_E2E_VIDEO (default: test-data/sources/vangestel/vallee-de-roanne/video.mp4), RSM_E2E_PBF (a
+//! Rhône-Alpes extract); defaults are in the git-ignored test-data/ (sources/vangestel/, osm/, runs/vallee-de-roanne, dem/).
 //!   scripts/guard.sh cargo test --manifest-path src-tauri/Cargo.toml --test e2e -- --ignored --nocapture --test-threads=1
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use video2gpx_lib::ctx::{Ctx, Emit};
 use video2gpx_lib::{geo, pbf, pipeline, projects, video};
 
-const VIDEO: &str = match option_env!("RSM_E2E_VIDEO") { Some(v) => v, None => concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/vangestel/vallee-de-roanne/video.mp4") };
+const VIDEO: &str = match option_env!("RSM_E2E_VIDEO") { Some(v) => v, None => concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/sources/vangestel/vallee-de-roanne/video.mp4") };
 const PBF: &str = match option_env!("RSM_E2E_PBF") { Some(v) => v, None => concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/osm/rhone-alpes.osm.pbf") };
 const DONE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/runs/vallee-de-roanne");
 const DEM: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/dem");
