@@ -1,5 +1,5 @@
-// "Atlas": the card of the Export stage for a project made from a POV Drive Atlas job (docs/FEATURE_atlas.md). The checklist of
-// src/atlas.ts (every blocking item green or overridden with a note), then "Für den Atlas speichern …" writes <id>.atlas.json, which the
+// "ridrs Scenic": the card of the Export stage for a project made from a ridrs Scenic job (docs/FEATURE_atlas.md). The checklist of
+// src/atlas.ts (every blocking item green or overridden with a note), then "Für ridrs Scenic speichern …" writes <id>.scenic.json, which the
 // atlas admin uploads ("video2gpx-Ergebnis hochladen"). The state of the list is kept in app.json (atlas.qc).
 import { api } from "../api";
 import { revealLabel } from "../app/platform";
@@ -95,7 +95,7 @@ export function atlasCard(): { el: HTMLElement; build(): void } {
       const admin = `${job.atlas.base}/admin/#v=${job.video_id}`;
       res.replaceChildren(el("div", { class: "ok-text" }, `Gespeichert: ${w.path} (${Math.round(w.bytes / 1024)} kB, ${payload.t.length} Punkte${payload.e ? ", mit Höhen" : ""}).`), " ",
         btn(revealLabel, () => void api.reveal(w.path), { size: "sm" }),
-        el("p", { class: "help" }, "Im Atlas das Video öffnen und die Datei mit „video2gpx-Ergebnis hochladen“ hochladen: ", el("span", { class: "mono wrap-any" }, admin), " ", copyBtn(() => admin, "Adresse kopieren")));
+        el("p", { class: "help" }, "Im Admin von ridrs Scenic das Video öffnen und die Datei mit „video2gpx-Ergebnis hochladen“ hochladen: ", el("span", { class: "mono wrap-any" }, admin), " ", copyBtn(() => admin, "Adresse kopieren")));
     } catch (e) { toast(e instanceof Error ? e.message : String(e), "error"); }
   }
 
@@ -108,16 +108,16 @@ export function atlasCard(): { el: HTMLElement; build(): void } {
     t0In = el("input", { type: "text", class: "narrow", value: fmt(st.t_start), "aria-label": "Erste Fahrsekunde", onchange: () => { st.t_start = parseT(t0In.value); persist(); render(); } });
     t1In = el("input", { type: "text", class: "narrow", value: fmt(st.t_end), "aria-label": "Letzte Fahrsekunde", onchange: () => { st.t_end = parseT(t1In.value); persist(); render(); } });
     const reset = btn("Aus dem Ergebnis", () => { const d = freshQc(r.points, r.intro_end); st.t_start = d.t_start; st.t_end = d.t_end; t0In.value = fmt(st.t_start); t1In.value = fmt(st.t_end); persist(); render(); }, { size: "sm" });
-    note = el("textarea", { rows: 2, "aria-label": "Notiz für den Atlas", oninput: () => { st.note = note.value; persist(); } });
+    note = el("textarea", { rows: 2, "aria-label": "Notiz für ridrs Scenic", oninput: () => { st.note = note.value; persist(); } });
     note.value = st.note;
-    list = el("ul", { class: "checks", "aria-label": "Prüfliste für den Atlas" });
-    saveBtn = btn("Für den Atlas speichern …", () => void write(), { kind: "primary", icon: "download" });
+    list = el("ul", { class: "checks", "aria-label": "Prüfliste für ridrs Scenic" });
+    saveBtn = btn("Für ridrs Scenic speichern …", () => void write(), { kind: "primary", icon: "download" });
     res = el("div", { class: "small", "aria-live": "polite" });
-    root.replaceChildren(el("h2", { id: "atlas-h" }, "Atlas"),
-      el("p", { class: "small muted" }, `Für ${job.title ?? job.video_id} (${job.video_id}) im POV Drive Atlas. Jeder Punkt muss grün sein oder mit einer Notiz übergangen werden; die Übereinstimmung mit der Atlas-Route ist nur ein Hinweis.`),
-      ...(job.route_gpx ? [] : [banner("info", "Der Atlas hat für dieses Video keine Route: die Linie von video2gpx kann dort die erste werden.")]),
+    root.replaceChildren(el("h2", { id: "atlas-h" }, "ridrs Scenic"),
+      el("p", { class: "small muted" }, `Für ${job.title ?? job.video_id} (${job.video_id}) in ridrs Scenic. Jeder Punkt muss grün sein oder mit einer Notiz übergangen werden; die Übereinstimmung mit der Scenic-Route ist nur ein Hinweis.`),
+      ...(job.route_gpx ? [] : [banner("info", "ridrs Scenic hat für dieses Video keine Route: die Linie von video2gpx kann dort die erste werden.")]),
       el("div", { class: "row wrap end-align" }, field("Erste Fahrsekunde", t0In).el, field("Letzte Fahrsekunde", t1In).el, reset),
-      list, field("Notiz für den Atlas (optional)", note).el,
+      list, field("Notiz für ridrs Scenic (optional)", note).el,
       el("div", { class: "row wrap" }, saveBtn), res);
     render();
   }

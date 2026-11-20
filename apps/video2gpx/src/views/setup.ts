@@ -8,7 +8,7 @@ import { defaultTemplate, imp as impState, importingFor, startImport } from "../
 import { YTDLP_480P } from "../atlas";
 import { canEditFrames, mapTools, sizeWarning, suggestFromTitle } from "../mapPanel";
 import { S, bus, coveringPbfs, effectivePbf, saveCur } from "../state";
-import type { BikePaths, Vehicle } from "../types";
+import type { AlignMode, BikePaths, Vehicle } from "../types";
 import { banner, btn, codeWell, disclosure, emptyState, field, iconBtn, isSoftDisabled, segmented, setBtnLabel, setSoftDisabled, toneIcon, uid, type Tone } from "../ui/components";
 import { icon } from "../ui/icons";
 import { el, fmtBytes, fmtDur, fmtSize, fromLocalInput, toLocalInput } from "../util";
@@ -24,7 +24,7 @@ let frameSize: HTMLElement, drawBtn: HTMLButtonElement, viewBtn: HTMLButtonEleme
 let hintsDisc: HTMLDetailsElement, hintsSummary: HTMLElement;
 const hintRows = {} as Record<"start" | "end", { draw: HTMLButtonElement; del: HTMLButtonElement; val: HTMLElement }>;
 let hintLoad: HTMLButtonElement, hintDel: HTMLButtonElement, hintName: HTMLElement, buf: HTMLInputElement, bufVal: HTMLElement, bufRow: HTMLElement;
-let vehicle: ReturnType<typeof segmented<Vehicle>>, bikePaths: ReturnType<typeof segmented<BikePaths>>, bikePathsField: HTMLElement, offset: HTMLInputElement, startTime: HTMLInputElement, fromFile: HTMLButtonElement, decoys: HTMLSelectElement;
+let vehicle: ReturnType<typeof segmented<Vehicle>>, bikePaths: ReturnType<typeof segmented<BikePaths>>, bikePathsField: HTMLElement, alignMode: ReturnType<typeof segmented<AlignMode>>, offset: HTMLInputElement, startTime: HTMLInputElement, fromFile: HTMLButtonElement, decoys: HTMLSelectElement;
 let checks: HTMLUListElement, startBtn: HTMLButtonElement, resumeBtn: HTMLButtonElement, runLink: HTMLAnchorElement, footNote: HTMLElement;
 
 export function mountSetup(sideEl: HTMLElement, wsEl: HTMLElement) {
@@ -81,12 +81,21 @@ export function mountSetup(sideEl: HTMLElement, wsEl: HTMLElement) {
   bikePaths.el.setAttribute("aria-describedby", bpHelp);
   bikePathsField = el("div", { class: "field" }, el("label", { id: bpLabel }, "Rad- und Waldwege einbeziehen"), bikePaths.el,
     el("div", { class: "help", id: bpHelp }, "Nur für Fahrräder. Automatisch: ein zweiter Durchlauf mit Rad-, Wald- und Feldwegen, wenn die Straßen keine sichere Route ergeben. Ein: immer mit diesen Wegen. Am besten mit kleinem Suchrahmen oder Streckenhinweis."));
+  // curve alignment in refine (pipeline --align-mode)
+  alignMode = segmented<AlignMode>("Kurvenabgleich", [["posterior", "Fein"], ["turns", "Nur starke Kurven"]], "posterior", (v) => void saveCur({ align_mode: v }));
   offset = el("input", { type: "number", step: "0.1", min: "-5", max: "5", placeholder: "Standard", class: "narrow", onchange: () => void saveCur({ offset_m: offset.value === "" ? null : Number(offset.value) }) });
   startTime = el("input", { type: "datetime-local", onchange: () => void saveCur({ start_time: fromLocalInput(startTime.value) }) });
   fromFile = btn("aus Videodatei", () => { const ct = S.cur?.app.probe?.creation_time; if (ct) { startTime.value = toLocalInput(ct); void saveCur({ start_time: fromLocalInput(startTime.value) }); } }, { size: "sm" });
   decoys = el("select", { onchange: () => void saveCur({ decoys: Number(decoys.value) }) },
     ...([[0, "aus (Standard)"], [3, "3 Vergleichsstrecken"], [19, "19 (vollständig, dauert lange)"]] as const).map(([v, l]) => el("option", { value: String(v) }, l)));
+  const alLabel = uid("al-l"), alHelp = uid("al-h");
+  alignMode.el.removeAttribute("aria-label");
+  alignMode.el.setAttribute("aria-labelledby", alLabel);
+  alignMode.el.setAttribute("aria-describedby", alHelp);
+  const alignField = el("div", { class: "field" }, el("label", { id: alLabel }, "Kurvenabgleich"), alignMode.el,
+    el("div", { class: "help", id: alHelp }, "Fein: die Position wird überall dort an die Kurven der Karte angeglichen, wo der Abgleich sicher ist, auch in sanften Kurven. Nur starke Kurven: wie bisher, nur ab etwa 30° Richtungsänderung. Ändert nur den Schritt Verfeinerung."));
   const opts = disclosure("Weitere Optionen",
+    alignField,
     field("Fahrlinie (m rechts)", offset, "Abstand rechts von der Straßenmitte in Metern. Leer = Standard (Fahrrad 1,5 m, sonst 1,6 m).").el,
     el("div", { class: "row end-align" }, field("Startzeit", startTime, "Uhrzeit des ersten Videobilds für die GPX-Zeitstempel. Später änderbar.", "grow").el, fromFile),
     field("Plausibilitätstest", decoys, "Prüft die Route gegen Vergleichsstrecken. Verdoppelt etwa die Rechenzeit.").el);
@@ -120,6 +129,7 @@ function syncInputs() {
   if (!app) return;
   vehicle.set(app.vehicle ?? "auto");
   bikePaths.set(app.bike_paths ?? "off");
+  alignMode.set(app.align_mode ?? "posterior");
   offset.value = app.offset_m == null ? "" : String(app.offset_m);
   startTime.value = toLocalInput(app.start_time);
   decoys.value = String(app.decoys ?? 0);
@@ -191,6 +201,7 @@ function update() {
   // vehicle, options
   vehicle.setDisabled(running);
   bikePaths.setDisabled(running);
+  alignMode.setDisabled(running);
   bikePathsField.hidden = app.vehicle === "motorcycle" || app.vehicle === "car";
   for (const x of [offset, startTime, decoys]) x.disabled = running;
   fromFile.hidden = !app.probe?.creation_time; fromFile.disabled = running;
@@ -228,7 +239,7 @@ function renderAtlas(loading: boolean) {
   atlasBox.dataset.sig = sig; atlasBox.hidden = !a;
   if (!a) { atlasBox.replaceChildren(); return; }
   const job = a.job;
-  const head = el("div", { class: "row" }, toneIcon("info"), el("span", { class: "grow" }, "Aus dem POV Drive Atlas: ", el("span", { class: "mono" }, job.video_id),
+  const head = el("div", { class: "row" }, toneIcon("info"), el("span", { class: "grow" }, "Aus ridrs Scenic: ", el("span", { class: "mono" }, job.video_id),
     job.route_level ? ` · Route Stufe ${job.route_level}` : " · ohne Route", job.channel ? ` · ${job.channel}` : ""));
   const parts: Node[] = [head];
   if (!app.video && !loading && !failed) {

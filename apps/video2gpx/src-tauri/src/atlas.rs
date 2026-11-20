@@ -1,5 +1,5 @@
-//! The POV Drive Atlas round trip (docs/FEATURE_atlas.md): read a job file (`<id>.v2g.json`), download the atlas route as the
-//! project's route hint, write the result file (`<id>.atlas.json`). The job and the payload are built and checked in the frontend
+//! The ridrs Scenic round trip (docs/FEATURE_atlas.md): read a job file (`<id>.v2g.json`), download the atlas route as the
+//! project's route hint, write the result file (`<id>.scenic.json`). The job and the payload are built and checked in the frontend
 //! (src/atlas.ts); this module only moves bytes, with limits.
 use crate::ctx::Ctx;
 use serde_json::{json, Value};
@@ -15,7 +15,7 @@ const MAX_RESULT: usize = 2_000_000;
 /// The text of a job file; only `*.v2g.json`, at most 1 MB.
 pub fn job_read(path: &str) -> Result<String, String> {
     if !path.to_lowercase().ends_with(".v2g.json") {
-        return Err("Nur Job-Dateien des Atlas (.v2g.json) lassen sich so öffnen.".into());
+        return Err("Nur Job-Dateien von ridrs Scenic (.v2g.json) lassen sich so öffnen.".into());
     }
     let meta = std::fs::metadata(path).map_err(|e| format!("Job-Datei nicht lesbar: {e}"))?;
     if meta.len() > MAX_JOB {
@@ -46,7 +46,7 @@ fn check_gpx(bytes: &[u8]) -> Result<String, String> {
     }
     let text = String::from_utf8(bytes.to_vec()).map_err(|_| "Die Route ist keine Textdatei (GPX).".to_string())?;
     if !text.contains("<gpx") {
-        return Err("Die Antwort des Atlas ist keine GPX-Datei.".into());
+        return Err("Die Antwort von ridrs Scenic ist keine GPX-Datei.".into());
     }
     Ok(text)
 }
@@ -74,13 +74,13 @@ pub fn hint_download(ctx: &Ctx, project: &str, url: &str, name: &str) -> Result<
     Ok(json!({"name": name, "path": dst, "text": text}))
 }
 
-/// Writes the result file chosen in the save dialog: `*.atlas.json`, a JSON object, at most 2 MB.
+/// Writes the result file chosen in the save dialog: `*.scenic.json`, a JSON object, at most 2 MB.
 pub fn result_write(dest: &str, text: &str) -> Result<Value, String> {
-    if !dest.to_lowercase().ends_with(".atlas.json") {
-        return Err("Die Datei für den Atlas muss auf .atlas.json enden.".into());
+    if !dest.to_lowercase().ends_with(".scenic.json") {
+        return Err("Die Datei für ridrs Scenic muss auf .scenic.json enden.".into());
     }
     if text.len() > MAX_RESULT {
-        return Err("Das Ergebnis ist zu groß für den Atlas (über 2 MB).".into());
+        return Err("Das Ergebnis ist zu groß für ridrs Scenic (über 2 MB).".into());
     }
     match serde_json::from_str::<Value>(text) {
         Ok(Value::Object(_)) => {}
@@ -124,11 +124,11 @@ mod tests {
     fn result_is_a_json_object_with_the_right_name() {
         let dir = std::env::temp_dir().join(format!("v2g-atlas-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let ok = dir.join("V2Gexample1.atlas.json");
+        let ok = dir.join("V2Gexample1.scenic.json");
         assert_eq!(result_write(ok.to_str().unwrap(), "{\"video_id\":\"x\"}").unwrap()["bytes"], 16);
         assert!(result_write(dir.join("x.json").to_str().unwrap(), "{}").is_err());
         assert!(result_write(ok.to_str().unwrap(), "[1]").is_err());
-        assert!(result_write(dir.join("missing/x.atlas.json").to_str().unwrap(), "{}").is_err());
+        assert!(result_write(dir.join("missing/x.scenic.json").to_str().unwrap(), "{}").is_err());
         let _ = std::fs::remove_dir_all(dir);
     }
 }

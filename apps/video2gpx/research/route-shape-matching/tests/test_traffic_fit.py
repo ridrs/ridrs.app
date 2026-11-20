@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 
 import numpy as np
+import pytest
 
 from rsm.pipeline.vmsx import motion as M
 
@@ -84,6 +85,42 @@ def test_pick_takes_the_candidate_that_continues_the_road_speed(tmp_path):
     assert all(r["pick"] == "" for r in out[:50])
 
 
+def test_pick_ignores_candidates_at_the_videos_own_fit_level(tmp_path):
+    """a soft video fits plain road at ~0.85 px: every pair is above ALT_TRIGGER and has candidates, but only pairs above ALT_TRIGGER_REL x the
+    video's median plain rms may be traffic; the others keep their plain fit and are the reference of the road speed"""
+    s = 3.0e-4
+    rng = np.random.default_rng(3)
+    rows = []
+    for i in range(1, 301):
+        e = float(rng.uniform(0.78, 0.92))
+        alts = ";".join([M._alt_text([s, 0, 0.1, 0, 0], 150, e), M._alt_text([0.97 * s, 0, 0.1, 0, 0], 50, 0.3)])
+        rows.append(_row(i, s, rms=e, alts=alts))
+    for i in range(150, 170):                                 # a real vehicle: plain fit reads 30 % at 2.1 px, one candidate is the road
+        alts = ";".join([M._alt_text([0.3 * s, 0, 0.1, 0, 0], 120, 2.1), M._alt_text([1.02 * s, 0, 0.2, 0, 0], 30, 0.25)])
+        rows[i] = _row(i + 1, 0.3 * s, rms=2.1, alts=alts)
+    f = tmp_path / "motion.csv"
+    _write(f, rows)
+    st = M.pick_alternatives(str(f))
+    assert st["candidates"] == 300 and st["replaced"] == 20 and st["kept"] == 280 and st["none"] == 0
+    assert abs(st["trigger"] - M.ALT_TRIGGER_REL * 0.85) < 0.02
+    with open(f, newline="") as fh:
+        out = list(csv.DictReader(fh))
+    for r in out[150:170]:
+        assert r["pick"] == "1" and abs(float(r["rel_speed"]) * DT / s - 1.02) < 1e-3
+    for r in out[:150] + out[170:]:                           # plain road: the plain fit stays, no candidate replaces it
+        assert r["pick"] == "0" and abs(float(r["rel_speed"]) * DT / s - 1) < 1e-3
+
+
+def test_pick_trigger_stays_absolute_on_a_clean_video(tmp_path):
+    rows = [_row(i, 3e-4, rms=0.25) for i in range(1, 200)]
+    alts = M._alt_text([1.5e-4, 0, 0.1, 0, 0], 150, 0.65) + ";" + M._alt_text([2.95e-4, 0, 0.1, 0, 0], 60, 0.3)
+    rows[100] = _row(101, 1.5e-4, rms=0.65, alts=alts)        # just above ALT_TRIGGER: a candidate may replace it
+    f = tmp_path / "motion.csv"
+    _write(f, rows)
+    st = M.pick_alternatives(str(f))
+    assert "trigger" not in st and st["replaced"] == 1
+
+
 def test_pick_leaves_an_old_csv_alone(tmp_path):
     f = tmp_path / "motion.csv"
     _write(f, [_row(i, 3e-4) for i in range(1, 50)], with_alts=False)
@@ -110,14 +147,16 @@ def test_overlay_marks_the_vehicle_as_ignored_traffic_when_a_candidate_replaced_
     assert (car == TRAFFIC).mean() > 0.9                  # the vehicle is marked as ignored traffic, not as road and not as a plain outlier
 
 
-def test_overlay_marks_every_fit_point_ignored_when_the_pair_is_rejected():
-    from rsm.pipeline.insight import TRAFFIC, traffic_points
+def test_overlay_marks_every_fit_point_ignored_but_not_as_traffic_when_the_pair_is_rejected():
+    """a rejected pair gives no speed, so every point that carried the fit is ignored; it is not located traffic (often only a soft frame), so the
+    points get their own code IGNORED, not TRAFFIC"""
+    from rsm.pipeline.insight import IGNORED, TRAFFIC, traffic_points
     mid, flow, _ = scene()
     fit = M.fit_fixed_horizon(mid, flow, W / 2, H / 2, HZ, M.MIN_RESIDUAL)
     cands = M.candidates(mid, flow, W / 2, H / 2, HZ, 1.0, seed=7)
     codes, info = traffic_points(mid, flow, W / 2, H / 2, HZ, 1.0, fit.inliers, _stored(fit, cands, -1, fit.rms), 0.8)
-    assert info["state"] == "rejected" and set(codes.tolist()) <= {0, TRAFFIC}
-    assert (codes == TRAFFIC).sum() == int(fit.inliers.sum())
+    assert info["state"] == "rejected" and set(codes.tolist()) <= {0, IGNORED}
+    assert (codes == IGNORED).sum() == int(fit.inliers.sum()) == info["n_ignored"] and (codes == TRAFFIC).sum() == 0
 
 
 def test_overlay_leaves_a_plain_road_pair_alone():
@@ -127,3 +166,34 @@ def test_overlay_leaves_a_plain_road_pair_alone():
     codes, info = traffic_points(mid, flow, W / 2, H / 2, HZ, 1.0, fit.inliers, dict(alts="", pick="", rms_px=f"{fit.rms:.4f}"), 0.8)
     assert info is None and codes.tolist() == fit.inliers.astype(int).tolist()
     assert traffic_points(mid, flow, W / 2, H / 2, HZ, 1.0, fit.inliers, None, 0.8)[1] is None
+
+
+def _noisy_road(seed: int, noise: float = 0.5, n: int = 150):
+    rng = np.random.default_rng(seed)
+    p = np.array([3.0e-4, 0.0, 0.3, 0.0, 0.0])
+    u = rng.uniform(15, 175, n)
+    mid = np.column_stack([W / 2 + rng.uniform(-1, 1, n) * 1.6 * u, HZ + u])
+    return mid, road_flow(mid, p) + rng.normal(0, noise, (n, 2))
+
+
+def test_candidate_tolerance_follows_the_videos_noise():
+    """a soft video scatters plain road at ~0.85 px (PCI25WijGrE): with the fixed 0.6 px tolerance the road splits into several candidate sets (the
+    rest is drawn as traffic); with the tolerance of `alt_threshold` one candidate holds the road"""
+    fixed, rel = [], []
+    for seed in range(8):
+        mid, flow = _noisy_road(seed, noise=0.6)
+        fit = M.fit_fixed_horizon(mid, flow, W / 2, H / 2, HZ, M.MIN_RESIDUAL)
+        assert fit.rms > 0.6
+        thr = M.alt_threshold(fit.rms, 1.0)
+        fixed.append(M.candidates(mid, flow, W / 2, H / 2, HZ, 1.0, seed=seed)[0][1] / len(mid))
+        rel.append(M.candidates(mid, flow, W / 2, H / 2, HZ, 1.0, seed=seed, thr=thr)[0][1] / len(mid))
+    assert np.mean(fixed) < 0.7 and np.mean(rel) > 0.9
+
+
+def test_alt_threshold_stays_absolute_on_a_clean_video():
+    assert M.alt_threshold(0.3, 1.0) == M.ALT_THR
+    assert M.alt_threshold(0.8 / 1.5, 1.0) == pytest.approx(M.ALT_THR)
+    assert M.alt_threshold(0.85, 1.0) == pytest.approx(M.ALT_THR + M.ALT_THR_SLOPE * (0.85 - 0.8 / 1.5))
+    assert M.alt_threshold(0.54, 1.0) == pytest.approx(M.ALT_THR, abs=0.02)        # continuous where it turns relative
+    assert M.alt_threshold(0.6, 2.0) == pytest.approx(2 * M.ALT_THR)            # rms in px of a 720-row analysis: 0.3 px at 360 rows
+    assert M.alt_threshold(float("nan"), 1.0) == M.ALT_THR

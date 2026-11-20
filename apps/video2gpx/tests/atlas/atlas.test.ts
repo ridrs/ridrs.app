@@ -1,5 +1,5 @@
 // node --test tests/atlas/atlas.test.ts   (Node >= 23: TypeScript types are stripped)
-// The atlas round trip (src/atlas.ts, docs/FEATURE_atlas.md): job file -> project hints, the Atlas checklist, the payload.
+// The ridrs Scenic round trip (src/atlas.ts, docs/FEATURE_atlas.md): job file -> project hints, the ridrs Scenic checklist, the payload.
 // fixtures/ holds the example job and payload of the contract (pov-atlas VIDEO2GPX-INTEGRATION.md section 8); the atlas tests
 // (pov-atlas web/test/video2gpx.test.mjs) use byte-identical copies: the job is what the atlas serves, the payload what it accepts.
 import assert from "node:assert/strict";
@@ -24,9 +24,9 @@ test("the example job becomes a project with the search frame, start/end frames,
   assert.deepEqual(p.bbox, [44.97305, 6.961887, 45.02695, 7.057169], "bbox as south, west, north, east");
   assert.deepEqual(p.start_frame, [44.997305, 6.996188, 45.002695, 7.003812]);
   assert.deepEqual(p.end_frame, [44.997305, 7.015244, 45.002695, 7.022868]);
-  assert.deepEqual(p.hint, { url: "https://atlas.example.org/gpx/V2Gexample1.gpx", name: "V2Gexample1.gpx", buffer_m: 300 });
+  assert.deepEqual(p.hint, { url: "https://ridrs.example.org/scenic/gpx/V2Gexample1.gpx", name: "V2Gexample1.gpx", buffer_m: 300 });
   assert.equal(p.vehicle, "car");
-  assert.deepEqual([p.atlas.base, p.atlas.video_id, p.atlas.job], ["https://atlas.example.org", "V2Gexample1", job]);
+  assert.deepEqual([p.atlas.base, p.atlas.video_id, p.atlas.job], ["https://ridrs.example.org/scenic", "V2Gexample1", job]);
   assert.equal(JSON.parse(JSON.stringify(p.atlas)).job.route_level, 4, "app.json round trip");
 });
 
@@ -51,7 +51,9 @@ test("job files that are not atlas jobs are refused with a German reason", () =>
   refused([1], /keine Job-Datei/);
   refused({ ...raw, video_id: "x" }, /Video-ID/);
   refused({ ...raw, url: "javascript:alert(1)" }, /Videoadresse/);
-  refused({ ...raw, atlas: { base: "https://a.example", video_id: "other123456" } }, /Verweis auf den Atlas/);
+  refused({ ...raw, scenic: { base: "https://a.example", video_id: "other123456" } }, /Verweis auf ridrs Scenic/);
+  // jobs written before the rename carry the link as "atlas"
+  { const { scenic, ...old } = raw; assert.equal(parseJob(JSON.stringify({ ...old, atlas: scenic })).atlas.base, "https://ridrs.example.org/scenic"); }
   refused({ ...raw, route_level: 3 }, /Routenstufe/);
   refused({ ...raw, route_gpx: "file:///etc/passwd" }, /Routenadresse/);
   refused({ ...raw, bbox: { south: 46, west: 7, north: 45, east: 8 } }, /Rahmen \(bbox\)/);
@@ -126,7 +128,7 @@ test("payload of the example result is exactly the shared example payload", () =
   assert.equal(p.t.length, 141);
   assert.ok(p.t.every((x, i) => i === 0 || x === p.t[i - 1] + 1), "one position per video second");
   assert.deepEqual(p.c[0], [7, 44.999986], "c is [lon, lat]");
-  assert.equal(payloadName(job), "V2Gexample1.atlas.json");
+  assert.equal(payloadName(job), "V2Gexample1.scenic.json");
   // without a profile there is no e; an unfinished list writes nothing
   assert.equal("e" in buildPayload({ job, ...exampleRun, points: examplePoints, standstills: exampleStandstills, cutTimes: [], state, items, eleAt: null }), false);
   const open = { ...state, viewed: { start: false, turn: false, end: false } };

@@ -233,6 +233,22 @@ def test_frame_marks_a_mismatch_instead_of_hiding_it(synth_run, tmp_path):
     assert "rotation" not in r
 
 
+def test_frame_refits_with_the_running_horizon_of_the_pair(synth_run, tmp_path):
+    """a run with a running horizon (vmsx.motion.HZ_*): the overlay fits the pair with the row the step used at that time, the road area stays the
+    one of the calibrated row; a track at the calibrated row reproduces the stored row, a track 40 rows off does not"""
+    d, video = synth_run["d"], synth_run["video"]
+    import shutil
+    for off, agree in ((0.0, True), (40.0, False)):
+        dd = tmp_path / f"out{int(off)}"
+        shutil.copytree(d, dd)
+        mj = json.loads((dd / "motion" / "motion.json").read_text())
+        mj["horizon_calibration"] = dict(horizon=mj["horizon_vms"], track=dict(t=[0.5, 2.5], row=[mj["horizon_vms"] + off] * 2))
+        (dd / "motion" / "motion.json").write_text(json.dumps(mj))
+        r = I.frame(dd, 1.7, str(video), ("motion",))["motion"]
+        assert r["horizon"] == pytest.approx(mj["horizon_vms"] + off, abs=0.05)
+        assert r["roi"] == mj["roi"] and r["agree"] is agree
+
+
 def test_frame_part_failing_does_not_hide_the_other(synth_run, tmp_path):
     import shutil
     dd = tmp_path / "out"

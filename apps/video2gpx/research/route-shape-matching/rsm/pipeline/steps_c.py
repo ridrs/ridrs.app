@@ -441,14 +441,14 @@ def refine(d: Path, P: dict, W: Worker):
                 sgi = np.clip(np.rint(al["s"]).astype(int), 0, len(phs) - 1)
                 turn = np.degrees(np.abs(phs[np.minimum(sgi + hw, len(phs) - 1)] - phs[np.maximum(sgi - hw, 0)]))
                 keep, last = [], -1e9
-                if C.ALIGN_MEAS_MODE == "posterior" and "s_sd" in al:
+                if AL.meas_mode(P) == "posterior" and "s_sd" in al:
                     # every sample, weighted by how sure the heading alignment is there (align.band_posterior): curves of any size pin the time, straights drop out
                     # position = the Viterbi path (the posterior mean trails it by ~10 m on long climbs), weight = the posterior spread; samples far from the
                     # HMM route are dropped (a wrong alignment start is confidently wrong, e.g. Grimone 0-70 s)
                     sdm = np.sqrt(al["s_sd"] ** 2 + C.ALIGN_POST_FLOOR_M ** 2) * C.ALIGN_POST_INFL
                     far = np.abs(al["s"] - np.interp(al["t"], ctx.t_step, ctx.s_vit)) > C.ALIGN_POST_GATE_M
-                    for t_, s_, sd_, f_ in zip(al["t"], al["s"], sdm, far):
-                        if not f_ and sd_ <= C.ALIGN_POST_MAX_SD_M and s_ - last >= C.ALIGN_MEAS_EVERY_M:
+                    for t_, s_, sd_, raw, f_ in zip(al["t"], al["s"], sdm, al["s_sd"], far):
+                        if not f_ and raw <= C.ALIGN_POST_MAX_SD_M and s_ - last >= C.ALIGN_MEAS_EVERY_M:
                             keep.append((t_, s_, float(sd_))); last = s_
                 else:
                     for t_, s_, tu in zip(al["t"], al["s"], turn):

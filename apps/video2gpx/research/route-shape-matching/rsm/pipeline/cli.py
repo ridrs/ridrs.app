@@ -14,6 +14,10 @@ from pathlib import Path
 
 from . import VERSION, config as C
 from .common import Worker, code_hash, emit, frozen_info, file_sig, jdump, jload, sha
+from rsm.odometry.gating import GateParams as _GP
+from rsm.pipeline.vmsx import motion as M_ALT
+
+GP_DEFAULT = _GP()    # the gate the steps use (rsm.odometry.gating): its rms limit decides which pairs make the tracks (rotation step on)
 
 EXIT = dict(ok=0, internal=1, args=2, resource=3, data=4, cancelled=130)
 SELF_CMD = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "rsm.pipeline"]
@@ -41,6 +45,9 @@ def parse_args(argv):
     r.add_argument("--bike-paths", default=None, choices=list(C.BIKE_PATHS_MODES),
                    help="cycleways, paths and tracks for a bike: off = roads only, on = in the search map, fallback = a second search with them when the road result is "
                         "not confident (default: the config flags, today off)")
+    r.add_argument("--align-mode", default=None, choices=list(C.ALIGN_MEAS_MODES),
+                   help="how the dense heading alignment pins the time in refine: posterior = wherever it is sure (weighted), turns = only in turns >= 30 deg "
+                        f"(default {C.ALIGN_MEAS_MODE})")
     r.add_argument("--anchors", default=None, help="user anchors: JSON file (or inline JSON) of [{t: video s, bbox: [S,W,N,E]}]; the camera is inside the frame at t (anchors.py)")
     r.add_argument("--intro-end", type=float, default=None, help="video second at which the intro ends, set by hand: replaces the intro found from the scene cuts "
                                                                   "(the route starts after it; app: \"Intro-Ende hier setzen\")")
@@ -130,6 +137,7 @@ class Run:
 
     def hashes(self, P):
         from . import anchors as AN
+        from . import align as AL
         h, prev = {}, ""
         hint_map = [["hint", P["hint_hash"], P["hint_buffer_m"]]] if P.get("hint") else []
         cons = [["frames", P.get("start_bbox"), P.get("end_bbox"), P["start_tol_m"]]] if (P.get("start_bbox") or P.get("end_bbox")) else []
@@ -146,15 +154,16 @@ class Run:
         bridge = [["bridge_rot1", C.ROT_BRIDGE_MIN_VALID]] if C.ROT_BRIDGE_ON else []   # heading across vms speed gaps (odofail.build): all route-side steps
         still = [["still1", C.STILL_WIN_S, C.STILL_GATE_REL, C.STILL_GATE_FAR, C.STILL_BASE_S, C.STILL_NPAIR, C.STILL_THR_PX, C.STILL_GRID, C.STILL_CELL_SHARE, C.STILL_ALL,
                    C.STILL_UP, C.STILL_MIN_S, C.STILL_EDGE_S, C.STILL_SAMPLE_S]] if C.STILL_ON else []   # sure standstill (standstill.py): detected in rotation, held in refine
-        parts = dict(motion=[file_sig(P["video"]), C.VMS, C.F360, "motion2"],
-                     rotation=[C.FAR, C.F_FAR, C.F_REF, "rotation2", C.ROT_BAND_OFF_VMS,
+        parts = dict(motion=[file_sig(P["video"]), C.VMS, C.F360, "motion2", "pick_rel1", M_ALT.ALT_TRIGGER_REL, "alt_thr_rel1", M_ALT.ALT_NOISE_REF, M_ALT.ALT_THR_SLOPE,
+                             ["hz_run1", M_ALT.HZ_EVERY, M_ALT.HZ_WINDOW, M_ALT.HZ_SPAN, M_ALT.HZ_MIN_FOES, M_ALT.HZ_MAX_DEV]],
+                     rotation=[C.FAR, C.F_FAR, C.F_REF, "rotation2", C.ROT_BAND_OFF_VMS, ["gate_rms_rel1", GP_DEFAULT.max_rms_px, GP_DEFAULT.max_rms_rel],
                                *([["same1", C.CUT_SAME_SHARE, C.CUT_SAME_WIN_S, C.CUT_SAME_H]] if (C.CUT_ON and C.CUT_SAME_ON) else []),
                                *([["intro_user1", P["intro_end"]]] if P.get("intro_end") is not None else []),
                                *([["strong2", C.CUT_STRONG_IMPULSE, C.CUT_STRONG_FACTOR, C.CUT_STRONG_MIN_DIFF, C.CUT_STRONG_AROUND, C.CUT_STRONG_NB_SHARE]] if C.CUT_ON else []), *still],
                      map=[P["bbox"], file_sig(P["pbf"]), P["vehicle"], C.CLASSES_BIKE, C.CLASSES_MOTOR, C.HMM_CAP_GB, "map1", *hint_map, *paths_map],
                      route_search=[C.F_GRID, C.K_GRID, C.REFINE_K, C.REFINE_F, C.H, "search1", C.CUT_PRIOR_SD_M, *cons, *bike_cal, *odo, *bridge, *AN.hash_part(P)],
                      plausibility=[C.N_FOREIGN, C.N_SHUFFLE, C.SEED0, C.VERDICT_CONFIDENT_MARGIN, P["decoys"], "plaus1"],
-                     refine=["refine4", "bridge1", *(["hold1"] if C.STILL_ON else []), *(["shape1"] if C.FUSE_SHAPE_STEPS else []), "raster1", C.GPX_HZ, C.LOCAL_MINOR_NATS_PER_KM, C.LOCAL_ON, C.LOCAL_BUF_M, C.LOCAL_D0, C.LOCAL_EXTRA, C.LOCAL_SAME_M, file_sig(P["pbf"]), C.GAP_MEASURED_SHARE, C.ALIGN_ON, C.ALIGN_DS,
+                     refine=["refine4", "bridge1", *(["hold1"] if C.STILL_ON else []), *(["shape1"] if C.FUSE_SHAPE_STEPS else []), *([["align_post1", C.ALIGN_POST_BAND_M, C.ALIGN_POST_FLOOR_M, C.ALIGN_POST_INFL, C.ALIGN_POST_MAX_SD_M, C.ALIGN_POST_GATE_M]] if AL.meas_mode(P) == "posterior" else []), "raster1", C.GPX_HZ, C.LOCAL_MINOR_NATS_PER_KM, C.LOCAL_ON, C.LOCAL_BUF_M, C.LOCAL_D0, C.LOCAL_EXTRA, C.LOCAL_SAME_M, file_sig(P["pbf"]), C.GAP_MEASURED_SHARE, C.ALIGN_ON, C.ALIGN_DS,
                              C.ALIGN_SMOOTH_M, C.ALIGN_REL, C.ALIGN_SIG0_DEG, C.ALIGN_BETA, C.ALIGN_NU, C.ALIGN_VMAX, C.ALIGN_MEAS_SD_M, C.ALIGN_MEAS_EVERY_M, C.ALIGN_MAX_DEV_M, C.ALIGN_TURN_DEG, C.ALIGN_TURN_HALF_M, C.POST_STRAIGHT_EVERY_M, C.POST_STRAIGHT_INFL,
                              "accept1", C.LOCAL_ACCEPT_ON, C.LOCAL_ACCEPT_MIN_S, C.LOCAL_ACCEPT_NATS, C.LOCAL_ACCEPT_R_M, C.LOCAL_KEPT_CONF, C.LM_MIN_DEG, C.LM_WIN_M, C.LM_TOL_DEG, C.LM_TOL_REL, C.LM_EXT_M, *ext],
                      gpx=[P["decoys"], C.NODECOY, C.PEAK_FLAT, C.COVERAGE, C.YAW_RATIO, P["offset_m"], P["traffic_side"], P["vehicle"], C.OFFSET_M, C.OFFSET_SMOOTH_M, "gpx1", *(["still_pts1"] if C.STILL_ON else []), "raster1", C.GPX_HZ])
@@ -278,6 +287,8 @@ class Run:
             P["intro_end"] = float(a.intro_end)
         if a.bike_paths is not None:
             P["bike_paths"] = a.bike_paths
+        if a.align_mode is not None:
+            P["align_mode"] = a.align_mode
         jdump(d / "project.params.json", P)
         signal.signal(signal.SIGTERM, self.cancel)
         signal.signal(signal.SIGINT, self.cancel)

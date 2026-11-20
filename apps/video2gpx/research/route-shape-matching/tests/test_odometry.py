@@ -290,3 +290,26 @@ def test_traffic_bridge_limits(tmp_path):
             rows[i]["rel_speed"] = 1e-6 / DT
         _traffic(rows, 300, 350)
     assert (300, 350) not in [(a, b) for a, b in segs(stop)] and segs(stop)[0][1] <= 300   # standing before it: left to the standstill test
+
+
+def test_rms_gate_follows_the_videos_own_fit_quality(tmp_path):
+    """a soft / low-resolution video fits plain road at ~0.9 px (PCI25WijGrE 480p: median 0.80 px, half of all pairs above 0.8 px, tracks split for 104 s):
+    the rms limit is max(max_rms_px, max_rms_rel x the video's median rms), so plain road stays usable and passing traffic (well above the level) is still rejected"""
+    from rsm.odometry.gating import HIGH_RMS, rms_limit
+    rng = np.random.default_rng(1)
+    noisy = 0.9 + 0.1 * rng.standard_normal(1000)
+
+    def mut(rows):
+        for i, r in enumerate(rows):
+            r["rms_px"] = round(float(max(noisy[i], 0.3)), 4)
+        _traffic(rows, 400, 450, rms=3.5)
+    p = load_pairs(write_csv(tmp_path / "a.csv", 1000, mutate=mut, yaw=0.5))
+    gp = GateParams(min_segment_s=2.0)
+    assert rms_limit(p.rms_px, p.inliers, gp) == pytest.approx(1.5 * np.median(p.rms_px), rel=0.02)
+    fl = pair_flags(p, gp)
+    assert not (np.delete(fl, np.s_[400:450]) & HIGH_RMS).any()
+    assert np.all(fl[400:450] & HIGH_RMS)
+    segs = build_segments(p, fl, gp)
+    assert [(s.i0, s.i1) for s in segs] == [(0, 1000)] and segs[0].n_bridged == 50
+    clean = load_pairs(write_csv(tmp_path / "b.csv", 1000))
+    assert rms_limit(clean.rms_px, clean.inliers, gp) == gp.max_rms_px            # a clean video (0.2 px) keeps the absolute 0.8 px gate (A17)

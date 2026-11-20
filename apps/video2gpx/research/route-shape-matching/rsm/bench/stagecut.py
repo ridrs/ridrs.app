@@ -45,7 +45,8 @@ def _motion(src: Path, dst: Path, t0: float, t1: float) -> None:
         w.writerow(head)
         w.writerows(rows)
     mj = json.loads((src / "motion.json").read_text())
-    mj.update(start=float(mj.get("start", 0.0)) + t0, duration=t1 - t0, pairs=len(rows), window=[t0, t1])
+    mj.update(start=float(mj.get("start", 0.0)) + t0, duration=t1 - t0, pairs=len(rows), window=[t0, t1],
+              track_t0=float(mj.get("track_t0") or 0.0) + t0)     # the running horizon track stays in source seconds (vmsx.motion.horizon_at)
     (dst / "motion.json").write_text(json.dumps(mj, indent=1, default=float))
     cj = json.loads((src / "cuts.json").read_text())
     cj["candidates"] = [dict(c, t=c["t"] - t0, i=c["i"] - f0) for c in cj["candidates"] if _in(c["t"], t0, t1)]

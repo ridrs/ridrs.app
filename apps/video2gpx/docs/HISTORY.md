@@ -56,6 +56,7 @@ The method has to be classical (no AI) and run locally.
 ## Open items
 
 **Product and app**
+- [ ] A20 curve alignment (`--align-mode posterior`, default on): find out why Pontaix gets worse (8.0 -> 8.7 m along median), confirm the 5 m sd limit on more GPS rides; manual tests in the app.
 - [ ] Verify in the real app (not only the browser mock): the dark-mode map fix, the playback profile, the Incyclist dialog.
 - [ ] POV Drive Atlas round trip (P21, 18 Nov, docs/FEATURE_atlas.md): a real job from the atlas admin (drop, route download, import with a 480p template, run, Atlas card, save dialog, upload in the admin); `pnpm ui-shots` for the scenarios `atlas`, `atlas-uncertain`, `atlas-setup`. Still open on the plan: deep link (C), direct send with a service token (D), atlas map lines (E).
 - [ ] Incyclist checks only the user can do: import of the XML, VP9-in-MP4 playback, whether standstills are skipped.
@@ -68,6 +69,7 @@ The method has to be classical (no AI) and run locally.
 - [ ] Sure standstill (A14, 16 Nov): check the thresholds on a held-out video with town traffic (Madone/Menton, Gotthard); check in Incyclist that the sub-second standstill edges are read and the stop plays right; run the regression bench (Roanne, Grimone, Rousset, Pontaix) against the code before A14.
 - [x] Gotthard: a sun flash at 3:12 was taken for a scene cut and the route jumped onto the Andermatt bypass unless anchored (16 Nov 2026, A15): same-scene veto, real-video test on 3:00-3:20. Not yet in an app build; old projects recompute the rotation step.
 - [ ] Lahntal and Marburg (Van Gestel, Hessen): the image odometry measures about a third of the real speed (T1 clip `lahntal-uniform-35m42`: GPS 7.5 m/s, vms about 3x too low, implied f_eff about 860), so the scale scan finds f_eff 211 / 193 and both T2 cases `lahntal-marburg` and `marburg-lahntal` end in `no_route` (20 Nov 2026, docs/CONCEPT_test_strategy.md step 4). Find out why the motion step underestimates the speed on this footage; the clip is the test case. Coarse GPS: check the fix on place scores only, tune nothing on it.
+- [ ] A21-A24 (20 Nov: relative rms gate, relative traffic trigger and tolerance, running horizon): image side changed, so every frozen stage is stale; T4 (`rsm.bench.stages make`, 5-6 h through `scripts/heavy.sh`), then T1, T2 and T3. Check by hand: Pontaix 30:00-34:00 in the app (the running horizon follows a FOE shift there); Cayolle 54:20-56:50 and its traffic marks (Cayolle has no stage).
 - [ ] Madone without hints still fails, because the calibration peak runs away. Ideas: a far-feature focal seed (not built), better motorcycle yaw.
 - [ ] A roundabout passed straight still lags (+8 s on Madone); roundabouts carry little heading information.
 - [ ] The road-class prior can mislead an all-residential route next to a parallel main road (seen in a synthetic town only).

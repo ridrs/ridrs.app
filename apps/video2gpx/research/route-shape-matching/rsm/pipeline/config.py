@@ -154,10 +154,13 @@ ALIGN_MAX_DEV_M = 400.0      # the alignment is rejected (old measurements used)
 ALIGN_TURN_DEG = 30.0        # aligned positions are used as measurements only where the path heading changes by this much ...
 ALIGN_TURN_HALF_M = 20       # ... within +- this many metres (on straights the alignment has no heading information)
 ALIGN_POST_BAND_M = 150.0    # m, band around the Viterbi path for the alignment posterior (align.band_posterior); 0 = no posterior
-ALIGN_MEAS_MODE = "turns"    # "turns": measurements only in turns (A7); "posterior": every ALIGN_MEAS_EVERY_M with the sd of the alignment posterior
+ALIGN_MEAS_MODE = "posterior"  # default of `run --align-mode` (app "Kurvenabgleich"): "turns" = measurements only in turns (A7); "posterior" = every
+                               # ALIGN_MEAS_EVERY_M where the alignment posterior is narrow, weighted by its sd (A20)
+ALIGN_MEAS_MODES = ("posterior", "turns")
 ALIGN_POST_FLOOR_M = 3.0     # posterior mode: measurement sd = sqrt(sd_post^2 + floor^2) x ALIGN_POST_INFL ...
 ALIGN_POST_INFL = 1.5        # ... (neighbouring samples share the same heading evidence, so each is inflated)
-ALIGN_POST_MAX_SD_M = 40.0   # ... and dropped if the sd is larger (a straight: no heading information)
+ALIGN_POST_MAX_SD_M = 5.0    # ... and dropped if the posterior sd itself is larger: a straight, no heading information (Roanne valley 8-12 m and 7 m late;
+                             #     the gentle curves of Madone 4-6 m)
 ALIGN_POST_GATE_M = 60.0     # ... and dropped if the alignment is this far from the HMM route
 
 # --- posterior on straights (refine step, Fable fix 3): on a straight the cell posterior carries no heading information; thinned and inflated there so the

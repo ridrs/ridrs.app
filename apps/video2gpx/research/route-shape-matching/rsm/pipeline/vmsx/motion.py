@@ -76,9 +76,36 @@ ALT_KEEP = 5
 #: `pick_alternatives`: the reference is the median speed of the clean pairs (no candidates) in the ALT_REF_S before and after (at most ALT_REF_N on
 #: each side, interpolated in time between the two); the closest candidate within ALT_TOL x max(|reference|, 0.1 x the video median) replaces the
 #: fit, otherwise the row stays as it was (high rms: gating rejects and bridges it).
+#: A pair is traffic only if its plain fit is worse than the video's own level: ALT_TRIGGER_REL x the median plain rms of the video, when that is
+#: above ALT_TRIGGER (2026-11-19). A soft, low-resolution video fits PLAIN road at 0.75-1.25 px (PCI25WijGrE, Switzerland 6, WBai5dLao38 480p): all
+#: its pairs are above ALT_TRIGGER, 72-85 % had candidates and 16 000 plain-road pairs of PCI25WijGrE (plain rms below the median) were replaced
+#: by a candidate and drawn as traffic. 1.125 = 3/4 of the gate's 1.5 (gating.GateParams.max_rms_rel), as ALT_TRIGGER is 3/4 of its 0.8 px:
+#: both turn relative at the same median, 0.53 px, so a clean video keeps both absolute limits.
+ALT_TRIGGER_REL = 1.125
+#: The inlier tolerance of a candidate follows the video's noise too (2026-11-19): `alt_threshold` = ALT_THR + ALT_THR_SLOPE x max(0, rms - ALT_NOISE_REF),
+#: rms = the median plain-road rms of the noise calibration (`calibrate_noise`, fixed stretches: the same for every chunk layout). On a soft video
+#: plain road scatters at 0.7-0.9 px and the fixed 0.6 px split it: the largest candidate held about half of the road points and the rest was drawn
+#: as traffic. ALT_NOISE_REF = 0.8 / 1.5, the median at which the gate's rms limit turns relative: a clean video keeps ALT_THR. A ramp, not a
+#: factor: continuous at ALT_NOISE_REF, where 0.6 px is only 1.1 x the rms; with slope 2.5 one candidate holds 88-96 % of a road at 0.7-1.1 px rms
+#: (synthetic, tests/test_traffic_fit.py; PCI25WijGrE 0.85 px -> 1.39 px).
+ALT_NOISE_REF = 0.8 / 1.5
+ALT_THR_SLOPE = 2.5
 ALT_REF_S = 1.5
 ALT_REF_N = 30
 ALT_TOL = 0.3
+
+#: Running horizon (2026-11-20). On pass roads filmed from a car the camera holds level while the road tilts: the road's horizon wanders with the
+#: grade (Gotthard WBai5dLao38: focus of expansion −300 rows per unit grade, r −0.74, about 21 rows at 7 %), and the one calibrated row read the
+#: distance uphill too long and downhill too short (map / nominal ≈ 1 − 2.3..3.3 × grade on the "4K HDR" passes). So the focus of expansion is
+#: sampled every HZ_EVERY s along the whole video (HZ_WINDOW s, every 3rd pair as in the calibration), and each pair is fitted with the mean of
+#: the stretch medians within ±HZ_SPAN / 2 s of it. A stretch with fewer than HZ_MIN_FOES foci or a median more than HZ_MAX_DEV rows (at 360)
+#: off the calibrated row says nothing; no stretch within reach: the calibrated row. Known cost: the bike videos (Pontaix 30:00-34:00, slow climb)
+#: show a FOE shift there that is not visible in the frames; the maintainer accepted that regression and checks it by hand.
+HZ_EVERY = 5.0
+HZ_WINDOW = 1.0
+HZ_SPAN = 60.0
+HZ_MIN_FOES = 5
+HZ_MAX_DEV = 60.0
 
 #: Focal length in px at 360 rows for the second-order rotation terms of the flow model (config.F360).
 F_ROT = 449.0
@@ -147,14 +174,22 @@ def fit_fixed_horizon(mid: np.ndarray, flow: np.ndarray, cx: float, cy: float, y
     return _robust_lstsq(a, np.concatenate([flow[:, 0], flow[:, 1]]), n, min_residual)
 
 
-def candidates(mid: np.ndarray, flow: np.ndarray, cx: float, cy: float, yh: float, scale: float, seed: int) -> list[tuple[np.ndarray, int, float]]:
-    """candidate road fits of one pair (see ALT_*): [(params, inliers, rms)], most inliers first"""
+def alt_threshold(rms_median: float, scale: float) -> float:
+    """the inlier tolerance of the road candidates (px of the analysis frame) for a video whose plain road fits at `rms_median` px (see ALT_NOISE_REF)"""
+    base = ALT_THR * scale
+    if not np.isfinite(rms_median) or rms_median <= ALT_NOISE_REF * scale:
+        return base
+    return base + ALT_THR_SLOPE * (rms_median - ALT_NOISE_REF * scale)
+
+
+def candidates(mid: np.ndarray, flow: np.ndarray, cx: float, cy: float, yh: float, scale: float, seed: int, thr: float | None = None) -> list[tuple[np.ndarray, int, float]]:
+    """candidate road fits of one pair (see ALT_*): [(params, inliers, rms)], most inliers first. thr: the inlier tolerance (px), default ALT_THR x scale"""
     a, n = _flow_design(mid, flow, cx, cy, yh)
     if n < max(MIN_INLIERS, ALT_SAMPLE + 1):
         return []
     b = np.concatenate([flow[:, 0], flow[:, 1]])
     ax, ay = a[:n], a[n:]
-    thr = ALT_THR * scale
+    thr = ALT_THR * scale if thr is None else float(thr)
     rng = np.random.default_rng(seed)
     hyp = []
     for _ in range(ALT_HYP):
@@ -313,6 +348,115 @@ def calibrate_horizon(path: str, height: int, samples: int = 16, window: float =
             'horizon_free': float(q50), 'iqr_free': float(q75 - q25), 'frames_free': len(arr)}
 
 
+def _foe_sample(args) -> list:
+    """focus-of-expansion rows of one stretch (every 3rd pair, all points of the frame, as in `_horizon_sample`); args = (path, height, start, window, hwaccel)"""
+    path, height, start, window, hwaccel = args
+    info = probe(path)
+    width = round(info.width * height / info.height / 2) * 2
+    whole = Tracker(height, width, top=round(0.1 * height), bottom=height - round(ABOVE_BOTTOM * height))
+    foes, prev = [], None
+    for i, (_, frame) in enumerate(frames(path, height, start=start, duration=window, hwaccel=hwaccel)):
+        if prev is not None and i % 3 == 0:
+            _, mid_w, flow_w = whole.track(prev, frame)
+            fo = focus_of_expansion(mid_w, flow_w, 0.3 * whole.scale)
+            if fo is not None and -height < fo[1] < 2 * height:
+                foes.append(fo[1])
+        prev = frame
+    return foes
+
+
+def horizon_track(path: str, height: int, horizon: float, t0: float = 0.0, t1: float | None = None, hwaccel: bool = True, pool=None) -> dict:
+    """the focus-of-expansion row along the video (HZ_*): dict(t, row), one entry per usable stretch, t its middle. The stretches start on one grid
+    from time 0 (k × HZ_EVERY), so a clip [t0, t1] gets the stretches of the whole video within HZ_SPAN / 2 of it (with `pool`: same result)."""
+    info = probe(path)
+    lo = max(0.0, t0 - HZ_SPAN / 2)
+    hi = min(info.duration, (info.duration if t1 is None else t1) + HZ_SPAN / 2)
+    starts = [k * HZ_EVERY for k in range(int(np.ceil(lo / HZ_EVERY - 1e-9)), int(np.floor(hi / HZ_EVERY + 1e-9)) + 1)
+              if k * HZ_EVERY + HZ_WINDOW <= info.duration + 1e-9]
+    jobs = [(path, height, float(s), HZ_WINDOW, hwaccel) for s in starts]
+    parts = pool.map(_foe_sample, jobs, chunksize=1) if pool is not None else [_foe_sample(j) for j in jobs]
+    dev = HZ_MAX_DEV * height / 360
+    t, row = [], []
+    for s, f in zip(starts, parts):
+        if len(f) < HZ_MIN_FOES:
+            continue
+        m = float(np.median(f))
+        if abs(m - horizon) > dev:
+            continue
+        t.append(float(s + HZ_WINDOW / 2))
+        row.append(m)
+    return dict(t=t, row=row)
+
+
+def running_horizon(track: dict | None, t, fallback: float) -> np.ndarray:
+    """the horizon row at times t: the mean of the track rows within ±HZ_SPAN / 2 s, else `fallback` (the calibrated row)"""
+    t = np.atleast_1d(np.asarray(t, float))
+    if not track or not track.get("t"):
+        return np.full(len(t), float(fallback))
+    tt, rr = np.asarray(track["t"], float), np.asarray(track["row"], float)
+    near = np.abs(t[:, None] - tt[None, :]) <= HZ_SPAN / 2 + 1e-9
+    n = near.sum(1)
+    s = (near * rr[None, :]).sum(1)
+    return np.where(n > 0, s / np.maximum(n, 1), float(fallback))
+
+
+def horizon_at(mj: dict, t: float) -> float:
+    """the horizon row the step fitted the pair at time t (s of this video) with, from its motion.json (running track in source seconds, shifted
+    by `track_t0` for a clip; else `horizon_vms`, else the old `horizon`)"""
+    hv = mj.get("horizon_vms")
+    base = float(hv if hv is not None else mj["horizon"])
+    cal = mj.get("horizon_calibration") or {}
+    return float(running_horizon(cal.get("track"), [t + float(mj.get("track_t0") or 0.0)], base)[0])
+
+
+def shift_track(track: dict, dt: float) -> dict:
+    """the track with its times moved by dt s (a clip's own track into source seconds)"""
+    return dict(t=[float(x) + dt for x in track["t"]], row=list(track["row"]))
+
+
+def below_horizon(mid: np.ndarray, flow: np.ndarray, horizon: float, height: int) -> tuple[np.ndarray, np.ndarray]:
+    """the tracked points at least BELOW_HORIZON × height below the row the pair is fitted with (a running horizon may lie below the road area's top)"""
+    k = mid[:, 1] >= horizon + BELOW_HORIZON * height
+    return mid[k], flow[k]
+
+
+def _noise_sample(args) -> list:
+    """plain-fit rms (px) of the pairs of one calibration stretch, fitted like `pair_row`; args = (path, height, start, window, hwaccel, horizon, top, bottom, road_width)"""
+    path, height, start, window, hwaccel, horizon, top, bottom, road_width = args
+    info = probe(path)
+    width = round(info.width * height / info.height / 2) * 2
+    tracker = Tracker(height, width, top, bottom, horizon, road_width)
+    min_res = MIN_RESIDUAL * tracker.scale
+    filt = Destatic() if DESTATIC_TAU > 0 else None
+    out, prev, prev_f = [], None, None
+    for i, (_, frame) in enumerate(frames(path, height, start=start, duration=window, hwaccel=hwaccel)):
+        frame_f = filt(frame) if filt is not None else frame
+        if prev is not None and i > NOISE_WARM:
+            _, mid, flow = tracker.track(prev_f, frame_f)
+            fit = fit_fixed_horizon(mid, flow, width / 2, height / 2, horizon, min_res) if len(mid) >= MIN_INLIERS else None
+            if fit is None and filt is not None:
+                _, mid, flow = tracker.track(prev, frame)
+                fit = fit_fixed_horizon(mid, flow, width / 2, height / 2, horizon, min_res) if len(mid) >= MIN_INLIERS else None
+            if fit is not None:
+                out.append(fit.rms)
+        prev, prev_f = frame, frame_f
+    return out
+
+
+#: the noise calibration skips the first frames of a stretch (the destatic running mean starts there)
+NOISE_WARM = 8
+
+
+def calibrate_noise(path: str, height: int, horizon: float, top: int, bottom: int, road_width: float | None = ROAD_WIDTH, samples: int = 16, window: float = 3.0,
+                    hwaccel: bool = True, pool=None) -> dict:
+    """the median plain-fit rms (px of the analysis frame) over `samples` fixed stretches, the road area and horizon of the analysis (with `pool`: same result)"""
+    info = probe(path)
+    jobs = [(path, height, info.duration * (k + 0.5) / samples, window, hwaccel, horizon, top, bottom, road_width) for k in range(samples)]
+    parts = pool.map(_noise_sample, jobs, chunksize=1) if pool is not None else [_noise_sample(j) for j in jobs]
+    r = np.array([x for p in parts for x in p])
+    return dict(rms_median=float(np.median(r)) if len(r) else float('nan'), rms_pairs=int(len(r)))
+
+
 #: `alts`: the candidate road fits of a pair with a bad fit (ALT_*), ';'-separated 's c yaw pitch roll inliers rms', the first one the plain fit;
 #: `pick` (written by `pick_alternatives`): '' no candidates, 0 the plain fit kept, k the k-th candidate replaced it, -1 none fits the road speed.
 COLUMNS = ['frame', 'time', 'corners', 'tracked', 'inliers', 'rms_px', 's', 'c', 'yaw', 'pitch', 'roll', 'diff', 'rel_speed', 'alts', 'pick']
@@ -356,7 +500,7 @@ class Destatic:
 
 
 def pair_row(tracker: Tracker, prev: np.ndarray, frame: np.ndarray, idx: int, t: float, horizon: float, min_res: float, dt: float, width: int, height: int,
-             raw: tuple[np.ndarray, np.ndarray] | None = None, seed0: int = 0) -> list:
+             raw: tuple[np.ndarray, np.ndarray] | None = None, seed0: int = 0, alt_thr: float | None = None) -> list:
     """The csv row (COLUMNS) of one frame pair. `seed0` + `idx` seeds the candidate fits: a clip of a video passes the index of its first frame in
     the video, so a pair gets the candidates it gets in the whole video. `prev` / `frame` are the frames the fit tracks (destatic-filtered in `analyse`); `raw` = the plain pair:
     the frame difference (`diff`, scene cuts) comes from it, and the fit falls back to it when the filtered pair gives none."""
@@ -365,16 +509,18 @@ def pair_row(tracker: Tracker, prev: np.ndarray, frame: np.ndarray, idx: int, t:
     small_b = rb[::4, ::4].astype(np.int16)
     diff = float(np.mean(np.abs(small_b - small_a)))
     corners, mid, flow = tracker.track(prev, frame)
+    mid, flow = below_horizon(mid, flow, horizon, height)
     fit = fit_fixed_horizon(mid, flow, width / 2, height / 2, horizon, min_res) if len(mid) >= MIN_INLIERS else None
     if fit is None and raw is not None:
         corners, mid, flow = tracker.track(ra, rb)
+        mid, flow = below_horizon(mid, flow, horizon, height)
         fit = fit_fixed_horizon(mid, flow, width / 2, height / 2, horizon, min_res) if len(mid) >= MIN_INLIERS else None
     if fit is None:
         return [idx, f'{t:.4f}', corners, len(mid), 0, '', '', '', '', '', '', f'{diff:.3f}', '', '', '']
     s, c, a, b, r = fit.params[:5]
     alts = ''
     if ALT_TRIGGER > 0 and fit.rms > ALT_TRIGGER * tracker.scale:
-        cands = candidates(mid, flow, width / 2, height / 2, horizon, tracker.scale, seed=int(idx) + int(seed0))
+        cands = candidates(mid, flow, width / 2, height / 2, horizon, tracker.scale, seed=int(idx) + int(seed0), thr=alt_thr)
         if cands:
             alts = ';'.join([_alt_text(fit.params, int(fit.inliers.sum()), fit.rms)] + [_alt_text(p, k, e) for p, k, e in cands])
     return [
@@ -383,9 +529,11 @@ def pair_row(tracker: Tracker, prev: np.ndarray, frame: np.ndarray, idx: int, t:
     ]
 
 
-def pick_alternatives(csv_path: str) -> dict:
+def pick_alternatives(csv_path: str, scale: float = 1.0) -> dict:
     """rewrite `csv_path` in place: every pair with candidates (column `alts`) gets the candidate closest to the road speed around it (see ALT_REF_*),
-    or keeps its plain fit (`pick` 0 / -1). A csv without the column is left as it is. -> counts"""
+    or keeps its plain fit (`pick` 0 / -1). A pair whose plain fit is not worse than the video's own level (ALT_TRIGGER_REL) keeps its plain fit
+    (`pick` 0, counted as kept) and counts as clean. `scale`: frame height / 360, as for ALT_TRIGGER. A csv without the column is left as it is.
+    -> counts (+ `trigger`, the rms limit in px, when it follows the video)"""
     with open(csv_path, newline='') as fh:
         rd = csv.reader(fh)
         head = next(rd)
@@ -397,14 +545,24 @@ def pick_alternatives(csv_path: str) -> dict:
     t = np.array([float(r[it]) for r in rows])
     v = np.array([float(r[iv]) if r[iv] != '' else np.nan for r in rows])
     has = np.array([r[ia] != '' for r in rows])
-    clean = ~has & np.isfinite(v)
+    irms = head.index('rms_px')
+    plain_rms = np.array([float(r[ia].split(';')[0].split()[6]) if r[ia] != '' else (float(r[irms]) if r[irms] != '' else np.nan) for r in rows])
+    trig = ALT_TRIGGER_REL * float(np.nanmedian(plain_rms)) if np.isfinite(plain_rms).any() else 0.0
+    quiet = np.zeros(n, bool)
+    if trig > ALT_TRIGGER * scale:
+        quiet = has & (plain_rms <= trig)
+    clean = (~has | quiet) & np.isfinite(v)
     tc, vc = t[clean], v[clean]
     vmed = float(np.median(vc[vc > 0])) if (vc > 0).any() else 0.0
     sp = np.array([float(r[idt]) if r[idt] != '' else np.nan for r in rows])
     ok = np.isfinite(sp) & np.isfinite(v) & (np.abs(v) > 0) & (np.abs(sp) > 0)
     dt_pair = float(np.median(sp[ok] / v[ok])) if ok.any() else (float(np.median(np.diff(t))) if n > 1 else 1.0)   # the pair interval of the rows
-    out = dict(candidates=int(has.sum()), replaced=0, kept=0, none=0)
-    for k in np.flatnonzero(has):
+    out = dict(candidates=int(has.sum()), replaced=0, kept=int(quiet.sum()), none=0)
+    if quiet.any():
+        out['trigger'] = round(trig, 4)
+        for k in np.flatnonzero(quiet):
+            rows[k][ip] = '0'
+    for k in np.flatnonzero(has & ~quiet):
         j = int(np.searchsorted(tc, t[k]))
         bi = np.arange(max(0, j - ALT_REF_N), j)
         bi = bi[tc[bi] >= t[k] - ALT_REF_S]
@@ -473,6 +631,7 @@ def analyse(
         progress = False
         on_progress(0, 1, 'horizon')
     horizon_rot = horizon
+    track = None
     if horizon is None:
         cal = calibration if calibration is not None else calibrate_horizon(path, height, hwaccel=hwaccel)
         horizon = cal['horizon'] + horizon_offset * height / 360  # opt-in: horizon_offset px at 360 rows added to the calibrated row (default 0: unchanged)
@@ -482,6 +641,15 @@ def analyse(
     bottom = height - round(ABOVE_BOTTOM * height)
     tracker = Tracker(height, width, top, bottom, horizon, road_width)  # road_width: opt-in (default ROAD_WIDTH: unchanged)
     min_res = MIN_RESIDUAL * tracker.scale
+    if cal is not None and 'rms_median' not in cal:
+        cal = dict(cal, **calibrate_noise(path, height, horizon, top, bottom, road_width, hwaccel=hwaccel))
+    alt_thr = alt_threshold(cal['rms_median'], tracker.scale) if cal is not None else None
+    t_src = seed0 / info.fps                       # the track is in source seconds: a clip (seed0 = its first source frame) starts at t_src there
+    if cal is not None:
+        if 'track' not in cal:
+            end = None if duration is None else start + duration
+            cal = dict(cal, track=shift_track(horizon_track(path, height, cal['horizon'], t0=start, t1=end, hwaccel=hwaccel), t_src))
+        track = cal['track']
     dt = step / info.fps
     total = (duration if duration is not None else info.duration - start) * info.fps / step
     n = 0
@@ -496,7 +664,8 @@ def analyse(
             if prev is not None:
                 # Time of the pair: the middle between its two frames, s into the video.
                 t = start + (idx - step / 2) / info.fps
-                w.writerow(pair_row(tracker, prev_f, frame_f, idx, t, horizon, min_res, dt, width, height, raw=(prev, frame) if filt is not None else None, seed0=seed0))
+                yh = horizon if track is None else float(running_horizon(track, [t + t_src], horizon)[0])
+                w.writerow(pair_row(tracker, prev_f, frame_f, idx, t, yh, min_res, dt, width, height, raw=(prev, frame) if filt is not None else None, seed0=seed0, alt_thr=alt_thr))
                 n += 1
                 if on_progress is not None and n % 60 == 0:
                     now = time.perf_counter()
@@ -507,7 +676,7 @@ def analyse(
                     el = time.perf_counter() - t0
                     print(f'  {n}/{total:.0f} pairs, {n / (el - t_cal):.0f} pairs/s', flush=True)
             prev, prev_f = frame, frame_f
-    traffic = pick_alternatives(out_csv) if ALT_TRIGGER > 0 else {}
+    traffic = pick_alternatives(out_csv, height / 360) if ALT_TRIGGER > 0 else {}
     elapsed = time.perf_counter() - t0
     if on_progress is not None:
         on_progress(n, max(total, n), 'pairs')
@@ -516,7 +685,7 @@ def analyse(
         'start': start, 'duration': duration if duration is not None else info.duration - start,
         # `horizon` is the row the far-feature rotation bands hang from (the free road-plane fit, unchanged); `horizon_vms` the row of this fit
         'horizon': horizon_rot, 'horizon_vms': horizon, 'destatic_tau': DESTATIC_TAU, 'horizon_offset': horizon_offset, 'road_width': road_width, 'horizon_calibration': cal, 'roi': [top, bottom],
-        'pairs': n, 'seconds': elapsed, 'calibration_seconds': t_cal, 'traffic': traffic,
+        'alt_thr': alt_thr if alt_thr is not None else ALT_THR * tracker.scale, 'track_t0': t_src, 'pairs': n, 'seconds': elapsed, 'calibration_seconds': t_cal, 'traffic': traffic,
         'seconds_per_video_hour': elapsed / ((duration if duration is not None else info.duration - start) / 3600),
     }
 
@@ -583,8 +752,9 @@ def _par_chunk(job: tuple[dict, int, int | None]) -> dict:
             frame_f = filt(frame) if filt is not None else frame
             if prev is not None and j > a:
                 t = (j - 0.5) / info.fps          # = start + (idx - step / 2) / fps of `analyse` with start 0, step 1
-                w.writerow(pair_row(tracker, prev_f, frame_f, j, t, X['horizon'], X['min_res'], X['dt'], width, height, raw=(prev, frame) if filt is not None else None,
-                                    seed0=X['seed0']))
+                yh = float(running_horizon(X['track'], [t + X['t_src']], X['horizon'])[0])
+                w.writerow(pair_row(tracker, prev_f, frame_f, j, t, yh, X['min_res'], X['dt'], width, height, raw=(prev, frame) if filt is not None else None,
+                                    seed0=X['seed0'], alt_thr=X['alt_thr']))
                 n += 1
             prev, prev_f = frame, frame_f
             if b is not None and j >= b:
@@ -616,14 +786,20 @@ def analyse_parallel(path: str, out_csv: str, height: int = 360, workers: int = 
     mpc = mp.get_context('fork')
     _STOP = mpc.Event()
     with mpc.Pool(max(1, workers), initializer=_worker_init) as pool:
-        cal = calibration if calibration is not None else calibrate_horizon(path, height, hwaccel=hwaccel, pool=pool)
-        t_cal = time.perf_counter() - t0
+        cal = dict(calibration) if calibration is not None else calibrate_horizon(path, height, hwaccel=hwaccel, pool=pool)
         horizon = cal['horizon']
         top = int(max(height * 0.45, horizon + BELOW_HORIZON * height))
         bottom = height - round(ABOVE_BOTTOM * height)
+        if 'rms_median' not in cal:
+            cal.update(calibrate_noise(path, height, horizon, top, bottom, ROAD_WIDTH, hwaccel=hwaccel, pool=pool))
+        alt_thr = alt_threshold(cal['rms_median'], height / 360)
+        t_src = seed0 / info.fps
+        if 'track' not in cal:
+            cal['track'] = shift_track(horizon_track(path, height, horizon, hwaccel=hwaccel, pool=pool), t_src)
+        t_cal = time.perf_counter() - t0
         if why is None:
             ctx = dict(path=path, info=info, height=height, width=width, hwaccel=hwaccel, top=top, bottom=bottom, horizon=horizon, road_width=ROAD_WIDTH,
-                        min_res=MIN_RESIDUAL * height / 360, dt=1 / info.fps, seed0=int(seed0))
+                        min_res=MIN_RESIDUAL * height / 360, dt=1 / info.fps, seed0=int(seed0), alt_thr=alt_thr, track=cal['track'], t_src=t_src)
             done: dict[int, dict] = {}
             nxt, pairs, last_cb = 0, 0, 0.0
             tmp = out_csv + '.part'
@@ -654,7 +830,7 @@ def analyse_parallel(path: str, out_csv: str, height: int = 360, workers: int = 
                         on_progress(pairs, max(n_est - 1, pairs), 'pairs')
             if why is None:
                 os.replace(tmp, out_csv)
-                traffic = pick_alternatives(out_csv) if ALT_TRIGGER > 0 else {}
+                traffic = pick_alternatives(out_csv, height / 360) if ALT_TRIGGER > 0 else {}
             else:
                 os.remove(tmp)
         pool.close()                     # a clean end: every worker idle and joined before the context manager's terminate()
@@ -673,6 +849,6 @@ def analyse_parallel(path: str, out_csv: str, height: int = 360, workers: int = 
     return {
         'video': path, 'height': height, 'width': width, 'step': 1, 'fps': info.fps, 'start': 0.0, 'duration': info.duration,
         'horizon': cal['horizon_free'], 'horizon_vms': horizon, 'destatic_tau': DESTATIC_TAU, 'horizon_offset': 0.0, 'road_width': ROAD_WIDTH, 'horizon_calibration': cal,
-        'roi': [top, bottom], 'pairs': pairs, 'traffic': traffic, 'seconds': elapsed, 'calibration_seconds': t_cal, 'seconds_per_video_hour': elapsed / (info.duration / 3600),
+        'roi': [top, bottom], 'alt_thr': alt_thr, 'track_t0': t_src, 'pairs': pairs, 'traffic': traffic, 'seconds': elapsed, 'calibration_seconds': t_cal, 'seconds_per_video_hour': elapsed / (info.duration / 3600),
         'parallel': dict(workers=int(workers), chunks=len(jobs), chunk_s=float(chunk_s), warm_frames=WARM_FRAMES),
     }

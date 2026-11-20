@@ -124,3 +124,16 @@ def test_the_place_score_needs_no_time(tmp_path, monkeypatch):
     r = RG.score_gps(dict(gps="col-de-rousset", window=[1000, 1100]), d)
     assert r["truth"] == "coarse" and abs(r["place_road"] - 67 / 100) < 0.02 and 4.0 <= r["place_median_m"] <= 6.0
     assert r["off_place_seconds"][0][0] >= 1066.0                                        # in video seconds: the window start added back
+
+
+def test_a_window_keeps_the_running_horizon_of_its_pairs(tmp_path):
+    """the running horizon track is in source seconds (vmsx.motion.HZ_*): a window shifts `track_t0` by its start, so a pair keeps its row"""
+    from rsm.pipeline.vmsx import motion as vm
+    st = _stage(tmp_path)
+    mj = json.loads((st / "motion" / "motion.json").read_text())
+    mj.update(horizon_vms=150.0, track_t0=0.0, horizon_calibration=dict(horizon=150.0, track=dict(t=[2.5 + 5 * k for k in range(20)], row=[140.0] * 8 + [180.0] * 12)))
+    (st / "motion" / "motion.json").write_text(json.dumps(mj))
+    out = SK.window(st, 50.0, 90.0, tmp_path / "w")
+    wj = json.loads((out / "motion" / "motion.json").read_text())
+    assert wj["track_t0"] == 50.0
+    assert vm.horizon_at(wj, 30.0) == pytest.approx(vm.horizon_at(mj, 80.0))

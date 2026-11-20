@@ -460,6 +460,14 @@ def _stored_row(csv: Path, idx: int) -> list[str] | None:
     return None
 
 
+def _rms_limit(csv: Path) -> float:
+    """the gate's high_rms limit for this run's pairs (rsm.odometry.gating.rms_limit: it follows the video's own fit quality)"""
+    from rsm.odometry.gating import rms_limit
+    from rsm.odometry.vms_csv import load_pairs
+    p = load_pairs(str(csv))
+    return rms_limit(p.rms_px, p.inliers)
+
+
 def _polygon(mask) -> list[list[float]]:
     import cv2
     cs, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -472,13 +480,14 @@ def _polygon(mask) -> list[list[float]]:
 
 #: point code of the motion overlay: 0 outlier, 1 carries the road fit, 2 passing traffic the speed ignores (decisions A17 / A18)
 TRAFFIC = 2
+IGNORED = 3          # the point carried the fit of a rejected pair: ignored, but not located traffic (often a soft frame)
 
 
-def traffic_points(mid, flow, cx: float, cy: float, yh: float, scale: float, plain_inl, stored: dict | None, max_rms: float):
+def traffic_points(mid, flow, cx: float, cy: float, yh: float, scale: float, plain_inl, stored: dict | None, max_rms: float, alt_thr: float | None = None):
     """the point codes of one pair as the pipeline USES it, and what happened to it (None: plain road pair, the fit is what the step used).
     `replaced`: a road candidate replaced the fit (pick >= 1); its points are the road, the points of the rejected plain fit and of the
     candidates that move at another speed are the traffic. `rejected`: the stored fit is above the gate's rms limit, the pair gives no speed
-    (bridged or split by gating); every point that carried the fit is ignored."""
+    (bridged or split by gating); every point that carried the fit is ignored (IGNORED, not TRAFFIC: nothing locates a vehicle there)."""
     from .vmsx import motion as vm
     plain = np.asarray(plain_inl, bool)
     codes = plain.astype(int)
@@ -490,8 +499,8 @@ def traffic_points(mid, flow, cx: float, cy: float, yh: float, scale: float, pla
         rms = float(stored.get("rms_px") or "nan")
     except ValueError:
         rms = float("nan")
-    info = dict(pick=int(pick) if pick.lstrip("-").isdigit() else None, candidates=max(0, len(alts) - 1), rms=_num(rms, 3))
-    thr = vm.ALT_THR * scale
+    info = dict(pick=int(pick) if pick.lstrip("-").isdigit() else None, candidates=max(0, len(alts) - 1), rms=_num(rms, 3), limit=_num(max_rms, 3))
+    thr = vm.ALT_THR * scale if alt_thr is None else float(alt_thr)        # the candidates' tolerance of the run (motion.json `alt_thr`; older runs: fixed)
     if info["pick"] is not None and 1 <= info["pick"] < len(alts):
         road_p = alts[info["pick"]][0]
         road = vm.near_fit(mid, flow, cx, cy, yh, road_p, thr)
@@ -502,11 +511,12 @@ def traffic_points(mid, flow, cx: float, cy: float, yh: float, scale: float, pla
         codes = np.where(road, 1, np.where(other, TRAFFIC, 0))
         info.update(state="replaced", road_s=float(road_p[0]), plain_s=float(alts[0][0][0]))
     if np.isfinite(rms) and rms > max_rms:
-        codes = np.where(codes != 0, TRAFFIC, 0)
+        codes = np.where(codes != 0, IGNORED, 0)
         info["state"] = "rejected"
     if "state" not in info:
         return codes, None if not alts else dict(info, state="kept")
     info["n_traffic"] = int((codes == TRAFFIC).sum())
+    info["n_ignored"] = int((codes == IGNORED).sum())
     return codes, info
 
 
@@ -517,7 +527,7 @@ def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
     from .common import hwaccel_enabled
     H, step, fps = int(mj["height"]), int(mj.get("step", 1)), float(info.fps)
     width = int(mj.get("width") or round(info.width * H / info.height / 2) * 2)
-    horizon = float(mj.get("horizon_vms") if mj.get("horizon_vms") is not None else mj["horizon"])
+    hz_area = float(mj.get("horizon_vms") if mj.get("horizon_vms") is not None else mj["horizon"])     # the road area hangs from the calibrated row
     top, bottom = (int(x) for x in mj["roi"])
     road_width = mj.get("road_width", vm.ROAD_WIDTH)
     pairs = int(mj.get("pairs", 0)) or None
@@ -526,7 +536,8 @@ def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
         j = min(j, pairs)
     idx = j * step
     t_pair = (idx - step / 2) / fps                 # time of the pair, as analyse writes it
-    tracker = vm.Tracker(H, width, top, bottom, horizon, road_width)
+    horizon = vm.horizon_at(mj, t_pair)             # the row the pair was fitted with (running horizon, else the calibrated row)
+    tracker = vm.Tracker(H, width, top, bottom, hz_area, road_width)
     min_res = vm.MIN_RESIDUAL * tracker.scale
     dt = step / fps
     first = max(0, idx - step * (DESTATIC_WARM + 1))
@@ -549,17 +560,18 @@ def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
     # the same tracking again, keeping the points (pair_row keeps only the fit)
     used = "gefiltert"
     corners, mid, flow = tracker.track(prev_f, frame_f)
+    mid, flow = vm.below_horizon(mid, flow, horizon, H)
     fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
     if fit is None and raw is not None:
         corners, mid, flow = tracker.track(*raw)
+        mid, flow = vm.below_horizon(mid, flow, horizon, H)
         fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
         used = "roh"
     stored = _stored_row(d / "motion" / "motion.csv", idx)
     cols = vm.COLUMNS
-    from rsm.odometry.gating import GateParams
     st = dict(zip(cols, stored)) if stored is not None and len(stored) == len(cols) else None
     plain_inl = fit.inliers if fit is not None else np.zeros(len(mid), bool)
-    codes, traffic = traffic_points(mid, flow, width / 2, H / 2, horizon, tracker.scale, plain_inl, st, GateParams().max_rms_px)
+    codes, traffic = traffic_points(mid, flow, width / 2, H / 2, horizon, tracker.scale, plain_inl, st, _rms_limit(d / "motion" / "motion.csv"), mj.get("alt_thr"))
     pts = [[round(float(a), 1), round(float(b), 1), round(float(c), 2), round(float(e), 2), int(codes[i])] for i, ((a, b), (c, e)) in enumerate(zip(mid, flow))]
     mine = [str(x) for x in row]
     if stored is not None and len(stored) == len(cols) and "pick" in cols:

@@ -109,11 +109,11 @@ export function createTauriApi(): Api {
       return typeof r === "string" ? r : null;
     },
     pickJob: async () => {
-      const r = await open({ multiple: false, directory: false, title: "Job-Datei des Atlas öffnen", filters: [{ name: "Atlas-Job", extensions: ["json"] }] });
+      const r = await open({ multiple: false, directory: false, title: "Job-Datei von ridrs Scenic öffnen", filters: [{ name: "Scenic-Job", extensions: ["json"] }] });
       return typeof r === "string" ? r : null;
     },
     pickSaveAtlas: async (defaultName) => {
-      const r = await save({ title: "Ergebnis für den Atlas speichern", defaultPath: defaultName, filters: [{ name: "Atlas-Ergebnis", extensions: ["json"] }] });
+      const r = await save({ title: "Ergebnis für ridrs Scenic speichern", defaultPath: defaultName, filters: [{ name: "Scenic-Ergebnis", extensions: ["json"] }] });
       return r ?? null;
     },
     pickSave: async (defaultName) => {

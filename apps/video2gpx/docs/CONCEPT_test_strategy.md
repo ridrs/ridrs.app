@@ -274,7 +274,10 @@ the YouTube link, the licence note and the truth that exists.
    - Horizon option: the motion step takes `P["calibration"]` (the `motion.json` of the source's stage) and uses its horizon calibration instead of
      calibrating on the clip (`vmsx.motion.analyse_parallel(calibration=...)`); `stepcache.step_keys` keys motion and rotation by it. Without the
      option the image side is unchanged (Gotthard rebuilt and compared, then the 12 stages rekeyed: `rsm.bench.stages rekey --reason`).
-   - Seed of the traffic candidates: the candidate fits of a disturbed pair are random samples seeded by the pair index. In a clip that index
+   - Running horizon (A24, 2026-11-20): the horizon calibration also carries the focus-of-expansion track of the whole source (`track`, source
+    seconds); a clip reads it at clip time + `frame0` / fps, a T2 window keeps it with `track_t0` = its start (`rsm.bench.stagecut`). A clip that
+    calibrates itself samples its own frames and stores its track shifted to source seconds.
+  - Seed of the traffic candidates: the candidate fits of a disturbed pair are random samples seeded by the pair index. In a clip that index
      counts from the clip's first frame, so a clip drew other candidates than the whole video, picked other fits, and on Bavaria the cut at
      521.5 s was not confirmed (the inliers around it differed). The motion step now takes `P["frame0"]` (the clip's first frame in the source)
      and seeds with the source index (`vmsx.motion.pair_row(seed0=...)`); with it the per-second speed of every clip correlates 0.99-1.00 with

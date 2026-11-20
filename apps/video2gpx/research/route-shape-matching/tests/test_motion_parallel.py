@@ -75,3 +75,15 @@ def test_calibration_stretches_in_a_pool_give_the_same_horizon(video):
     with mp.get_context("fork").Pool(3, initializer=vm._worker_init) as pool:
         par = pool.map(vm._horizon_sample, jobs, chunksize=1)
     assert par == seq and sum(len(e) for e, _ in seq) > 0
+
+
+def test_the_candidate_tolerance_comes_from_the_noise_calibration(video, tmp_path):
+    """the tolerance of the road candidates follows the plain-road rms of the calibration stretches (fixed samples: the same for every chunk layout);
+    a calibration that already carries `rms_median` is used as it is"""
+    st = vm.analyse(str(video), str(tmp_path / "a.csv"), hwaccel=False, progress=False, calibration=dict(CAL, rms_median=0.85))
+    assert st["alt_thr"] == pytest.approx(vm.alt_threshold(0.85, 1.0))
+    st = vm.analyse(str(video), str(tmp_path / "b.csv"), hwaccel=False, progress=False, calibration=dict(CAL))
+    med = st["horizon_calibration"]["rms_median"]
+    assert med > 0 and st["alt_thr"] == pytest.approx(vm.alt_threshold(med, 1.0))
+    par = vm.analyse_parallel(str(video), str(tmp_path / "c.csv"), workers=3, chunk_s=CHUNK_S, hwaccel=False, calibration=dict(CAL))
+    assert par["horizon_calibration"]["rms_median"] == med and par["alt_thr"] == st["alt_thr"]

@@ -1,6 +1,6 @@
-// The POV Drive Atlas round trip (docs/FEATURE_atlas.md; contract: pov-atlas VIDEO2GPX-INTEGRATION.md section 8).
-// Pure functions, no DOM and no api: a job file (<id>.v2g.json) becomes the hints of a new project, the "Atlas" checklist of the
-// Export stage is computed from the result, and the payload <id>.atlas.json is built from it. Tested in tests/atlas/atlas.test.ts
+// The ridrs Scenic round trip (docs/FEATURE_atlas.md; contract: pov-atlas VIDEO2GPX-INTEGRATION.md section 8).
+// Pure functions, no DOM and no api: a job file (<id>.v2g.json) becomes the hints of a new project, the "ridrs Scenic" checklist of the
+// Export stage is computed from the result, and the payload <id>.scenic.json is built from it. Tested in tests/atlas/atlas.test.ts
 // against the example job and payload the atlas tests use too (tests/atlas/fixtures/, byte-identical copies).
 import type { Bbox, RoutePoint, Vehicle, Verdict } from "./types";
 
@@ -60,10 +60,11 @@ function box(x: unknown, name: string): AtlasBox | null {
 export function parseJob(text: string): AtlasJob {
   let j: any;
   try { j = JSON.parse(text); } catch { throw new Error("Die Datei ist kein JSON."); }
-  if (!j || typeof j !== "object" || Array.isArray(j)) throw new Error("Das ist keine Job-Datei des Atlas.");
+  if (!j || typeof j !== "object" || Array.isArray(j)) throw new Error("Das ist keine Job-Datei von ridrs Scenic.");
   if (typeof j.video_id !== "string" || !/^[\w-]{11}$/.test(j.video_id)) throw new Error("Die Job-Datei hat keine gültige Video-ID.");
   if (typeof j.url !== "string" || !/^https:\/\/[^\s]+$/.test(j.url)) throw new Error("Die Job-Datei hat keine Videoadresse.");
-  if (!j.atlas || typeof j.atlas.base !== "string" || !/^https?:\/\/[^\s/]+/.test(j.atlas.base) || j.atlas.video_id !== j.video_id) throw new Error("Die Job-Datei hat keinen Verweis auf den Atlas.");
+  const link = j.scenic ?? j.atlas; // "atlas" = jobs written before the rename
+  if (!link || typeof link.base !== "string" || !/^https?:\/\/[^\s/]+/.test(link.base) || link.video_id !== j.video_id) throw new Error("Die Job-Datei hat keinen Verweis auf ridrs Scenic.");
   const level = j.route_level == null ? null : j.route_level === 4 || j.route_level === 5 ? j.route_level : NaN;
   if (Number.isNaN(level)) throw new Error("Die Job-Datei hat eine unbekannte Routenstufe.");
   if (j.route_gpx != null && (typeof j.route_gpx !== "string" || !/^https?:\/\/[^\s]+$/.test(j.route_gpx))) throw new Error("Die Job-Datei hat eine ungültige Routenadresse.");
@@ -72,7 +73,7 @@ export function parseJob(text: string): AtlasJob {
     video_id: j.video_id, url: j.url, title: s(j.title), channel: s(j.channel), duration_s: n(j.duration_s), fps: n(j.fps), country: s(j.country), vehicle: s(j.vehicle),
     route_gpx: s(j.route_gpx), route_level: j.route_gpx ? (level as 4 | 5 | null) ?? 5 : null,
     bbox: box(j.bbox, "bbox"), start_bbox: box(j.start_bbox, "start_bbox"), end_bbox: box(j.end_bbox, "end_bbox"),
-    atlas: { base: j.atlas.base.replace(/\/+$/, ""), video_id: j.video_id },
+    atlas: { base: link.base.replace(/\/+$/, ""), video_id: j.video_id }, // internal name; the file says "scenic"
   };
 }
 
@@ -215,8 +216,8 @@ export function qcChecks(q: QcInput): QcItem[] {
       q.verdict === "confident" ? "sicher" : q.verdict === "uncertain" ? "unsicher: nur mit Notiz" : "keine Route gefunden", { overridable: q.verdict === "uncertain" }),
     item("coverage", "Abdeckung", spanOk && cov.share >= MIN_COVERAGE && cov.max_gap_s <= MAX_GAP_S, { share: cov.share, max_gap_s: cov.max_gap_s },
       spanOk ? `${pct(cov.share)} der Fahrzeit mit Position (mindestens 90 %), längste Lücke ${cov.max_gap_s} s (höchstens 60 s)` : "erst Anfang und Ende setzen"),
-    item("route_agreement", "Übereinstimmung mit der Atlas-Route", !agree || agree.median_m <= ROUTE_AGREE_M, agree,
-      !q.hasRoute ? "keine Atlas-Route" : agree ? `Median ${agree.median_m.toFixed(1).replace(".", ",")} m, höchstens ${Math.round(agree.max_m)} m (Hinweis, kein Ausschlussgrund: die Atlas-Route kann die falsche sein)` : "–",
+    item("route_agreement", "Übereinstimmung mit der Scenic-Route", !agree || agree.median_m <= ROUTE_AGREE_M, agree,
+      !q.hasRoute ? "keine Scenic-Route" : agree ? `Median ${agree.median_m.toFixed(1).replace(".", ",")} m, höchstens ${Math.round(agree.max_m)} m (Hinweis, kein Ausschlussgrund: die Scenic-Route kann die falsche sein)` : "–",
       { blocking: false }),
     item("cuts", "Schnitte", spanOk && (pieces.length === 1 || pieces.every(([a]) => st.cuts_checked.includes(a))),
       { times: pieces.slice(1).map(([a]) => a), checked: st.cuts_checked.filter((a) => pieces.length > 1 && pieces.some(([b]) => b === a)) },
@@ -231,7 +232,7 @@ export const qcReady = (items: QcItem[]) => items.every((i) => !i.blocking || i.
 
 // ---------------------------------------------------------------- payload
 
-/** <id>.atlas.json (contract 8.2): exactly these fields, in this order */
+/** <id>.scenic.json (contract 8.2): exactly these fields, in this order */
 export interface AtlasPayload {
   video_id: string; pipeline_hash: string; app_version: string; vehicle: string; offset_m: number | null;
   t: number[]; c: [number, number][]; e?: number[];
@@ -245,7 +246,7 @@ export interface PayloadInput {
   /** height at an arc length of the route (the elevation profile, P13/P17), or null without a profile */
   eleAt?: ((arc_m: number) => number) | null;
 }
-export const payloadName = (job: AtlasJob) => `${job.video_id}.atlas.json`;
+export const payloadName = (job: AtlasJob) => `${job.video_id}.scenic.json`;
 
 export function buildPayload(i: PayloadInput): AtlasPayload {
   const t0 = i.state.t_start, t1 = i.state.t_end;

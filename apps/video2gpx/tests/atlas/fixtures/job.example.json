@@ -7,7 +7,7 @@
   "fps": 30,
   "country": "IT",
   "vehicle": "car",
-  "route_gpx": "https://atlas.example.org/gpx/V2Gexample1.gpx",
+  "route_gpx": "https://ridrs.example.org/scenic/gpx/V2Gexample1.gpx",
   "route_level": 4,
   "bbox": {
     "south": 44.97305,
@@ -27,8 +27,8 @@
     "north": 45.002695,
     "east": 7.022868
   },
-  "atlas": {
-    "base": "https://atlas.example.org",
+  "scenic": {
+    "base": "https://ridrs.example.org/scenic",
     "video_id": "V2Gexample1"
   }
 }

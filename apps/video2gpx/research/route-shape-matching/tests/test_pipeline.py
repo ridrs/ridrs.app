@@ -1632,3 +1632,10 @@ def test_standstill_is_part_of_the_rotation_step(tmp_path, monkeypatch):
     assert json.loads((tmp_path / "rotation" / "standstill.json").read_text())["spans"] == [[1.0, 4.0]]
     steps_a.standstill(tmp_path, dict(), w)                               # no video: nothing detected, no stale result left
     assert not (tmp_path / "rotation" / "standstill.json").exists()
+
+
+def test_align_mode_from_params_or_config_default():
+    from rsm.pipeline import align as AL, config as C
+    assert AL.meas_mode({}) == C.ALIGN_MEAS_MODE == "posterior"
+    assert AL.meas_mode({"align_mode": "turns"}) == "turns"
+    assert AL.meas_mode({"align_mode": "bogus"}) == C.ALIGN_MEAS_MODE

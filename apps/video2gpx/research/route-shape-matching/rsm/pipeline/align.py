@@ -18,6 +18,12 @@ from scipy.ndimage import gaussian_filter1d
 from . import config as C
 
 
+def meas_mode(P: dict) -> str:
+    """the alignment measurement mode of a run: `--align-mode` (params key `align_mode`), else the config default"""
+    m = P.get("align_mode")
+    return m if m in C.ALIGN_MEAS_MODES else C.ALIGN_MEAS_MODE
+
+
 def path_heading(xy: np.ndarray, smooth_m: float) -> np.ndarray:
     """heading (rad, counter-clockwise, unwrapped) of a path sampled every 1 m, smoothed along the path"""
     phi = np.unwrap(np.arctan2(np.gradient(xy[:, 1]), np.gradient(xy[:, 0])))

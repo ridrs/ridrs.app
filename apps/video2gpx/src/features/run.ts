@@ -183,6 +183,7 @@ export async function start(resume: boolean, fromStep: StepId | null = null): Pr
       offset_m: app.offset_m ?? null, start_time: app.start_time ?? null, decoys: app.decoys ?? 0,
       start_bbox: S.startFrame, end_bbox: S.endFrame, hint: h?.path ?? null, hint_buffer_m: h ? h.buffer_m : null, hint_fallback: "auto",
       bike_paths: bikePathsArg((app.vehicle ?? "auto") as Vehicle, app.bike_paths ?? "off"),
+      align_mode: app.align_mode ?? "posterior",
       anchors: anchorsParam(app.anchors),
       intro_end: introParam(app.intro_end),
     };

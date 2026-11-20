@@ -4,10 +4,15 @@
 The per-pair criteria are those `vms.evaluate.usable_pairs` applies (reimplemented here; same constants, which are counts of
 frame pairs, not seconds):
   no_fit      no fit (empty rel_speed) or fewer than `min_inliers` (vms.motion.MIN_INLIERS = 10) road points kept
-  high_rms    fit rms above `max_rms_px` (0.8 px at 360 rows; vms.evaluate.MAX_RMS = 2.0 until 2026-11-17). Passing traffic: a vehicle that
+  high_rms    fit rms above the limit `rms_limit`: `max_rms_px` (0.8 px at 360 rows; vms.evaluate.MAX_RMS = 2.0 until 2026-11-17), or
+              `max_rms_rel` x the video's median rms if that is higher. Passing traffic: a vehicle that
               covers much of the road area inflates the trimming threshold of the fit, nothing is trimmed, and the speed is a blend of road and
               vehicle. Overtaking from behind reads slow (its flow points at the horizon), oncoming traffic reads fast. Those pairs have 1-3 px rms
               against 0.2 px on plain road; above 0.8 px 28-80 % of the pairs are >20 % off on all six app videos (work/passing-cars).
+              A soft, low-resolution or shaky video fits PLAIN road at 0.75-0.96 px (median; PCI25WijGrE 480p, Switzerland 6): there the
+              absolute limit rejected half of all pairs and split the tracks for minutes, so the limit follows the video's own level (1.5 x the
+              median; videos with a median up to 0.53 px keep the 0.8 px). On PCI25WijGrE pairs up to 1.5 x the median read the speed like the
+              clean pairs (median ratio 1.00-1.05), pairs at 1.5-2.5 x read it 11-17 % fast and 25-52 % of them >20 % off.
   cut         frame difference above `cut_factor` (4) x its 61-pair running median (>= 1) and above `cut_min_diff` (25),
               dilated by +-7 pairs (a scene cut, or a bump / flash big enough to look like one)
   spike       speed more than 0.35 |median| + 2e-4 from the 31-pair running median of the usable speeds
@@ -38,6 +43,7 @@ REASONS = {"cut": CUT, "no_fit": NO_FIT, "high_rms": HIGH_RMS, "spike": SPIKE, "
 class GateParams:
     min_inliers: int = 10
     max_rms_px: float = 0.8
+    max_rms_rel: float = 1.5
     traffic_bridge_s: float = 4.0
     traffic_share: float = 0.3
     traffic_side_s: float = 1.0
@@ -83,11 +89,18 @@ def _nan_running_median(x: np.ndarray, size: int) -> np.ndarray:
     return median_filter(filled, size=size, mode="nearest")
 
 
+def rms_limit(rms_px: np.ndarray, inliers: np.ndarray, gp: GateParams = GateParams()) -> float:
+    """the high_rms limit of a video (px): max(max_rms_px, max_rms_rel x the median rms of its fitted pairs). Takes the WHOLE video's pairs."""
+    r = np.asarray(rms_px, float)
+    r = r[np.isfinite(r) & (np.asarray(inliers, float) >= gp.min_inliers)]
+    return float(max(gp.max_rms_px, gp.max_rms_rel * np.median(r))) if len(r) else float(gp.max_rms_px)
+
+
 def pair_flags(p: Pairs, gp: GateParams = GateParams()) -> np.ndarray:
     """Per pair a bit mask of the reasons it is unusable (0 = usable)."""
     v = p.rel_speed
     fitted = ~np.isnan(v) & ~np.isnan(p.yaw) & (p.inliers >= gp.min_inliers)
-    rms_bad = fitted & (p.rms_px > gp.max_rms_px)
+    rms_bad = fitted & (p.rms_px > rms_limit(np.where(fitted, p.rms_px, np.nan), p.inliers, gp))
     diff = np.nan_to_num(p.diff)
     base = median_filter(diff, size=gp.cut_median_window, mode="nearest")
     cut = (diff > gp.cut_factor * np.maximum(base, 1.0)) & (diff > gp.cut_min_diff)

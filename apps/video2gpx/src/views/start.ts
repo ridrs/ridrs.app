@@ -13,7 +13,7 @@ import { isJobPath, openJobFile } from "../features/atlasJob";
 
 const RESPONSIBILITY = "Die App lädt nichts von sich aus. Was der Befehl tut und ob du das Video verwenden darfst, liegt bei dir.";
 const RECENT = 6;
-const DROP_TEXT = "… oder eine Videodatei oder Atlas-Job-Datei (.v2g.json) in dieses Fenster ziehen";
+const DROP_TEXT = "… oder eine Videodatei oder Scenic-Job-Datei (.v2g.json) in dieses Fenster ziehen";
 let input: HTMLInputElement, primary: HTMLButtonElement, lineEl: HTMLElement, listEl: HTMLElement, listHead: HTMLElement, dropText: HTMLElement, cardEl: HTMLElement;
 let fld: ReturnType<typeof field>;
 let tplSel: HTMLSelectElement, cmd: ReturnType<typeof codeWell>, cmdErr: HTMLElement, copyFirst: HTMLInputElement;
@@ -35,8 +35,8 @@ export function mountStart(root: HTMLElement) {
   cardEl = el("div", { class: "panel start-card" },
     el("div", { class: "src-row" }, fld.el, btn("Datei wählen …", () => void pickVideo(), { size: "lg", icon: "folder" }), primary),
     lineEl, dropText,
-    el("div", { class: "row wrap" }, btn("Atlas-Job öffnen …", () => void pickJob(), { size: "sm", icon: "map" }),
-      el("span", { class: "small muted" }, "Job-Datei (.v2g.json) aus dem POV Drive Atlas: Suchrahmen, Start, Ziel und Route sind dann schon gesetzt.")));
+    el("div", { class: "row wrap" }, btn("Scenic-Job öffnen …", () => void pickJob(), { size: "sm", icon: "map" }),
+      el("span", { class: "small muted" }, "Job-Datei (.v2g.json) aus ridrs Scenic: Suchrahmen, Start, Ziel und Route sind dann schon gesetzt.")));
   listHead = el("div", { class: "list-head" });
   listEl = el("ul", { class: "projlist" });
   root.append(el("div", { class: "page narrow" },
@@ -154,7 +154,7 @@ export function handleDrop(paths: string[]) {
   const job = paths.find(isJobPath);
   if (job) { void openJob(job); return; }
   const v = paths.find(isVideoPath);
-  if (v) void openFile(v); else toast("Bitte eine Videodatei oder eine Atlas-Job-Datei (.v2g.json) ablegen. Unterstützt: mp4, mov, m4v, mkv, webm, avi, mts, ts, mpg.", "error");
+  if (v) void openFile(v); else toast("Bitte eine Videodatei oder eine Scenic-Job-Datei (.v2g.json) ablegen. Unterstützt: mp4, mov, m4v, mkv, webm, avi, mts, ts, mpg.", "error");
 }
 
 /** an atlas job file: a new project with its hints, then Einrichten (the video is imported from there) */
@@ -165,7 +165,7 @@ async function openJob(path: string) {
 async function pickJob() {
   const f = await api.pickJob();
   if (!f) return;
-  if (!isJobPath(f)) { toast("Bitte eine Job-Datei des Atlas wählen (Endung .v2g.json).", "error"); return; }
+  if (!isJobPath(f)) { toast("Bitte eine Job-Datei von ridrs Scenic wählen (Endung .v2g.json).", "error"); return; }
   await openJob(f);
 }
 

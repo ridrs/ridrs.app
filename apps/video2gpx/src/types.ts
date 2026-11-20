@@ -106,6 +106,8 @@ export interface VideoProbe {
 export type Vehicle = "auto" | "bike" | "motorcycle" | "car";
 /** "Rad- und Waldwege einbeziehen" (bikes only): off = roads only, auto = a second search with paths when the road result is not reliable, on = always */
 export type BikePaths = "off" | "auto" | "on";
+/** "Kurvenabgleich" (pipeline --align-mode): posterior = the curve alignment pins the time wherever it is sure (default), turns = only in strong turns (before) */
+export type AlignMode = "posterior" | "turns";
 
 export interface RunParamsSaved {
   video: string; bbox: Bbox; pbf: string; vehicle: Vehicle; offset_m: number | null;
@@ -113,6 +115,7 @@ export interface RunParamsSaved {
   start_bbox?: Bbox | null; end_bbox?: Bbox | null;
   hint?: string | null; hint_buffer_m?: number | null; hint_fallback?: "auto" | "off";
   bike_paths?: "on" | "fallback" | null;
+  align_mode?: AlignMode | null;
   /** user anchors ("Ortsangaben", src/anchors.ts): at video time t the camera is inside bbox */
   anchors?: { t: number; bbox: Bbox }[] | null;
   /** intro end set by hand (video s, src/intro.ts; pipeline --intro-end); null or missing = from the scene cuts */
@@ -141,6 +144,7 @@ export interface ProjectApp {
   pbf?: string | null;
   vehicle?: Vehicle;
   bike_paths?: BikePaths;
+  align_mode?: AlignMode;
   offset_m?: number | null;
   start_time?: string | null;
   decoys?: number;
@@ -275,7 +279,7 @@ export interface InspectSeries {
 }
 /** Rust inspect_series: the series (cached or made now), or why not */
 export interface InspectSeriesLoad { ready: boolean; reason?: string; error?: string; series?: InspectSeries; cached?: boolean }
-/** a tracked point of the overlay: x, y (px of the analysis frame, 360 rows), flow dx, dy (px), code: 1 = inlier, 0 = outlier, 2 = passing traffic the speed ignores (motion only) */
+/** a tracked point of the overlay: x, y (px of the analysis frame, 360 rows), flow dx, dy (px), code: 1 = inlier, 0 = outlier, 2 = passing traffic the speed ignores, 3 = point of a rejected pair, ignored but not located traffic (motion only) */
 export type FramePoint = [number, number, number, number, number];
 export interface FrameStoredRow { [column: string]: string }
 export interface FrameMotion {
@@ -283,8 +287,8 @@ export interface FrameMotion {
   source: string; row: FrameStoredRow; stored: FrameStoredRow | null; agree: boolean; diff?: Record<string, [string, string]>;
   fit: null | { inliers: number; rms: number | null; s: number; yaw_px: number | null; pitch_px: number | null; roll: number; speed_ms: number | null; yaw_deg_s: number | null; pitch_deg_s: number | null };
   decoded?: number; error?: string;
-  /** passing traffic (decisions A17 / A18): replaced = a road candidate replaced the fit, rejected = the pair gives no speed (gating), kept = candidates checked, plain fit used */
-  traffic?: null | { state: "replaced" | "rejected" | "kept"; pick: number | null; candidates: number; rms: number | null; road_s?: number; plain_s?: number; n_traffic?: number };
+  /** passing traffic (decisions A17 / A18): replaced = a road candidate replaced the fit, rejected = the pair gives no speed (gating: rms above `limit`, which follows the video's own fit quality), kept = candidates checked, plain fit used */
+  traffic?: null | { state: "replaced" | "rejected" | "kept"; pick: number | null; candidates: number; rms: number | null; limit?: number; road_s?: number; plain_s?: number; n_traffic?: number; n_ignored?: number };
   /** the plain fit a road candidate replaced */
   plain_fit?: { inliers: number; rms: number | null; s: number; speed_ms: number | null };
 }

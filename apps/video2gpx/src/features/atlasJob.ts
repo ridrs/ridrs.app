@@ -1,4 +1,4 @@
-// Opening a POV Drive Atlas job file (<id>.v2g.json, by drop or "Atlas-Job öffnen …"): a new project with the job's URL, title and the
+// Opening a ridrs Scenic job file (<id>.v2g.json, by drop or "Scenic-Job öffnen …"): a new project with the job's URL, title and the
 // hints the app already has (search frame, start/end frame, route hint, vehicle; src/atlas.ts jobPlan), and the atlas link in app.json.
 // The video is not loaded here: the user starts the import with their own template (P2).
 import { api } from "../api";
@@ -24,7 +24,7 @@ export async function openJobFile(path: string): Promise<string | null> {
       app.hint = { name: h.name, path: h.path, buffer_m: plan.hint.buffer_m };
       await api.projectSave(app.id, app);
     } catch (e) {
-      toast(`Die Route des Atlas wurde nicht geladen; das Projekt sucht im ganzen Suchrahmen. (${e instanceof Error ? e.message : e})`, "error");
+      toast(`Die Route aus ridrs Scenic wurde nicht geladen; das Projekt sucht im ganzen Suchrahmen. (${e instanceof Error ? e.message : e})`, "error");
     }
   }
   await refreshProjects();

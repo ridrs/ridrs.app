@@ -1,11 +1,11 @@
 // The overlay of the Analyse stage: a canvas exactly on the picture of the video (letterbox-aware) that draws what the pipeline tracked at the current time.
-// "Bewegung": road points of the vms pair (inliers green, outliers red, passing traffic the speed ignores magenta and dashed), their flow, the road area and the horizon row. "Rotation": the far features of the
+// "Bewegung": road points of the vms pair (inliers green, outliers red, passing traffic the speed ignores magenta and dashed, the points of a rejected pair grey and dashed), their flow, the road area and the horizon row. "Rotation": the far features of the
 // far-feature window (inliers cyan, outliers orange), the band rows and a yaw-rate arrow. Coordinates come in px of the analysis frame (360 rows).
 import { de, letterbox, toPicture, type Rect } from "./analyseStats";
 import type { FrameBand, InspectFrame } from "./types";
 import { el } from "./util";
 
-export const COL = { inlier: "#3ddc84", outlier: "#ff5a4d", traffic: "#ff4dd8", farIn: "#4dd0ff", farOut: "#ffb020", horizon: "#ffe14d", band: "#7fdcff", area: "rgba(255,255,255,.55)" };
+export const COL = { inlier: "#3ddc84", outlier: "#ff5a4d", traffic: "#ff4dd8", ignored: "#b8b8b8", farIn: "#4dd0ff", farOut: "#ffb020", horizon: "#ffe14d", band: "#7fdcff", area: "rgba(255,255,255,.55)" };
 /** arrows show the flow of one frame pair (motion) or of one window of k frames (rotation) enlarged by this factor */
 export const GAIN = { motion: 14, rotation: 3 };
 
@@ -94,6 +94,11 @@ function drawMotion(c: CanvasRenderingContext2D, pic: Rect, f: InspectFrame) {
     const [px, py] = toPicture(pic, fw, fh, x, y);
     arrow(c, px, py, dx * k * GAIN.motion, dy * k * GAIN.motion, COL.outlier, 1.1); dot(c, px, py, 2, COL.outlier);
   }
+  for (const [x, y, dx, dy, inl] of m.points) {                    // a rejected pair (fit not good enough): every point ignored, no vehicle located
+    if (inl !== 3) continue;
+    const [px, py] = toPicture(pic, fw, fh, x, y);
+    arrow(c, px, py, dx * k * GAIN.motion, dy * k * GAIN.motion, COL.ignored, 1.1, [4, 3]); dot(c, px, py, 2, COL.ignored);
+  }
   for (const [x, y, dx, dy, inl] of m.points) {                    // passing traffic: tracked, but the speed ignores it (dashed, crossed out)
     if (inl !== 2) continue;
     const [px, py] = toPicture(pic, fw, fh, x, y);
@@ -106,7 +111,7 @@ function drawMotion(c: CanvasRenderingContext2D, pic: Rect, f: InspectFrame) {
   }
   const tr = m.traffic;
   if (tr && (tr.state === "replaced" || tr.state === "rejected"))
-    label(c, tr.state === "rejected" ? "Verkehr: Bildpaar ignoriert" : "Verkehr erkannt: magenta ignoriert", pic.x + 6, pic.y + 18, COL.traffic);
+    label(c, tr.state === "rejected" ? "Fit ungenau: Bildpaar ignoriert (grau)" : "Verkehr erkannt: magenta ignoriert", pic.x + 6, pic.y + 18, tr.state === "rejected" ? COL.ignored : COL.traffic);
 }
 
 /** the band whose points are drawn: the one the series uses, else the first with a fit, else the widest */

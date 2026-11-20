@@ -44,7 +44,7 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement) {
   const dotSw = (...cols: string[]) => el("span", { class: "an-swatch", "aria-hidden": "true" }, ...cols.map((col) => el("i", { style: `background:${col}` })));
   ovBox = el("section", { class: "panel stack", "aria-labelledby": "an-ov-h" },
     el("div", { class: "row wrap between" }, el("h3", { id: "an-ov-h" }, "Overlay auf dem Video"),
-      el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)))),
+      el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic, COL.ignored)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)))),
     el("p", { class: "small muted" }, `Die Punkte werden für das Bild unter dem Zeiger neu verfolgt (mit den Parametern der Berechnung, ohne ein Ergebnis zu ändern); das dauert etwa eine Sekunde. Bewegung: Straßenpunkte der Bildbewegung, grün = zählt für Tempo und Gierrate (Inlier), rot = verworfen, magenta gestrichelt und durchgekreuzt = vorbeifahrender Verkehr, vom Tempo ignoriert, Pfeil = Verschiebung zum nächsten Bild (${GAIN.motion}-fach), gestrichelt das Straßenfeld, gelb der Horizont. Rotation: Fernmerkmale über dem Horizont, cyan = Inlier, orange = verworfen, Pfeil = Verschiebung im Fenster (${GAIN.rotation}-fach), gepunktet die Bänder, oben die Gierrate. Beim Abspielen wird alle ${TICK_MS / 1000} s aktualisiert.`),
     frameInfo);
   legendEl = el("div", { class: "elev-legend", role: "group", "aria-label": "Spuren der Diagramme" });
@@ -191,7 +191,7 @@ function frameLines(f: InspectFrame): HTMLElement[] {
       if (tr?.state === "replaced")
         out.push(frameLine("Verkehr", `Ein Fahrzeug hat den Fit verfälscht${pf?.speed_ms != null ? ` (er las ${de(pf.speed_ms, 1)} m/s, rms ${de(pf.rms ?? 0, 2)} px)` : ""}. Verwendet wird der Straßen-Kandidat ${tr.pick} von ${tr.candidates}; ${tr.n_traffic ?? 0} Punkte (magenta) sind ignoriert.`));
       else if (tr?.state === "rejected")
-        out.push(frameLine("Verkehr", `${tr.pick === -1 ? "Kein Straßen-Kandidat passt zum Tempo davor und danach" : "Der Fit ist zu ungenau für ein Tempo"} (rms ${de(tr.rms ?? 0, 2)} px): dieses Bildpaar gibt kein Tempo, alle ${tr.n_traffic ?? 0} Punkte (magenta) sind ignoriert. Kurze Läufe solcher Paare werden überbrückt.`));
+        out.push(frameLine("Fit", `${tr.pick === -1 ? "Kein Straßen-Kandidat passt zum Tempo davor und danach" : "Der Fit ist zu ungenau für ein Tempo"} (rms ${de(tr.rms ?? 0, 2)} px${tr.limit != null ? `, Grenze ${de(tr.limit, 2)} px` : ""}; vorbeifahrender Verkehr oder ein unscharfes Bild): dieses Bildpaar gibt kein Tempo, alle ${tr.n_ignored ?? tr.n_traffic ?? 0} Punkte (grau) sind ignoriert. Kurze Läufe solcher Paare werden überbrückt.`));
     }
   }
   if (r) {

@@ -221,6 +221,8 @@ pub struct RunParams {
     pub hint_fallback: Option<String>,
     /// bike paths for a bike: "on" | "fallback" (pipeline `--bike-paths`); anything else / missing = roads only (the option is left out)
     pub bike_paths: Option<String>,
+    /// dense heading alignment in refine: "posterior" (wherever it is sure, weighted) | "turns" (only strong turns) (`--align-mode`); missing = pipeline default
+    pub align_mode: Option<String>,
     /// user anchors [{t, bbox: [S,W,N,E]}] ("Ortsangaben"): written to `<project>/anchors.json` and passed as `--anchors` (docs/USER_ANCHORS.md)
     pub anchors: Option<Vec<Value>>,
     /// video second at which the intro ends, set by hand ("Intro-Ende hier setzen"): replaces the intro found from the scene cuts (`--intro-end`)
@@ -267,6 +269,9 @@ pub fn build_args(p: &RunParams, out: &Path) -> Vec<String> {
     }
     if let Some(b) = p.bike_paths.as_ref().filter(|b| *b == "on" || *b == "fallback") {
         a.extend(["--bike-paths".into(), b.clone()]);
+    }
+    if let Some(m) = p.align_mode.as_ref().filter(|m| *m == "posterior" || *m == "turns") {
+        a.extend(["--align-mode".into(), m.clone()]);
     }
     if let Some(t) = p.intro_end.filter(|t| t.is_finite() && *t > 0.0) {
         a.extend(["--intro-end".into(), format!("{t:.2}")]);
@@ -375,6 +380,19 @@ mod tests {
         }
         let p: RunParams = serde_json::from_str(r#"{"project":"p","video":"v.mp4","bbox":[1,2,3,4],"pbf":"x.pbf","bike_paths":"fallback"}"#).unwrap();
         assert_eq!(p.bike_paths.as_deref(), Some("fallback"));
+    }
+
+    #[test]
+    fn args_with_align_mode_only_when_known() {
+        let base = RunParams { project: "p".into(), video: "v.mp4".into(), bbox: [1.0, 2.0, 3.0, 4.0], pbf: "x.pbf".into(), ..Default::default() };
+        for (v, want) in [(Some("posterior"), Some("--align-mode posterior")), (Some("turns"), Some("--align-mode turns")), (Some("x"), None), (None, None)] {
+            let p = RunParams { align_mode: v.map(String::from), ..base.clone() };
+            let a = build_args(&p, Path::new("/o")).join(" ");
+            match want {
+                Some(w) => assert!(a.ends_with(w), "{a}"),
+                None => assert!(!a.contains("--align-mode"), "{a}"),
+            }
+        }
     }
 
     #[test]

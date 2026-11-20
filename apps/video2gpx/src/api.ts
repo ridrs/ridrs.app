@@ -10,6 +10,8 @@ export interface RunParams {
   hint?: string | null; hint_buffer_m?: number | null; hint_fallback?: string | null;
   /** "on" | "fallback" (pipeline `--bike-paths`); null or missing = roads only */
   bike_paths?: string | null;
+  /** "posterior" | "turns" (pipeline `--align-mode`) */
+  align_mode?: string | null;
   /** user anchors (pipeline `--anchors`, written to the project as anchors.json by the backend); null or missing = none */
   anchors?: { t: number; bbox: Bbox }[] | null;
   /** intro end set by hand (pipeline `--intro-end`); null or missing = from the scene cuts */
@@ -56,12 +58,12 @@ export interface Api {
   hintImport(project: string, src: string): Promise<{ name: string; path: string; text: string }>;
   hintRead(project: string, path: string): Promise<string>;
   hintRemove(project: string): Promise<void>;
-  // POV Drive Atlas (src/atlas.ts): the job file, its route as the hint, the result file
+  // ridrs Scenic (src/atlas.ts): the job file, its route as the hint, the result file
   /** the text of a `*.v2g.json` job file */
   atlasJobRead(path: string): Promise<string>;
   /** downloads the job's route into the project's hint folder (replaces a hint) */
   atlasHintDownload(project: string, url: string, name: string): Promise<{ name: string; path: string; text: string }>;
-  /** writes `<id>.atlas.json` */
+  /** writes `<id>.scenic.json` */
   atlasResultWrite(dest: string, text: string): Promise<{ path: string; bytes: number }>;
   /** the app's version (tauri.conf.json) */
   appVersion(): Promise<string>;
@@ -119,7 +121,7 @@ export interface Api {
   pickHint(): Promise<string | null>;
   /** an atlas job file (`*.v2g.json`) */
   pickJob(): Promise<string | null>;
-  /** save dialog for `<id>.atlas.json` */
+  /** save dialog for `<id>.scenic.json` */
   pickSaveAtlas(defaultName: string): Promise<string | null>;
   pickImage(): Promise<string | null>;
   pickSave(defaultName: string): Promise<string | null>;

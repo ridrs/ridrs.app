@@ -50,7 +50,7 @@ const lastRun = { video: "/mock/test.mp4", bbox: [44.4506, 4.9, 45.0506, 5.63] a
 const hasResult = !!SC.result;
 const demo: ProjectApp = {
   id: "demo-1", name: PROBE.title, video: "/mock/test.mp4", created: now - day, updated: now - 3600e3, has_result: hasResult, verdict: SC.result ?? null,
-  last_run: hasResult || SC.run ? lastRun : null, probe: PROBE, poster: "/mock/poster.jpg", bbox: lastRun.bbox, suggested: true, pbf: PBFS[0].path, vehicle: "auto", bike_paths: "off", decoys: 0,
+  last_run: hasResult || SC.run ? lastRun : null, probe: PROBE, poster: "/mock/poster.jpg", bbox: lastRun.bbox, suggested: true, pbf: PBFS[0].path, vehicle: "auto", bike_paths: "off", align_mode: "posterior", decoys: 0,
 };
 switch (SC.project) {
   case "fresh": Object.assign(demo, { bbox: null, suggested: false }); break;
@@ -68,12 +68,12 @@ const projects: ProjectApp[] = SC.empty ? [] : [
 if (SC.import && SC.run !== "stream") projects.unshift({ id: "demo-import", name: "Route des Grandes Alpes – Col de l'Iseran", video: null, created: now, updated: now });
 
 const hints: Record<string, { name: string; path: string; text: string }> = {};
-// a project from a POV Drive Atlas job: the job's frames, its route as the hint (the mock route hint), the atlas link
+// a project from a ridrs Scenic job: the job's frames, its route as the hint (the mock route hint), the atlas link
 const ATLAS_JOB: AtlasJob = {
   video_id: "aBcDeFgHiJk", url: "https://www.youtube.com/watch?v=aBcDeFgHiJk", title: PROBE.title, channel: "Demo-Kanal", duration_s: VIDEO_S, fps: 30, country: "FR", vehicle: null,
-  route_gpx: "https://atlas.example.org/gpx/aBcDeFgHiJk.gpx", route_level: 4,
+  route_gpx: "https://ridrs.example.org/scenic/gpx/aBcDeFgHiJk.gpx", route_level: 4,
   bbox: { south: 44.7, west: 5.2, north: 44.8, east: 5.33 }, start_bbox: { south: 44.742, west: 5.245, north: 44.754, east: 5.262 }, end_bbox: null,
-  atlas: { base: "https://atlas.example.org", video_id: "aBcDeFgHiJk" },
+  atlas: { base: "https://ridrs.example.org/scenic", video_id: "aBcDeFgHiJk" },
 };
 if (SC.atlas) {
   const h = hintText(false);
