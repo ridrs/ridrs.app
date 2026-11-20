@@ -322,3 +322,13 @@ MOTION_PARALLEL = True
 # reused while its key holds: video, extraction settings, OpenCV) and fits motion.csv from the stored points (vmsx.interpret). An interpretation change
 # reruns the step in about a minute per 10 min of video instead of decoding again. False: the inline pass of vmsx.motion (kept for one release, rule 8).
 MOTION_FROM_EXTRACT = True
+# the rotation step fits its far bands from the same extraction (the `rot` stream; no decode) when the motion step made one
+ROT_FROM_EXTRACT = True
+# A25 (2026-11-20, decision E2): the heading series removes the translation leak of the far bands with the focus-of-expansion column x0 of the road
+# fit (median -c/s of the clean pairs: s above X0_MIN_S, rms at most X0_MAX_RMS px; at least X0_MIN_PAIRS of them, else farrot.series.estimate_x0
+# as before). estimate_x0 read 13.8 px on Pontaix (8-10 on grid points), the road fit says 17.2 px; heading error over 120 s against the verified
+# track 14.0 -> 13.0 deg (today's points), 11.8 deg (grid points), docs/CONCEPT_extraction.md section 4.
+ROT_X0_ROAD = True
+X0_MIN_S = 1e-4
+X0_MAX_RMS = 0.8
+X0_MIN_PAIRS = 100

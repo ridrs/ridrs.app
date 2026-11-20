@@ -62,7 +62,12 @@ route side run on them (T3 with the motion and band fits injected).
    synthetic straight road it finds the horizon (150.4 for 150), where the inline pass finds no focus of expansion at all.
    First measurement, Pontaix 10 min from the phase 1 extraction: interpretation 12 s; speed per second against the stage of today ratio
    1.02, correlation 0.998; usable share 100 %; own calibration 197.0 rows against 194.2 of the stage (whole source).
-3. **Rotation as interpretation**: band fits from `rot`, x0 from the road fit (A25); series, tracks, cuts and vehicle unchanged; the pixel probes stay.
+3. **Rotation as interpretation** (built 2026-11-20, DECISIONS A25 / A26): band fits from `rot` (`interpret.rotation_windows`, the chunk layout and
+   generator seeding of `steps_a._chunk`, same fits for any number of workers), x0 from the road fit (A25, `steps_a.road_x0`); series, tracks,
+   cuts and vehicle unchanged; the pixel probes (same-scene veto, standstill test) stay with the video. The far-window overlay reads the stored
+   points. Measured (whole pipeline from the video, cache off): Pontaix heading error 30 / 60 / 120 s today 7.2 / 9.9 / 15.6°, now 6.8 / 8.8 /
+   12.0°; Pontaix along median / p90 today 18.4 / 34.0 m, now 18.3 / 37.6 m; Gotthard 10/10 checkpoints, max 55 m today, 33 m now. The p90 of
+   Pontaix is 3.6 m worse (the scale scan lands on kappa 0.988 instead of 1.062: Phase 0 already showed this sensitivity); open.
 4. **Test strategy**: stages hold `extract/`; T4 = extraction only; an interpretation change re-interprets the stages; clips extract themselves.
 5. **Re-baseline**: one T4, T1-T3, Pontaix against the verified track (E1), the maintainer's check in the app. The inline image pass is removed
    after one release (rule 8).

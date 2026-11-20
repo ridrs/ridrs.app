@@ -209,6 +209,27 @@ def _chunk(args):
     return w0, out, n_dec
 
 
+def extract_of_run(d: Path, mj: dict, k: int) -> bool:
+    """the rotation step may fit from run/extract/: on (ROT_FROM_EXTRACT), the motion step interpreted this very extraction (its key), and the
+    extraction's rotation windows are k frames long"""
+    f = d / "extract" / "extract.json"
+    if not (C.ROT_FROM_EXTRACT and mj.get("extract") and f.exists()):
+        return False
+    m = jload(f)
+    return m.get("key") == mj["extract"].get("key") and int(m.get("k", -1)) == int(k)
+
+
+def road_x0(csv_path: str) -> float | None:
+    """A25: the focus-of-expansion column (px from the image centre at 360 rows) of the road fit, the median -c/s over the clean pairs
+    (C.X0_MIN_S, C.X0_MAX_RMS); None with fewer than C.X0_MIN_PAIRS of them"""
+    q = np.genfromtxt(csv_path, delimiter=",", names=True, filling_values=np.nan)
+    s, c, rms = (np.atleast_1d(q[n]) for n in ("s", "c", "rms_px"))
+    ok = np.isfinite(s) & np.isfinite(c) & (s > C.X0_MIN_S) & (rms <= C.X0_MAX_RMS)
+    if ok.sum() < C.X0_MIN_PAIRS:
+        return None
+    return float(np.median(-c[ok] / s[ok]))
+
+
 def scene_cuts(d: Path, out: Path, tracks: list[dict], ta, tb, ok, n_inl, W: Worker, video: str | None = None, intro_user: float | None = None) -> list[dict]:
     """final cut decision (frame-difference impulse + road-flow or far-feature fit failure, rsm.pipeline.cuts) and the plan applied to the tracks:
     jumps at cuts, inserted shots dropped, start rule. Writes rotation/cuts.json; status lines only for a video with cuts."""
@@ -263,20 +284,28 @@ def rotation(d: Path, P: dict, W: Worker):
     chunks = [(s, min(s + cw, n_win)) for s in range(0, n_win, cw)]
     hz, off = farfeat.band_horizon(mj, C.ROT_BAND_OFF_VMS, farfeat.Params.band_off)   # FOE horizon of vms (old projects: free road-plane fit)
     p = farfeat.Params(min_inl=F["min_inl"], band_off=off)
-    _G.update(video=P["video"], info=info, k=k, H=360, f=C.F_FAR, p=p, horizon=hz, min_inl=F["min_inl"], band_step=F["band_step"], n_bands=F["n_bands"])
+    ends = band_ends(hz, 360, p, F["band_step"], F["n_bands"])
     t0 = time.time()
-    procs = min(C.MAX_WORKERS, len(chunks))
-    res = []
-    with mp.get_context("fork").Pool(procs) as pool:
-        for r in pool.imap_unordered(_chunk, chunks, chunksize=1):
-            res.append(r)
-            W.progress(95.0 * len(res) / len(chunks), "tracking")
-    res.sort(key=lambda x: x[0])
-    arr = np.concatenate([x[1] for x in res])
+    ex = d / "extract"
+    if extract_of_run(d, mj, k):              # the windows from the stored `rot` stream of the motion step's extraction: no decode
+        arr = VI.rotation_windows(VI.Points(ex, streams=("rot",)), ends, p, C.F_FAR, F["min_inl"], n_win, cw, FIELDS, WHY, workers=min(C.MAX_WORKERS, len(chunks)),
+                                  on_progress=lambda n, total, phase: W.progress(95.0 * n / max(total, 1), phase))
+        source = "extract"
+    else:
+        _G.update(video=P["video"], info=info, k=k, H=360, f=C.F_FAR, p=p, horizon=hz, min_inl=F["min_inl"], band_step=F["band_step"], n_bands=F["n_bands"])
+        procs = min(C.MAX_WORKERS, len(chunks))
+        res = []
+        with mp.get_context("fork").Pool(procs) as pool:
+            for r in pool.imap_unordered(_chunk, chunks, chunksize=1):
+                res.append(r)
+                W.progress(95.0 * len(res) / len(chunks), "tracking")
+        res.sort(key=lambda x: x[0])
+        arr = np.concatenate([x[1] for x in res])
+        source = "video"
     idx = np.arange(0, n_win)
     NF = len(FIELDS)
     meta = dict(video="video", f=C.F_FAR, k=k, fps=info.fps, horizon=hz, band_off=off, n_windows=int(n_win), n_ok=int(np.nansum(arr[:, 0, NF])), wall_s=time.time() - t0,
-                band_ends=band_ends(hz, 360, p, F["band_step"], F["n_bands"]))
+                band_ends=ends, source=source)
     np.savez(out / "win_video_base.npz", idx=idx, ta=idx * k / info.fps, tb=(idx + 1) * k / info.fps, fields=np.array(FIELDS), data=arr[:, :, :NF], ok=arr[:, :, NF].astype(bool),
              n_pts=arr[:, :, NF + 1], n_inl=arr[:, :, NF + 2], why=arr[:, :, NF + 3], meta=json.dumps(meta))
     return rotation_series(d, P, W, meta)
@@ -308,7 +337,9 @@ def rotation_series(d: Path, P: dict, W: Worker, meta: dict | None = None):
     z = np.load(out / "win_video_base.npz")
     meta = json.loads(str(z["meta"])) if meta is None else meta
     fser.WORK = out          # load_windows reads WORK / win_<name>_<tag>.npz
-    S = fser.build("video", str(d / "motion" / "motion.csv"), tag="base")
+    x0 = road_x0(str(d / "motion" / "motion.csv")) if C.ROT_X0_ROAD else None      # A25; None: estimate_x0 of the series, as before
+    S = fser.build("video", str(d / "motion" / "motion.csv"), tag="base", x0=x0)
+    S.meta["x0_source"], S.meta["x0_road"] = ("road" if x0 is not None else "straight windows"), x0
     W.progress(97.0, "series")
     tr = T.far_tracks(str(d / "motion" / "motion.csv"), S)
     if C.CUT_ON:

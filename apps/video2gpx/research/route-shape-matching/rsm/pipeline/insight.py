@@ -174,8 +174,10 @@ def series(d, window_m: float = WINDOW_M) -> dict:
     # ---- far-feature windows -> the series the rotation step builds (the pipeline's own builder, read only)
     old_work = fser.WORK
     fser.WORK = d / "rotation"
+    sj = d / "rotation" / "summary.json"
+    x0 = (jload(sj).get("series") or {}).get("x0_road") if sj.exists() else None      # A25: the x0 the step used (None: estimate_x0, as the step then did)
     try:
-        S = fser.build("video", str(csv), tag="base")
+        S = fser.build("video", str(csv), tag="base", x0=x0)
     finally:
         fser.WORK = old_work
     W = np.load(d / "rotation" / "win_video_base.npz")
@@ -656,14 +658,29 @@ def far_window(d: Path, video: str, mj: dict, t: float, info, seed: int = 0) -> 
     F = C.FAR
     p = farfeat.Params(min_inl=F["min_inl"], band_off=float(meta.get("band_off", farfeat.Params.band_off)))
     W = round(info.width * H / info.height / 2) * 2
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(1) as ex:            # the decode (an ffmpeg process) runs while the generator is replayed
-        job = ex.submit(lambda: list(SA.ffmpeg_frames(video, info, H, i * k, 2, k)))
+    from_extract = meta.get("source") == "extract" and (d / "extract" / "extract.json").exists()
+    if from_extract:                             # a run of the rotation interpretation: the window's stored points, no decode
+        from .vmsx import interpret as VI
+        PX = VI.Points(d / "extract", around=(i + 1) * k, streams=("rot",))
+        if i not in PX.wpos:
+            raise ValueError(f"far-feature window {i} is not in the extraction")
         rng = _replay_rng(z, i, k, fps, F)
-        fr = job.result()
-    if len(fr) < 2:
-        raise ValueError(f"could not decode the far-feature window around t = {t:.2f} s")
-    prev, cur = fr[0], fr[1]
+
+        def tracked(m):
+            n, q0, fl = PX.starts("rot", PX.wpos[i], m > 0, p.fb_err * H / 360)
+            return None if n < p.min_inl else (q0, fl)
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(1) as ex:            # the decode (an ffmpeg process) runs while the generator is replayed
+            job = ex.submit(lambda: list(SA.ffmpeg_frames(video, info, H, i * k, 2, k)))
+            rng = _replay_rng(z, i, k, fps, F)
+            fr = job.result()
+        if len(fr) < 2:
+            raise ValueError(f"could not decode the far-feature window around t = {t:.2f} s")
+        prev, cur = fr[0], fr[1]
+
+        def tracked(m):
+            return farfeat.track_pair(cv2, m, prev, cur, p, H / 360)
     SP = fser.SeriesParams()
     bands = []
     chosen = -1
@@ -671,7 +688,7 @@ def far_window(d: Path, video: str, mj: dict, t: float, info, seed: int = 0) -> 
         m = np.zeros((H, W), np.uint8)
         mx = int(0.02 * W)
         m[:int(e), mx:W - mx] = 255
-        tr = farfeat.track_pair(cv2, m, prev, cur, p, H / 360)
+        tr = tracked(m)
         st = dict(band=b, end=_num(e, 1), ok=False, why="", n_pts=0, n_inl=0, points=[])
         sto = {name: _num(float(z["data"][i, b, j]), 3) for j, name in enumerate(SA.FIELDS)}
         stored = dict(ok=bool(z["ok"][i, b]), n_pts=int(z["n_pts"][i, b]), n_inl=int(z["n_inl"][i, b]), why=SA.WHY[int(z["why"][i, b])] if int(z["why"][i, b]) < len(SA.WHY) else "", **sto)
@@ -699,7 +716,7 @@ def far_window(d: Path, video: str, mj: dict, t: float, info, seed: int = 0) -> 
         st["agree"] = bool(st["ok"] == stored["ok"] and st["n_pts"] == stored["n_pts"] and (not st["ok"] or all(close(st.get(a), stored[a], 0.05 if a in ("A", "B", "C", "e") else 0.1) for a in ("A", "B", "C", "e"))))
         bands.append(st)
     out = dict(window=i, ta=_num(i * k / fps, 3), tb=_num((i + 1) * k / fps, 3), k=k, width=W, height=H, horizon=_num(meta.get("horizon"), 1), band_ends=band_ends, bands=bands, chosen=chosen,
-               agree=all(b["agree"] for b in bands))
+               agree=all(b["agree"] for b in bands), points_from="extract" if from_extract else "video")
     if chosen >= 0:
         _, f_eff, _ = (lambda r: (r["kappa"], r["f_eff"], r["ok"]))(_route_info(d))
         A = bands[chosen]["A"]

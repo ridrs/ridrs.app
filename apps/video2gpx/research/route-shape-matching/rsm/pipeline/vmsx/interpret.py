@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import csv
 import json
+import multiprocessing as mp
 import time
 from pathlib import Path
 
 import numpy as np
+
+from rsm.farrot import model
 
 from . import extract as EX, motion as vm
 
@@ -48,11 +51,11 @@ def select(x: np.ndarray, y: np.ndarray, fb: np.ndarray, fb_max: float, cell: in
 class Points:
     """the stored points of one extraction, per pair (des, raw) or window (rot)"""
 
-    def __init__(self, d, around: int | None = None):
-        """`around`: a pair's frame j, only the chunk holding it is loaded (the overlay of one pair)"""
+    def __init__(self, d, around: int | None = None, streams=None):
+        """`around`: a pair's frame j, only the chunk holding it is loaded (the overlay of one pair); `streams`: only these streams"""
         self.dir = Path(d)
         self.meta = json.loads((self.dir / "extract.json").read_text())
-        self.z = EX.load(self.dir, around)
+        self.z = EX.load(self.dir, around, streams)
         m = self.meta
         self.fps, self.width, self.height = float(m["fps"]), int(m["width"]), int(m["height"])
         self.duration = float(m.get("duration") or (m["pairs"] + 1) / self.fps)
@@ -61,10 +64,16 @@ class Points:
         self.diff = self.z["diff"]
         self.pos = {int(j): i for i, j in enumerate(self.idx)}
         self.rpos = {int(j): i for i, j in enumerate(self.z["raw_idx"])}
-        self.off = {s: np.concatenate([[0], np.cumsum(self.z[f"{s}_count"])]) for s in EX.STREAMS}
+        self.off = {s: np.concatenate([[0], np.cumsum(self.z[f"{s}_count"])]) for s in EX.STREAMS if f"{s}_count" in self.z}
+        self.wpos = {int(w): i for i, w in enumerate(self.z["rot_w"])}
 
     def get(self, s: str, i: int, mask: np.ndarray | None, fb_max: float) -> tuple[int, np.ndarray, np.ndarray]:
         """(stored points in the mask, midpoints, flow) of entry i of stream s: the points used (`select`) within the mask"""
+        n, p0, fl = self.starts(s, i, mask, fb_max)
+        return n, p0 + fl / 2, fl
+
+    def starts(self, s: str, i: int, mask: np.ndarray | None, fb_max: float) -> tuple[int, np.ndarray, np.ndarray]:
+        """(stored points in the mask, start points, flow) of entry i of stream s: the points used (`select`) within the mask"""
         a, b = self.off[s][i], self.off[s][i + 1]
         x, y, dx, dy, fb = EX.dequantise(*(self.z[f"{s}_{c}"][a:b] for c in ("x", "y", "dx", "dy", "fb")))
         if mask is not None:
@@ -73,9 +82,7 @@ class Points:
             x, y, dx, dy, fb = x[inm], y[inm], dx[inm], dy[inm], fb[inm]
         n = len(x)
         k = select(x, y, fb, fb_max, self.cell)
-        p0 = np.column_stack([x[k], y[k]])
-        fl = np.column_stack([dx[k], dy[k]])
-        return n, p0 + fl / 2, fl
+        return n, np.column_stack([x[k], y[k]]), np.column_stack([dx[k], dy[k]])
 
     def stretch(self, start: float, window: float) -> list[int]:
         """the pair frames j of the stretch [start, start + window) as `vmsx.decode.frames(start, window)` decodes it: pairs within its frames"""
@@ -235,6 +242,73 @@ def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 
         "seconds": elapsed, "calibration_seconds": t_cal, "seconds_per_video_hour": elapsed / (P.duration / 3600),
         "extract": dict(version=m["version"], key=m.get("key"), seconds=m.get("seconds")), "interpret": params(),
     }
+
+
+# ------------------------------------------------------------------ rotation (phase 3)
+def band_masks(P: Points, ends) -> list[np.ndarray]:
+    """the far bands of steps_a._chunk: rows above each band end, the width less 2 % on each side"""
+    out = []
+    mx = int(0.02 * P.width)
+    for e in ends:
+        m = np.zeros((P.height, P.width), bool)
+        m[:int(e), mx:P.width - mx] = True
+        out.append(m)
+    return out
+
+
+_R: dict = {}       # the context of rotation_windows, inherited by the forked workers
+
+
+def _windows(args) -> tuple[int, np.ndarray]:
+    """the band fits of windows w0 .. w1 - 1 as steps_a._chunk makes them from the decoded frames: one generator per chunk, seeded 1000 + w0, a
+    band fitted when at least p.min_inl stored points lie in it (else 'few corners', no draw)"""
+    w0, w1 = args
+    R = _R
+    P, masks, p, f, min_inl, NF, why = R["P"], R["masks"], R["p"], R["f"], R["min_inl"], len(R["fields"]), R["why"]
+    sc = _scale(P)
+    rng = np.random.default_rng(1000 + w0)
+    out = np.full((w1 - w0, len(masks), NF + 4), np.nan)
+    out[:, :, NF:] = [0, 0, 0, 1]
+    for wi in range(w0, w1):
+        i = P.wpos.get(wi)
+        if i is None:
+            continue
+        for b, m in enumerate(masks):
+            n, q0, fl = P.starts("rot", i, m, p.fb_err * sc)
+            if n < p.min_inl:
+                continue
+            x, y = q0[:, 0] - P.width / 2, q0[:, 1] - P.height / 2
+            wf = model.fit_window(x, y, fl, f, scale=sc, rng=rng, min_inl=min_inl, min_xspread=0.0)
+            out[wi - w0, b, :NF] = [getattr(wf, a) for a in R["fields"]]
+            out[wi - w0, b, NF:] = [wf.ok, wf.n_pts, wf.n_inl, why.index(wf.why) if wf.why in why else 2]
+    return w0, out
+
+
+def rotation_windows(P: Points, ends, p, f: float, min_inl: int, n_win: int, chunk_w: int, fields, why, workers: int = 1, on_progress=None) -> np.ndarray:
+    """(n_win, bands, len(fields) + 4) band fits of the rotation windows from the stored `rot` stream, in the layout of steps_a._chunk (fields, then
+    ok, n_pts, n_inl, why index); chunks of chunk_w windows, in `workers` processes (the same fits for any number)"""
+    _R.clear()
+    _R.update(P=P, masks=band_masks(P, ends), p=p, f=f, min_inl=min_inl, fields=list(fields), why=list(why))
+    chunks = [(s, min(s + chunk_w, n_win)) for s in range(0, n_win, chunk_w)]
+    res = []
+    if workers > 1 and len(chunks) > 1:
+        with mp.get_context("fork").Pool(min(workers, len(chunks)), initializer=EX._worker_init) as pool:
+            for r in pool.imap_unordered(_windows, chunks, chunksize=1):
+                res.append(r)
+                if on_progress is not None:
+                    on_progress(len(res), len(chunks), "bands")
+            pool.close()
+            pool.join()
+    else:
+        for c in chunks:
+            res.append(_windows(c))
+            if on_progress is not None:
+                on_progress(len(res), len(chunks), "bands")
+    res.sort(key=lambda r: r[0])
+    _R.clear()
+    if not res:
+        return np.zeros((0, len(ends), len(fields) + 4))
+    return np.concatenate([r[1] for r in res])
 
 
 def ensure_extract(video: str, d, key, height: int = 360, workers: int = 4, hwaccel: bool = True, log=None, on_progress=None) -> tuple[dict, bool]:

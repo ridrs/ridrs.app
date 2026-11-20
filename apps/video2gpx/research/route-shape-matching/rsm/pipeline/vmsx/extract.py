@@ -276,14 +276,19 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
     return meta
 
 
-def load(d, around: int | None = None) -> dict:
-    """all chunks of an extraction concatenated (counts stay aligned with idx / raw_idx / rot_w); `around` = a pair's frame j: only its chunk"""
+def load(d, around: int | None = None, streams=None) -> dict:
+    """all chunks of an extraction concatenated (counts stay aligned with idx / raw_idx / rot_w); `around` = a pair's frame j: only its chunk;
+    `streams`: only the arrays of these streams (plus idx, diff, raw_idx, rot_w)"""
     d = Path(d)
     meta = json.loads((d / "extract.json").read_text())
     chunks = meta["chunks"]
     if around is not None:
         chunks = [c for c in chunks if c[0] < around <= c[1]] or chunks[:1]
-    parts = [dict(np.load(d / name)) for _, _, name in chunks]
+    want = None if streams is None else lambda key: key.split("_")[0] not in STREAMS or key in ("raw_idx", "rot_w") or key.split("_")[0] in streams
+    parts = []
+    for _, _, name in chunks:
+        with np.load(d / name) as f:
+            parts.append({key: f[key] for key in f.files if want is None or want(key)})
     return {key: np.concatenate([p[key] for p in parts]) for key in parts[0]}
 
 
