@@ -81,6 +81,9 @@ Logo, colours and type come from ridrs (`ridrs_app/web/public/logo.svg`, `favico
 
 `scripts/build.mjs` writes `dist/lines.json` with every exported (OSM-derived) route line, simplified to about 30 m and delta-encoded in 1e-5 degrees (about 1.5 MB, 0.7 MB compressed). The page loads it after the map, draws the routes of the filtered videos from zoom 5 on, coloured by Lokalisierungsstufe, and opens the video on click. The dialog still uses the full line from `/api/videos/:id`.
 
+- **Lines set in the admin** are not in the build: the worker lays them over the build's file when it serves `lines.json` (`linesJson` in `src/worker.js`). A manual route (set by hand or „Route aus video2gpx übernehmen“, `manual_field` `route`) replaces the build's line; an uploaded video2gpx track gives a line to a video without one. Encoding and simplification are shared in `site/lib/lines.js` (build, worker, page).
+- **Open video:** while its exact route is drawn, its coarse overview line is hidden, so the map shows one line.
+
 ## Several videos at one point
 
 Videos located only from the title (Lokalisierungsstufe 7) or pinned to the same place share their exact position: about 5,500 videos sit on about 590 shared points (up to 361 on one). The map therefore has one feature per position with `n` = number of videos; clusters sum `n` (`clusterProperties`), so the numbers are videos, not points. A position with several videos is a ring with the number; clicking it opens the choice of exactly these videos in the dialog (sorted by Lokalisierungsstufe, then views), and a video opened from there has a link back to the choice. This is not a route list: it only lists what lies on that one point.

@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, st
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSyncTracks } from './lib/sync-sources.mjs';
+import { encodeLine } from '../site/lib/lines.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 import { PIPELINE, RIDRS } from './lib/paths.mjs'; // the data pipeline folder (export/) lives outside the repository
@@ -51,29 +52,8 @@ const tracks = loadSyncTracks(RIDRS);
 mkdirSync(join(dist, 'sync'));
 for (const t of tracks) writeFileSync(join(dist, 'sync', `${t.videoId}.json`), t.raw);
 
-// All route lines for the overview map (lines.json): the OSM-derived lines of the export, simplified
-// (Douglas-Peucker, ~30 m) and stored as {videoId: [lon0, lat0, dlon1, dlat1, …]} in integer 1e-5 degrees
-// (~1 m), delta-encoded so it compresses well. site/app.js decodes it. The dialog keeps the full line.
-const TOL = 0.0003;
-function simplify(pts) {
-  if (pts.length < 3) return pts;
-  const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
-  const stack = [[0, pts.length - 1]];
-  while (stack.length) {
-    const [a, b] = stack.pop();
-    const [ax, ay] = pts[a], [bx, by] = pts[b], k = Math.cos((ay * Math.PI) / 180);
-    const dx = (bx - ax) * k, dy = by - ay, len2 = dx * dx + dy * dy;
-    let best = -1, bestD = TOL * TOL;
-    for (let i = a + 1; i < b; i++) {
-      const px = (pts[i][0] - ax) * k, py = pts[i][1] - ay;
-      const t = len2 ? Math.max(0, Math.min(1, (px * dx + py * dy) / len2)) : 0;
-      const d = (px - t * dx) ** 2 + (py - t * dy) ** 2;
-      if (d > bestD) { bestD = d; best = i; }
-    }
-    if (best > 0) { keep[best] = 1; stack.push([a, best], [best, b]); }
-  }
-  return pts.filter((_, i) => keep[i]);
-}
+// All route lines for the overview map (lines.json): the OSM-derived lines of the export, simplified and delta-encoded by
+// site/lib/lines.js (shared with the worker, which lays the lines set in the admin over these, and with site/app.js).
 const lines = {};
 let linePts = 0;
 for (const row of readFileSync(join(PIPELINE, 'export/videos.ndjson'), 'utf8').split('\n')) {
@@ -83,14 +63,12 @@ for (const row of readFileSync(join(PIPELINE, 'export/videos.ndjson'), 'utf8').s
   addLine(v.video_id, line.map(([la, lo]) => [lo, la]));
 }
 // Synced videos without an exported OSM route still get a line: the sync track ({c: [[lon, lat], …]}).
-// Anchor-based tracks from the admin (D1, /api/sync/:id.json) are not part of this static build.
+// Lines set in the admin (D1: manual routes, uploaded video2gpx tracks) are added by the worker (src/worker.js linesJson).
 for (const t of tracks) if (!lines[t.videoId]) addLine(t.videoId, JSON.parse(t.raw).c);
 function addLine(id, lonLat) {
-  if (!lonLat || lonLat.length < 2) return;
-  const s = simplify(lonLat);
-  const flat = []; let px = 0, py = 0;
-  for (const [lo, la] of s) { const x = Math.round(lo * 1e5), y = Math.round(la * 1e5); flat.push(x - px, y - py); px = x; py = y; }
-  lines[id] = flat; linePts += s.length;
+  const flat = encodeLine(lonLat);
+  if (!flat) return;
+  lines[id] = flat; linePts += flat.length / 2;
 }
 const linesJson = JSON.stringify(lines);
 writeFileSync(join(dist, 'lines.json'), linesJson);

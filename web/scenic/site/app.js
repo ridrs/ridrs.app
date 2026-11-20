@@ -5,6 +5,7 @@ import { Map as MapGL, NavigationControl, LngLatBounds, Marker } from './vendor/
 import { mountPlayer } from './player.js';
 import { prepare, compute, fromQuery, toQuery, ROADS, roadName, flag } from './filters.js';
 import { mountPanel } from './panel.js';
+import { decodeLine } from './lib/lines.js';
 import { initI18n, t, num as fmtNum, date, countryName, regionName, getLang, translateDom, mountLangMenu } from './i18n.js';
 
 // Interface language first (browser language, else English): everything below renders text.
@@ -202,15 +203,10 @@ function bindLayerEvents() {
   }
 }
 
-// lines.json: {id: [lon0, lat0, dlon, dlat, …]} in 1e-5 degrees (scripts/build.mjs).
+// lines.json: {id: [lon0, lat0, dlon, dlat, …]} in 1e-5 degrees (site/lib/lines.js).
 async function loadLines() {
   const raw = await fetch('lines.json').then((r) => (r.ok ? r.json() : {}));
-  lineGeo = new Map();
-  for (const [id, f] of Object.entries(raw)) {
-    const c = []; let x = 0, y = 0;
-    for (let i = 0; i < f.length; i += 2) { x += f[i]; y += f[i + 1]; c.push([x / 1e5, y / 1e5]); }
-    lineGeo.set(id, c);
-  }
+  lineGeo = new Map(Object.entries(raw).map(([id, f]) => [id, decodeLine(f)]));
   setLines();
 }
 function setLines() {
@@ -224,6 +220,9 @@ function drawRoute(line, fit = true) {
   currentLine = line;
   map.getSource('route')?.setData({ type: 'FeatureCollection', features: line?.length > 1
     ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: {} }] : [] });
+  // While the exact route of the open video is drawn, its coarse overview line would only show a second, slightly different line.
+  const hide = line?.length > 1 && current ? ['!=', ['get', 'id'], current] : null;
+  for (const l of ['lines', 'lines-hit']) if (map.getLayer(l)) map.setFilter(l, hide);
   if (fit && line?.length > 1) {
     const b = line.reduce((bb, c) => bb.extend(c), new LngLatBounds(line[0], line[0]));
     map.fitBounds(b, { padding: padding(), maxZoom: 14, duration: 600 });
