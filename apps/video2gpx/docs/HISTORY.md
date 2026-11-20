@@ -67,6 +67,7 @@ The method has to be classical (no AI) and run locally.
 **Algorithm**
 - [ ] Sure standstill (A14, 16 Nov): check the thresholds on a held-out video with town traffic (Madone/Menton, Gotthard); check in Incyclist that the sub-second standstill edges are read and the stop plays right; run the regression bench (Roanne, Grimone, Rousset, Pontaix) against the code before A14.
 - [x] Gotthard: a sun flash at 3:12 was taken for a scene cut and the route jumped onto the Andermatt bypass unless anchored (16 Nov 2026, A15): same-scene veto, real-video test on 3:00-3:20. Not yet in an app build; old projects recompute the rotation step.
+- [ ] Lahntal and Marburg (Van Gestel, Hessen): the image odometry measures about a third of the real speed (T1 clip `lahntal-uniform-35m42`: GPS 7.5 m/s, vms about 3x too low, implied f_eff about 860), so the scale scan finds f_eff 211 / 193 and both T2 cases `lahntal-marburg` and `marburg-lahntal` end in `no_route` (20 Nov 2026, docs/CONCEPT_test_strategy.md step 4). Find out why the motion step underestimates the speed on this footage; the clip is the test case. Coarse GPS: check the fix on place scores only, tune nothing on it.
 - [ ] Madone without hints still fails, because the calibration peak runs away. Ideas: a far-feature focal seed (not built), better motorcycle yaw.
 - [ ] A roundabout passed straight still lags (+8 s on Madone); roundabouts carry little heading information.
 - [ ] The road-class prior can mislead an all-residential route next to a parallel main road (seen in a synthetic town only).

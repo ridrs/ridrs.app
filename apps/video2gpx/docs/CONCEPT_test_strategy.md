@@ -293,8 +293,8 @@ the YouTube link, the licence note and the truth that exists.
    - Truth by quality: Pontaix is scored timed against the verified track (no clock alignment); the coarse Van Gestel cases get place scores only
      (`place_road`: share of route seconds within 20 m of the nearest track point, `place_median_m`, `place_p90_m`; no time); checkpoints and
      landmarks as before.
-   - OSM: `$RSM_OSM_DIR` defaults to `test-data/osm/` (rhone-alpes; alps and sud cloned there from the app's OSM folder with `cp -c`). The Hessen
-     extract of Lahntal and Marburg is missing on this machine: those two cases fail until it is there.
+   - OSM: `$RSM_OSM_DIR` defaults to `test-data/osm/` (rhone-alpes; alps and sud cloned there from the app's OSM folder with `cp -c`; Hessen
+     downloaded from Geofabrik on 2026-11-20).
    - A window that does not start at the video start carries a `start_bbox` (±1 km around the position at t0 of the confident full run of the
      same stage, never from the GPS), as the app run with a start frame: without it `rousset-end` found no route and `pennes-descent` a road
      14 km away (10-15 min of road in a 60 km frame are ambiguous).
@@ -302,11 +302,30 @@ the YouTube link, the licence note and the truth that exists.
      seconds): roanne, pontaix, rousset, grimone, cdp, pennes, amalfi confident; place 99-100 %, p90 ≤ 6 m on the coarse cases; Pontaix
      verified 100 % on the road, along median 2.2 m, p90 5.4 m. `rousset-end` uncertain, `pennes-descent` confident, both 100 % place, p90 ≤ 5 m.
      `gotthard-start` 10/10 checkpoints; `madone-start` landmarks 4 s mean.
+   - Known: `lahntal-marburg` and `marburg-lahntal` end in `no_route` (2026-11-20): the image odometry measures about 3x too little speed (the
+     T1 clip `lahntal-uniform-35m42`, implied f_eff about 860), the scan finds f_eff 211 and 193. An image-side failure, not one of the route side.
    - Known: `madone-town` is on the right road (median 7 m from the full run) but the scale scan of 6 min in town finds f_eff 230 instead of
      461, so the window comes out 40 % short and the landmarks about 90 s late (case field `known`, shown in the table). The Amalfi tunnel score
-     needs `work/amalfi/evidence.json` (the tunnels judged by eye), local work data that was never versioned: the score is skipped with a note.
+     needed `work/amalfi/evidence.json` (the tunnels judged by eye), local work data that was never versioned; removed on 2026-11-20 (maintainer):
+     `amalfi` is scored on its verdict only (`score: none`). The Lahntal odometry failure is an open item in docs/HISTORY.md.
    - Tests: `tests/test_stagecut.py` (window, stage mode without video, landmarks in a window, place score).
-5. **Long videos (D):** cut `pontaix-10m` and `gotthard-start`, repoint `e2e.rs`, rebuild `runs/`, T3.
+5. **Long videos (D):** cut `pontaix-10m` and `gotthard-start`, repoint `e2e.rs`, rebuild `runs/`, T3. Built 2026-11-20:
+   - `rsm.bench.long` (`cut`, `run`, `score`, `list`) with the videos of `rsm/bench/long_set.json`: cut by stream copy as the clips (the clip cutter
+     with another folder), `test-data/long/<id>/video.mp4` and `case.json`; both start at second 0 of the source (first frame equal), Pontaix 289 MB,
+     Gotthard 74 MB. `gotthard-start` of regress_cases.json now points at the long video, the old 588 s cut in `work/regress/_videos/` is not used.
+   - A long video runs the whole pipeline through the step cache as its route case (`case`: search frame, extract, score) into
+     `work/regress/t3/<id>/` and is scored as that case plus the parity with its stage (`par_*`: speed and yaw correlation, speed ratio, scene cuts
+     not in both, standstill seconds) and, with `--t2 TAG`, against the T2 run of the same window (`t2_*`). `checks` and `verdict` per video;
+     `tests/test_t3_long.py` (marker `long`, deselected by default) runs it: `scripts/heavy.sh .venv/bin/python -m pytest -m long`.
+   - First T3 (2026-11-20, cold: 6.6 min for both): parity speed correlation 1.00, ratio 1.02 / 0.99, yaw correlation 0.999 / 0.997, no
+     scene cut and no standstill second different; the route on the same road as T2 everywhere. `gotthard-start` on the 480p source: uncertain,
+     10/10 checkpoints (max 45 m), the expected verdict of D confirmed. `pontaix-10m`: confident, 100 % on the road, but along median 17 m
+     (p90 37 m) against 2.2 m of the whole video: the scale scan of 10 min finds f_eff 355 instead of 423 and the route lags about 15 m (as
+     `madone-town` in T2, f_eff 230 instead of 461: the shorter the video, the lower the scale found; a finding of the route side, recorded as
+     `known`, the checks set around it).
+   - `src-tauri/tests/e2e.rs` reads `test-data/long/pontaix-10m/video.mp4` (`RSM_E2E_VIDEO`) and the finished run `test-data/runs/pontaix-10m`
+     (made with `python -m rsm.pipeline run` on that video, the Pontaix search frame and the start time of the test) instead of the whole
+     Roanne video and `runs/vallee-de-roanne`.
 6. **Clean up:** no test reads `sources/` any more (a T0 test checks that no test or case path points into it); `sources/` stays for T4 (D1).
 
 ## 5. Data and time

@@ -1,7 +1,8 @@
 //! End-to-end harness for the Rust command layer (the same functions the Tauri commands call), against the real
-//! pipeline. Run explicitly (they need the research venv, ffmpeg, the Roanne video and the rhone-alpes extract):
-//! The paths come from the environment at build time: RSM_E2E_VIDEO (default: test-data/sources/vangestel/vallee-de-roanne/video.mp4), RSM_E2E_PBF (a
-//! Rhône-Alpes extract); defaults are in the git-ignored test-data/ (sources/vangestel/, osm/, runs/vallee-de-roanne, dem/).
+//! pipeline. Run explicitly (they need the research venv, ffmpeg, the 10 min Pontaix video and the rhone-alpes extract):
+//! The paths come from the environment at build time: RSM_E2E_VIDEO (default: test-data/long/pontaix-10m/video.mp4, the long video of T3 cut by
+//! `python -m rsm.bench.long cut`, docs/CONCEPT_test_strategy.md D), RSM_E2E_PBF (a Rhône-Alpes extract); defaults are in the git-ignored test-data/
+//! (long/, osm/, runs/pontaix-10m: the finished run of that video, dem/).
 //!   scripts/guard.sh cargo test --manifest-path src-tauri/Cargo.toml --test e2e -- --ignored --nocapture --test-threads=1
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -10,9 +11,9 @@ use std::time::{Duration, Instant};
 use video2gpx_lib::ctx::{Ctx, Emit};
 use video2gpx_lib::{geo, pbf, pipeline, projects, video};
 
-const VIDEO: &str = match option_env!("RSM_E2E_VIDEO") { Some(v) => v, None => concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/sources/vangestel/vallee-de-roanne/video.mp4") };
+const VIDEO: &str = match option_env!("RSM_E2E_VIDEO") { Some(v) => v, None => concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/long/pontaix-10m/video.mp4") };
 const PBF: &str = match option_env!("RSM_E2E_PBF") { Some(v) => v, None => concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/osm/rhone-alpes.osm.pbf") };
-const DONE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/runs/vallee-de-roanne");
+const DONE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/runs/pontaix-10m");
 const DEM: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test-data/dem");
 
 type Log = Arc<Mutex<Vec<(String, Value)>>>;
@@ -42,7 +43,7 @@ fn wait_for(log: &Log, name: &str, timeout_s: u64, pred: impl Fn(&Value) -> bool
     None
 }
 
-fn roanne_bbox() -> [f64; 4] {
+fn done_bbox() -> [f64; 4] {
     let p: Value = serde_json::from_str(&std::fs::read_to_string(format!("{DONE}/project.json")).unwrap()).unwrap();
     let b = &p["params"]["bbox"];
     [b["south"].as_f64().unwrap(), b["west"].as_f64().unwrap(), b["north"].as_f64().unwrap(), b["east"].as_f64().unwrap()]
@@ -73,10 +74,10 @@ fn environment_pbf_video() {
     s.ffmpeg = String::new();
     video2gpx_lib::settings::save(&ctx, &s).unwrap();
 
-    // pbf header bbox, link in place, coverage of the Roanne bbox
+    // pbf header bbox, link in place, coverage of the Pontaix bbox
     let hb = pbf::header_bbox(Path::new(PBF)).unwrap().expect("header bbox");
     println!("rhone-alpes header bbox S,W,N,E = {hb:?}");
-    let rb = roanne_bbox();
+    let rb = done_bbox();
     assert!(pbf::covers(&hb, &rb), "extract must cover {rb:?}");
     let info = pbf::link(&ctx, PBF).unwrap();
     println!("linked: {info}");
@@ -88,8 +89,8 @@ fn environment_pbf_video() {
     // video probe + poster
     let pr = video::probe(&ctx, VIDEO).unwrap();
     println!("probe: {pr}");
-    assert_eq!(pr["title"], json!("vallee de roanne"));
-    let p = projects::create(&ctx, "roanne", Some(VIDEO.into())).unwrap();
+    assert_eq!(pr["title"], json!("pontaix 10m"));
+    let p = projects::create(&ctx, "pontaix", Some(VIDEO.into())).unwrap();
     let id = p["id"].as_str().unwrap();
     let poster = video::poster(&ctx, id, VIDEO, 30.0, false).unwrap();
     println!("poster: {poster} ({} bytes)", std::fs::metadata(&poster).unwrap().len());
@@ -168,9 +169,9 @@ fn import_template_rules() {
 fn network_geofabrik_and_nominatim() {
     let (ctx, _log, _d) = harness("net");
     pbf::link(&ctx, PBF).unwrap();
-    let rb = roanne_bbox();
+    let rb = done_bbox();
     let c = pbf::geofabrik_candidates(&ctx, &rb).unwrap();
-    println!("Geofabrik candidates for the Roanne bbox (smallest first):");
+    println!("Geofabrik candidates for the Pontaix bbox (smallest first):");
     for x in &c {
         println!("  {} ({}) {} bytes {}", x["name"], x["parent"], x["bytes"], x["url"]);
     }
@@ -186,7 +187,7 @@ fn network_geofabrik_and_nominatim() {
 fn pipeline_live_cancel_then_resume_result() {
     let (ctx, log, _d) = harness("pipe");
     pbf::link(&ctx, PBF).unwrap();
-    let rb = roanne_bbox();
+    let rb = done_bbox();
     let mk = |name: &str| {
         let p = projects::create(&ctx, name, Some(VIDEO.into())).unwrap();
         p["id"].as_str().unwrap().to_string()
@@ -197,7 +198,7 @@ fn pipeline_live_cancel_then_resume_result() {
     };
 
     // ---- A: a live run from scratch; progress parsing of step 1, then cancel (process group SIGTERM) ----
-    let a = mk("roanne-live");
+    let a = mk("pontaix-live");
     println!("command: [python -m rsm.pipeline | sidecar] {}", pipeline::build_args(&params(&a, false), &ctx.project_dir(&a).unwrap().join("out")).join(" "));
     pipeline::start(&ctx, params(&a, false)).unwrap();
     assert!(pipeline::start(&ctx, params(&a, false)).is_err(), "second start must be refused");
@@ -220,9 +221,9 @@ fn pipeline_live_cancel_then_resume_result() {
     println!("A) leftover rsm.pipeline processes: {:?}", left);
     assert!(left.is_empty());
 
-    // ---- B: the finished Roanne checkpoints in a project copy, `--resume`; refine and gpx run live ----
+    // ---- B: the finished Pontaix checkpoints in a project copy, `--resume`; refine and gpx run live ----
     log.lock().unwrap().clear();
-    let b = mk("roanne-resume");
+    let b = mk("pontaix-resume");
     let out = ctx.project_dir(&b).unwrap().join("out");
     let _ = std::fs::remove_dir_all(&out);
     assert!(std::process::Command::new("cp").args(["-R", DONE]).arg(&out).status().unwrap().success());
@@ -249,7 +250,7 @@ fn pipeline_live_cancel_then_resume_result() {
     let rp: Value = serde_json::from_str(r["route_points"].as_str().unwrap()).unwrap();
     let pts = rp["points"].as_array().unwrap();
     println!("B) result_load: {} route points, first {}, last {}, gpx {} bytes, project.json {} bytes", pts.len(), pts[0], pts[pts.len() - 1], r["gpx_bytes"], r["project"].as_str().unwrap().len());
-    assert!(pts.len() > 2000);
+    assert!(pts.len() >= 590, "one route point per second of the 10 min video");
     let gpx = std::fs::read_to_string(r["gpx"].as_str().unwrap()).unwrap();
     println!("B) gpx: {}", gpx.lines().filter(|l| l.contains("<time>")).take(2).collect::<Vec<_>>().join(" | "));
     assert!(gpx.contains("2026-05-01T06:30:00Z"), "the start time (08:30+02:00 = 06:30Z) is in the gpx");
@@ -275,7 +276,7 @@ fn pipeline_live_cancel_then_resume_result() {
 #[ignore]
 fn incyclist_package() {
     use video2gpx_lib::incyclist;
-    // defaults: the Roanne run and video and the DEM tiles in test-data/, the package in the test folder
+    // defaults: the Pontaix run and video and the DEM tiles in test-data/, the package in the test folder
     let (ctx, log, d) = harness("incyclist");
     let dest_default = d.join("Test.zip").to_string_lossy().into_owned();
     let env = |k: &str| std::env::var(k).unwrap_or_else(|_| match k {

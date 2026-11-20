@@ -99,13 +99,14 @@ def _frame_md5(video: Path, t: float | None) -> str:
     return hashlib.md5(out.stdout).hexdigest()
 
 
-def cut(c: dict, log=print, again: bool = False) -> Path:
-    """stream-copy the clip from the source -> test-data/clips/<id>/ (clip.<ext>, clip.json); kept when it exists, unless `again`"""
-    d = CLIPS / c["id"]
-    meta_f = d / "clip.json"
+def cut(c: dict, log=print, again: bool = False, root: Path = CLIPS, stem: str = "clip", meta_name: str = "clip.json") -> Path:
+    """stream-copy the clip from the source -> test-data/clips/<id>/ (clip.<ext>, clip.json); kept when it exists, unless `again`. The long videos of
+    T3 (rsm.bench.long) are cut the same way into test-data/long/<id>/ (video.<ext>, case.json)"""
+    d = root / c["id"]
+    meta_f = d / meta_name
     if meta_f.exists() and not again:
         return d
-    for old in (d.glob("clip.*") if d.exists() else []):
+    for old in (d.glob(f"{stem}.*") if d.exists() else []):
         old.unlink()
     s = sources()[c["source"]]
     src = _x(s["video"]).resolve()
@@ -115,8 +116,8 @@ def cut(c: dict, log=print, again: bool = False) -> Path:
     nxt = min([k for k in ks if k > kf + 1e-3], default=kf + 2.0)
     t0 = kf - info["start"]                                       # source seconds of the clip's first frame (the pipeline counts from the first frame)
     d.mkdir(parents=True, exist_ok=True)
-    f = d / f"clip{src.suffix}"
-    tmp = d / f"clip.tmp{src.suffix}"
+    f = d / f"{stem}{src.suffix}"
+    tmp = d / f"{stem}.tmp{src.suffix}"
     t = time.time()
     # a stream-copy seek lands on a keyframe before the target, but with B-frames not on one just before it (Gotthard: 229.26 s fell back to the
     # keyframe at 223.36 s, 229.5 s found 229.24 s): aim at the middle between the keyframe and the next one; the first-frame check below proves it

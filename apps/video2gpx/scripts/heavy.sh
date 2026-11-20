@@ -9,7 +9,11 @@ while ! mkdir "$LOCK" 2>/dev/null; do
 done
 echo $$ > "$LOCK/pid"
 # a run started from the app (user's job) also counts as heavy: wait until it is finished. The bundled sidecar is `rsm-pipeline run`, a dev app or
-# a manual run is `python -m rsm.pipeline run`; the bench runs single steps (`_step`) and is not matched.
-while pgrep -f "rsm-pipeline run|rsm\.pipeline run" >/dev/null 2>&1; do sleep 15; done
+# a manual run is `python -m rsm.pipeline run`; the bench runs single steps (`_step`) and is not matched. Only processes whose program is the
+# sidecar or a Python count: the shells that start this script (and this script itself) carry the same words in their command line, and a
+# `heavy.sh python -m rsm.pipeline run` would otherwise wait for itself forever.
+PAT='^[^ ]*python[0-9.]* (-[^ ]+ )*-m rsm\.pipeline run( |$)|^[^ ]*rsm-pipeline run( |$)'
+running() { ps -axo command= | grep -Eq "$PAT"; }
+while running; do sleep 15; done
 trap 'rm -rf "$LOCK"' EXIT INT TERM
 "$(dirname "$0")/guard.sh" "$@"

@@ -1,0 +1,61 @@
+{
+ "_doc": "The long videos of T3 (rsm.bench.long, docs/CONCEPT_test_strategy.md D). source: an id of clip_sources.json with a frozen stage `stage`; t0 must be 0 (the seconds of a long video are source seconds), dur: its length; case: the route case of regress_cases.json whose search frame, extract and score it takes; landmarks: the checkpoints of regress_landmarks.json. checks: min / max per score of rsm.bench.long.score (rsm.bench.clips.check), set from the first run with a margin (a regression bound, not a target). verdict: the verdicts that pass. known: a finding of the first run, reported, the checks are set around it.",
+ "long": [
+  {
+   "id": "pontaix-10m",
+   "source": "pontaix",
+   "stage": "pontaix",
+   "t0": 0,
+   "dur": 600,
+   "case": "pontaix",
+   "why": "the one ride with verified truth: timed scores of the whole pipeline (D6)",
+   "verdict": [
+    "confident"
+   ],
+   "known": "the scale scan of 10 min finds f_eff 355 instead of 423 (whole video): right road, but the route lags about 15 m along it (along median 17 m against 2 m of the whole video), T3 of 2026-11-20",
+   "checks": {
+    "min": {
+     "correct_road": 0.98,
+     "par_v_corr": 0.98,
+     "par_yaw_corr": 0.98,
+     "par_v_ratio": 0.97,
+     "t2_same_road_share": 0.98
+    },
+    "max": {
+     "par_v_ratio": 1.05,
+     "par_cuts_unmatched": 0,
+     "along_median": 22.0,
+     "along_p90": 45.0
+    }
+   }
+  },
+  {
+   "id": "gotthard-start",
+   "source": "gotthard",
+   "stage": "gotthard",
+   "t0": 0,
+   "dur": 588,
+   "case": "gotthard-start",
+   "landmarks": "gotthard-start",
+   "why": "odometry failure, disputed start, scene cuts: odofail, the local pass, islands, the verdict",
+   "verdict": [
+    "confident",
+    "uncertain"
+   ],
+   "checks": {
+    "min": {
+     "par_v_corr": 0.98,
+     "par_yaw_corr": 0.98,
+     "par_v_ratio": 0.96,
+     "t2_same_road_share": 0.98
+    },
+    "max": {
+     "par_v_ratio": 1.02,
+     "par_cuts_unmatched": 0,
+     "cp_missed": 0,
+     "cp_max_m": 70.0
+    }
+   }
+  }
+ ]
+}

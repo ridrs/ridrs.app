@@ -405,14 +405,6 @@ def score_checkpoints(c: dict, d: Path, L: list | None = None) -> dict:
     return dict(checkpoints=rows, cp_ok=f"{sum(r['ok'] for r in rows)}/{len(rows)}", cp_median_m=float(np.median(dd)), cp_max_m=float(dd.max()))
 
 
-def score_amalfi(c: dict, d: Path) -> dict:
-    from rsm.pipeline import validate
-    if not (ROOT / "work" / "amalfi" / "evidence.json").exists():   # the tunnels judged by eye were local work data, never versioned
-        return dict(score_note="amalfi score skipped: work/amalfi/evidence.json (tunnels by eye) missing")
-    r = validate.amalfi(d)
-    return dict(tunnels=f"{r['tunnels']['hits']}/{r['tunnels']['n']}", tunnel_p_shift=r["tunnels"]["p_shift"], vietri_m=r["vietri_window_m"], erchie_m=r["erchie_window_m"])
-
-
 def same_route(d: Path, ref: Path, tol: float = 50.0) -> dict:
     """share of the seconds where the per-second position of run d lies within tol m of the path of run ref (route identity), and within tol m of ref's position at that second"""
     from pyproj import Transformer
@@ -444,8 +436,6 @@ def score_case(c: dict, d: Path, log=print) -> dict:
             row.update(score_landmarks(c, d))
         elif kind == "checkpoints":
             row.update(score_checkpoints(c, d))
-        elif kind == "amalfi":
-            row.update(score_amalfi(c, d))
         if c.get("same_route_as") and (d.parent / c["same_route_as"] / "refine" / "result.npz").exists():
             row.update({f"vs_{c['same_route_as']}_{k}": v for k, v in same_route(d, d.parent / c["same_route_as"]).items()})
     except Exception as e:  # noqa: BLE001  a failed case is a row of the table, not the end of the bench
@@ -482,7 +472,6 @@ def fmt_table(rows: list[dict], base: dict | None = None) -> str:
         notes = [r[k] for k in ("error", "score_note") if k in r] + ([f"known: {r['known']}"] if r.get("known") else [])
         notes += [f"{k[3:]} {v:.1%}" for k, v in r.items() if k.startswith("vs_") and k.endswith("same_road_share")]
         notes += [f"vs baseline: same road {r['vs_base_same_road_share']:.1%}, position diff median {r['vs_base_position_diff_median_m']:.1f} m"] if "vs_base_same_road_share" in r else []
-        notes += [f"tunnels {r['tunnels']}, Vietri {r['vietri_m']:.0f} m, Erchie {r['erchie_m']:.0f} m"] if "tunnels" in r else []
         notes += [f"prior-decided {r['prior_decided_share']:.1%}"] if "prior_decided_share" in r else []
         notes += ["checkpoints (s: m, ! = outside tol): " + ", ".join(f"{cp['t']:g}: {cp['dist_m']:.0f}" + ("" if cp["ok"] else "!") for cp in r["checkpoints"])] if r.get("checkpoints") else []
         if r.get("off_road_seconds"):

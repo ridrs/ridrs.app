@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """DEVELOPMENT-ONLY scoring of a finished pipeline run (imports research modules, needs GPS / evidence files). Not part of the packaged pipeline.
     python -m rsm.pipeline.validate roanne DIR      GPS scoring (GPS is used for scoring only)
-    python -m rsm.pipeline.validate amalfi DIR      decoy verdict, Vietri / ERCHIE sign distances, tunnel hits, runtimes"""
 from __future__ import annotations
 
 import json
@@ -67,45 +66,8 @@ def roanne(d: Path, video="vallee-de-roanne") -> dict:
     out["gpx_point_to_gps_distance_correct_road"] = dict(median=float(np.median(d2[road])), p90=float(np.percentile(d2[road], 90)), w10=float((d2[road] <= 10).mean()), w20=float((d2[road] <= 20).mean()), w30=float((d2[road] <= 30).mean()))
     return out
 
-
-def amalfi(d: Path) -> dict:
-    from rsm.hmm_cal import area as carea
-    from rsm.nogps import verify
-    R, rp, path, crs = _load(d)
-    g = NetGraph.load(d / "map" / "graph_real.npz")
-    E = np.load(d / "map" / "edges_real.npy")
-    import types
-
-    class Rt:
-        pass
-    rt = Rt()
-    ext = R["extrap"]
-    tun = np.asarray(R["tunnel"], bool)
-    ts = R["t"][~ext]
-    rt.t = np.asarray(ts, float)
-    rt.E = tun[np.minimum(R["s"][~ext].astype(int), len(tun) - 1)].astype(int)       # fake edge ids: 1 = tunnel (the per-second FUSED position is checked)
-    gtun = types.SimpleNamespace(edge_tunnel=np.array([False, True]))
-    rt.gap_edges = []
-    rt.inc = np.zeros(len(rt.t))
-    rt.xy = path.xy_at(R["s"])[~ext]
-    ts = R["t"][~ext]
-    root = Path(__file__).resolve().parents[2]
-    ev = json.loads((root / "work" / "amalfi" / "evidence.json").read_text())
-    ivs = [x for x in ev["dark_intervals"] if x.get("tunnel_by_eye")]
-    T = int(R["t"][-1])
-    tc = verify.tunnel_check(rt, gtun, ivs, T=T)
-    places = json.loads((root / "work" / "amalfi_cal" / "cache" / "places.json").read_text())
-    rt2 = Rt(); rt2.t = ts; rt2.xy = rt.xy
-    v = verify.place_check(rt2, g, places, "Vietri", 30.0)
-    e = verify.place_check(rt2, g, places, "Erchie", 790.0)
-    out = dict(tunnels=dict(n=tc["n"], hits=tc["hits"], tunnel_share_of_route_time=tc["tunnel_share_of_route_time"], shifted_p95=tc["shifted_hits_p95"], shifted_mean=tc["shifted_hits_mean"], p_shift=tc["p_shift"]),
-               vietri_window_m=min([x["dist_m"] for x in v["named"]] or [np.nan]), erchie_window_m=min([x["dist_m"] for x in e["named"]] or [np.nan]),
-               vietri_nearest_at_30s=v["nearest_places_at_t"][:2], erchie_nearest_at_790s=e["nearest_places_at_t"][:2])
-    return out
-
-
 if __name__ == "__main__":
     d = Path(sys.argv[2])
-    r = {"roanne": roanne, "amalfi": amalfi}[sys.argv[1]](d)
+    r = {"roanne": roanne}[sys.argv[1]](d)
     (d / "validation.json").write_text(json.dumps(r, indent=1, default=float))
     print(json.dumps(r, indent=1, default=float))
