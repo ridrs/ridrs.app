@@ -4,6 +4,7 @@ import { api } from "../api";
 import { S, bus, effectivePbf, freshRun, reduce, saveCur, toast, type RunState } from "../state";
 import type { BikePaths, EnvCheck, PipelineEvent, ResultData, RoutePoint, RunParamsSaved, StepId, Vehicle, Verdict } from "../types";
 import { anchorsParam, rerunArgs } from "../anchors";
+import { resultSig } from "../atlas";
 import { introParam } from "../intro";
 import { importPct, importingFor } from "./import";
 
@@ -95,10 +96,15 @@ export async function loadResult() {
     const rp = JSON.parse(r.route_points);
     const pj = JSON.parse(r.project);
     const pts: RoutePoint[] = (rp.points as RoutePoint[]).slice().sort((a, b) => a.t - b.t);
+    const sig = await resultSig(r.route_points);
+    if (S.cur !== cur) return;
     const res: ResultData = {
       points: pts, verdict: (rp.verdict ?? pj.verdict) as Verdict, verdict_basis: rp.verdict_basis ?? pj.verdict_basis ?? "",
       reasons: pj.verdict_detail?.reasons ?? [], project: pj, gpx: r.gpx, gpx_bytes: r.gpx_bytes,
       intro_end: typeof rp.cuts?.intro_end === "number" ? rp.cuts.intro_end : null,
+      cut_times: Array.isArray(rp.cuts?.times) ? rp.cuts.times.filter((x: unknown) => typeof x === "number") : [],
+      standstills: Array.isArray(rp.standstills) ? rp.standstills.filter((x: any) => typeof x?.t0 === "number" && typeof x?.t1 === "number").map((x: any) => [x.t0, x.t1] as [number, number]) : [],
+      sig,
     };
     S.result = res;
     S.showRoute = res.verdict !== "no_route";

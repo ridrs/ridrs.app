@@ -7,6 +7,7 @@ import type {
   PipelineEvent, ProjectApp, Settings, ToolCheck,
 } from "../types";
 import { wait } from "../util";
+import type { AtlasJob } from "../atlas";
 import { CENTER, DEM_TILE, PBFS, PROBE, ROUTE, STEP_IDS, VIDEO_S, hintText, resultEvents, statuses, stepsDone } from "./fixtures";
 import * as AN from "./analyse";
 import * as EL from "./elevation";
@@ -67,6 +68,19 @@ const projects: ProjectApp[] = SC.empty ? [] : [
 if (SC.import && SC.run !== "stream") projects.unshift({ id: "demo-import", name: "Route des Grandes Alpes – Col de l'Iseran", video: null, created: now, updated: now });
 
 const hints: Record<string, { name: string; path: string; text: string }> = {};
+// a project from a POV Drive Atlas job: the job's frames, its route as the hint (the mock route hint), the atlas link
+const ATLAS_JOB: AtlasJob = {
+  video_id: "aBcDeFgHiJk", url: "https://www.youtube.com/watch?v=aBcDeFgHiJk", title: PROBE.title, channel: "Demo-Kanal", duration_s: VIDEO_S, fps: 30, country: "FR", vehicle: null,
+  route_gpx: "https://atlas.example.org/gpx/aBcDeFgHiJk.gpx", route_level: 4,
+  bbox: { south: 44.7, west: 5.2, north: 44.8, east: 5.33 }, start_bbox: { south: 44.742, west: 5.245, north: 44.754, east: 5.262 }, end_bbox: null,
+  atlas: { base: "https://atlas.example.org", video_id: "aBcDeFgHiJk" },
+};
+if (SC.atlas) {
+  const h = hintText(false);
+  hints["demo-1"] = { name: "aBcDeFgHiJk.gpx", path: "/mock/demo-1/hint/aBcDeFgHiJk.gpx", text: h.text };
+  Object.assign(demo, { bbox: [44.7, 5.2, 44.8, 5.33], start_frame: [44.742, 5.245, 44.754, 5.262], hint: { name: "aBcDeFgHiJk.gpx", path: hints["demo-1"].path, buffer_m: 300 },
+    atlas: { base: ATLAS_JOB.atlas.base, video_id: ATLAS_JOB.video_id, job: ATLAS_JOB, qc: null, written: null }, name: PROBE.title, suggested: true });
+}
 if (SC.hints) {
   const h = hintText(qp("hint") === "kml");
   hints["demo-1"] = { name: h.name, path: `/mock/demo-1/hint/${h.name}`, text: h.text };
@@ -345,6 +359,10 @@ export function createMockApi(): Api {
     hintImport: async (project) => { const h = hintText(qp("hint") === "kml"); const r = { name: h.name, path: `/mock/${project}/hint/${h.name}`, text: h.text }; hints[project] = r; return r; },
     hintRead: async (project) => (hints[project] ?? { text: hintText(false).text }).text,
     hintRemove: async (project) => { delete hints[project]; },
+    atlasJobRead: async () => JSON.stringify(ATLAS_JOB),
+    atlasHintDownload: async (project, _url, name) => { const r = { name, path: `/mock/${project}/hint/${name}`, text: hintText(false).text }; hints[project] = r; return r; },
+    atlasResultWrite: async (dest, text) => ({ path: dest, bytes: text.length }),
+    appVersion: async () => "0.1.0",
     importTemplates: async () => [...BUILTIN, ...(settings.import_templates ?? []).map((t) => ({ ...t, builtin: false }))],
     importResolve: async (project, req) => {
       const t = [...BUILTIN, ...(settings.import_templates ?? [])].find((x) => x.id === req.template_id);
@@ -403,6 +421,8 @@ export function createMockApi(): Api {
     pickHint: async () => "/Users/demo/Downloads/tour.gpx",
     pickImage: async () => "/Users/demo/Pictures/madone.jpg",
     pickSave: async (n) => "/Users/demo/Desktop/" + n,
+    pickJob: async () => "/Users/demo/Downloads/aBcDeFgHiJk.v2g.json",
+    pickSaveAtlas: async (n) => "/Users/demo/Desktop/" + n,
     pickSavePackage: async (n, folder) => "/Users/demo/Desktop/" + n + (folder ? "" : ".zip"),
     confirm: async (m) => window.confirm(m),
   };

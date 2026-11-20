@@ -27,6 +27,7 @@ frozen pipeline (`research/route-shape-matching/`), and the documentation. Start
 | Map data | List of local `.osm.pbf` files (app data dir, plus "add existing file" which links in place, never copies), the local extract covering the current bbox (header bbox), and "download from Geofabrik": loads `index-v1.json`, picks the smallest region whose polygon contains the bbox, shows name and size (HEAD), downloads with progress and cancel only after the click. |
 | Run | Start, vehicle (auto/bike/motorcycle/car), driving-line offset (empty = pipeline default), start time (optional), optional decoy test (0/3/19), cancel, resume (`--resume`). Vertical step list (several steps can run at once), overall bar and ETA, a "Video laden" row when the run was started during an import (it begins when the import ends, DECISIONS E8), signals from the `status` events, end states with an action per exit code. The run goes on when the project is left (activity chip in the bar). |
 | Result | Verdict (with "ohne Täuschungstest" when no decoys ran), route coloured by per-point confidence, video and map synchronised (marker with heading arrow; click on the route seeks the video), one timeline with the confidence strip and the elevation profile of the whole route (a keyboard slider), accuracy note. Analyse stage: why weak stretches are weak (video overlay of the tracked points, curvature of the video against the map, rotation, speed, quality, the causes per stretch). Höhe stage: the sources of the elevation data with the download, the profile over the whole route (zoom, layers, hover, click) and its key figures. Export stage: GPX to a chosen place, Incyclist package, start time via `rsm.pipeline retime` without recompute. |
+| POV Drive Atlas | A job file `<id>.v2g.json` from the atlas admin (drop or "Atlas-Job öffnen …") creates a project with the job's address, search frame, start/end frame, the atlas route as the route hint and the vehicle; the video comes through the user's own import template. The Export stage then has a card **"Atlas"** with a checklist (each item green or overridden with a note) and writes `<id>.atlas.json` for the upload in the atlas admin. See [docs/FEATURE_atlas.md](docs/FEATURE_atlas.md). |
 | Settings | The **pipeline bundled in the app (sidecar) runs by default**; Settings show its version (frozen code hash) and the result stores it (`pipeline_hash`). **"Entwicklermodus: externes Python"** (badge "Entwicklermodus" in the header) switches to the research `.venv` (interpreter, pipeline folder, optional other sidecar). Existing settings without the switch use the bundled pipeline. ffmpeg/ffprobe (default: PATH and Homebrew; **ffmpeg is not bundled yet**), online title lookup on/off. Clear errors if the bundled pipeline, ffmpeg are missing. |
 
 ## Setup
@@ -92,7 +93,7 @@ test video (`public/mock/`, removed from the production build). `?mock=<scenario
 `tools-ytdlp`, `tools-nopipeline`, `import`, `import-error`, `templates`, `dev`, `project`, `fresh`, `nosuggest`, `noframe`,
 `nomap`, `novideo`, `videomissing`, `offline`, `mapdata`, `frames`, `running`, `running-start`, `running-parallel`,
 `running-stream`, `cancelled`, `failed`, `result`, `uncertain`, `noroute`, `difficult`, `hints`, `result-frames`, `export`,
-`export-uncertain`, `export-running`, `export-done`, `selfcheck` (aliases `empty`, `noenv`).
+`export-uncertain`, `export-running`, `export-done`, `atlas`, `atlas-uncertain`, `atlas-setup`, `selfcheck` (aliases `empty`, `noenv`).
 
 ```sh
 pnpm ui-shots            # every scenario light and dark (+ 900 × 640 subset): screenshots, axe WCAG 2.1 AA, console errors,
@@ -130,6 +131,7 @@ src/                      TypeScript frontend (Vite, no framework; Leaflet), see
   mapPanel.ts frames.ts hint.ts      Leaflet map, frame editing (mouse and keyboard), route hints
   videoPanel.ts ridePanel.ts         player (HTML5 or ffmpeg-frame fallback), readouts, elevation data
   incyclist.ts            Incyclist export card
+  atlas.ts                POV Drive Atlas: job file -> project hints, the "Atlas" checklist, the <id>.atlas.json payload (pure; views/atlasCard.ts, features/atlasJob.ts)
   state.ts                store, event bus, run-event reducer (parallel steps, input events)
   api.ts / tauri.ts / mock/          command interface; real (invoke/listen) and mock implementation with scenarios
 src-tauri/src/            Rust command layer (independent of Tauri apart from lib.rs)
@@ -144,6 +146,7 @@ src-tauri/src/            Rust command layer (independent of Tauri apart from li
                           the split, validation, exact argument preview, progress parser (yt-dlp, percent, file size), cancel
   pbf.rs                  .osm.pbf header bbox (own protobuf reader), local list/link, Geofabrik index, download
   geo.rs                  Nominatim (1 req/s) and the title-based suggestion
+  atlas.rs                POV Drive Atlas: read a .v2g.json job, download its route as the hint, write <id>.atlas.json
   video.rs                ffprobe, preview frame, fallback frames
   proc.rs                 process groups (`process_group(0)`, `killpg`)
   lib.rs                  Tauri commands and setup

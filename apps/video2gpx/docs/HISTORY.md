@@ -57,6 +57,7 @@ The method has to be classical (no AI) and run locally.
 
 **Product and app**
 - [ ] Verify in the real app (not only the browser mock): the dark-mode map fix, the playback profile, the Incyclist dialog.
+- [ ] POV Drive Atlas round trip (P21, 18 Nov, docs/FEATURE_atlas.md): a real job from the atlas admin (drop, route download, import with a 480p template, run, Atlas card, save dialog, upload in the admin); `pnpm ui-shots` for the scenarios `atlas`, `atlas-uncertain`, `atlas-setup`. Still open on the plan: deep link (C), direct send with a service token (D), atlas map lines (E).
 - [ ] Incyclist checks only the user can do: import of the XML, VP9-in-MP4 playback, whether standstills are skipped.
 - [ ] Make "Als Ordner speichern" the export default (offered, not decided).
 - [x] Compute the elevation profile as its own step and let the export reuse it (15 Nov 2026, P18): the Höhe stage makes and shows the profile, the export interpolates its GPX heights from it when it is current. Old profiles are recomputed when the pipeline code or the cached source blocks changed (`stale` in `profile_load`).

@@ -1,6 +1,7 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getVersion } from "@tauri-apps/api/app";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import type { Api } from "./api";
 
@@ -38,6 +39,10 @@ export function createTauriApi(): Api {
     gpxExport: (project, dest, ele = true) => invoke("gpx_export", { project, dest, ele }),
     hintImport: (project, src) => invoke("hint_import", { project, src }),
     hintRead: (project, path) => invoke("hint_read", { project, path }),
+    atlasJobRead: (path) => invoke("atlas_job_read", { path }),
+    atlasHintDownload: (project, url, name) => invoke("atlas_hint_download", { project, url, name }),
+    atlasResultWrite: (dest, text) => invoke("atlas_result_write", { dest, text }),
+    appVersion: () => getVersion(),
     hintRemove: (project) => invoke("hint_remove", { project }),
     // contract of plan-ui section 8: commands import_templates / import_resolve / import_preview / import_start / import_status, event import-progress
     importTemplates: () => invoke("import_templates"),
@@ -102,6 +107,14 @@ export function createTauriApi(): Api {
     pickHint: async () => {
       const r = await open({ multiple: false, directory: false, title: "Routenhinweis wählen (GPX oder KML)", filters: [{ name: "GPX / KML", extensions: ["gpx", "kml"] }] });
       return typeof r === "string" ? r : null;
+    },
+    pickJob: async () => {
+      const r = await open({ multiple: false, directory: false, title: "Job-Datei des Atlas öffnen", filters: [{ name: "Atlas-Job", extensions: ["json"] }] });
+      return typeof r === "string" ? r : null;
+    },
+    pickSaveAtlas: async (defaultName) => {
+      const r = await save({ title: "Ergebnis für den Atlas speichern", defaultPath: defaultName, filters: [{ name: "Atlas-Ergebnis", extensions: ["json"] }] });
+      return r ?? null;
     },
     pickSave: async (defaultName) => {
       const r = await save({ title: "GPX speichern", defaultPath: defaultName, filters: [{ name: "GPX", extensions: ["gpx"] }] });

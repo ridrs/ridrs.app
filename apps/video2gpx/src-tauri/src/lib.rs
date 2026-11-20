@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+pub mod atlas;
 pub mod ctx;
 pub mod geo;
 pub mod import;
@@ -188,6 +189,23 @@ fn hint_remove(ctx: State<Ctx>, project: String) -> R<()> {
     pipeline::hint_remove(&ctx, &project)
 }
 
+/// The text of an atlas job file (`*.v2g.json`); the frontend parses it (src/atlas.ts).
+#[tauri::command]
+fn atlas_job_read(path: String) -> R<String> {
+    atlas::job_read(&path)
+}
+/// Downloads the atlas route of a job as the project's route hint (network only on opening a job, the user's action).
+#[tauri::command]
+async fn atlas_hint_download(ctx: State<'_, Ctx>, project: String, url: String, name: String) -> R<Value> {
+    let c = ctx.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || atlas::hint_download(&c, &project, &url, &name)).await.map_err(|e| e.to_string())?
+}
+/// Writes `<id>.atlas.json` to the place chosen in the save dialog.
+#[tauri::command]
+fn atlas_result_write(dest: String, text: String) -> R<Value> {
+    atlas::result_write(&dest, &text)
+}
+
 /// Built-in import templates and the user's (the user's are saved through `settings_set`).
 #[tauri::command]
 fn import_templates(ctx: State<Ctx>) -> Vec<settings::ImportTemplate> {
@@ -349,7 +367,7 @@ pub fn run() {
             pbf_list, pbf_link, pbf_remove, geofabrik_candidates, pbf_download, pbf_download_cancel,
             geo_search, geo_suggest,
             pipeline_start, pipeline_status, pipeline_cancel, pipeline_retime, result_load, gpx_export,
-            hint_import, hint_read, hint_remove, import_templates, import_resolve, import_preview, import_start, import_cancel, import_status, reveal,
+            hint_import, hint_read, hint_remove, atlas_job_read, atlas_hint_download, atlas_result_write, import_templates, import_resolve, import_preview, import_start, import_cancel, import_status, reveal,
             incyclist_info, incyclist_export, incyclist_cancel, incyclist_preview_set, incyclist_preview_clear, dem_status, dem_download, dem_cancel, dem_list, dem_remove, geo_country, profile_load, profile_diag, inspect_series, inspect_frame,
         ])
         .run(tauri::generate_context!())

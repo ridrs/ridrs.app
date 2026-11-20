@@ -1,3 +1,5 @@
+import type { AtlasLink } from "./atlas";
+
 export type Bbox = [number, number, number, number]; // south, west, north, east
 
 export interface Settings {
@@ -147,6 +149,8 @@ export interface ProjectApp {
   verdict?: Verdict | null;
   /** the last options of "Für Incyclist speichern" */
   incyclist?: IncyclistOptions | null;
+  /** created from a POV Drive Atlas job (src/atlas.ts, docs/FEATURE_atlas.md): the job, the link back and the state of the Atlas checklist */
+  atlas?: AtlasLink | null;
 }
 
 export interface OpenProject {
@@ -190,6 +194,8 @@ export type PipelineEvent =
 export interface RoutePoint {
   t: number; lat: number; lon: number; heading: number; confidence: number;
   in_gap?: boolean; extrapolated?: boolean; sd_m?: number; arc_m?: number; offset_m?: number;
+  /** driving, standstill (a sure standstill) or gap (route_points.json; results of older pipelines have none) */
+  motion_state?: string;
 }
 
 export interface ResultData {
@@ -202,6 +208,12 @@ export interface ResultData {
   gpx_bytes: number;
   /** end of the detected intro in video seconds (route_points.json cuts.intro_end), null without one */
   intro_end: number | null;
+  /** the scene cuts in video seconds (route_points.json cuts.times) */
+  cut_times: number[];
+  /** the sure standstills [t0, t1] in video seconds (route_points.json standstills) */
+  standstills: [number, number][];
+  /** signature of this result (src/atlas.ts resultSig of route_points.json): the Atlas checklist belongs to one result */
+  sig: string;
 }
 
 /** options of the Incyclist export (Rust: incyclist::ExportOptions) */

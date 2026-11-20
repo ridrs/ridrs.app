@@ -6,9 +6,11 @@ import { S, bus, saveCur, toast } from "../state";
 import { banner, btn, field } from "../ui/components";
 import { debounce, el, fmtBytes, fromLocalInput, toLocalInput } from "../util";
 import { revealLabel } from "../app/platform";
+import { atlasCard } from "./atlasCard";
 
 let root: HTMLElement, eleIn: HTMLInputElement, warn: HTMLElement, startIn: HTMLInputElement, fromFile: HTMLButtonElement, gpxInfo: HTMLElement, gpxRes: HTMLElement;
 let inc: ReturnType<typeof incyclistCard>;
+let atlas: ReturnType<typeof atlasCard>;
 let builtFor = "";
 
 export function mountExport(mainEl: HTMLElement) {
@@ -21,13 +23,14 @@ export function mountExport(mainEl: HTMLElement) {
   eleIn = el("input", { type: "checkbox", checked: true });
   gpxRes = el("div", { class: "small", "aria-live": "polite" });
   inc = incyclistCard();
+  atlas = atlasCard();
   root.append(warn,
     el("section", { class: "panel row wrap end-align" }, field("Startzeit der GPX-Zeitstempel", startIn, "Uhrzeit des ersten Videobilds. Schreibt nur die Zeiten neu, ohne Neuberechnung.", "grow").el, fromFile, apply),
     el("div", { class: "cards" },
       el("section", { class: "panel stack card", "aria-labelledby": "gpx-h" }, el("h2", { id: "gpx-h" }, "GPX"), gpxInfo,
         el("label", { class: "row small" }, eleIn, "mit Höhen (aus dem Höhenprofil)"),
         el("div", { class: "row wrap" }, btn("GPX speichern …", () => void exportGpx(), { kind: "primary", icon: "download", attrs: { "data-primary": "" } }), btn(revealLabel, () => S.result && void api.reveal(S.result.gpx), { icon: "folder" })), gpxRes),
-      inc.el));
+      inc.el, atlas.el));
   mainEl.append(root);
   bus.on("stage", (s: string | null) => { root.hidden = s !== "export"; if (s === "export") show(); });
   bus.on("result", () => { if (!root.hidden) show(); });
@@ -45,6 +48,7 @@ function show() {
   startIn.value = toLocalInput(cur.app.start_time ?? r.project.effective?.start_time);
   fromFile.hidden = !cur.app.probe?.creation_time;
   gpxInfo.textContent = `1 Punkt pro Sekunde · ${r.points.length} Punkte · ${fmtBytes(r.gpx_bytes)}`;
+  atlas.build();   // only for a project from an atlas job; the result may have changed
   if (builtFor !== cur.app.id) { builtFor = cur.app.id; gpxRes.textContent = ""; inc.build(); }
   else { inc.update(); inc.refresh(); }   // the elevation may have changed in the Höhe stage
 }

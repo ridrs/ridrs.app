@@ -4,11 +4,12 @@ import { api } from "../api";
 import { attachVideo } from "../app/project";
 import { go, routePath } from "../app/router";
 import { active, canResume, checklist, start, type CheckId } from "../features/run";
-import { importingFor } from "../features/import";
+import { defaultTemplate, imp as impState, importingFor, startImport } from "../features/import";
+import { YTDLP_480P } from "../atlas";
 import { canEditFrames, mapTools, sizeWarning, suggestFromTitle } from "../mapPanel";
 import { S, bus, coveringPbfs, effectivePbf, saveCur } from "../state";
 import type { BikePaths, Vehicle } from "../types";
-import { banner, btn, disclosure, emptyState, field, iconBtn, isSoftDisabled, segmented, setBtnLabel, setSoftDisabled, toneIcon, uid, type Tone } from "../ui/components";
+import { banner, btn, codeWell, disclosure, emptyState, field, iconBtn, isSoftDisabled, segmented, setBtnLabel, setSoftDisabled, toneIcon, uid, type Tone } from "../ui/components";
 import { icon } from "../ui/icons";
 import { el, fmtBytes, fmtDur, fmtSize, fromLocalInput, toLocalInput } from "../util";
 import { importBlock } from "./importDetails";
@@ -18,6 +19,7 @@ import { pickVideo } from "./start";
 let side: HTMLElement, ws: HTMLElement;
 let videoInfo: HTMLElement, videoEmpty: HTMLElement, videoMissing: HTMLElement, poster: HTMLElement, vTitle: HTMLElement, vMeta: HTMLElement, previewBtn: HTMLButtonElement;
 let imp: ReturnType<typeof importBlock>;
+let atlasBox: HTMLElement;
 let frameSize: HTMLElement, drawBtn: HTMLButtonElement, viewBtn: HTMLButtonElement, delBtn: HTMLButtonElement, coverage: HTMLElement, sizeWarn: HTMLElement, pbfSel: HTMLSelectElement, mapBtn: HTMLButtonElement;
 let hintsDisc: HTMLDetailsElement, hintsSummary: HTMLElement;
 const hintRows = {} as Record<"start" | "end", { draw: HTMLButtonElement; del: HTMLButtonElement; val: HTMLElement }>;
@@ -37,6 +39,7 @@ export function mountSetup(sideEl: HTMLElement, wsEl: HTMLElement) {
     btn("Datei wählen …", () => void pickVideo(), { size: "sm", icon: "folder" }), btn("Adresse eingeben", () => go(routePath.start), { size: "sm" }));
   videoMissing = el("div", {});
   imp = importBlock();
+  atlasBox = el("div", { class: "stack-s" });
   // ---- search frame
   frameSize = el("span", { class: "small muted tnum nowrap" });
   drawBtn = btn("Zeichnen", () => mapTools.toggleDraw("search"), { size: "sm", icon: "edit", attrs: { "aria-pressed": "false" } });
@@ -97,7 +100,7 @@ export function mountSetup(sideEl: HTMLElement, wsEl: HTMLElement) {
   const sec = (n: string, title: string, ...body: (Node | null)[]) => el("section", { class: "side-sec" }, el("h2", { class: "sec-h" }, n ? el("span", { class: "sec-n" }, n) : null, title), ...body);
   side.append(
     el("div", { class: "side-scroll" },
-      el("section", { class: "side-sec" }, el("h2", { class: "sec-h" }, "Video"), videoMissing, videoInfo, videoEmpty, imp.el),
+      el("section", { class: "side-sec" }, el("h2", { class: "sec-h" }, "Video"), atlasBox, videoMissing, videoInfo, videoEmpty, imp.el),
       sec("1", "Suchrahmen", el("div", { class: "row between" }, el("div", { class: "row wrap" }, drawBtn, viewBtn, delBtn), frameSize), coverage, sizeWarn),
       el("section", { class: "side-sec" }, hintsDisc),
       sec("3", "Fahrzeug", vehicle.el, bikePathsField, opts)),
@@ -140,8 +143,9 @@ function update() {
   const editable = canEditFrames();
   // video
   imp.update(app.id);
+  renderAtlas(loading);
   videoInfo.hidden = !app.video || S.videoMissing;
-  videoEmpty.hidden = !!app.video || loading || !imp.el.hidden;
+  videoEmpty.hidden = !!app.video || loading || !imp.el.hidden || !!app.atlas;
   videoMissing.replaceChildren();
   if (app.video && S.videoMissing) videoMissing.append(banner("warn", el("div", {}, "Das Video wurde nicht gefunden: ", el("span", { class: "mono wrap-any" }, app.video)), el("div", { class: "row" }, btn("Neu zuordnen …", async () => { const f = await api.pickVideo(); if (f) await attachVideo(app.id, f); }, { size: "sm" }))));
   if (app.video) {
@@ -212,6 +216,31 @@ function update() {
   runLink.hidden = !runningHere; runLink.href = routePath.project(app.id, "berechnung");
   footNote.hidden = !(open.length || (active.project && !runningHere) || (loading && !open.length));
   footNote.textContent = open.length ? `Es fehlt noch: ${open.map((c) => c.label).join(", ")}.` : active.project && !runningHere ? "Es läuft schon eine Berechnung in einem anderen Projekt." : "Die Berechnung startet, sobald das Video geladen ist.";
+}
+
+/** a project from an atlas job: where it comes from, and (without a video) the import of its address with the user's own template (P2) */
+function renderAtlas(loading: boolean) {
+  const app = S.cur!.app, a = app.atlas;
+  const t = defaultTemplate("url");
+  const failed = !!impState.done && !impState.done.ok && impState.project === app.id;
+  const sig = a ? `${app.id}|${!!app.video}|${loading}|${t?.id ?? ""}|${failed}` : "";
+  if (atlasBox.dataset.sig === sig) return;
+  atlasBox.dataset.sig = sig; atlasBox.hidden = !a;
+  if (!a) { atlasBox.replaceChildren(); return; }
+  const job = a.job;
+  const head = el("div", { class: "row" }, toneIcon("info"), el("span", { class: "grow" }, "Aus dem POV Drive Atlas: ", el("span", { class: "mono" }, job.video_id),
+    job.route_level ? ` · Route Stufe ${job.route_level}` : " · ohne Route", job.channel ? ` · ${job.channel}` : ""));
+  const parts: Node[] = [head];
+  if (!app.video && !loading && !failed) {
+    parts.push(el("div", { class: "small mono wrap-any" }, job.url));
+    if (t) parts.push(el("div", { class: "row wrap" }, btn("Video importieren", () => void startImport(app.id, t, job.url), { kind: "primary", size: "sm", icon: "download" }),
+      el("span", { class: "small muted" }, `Vorlage: ${t.name}`)));
+    else parts.push(el("p", { class: "help" }, "Für Adressen ist noch keine Import-Vorlage eingerichtet. Lege in den Einstellungen eine eigene an, zum Beispiel (mindestens 480p, nur Bild, H.264 bevorzugt):"),
+      codeWell(YTDLP_480P, { label: "Vorschlag für eine Import-Vorlage" }).el, el("a", { href: routePath.settings }, "Import-Vorlagen öffnen"));
+    parts.push(el("p", { class: "help" }, "Die App lädt nichts von sich aus. Was der Befehl tut und ob du das Video verwenden darfst, liegt bei dir. Oder eine schon geladene Datei wählen: ",
+      btn("Datei wählen …", () => void pickVideo(), { size: "sm", icon: "folder" })));
+  }
+  atlasBox.replaceChildren(...parts);
 }
 
 async function onStart() {

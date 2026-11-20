@@ -28,6 +28,8 @@ export interface Scenario {
   elev?: "missing" | "stale" | "old" | "extra-have";
   /** the Analyse stage: "bad" = a route with five weak stretches of different causes (the default result has one) */
   analyse?: "bad";
+  /** the demo project was created from a POV Drive Atlas job (docs/FEATURE_atlas.md); "novideo": before the import */
+  atlas?: "job" | "novideo";
 }
 
 const P = "#/p/demo-1/";
@@ -82,6 +84,10 @@ export const SCENARIOS: Record<string, Scenario> = {
   // Analyse
   analyse: { route: P + "analyse", result: "confident" },
   "analyse-bad": { route: P + "analyse", result: "uncertain", analyse: "bad" },
+  // POV Drive Atlas (docs/FEATURE_atlas.md): the Atlas card of the Export stage, the Einrichten stage of a fresh job project
+  atlas: { route: P + "export", result: "confident", atlas: "job" },
+  "atlas-uncertain": { route: P + "export", result: "uncertain", atlas: "job" },
+  "atlas-setup": { route: P + "einrichten", project: "novideo", atlas: "novideo" },
   selfcheck: { route: "#/_selfcheck" },
 };
 const ALIAS: Record<string, string> = { empty: "start", noenv: "tools" };

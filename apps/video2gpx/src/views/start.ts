@@ -9,9 +9,11 @@ import { btn, codeWell, disclosure, field, menu, setBtnLabel, setSoftDisabled, i
 import { icon } from "../ui/icons";
 import { debounce, el, fmtDay, fmtDur, fmtSize, isVideoPath } from "../util";
 import { revealLabel, thisComputer } from "../app/platform";
+import { isJobPath, openJobFile } from "../features/atlasJob";
 
 const RESPONSIBILITY = "Die App lädt nichts von sich aus. Was der Befehl tut und ob du das Video verwenden darfst, liegt bei dir.";
 const RECENT = 6;
+const DROP_TEXT = "… oder eine Videodatei oder Atlas-Job-Datei (.v2g.json) in dieses Fenster ziehen";
 let input: HTMLInputElement, primary: HTMLButtonElement, lineEl: HTMLElement, listEl: HTMLElement, listHead: HTMLElement, dropText: HTMLElement, cardEl: HTMLElement;
 let fld: ReturnType<typeof field>;
 let tplSel: HTMLSelectElement, cmd: ReturnType<typeof codeWell>, cmdErr: HTMLElement, copyFirst: HTMLInputElement;
@@ -29,10 +31,12 @@ export function mountStart(root: HTMLElement) {
   cmd = codeWell("", { label: "Genau dieser Befehl wird ausgeführt" });
   cmdErr = el("div", { class: "field-error", hidden: true });
   copyFirst = el("input", { type: "checkbox", onchange: () => update() });
-  dropText = el("p", { class: "drop-text muted" }, "… oder eine Videodatei in dieses Fenster ziehen");
+  dropText = el("p", { class: "drop-text muted" }, DROP_TEXT);
   cardEl = el("div", { class: "panel start-card" },
     el("div", { class: "src-row" }, fld.el, btn("Datei wählen …", () => void pickVideo(), { size: "lg", icon: "folder" }), primary),
-    lineEl, dropText);
+    lineEl, dropText,
+    el("div", { class: "row wrap" }, btn("Atlas-Job öffnen …", () => void pickJob(), { size: "sm", icon: "map" }),
+      el("span", { class: "small muted" }, "Job-Datei (.v2g.json) aus dem POV Drive Atlas: Suchrahmen, Start, Ziel und Route sind dann schon gesetzt.")));
   listHead = el("div", { class: "list-head" });
   listEl = el("ul", { class: "projlist" });
   root.append(el("div", { class: "page narrow" },
@@ -41,7 +45,7 @@ export function mountStart(root: HTMLElement) {
     cardEl, el("section", { "aria-label": "Projekte" }, listHead, listEl)));
   for (const ev of ["projects", "run", "import"]) bus.on(ev, renderList);
   bus.on("templates", update); bus.on("env", update);
-  bus.on("drag", (over: boolean) => { cardEl.classList.toggle("drop", over); dropText.textContent = over ? "Loslassen, um das Video zu öffnen" : "… oder eine Videodatei in dieses Fenster ziehen"; });
+  bus.on("drag", (over: boolean) => { cardEl.classList.toggle("drop", over); dropText.textContent = over ? "Loslassen, um die Datei zu öffnen" : DROP_TEXT; });
   bus.on("pick-video", () => void pickVideo());
   update(); renderList();
 }
@@ -147,8 +151,22 @@ export async function openFile(path: string) {
   if (id) go(routePath.project(id, "einrichten"));
 }
 export function handleDrop(paths: string[]) {
+  const job = paths.find(isJobPath);
+  if (job) { void openJob(job); return; }
   const v = paths.find(isVideoPath);
-  if (v) void openFile(v); else toast("Bitte eine Videodatei ablegen. Unterstützt: mp4, mov, m4v, mkv, webm, avi, mts, ts, mpg.", "error");
+  if (v) void openFile(v); else toast("Bitte eine Videodatei oder eine Atlas-Job-Datei (.v2g.json) ablegen. Unterstützt: mp4, mov, m4v, mkv, webm, avi, mts, ts, mpg.", "error");
+}
+
+/** an atlas job file: a new project with its hints, then Einrichten (the video is imported from there) */
+async function openJob(path: string) {
+  const id = await openJobFile(path);
+  if (id) go(routePath.project(id, "einrichten"));
+}
+async function pickJob() {
+  const f = await api.pickJob();
+  if (!f) return;
+  if (!isJobPath(f)) { toast("Bitte eine Job-Datei des Atlas wählen (Endung .v2g.json).", "error"); return; }
+  await openJob(f);
 }
 
 function row(p: ProjectApp): HTMLElement {

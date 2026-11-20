@@ -17,6 +17,7 @@ apps/video2gpx/                    the product: Tauri app for macOS, runs on Lin
 │   ├── FEATURE_ui_redesign.md     UI redesign (stages, design system, mock scenarios)
 │   ├── FEATURE_analysis_insight.md the Analyse stage (Part A implemented; choices in "Implementation notes (Part A)"; Part B live preview planned)
 │   ├── FEATURE_elevation_stage.md elevation as its own stage "Höhe" (implemented; choices in "Implementation notes")
+│   ├── FEATURE_atlas.md           POV Drive Atlas round trip: job file in, checklist "Atlas", <id>.atlas.json out (implemented, P21)
 │   ├── BAVARIA_DIAGNOSIS.md       why the Bavaria video failed; fixes F1-F5
 │   ├── ELEVATION_ANALYSIS.md, DEM_STUDY.md  elevation noise root cause; better elevation models
 │   ├── ELEVATION_STRATEGY.md      regional DEM sources (registry, licences) and the robust road-height estimator (P17)

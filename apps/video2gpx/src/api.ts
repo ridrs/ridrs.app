@@ -56,6 +56,15 @@ export interface Api {
   hintImport(project: string, src: string): Promise<{ name: string; path: string; text: string }>;
   hintRead(project: string, path: string): Promise<string>;
   hintRemove(project: string): Promise<void>;
+  // POV Drive Atlas (src/atlas.ts): the job file, its route as the hint, the result file
+  /** the text of a `*.v2g.json` job file */
+  atlasJobRead(path: string): Promise<string>;
+  /** downloads the job's route into the project's hint folder (replaces a hint) */
+  atlasHintDownload(project: string, url: string, name: string): Promise<{ name: string; path: string; text: string }>;
+  /** writes `<id>.atlas.json` */
+  atlasResultWrite(dest: string, text: string): Promise<{ path: string; bytes: number }>;
+  /** the app's version (tauri.conf.json) */
+  appVersion(): Promise<string>;
   // import by template (plan-ui section 8); replaces the free shell command (importDisplay / importRun)
   /** built-in templates and the user's */
   importTemplates(): Promise<ImportTemplate[]>;
@@ -108,6 +117,10 @@ export interface Api {
   pickPbf(): Promise<string | null>;
   pickFile(title: string): Promise<string | null>;
   pickHint(): Promise<string | null>;
+  /** an atlas job file (`*.v2g.json`) */
+  pickJob(): Promise<string | null>;
+  /** save dialog for `<id>.atlas.json` */
+  pickSaveAtlas(defaultName: string): Promise<string | null>;
   pickImage(): Promise<string | null>;
   pickSave(defaultName: string): Promise<string | null>;
   /** save dialog for the Incyclist package: a .zip, or (folder) the name of the folder to create */
