@@ -16,8 +16,9 @@
     {
       "binding": "DB",
       "database_name": "ridrs-scenic",
-      // Placeholder for local development. Replace with the id from `wrangler d1 create ridrs-scenic` before deploying.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "041075fb-6133-4616-9876-07d84f365fd8",
+      // Local development (wrangler dev, --local) keeps using the shared state in pov-atlas/dev-state, stored under this id.
+      "preview_database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ],
