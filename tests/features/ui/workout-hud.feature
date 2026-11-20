@@ -8,8 +8,10 @@ Feature: The workout in the HUD
   zone's colour growing from the chip to the right edge as it goes by, the time left in it counting
   down, its length and cadence below; then the next five. The workout's cues show for their
   duration in the middle of the screen, where a pause shows, and not during one; 3-2-1 shows in
-  place of the time left before a segment changes. The widget only reads: `activity.state-changed`,
-  `activity.athlete`, `workout.step-changed`, `workout.finished` and the clock of the frames; it takes no focus. Without a workout it does not
+  place of the time left before a segment changes. Below the last segment shown, a footer shows
+  the workout's intensity ("Intensity 100 %"), which the rider changes with plus and minus; the
+  targets of the segments are shown at that intensity, as the trainer holds them. The widget only reads: `activity.state-changed`,
+  `activity.athlete`, `workout.step-changed`, `workout.finished`, `workout.intensity-changed` and the clock of the frames; it takes no focus. Without a workout it does not
   show.
 
   Here the scenarios publish those events directly, as the workout player does; the workout is
@@ -116,6 +118,31 @@ Feature: The workout in the HUD
     When the workout player reports step 6 of the workout
     Then the workout HUD counts nothing down
     And the workout HUD shows the current segment "Z1 4 min 125 W"
+
+  Scenario: The workout's intensity shows as a footer below the last segment
+    Given the workout HUD is shown
+    And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
+    When the workout player reports step 5 of the workout
+    Then the workout HUD shows "Intensity 100 %" as its footer, below the last segment
+    When the workout's intensity changes to 110 %
+    Then the workout HUD shows "Intensity 110 %" as its footer, below the last segment
+    And the workout HUD shows the current segment "Z6 4 min 317 W" with "95–105 rpm"
+    And the workout HUD lists the segments
+      | state   | zone | length | target |
+      | done    | Z1   | 4 min  | 138 W  |
+      | current | Z6   | 4 min  | 317 W  |
+      | coming  | Z1   | 4 min  | 138 W  |
+      | coming  | Z6   | 4 min  | 317 W  |
+      | coming  | Z1   | 4 min  | 138 W  |
+      | coming  | Z6   | 4 min  | 317 W  |
+      | coming  | Z1   | 4 min  | 138 W  |
+
+  Scenario: The intensity of an earlier ride is not this ride's
+    Given the workout HUD is shown
+    And the workout's intensity changed to 120 % in an earlier ride
+    And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
+    When the workout player reports step 5 of the workout
+    Then the workout HUD shows "Intensity 100 %" as its footer, below the last segment
 
   Scenario: Without a workout nothing shows
     Given the workout HUD is shown

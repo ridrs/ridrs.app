@@ -7,6 +7,8 @@ import {
   activityStartRequestedEvent,
   activityStateChangedEvent,
   type CompletedWorkout,
+  controllerButtonSchema,
+  controllerButtonsChangedEvent,
   type DataSource,
   DEFAULT_PROVIDER,
   type EventEnvelope,
@@ -23,8 +25,10 @@ import {
   type Workout,
   type WorkoutDuration,
   type WorkoutEffort,
+  type WorkoutIntensityChangedPayload,
   type WorkoutStepChangedPayload,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
   worldTerrainPreviewEvent,
@@ -63,6 +67,7 @@ function registerPlayerEvents(world: RidrsWorld): void {
     workoutStepChangedEvent,
     workoutFinishedEvent,
     workoutNextStepRequestedEvent,
+    workoutIntensityChangedEvent,
   ]) {
     world.eventDefinitions.set(event.id, event);
   }
@@ -249,6 +254,31 @@ When('the rider asks ERG for {string}', async function (this: RidrsWorld, change
   await this.settle();
 });
 
+When(
+  'the rider asks ERG for {string} {int} times',
+  async function (this: RidrsWorld, change: string, times: number) {
+    for (let i = 0; i < times; i++) {
+      this.ensureHost().publishEvent('ui-bridge', trainerErgRequestedEvent, {
+        change: change as 'enter' | 'up' | 'down' | 'leave',
+      });
+      await this.settle();
+    }
+  },
+);
+
+/** A press: the button goes down and up again, as a device reports it. */
+When(
+  "the rider presses the controller's {string}",
+  async function (this: RidrsWorld, button: string) {
+    const ctx = this.ensureHost().getPluginContext('test-ui');
+    assert.ok(ctx, 'Expected the plugin "test-ui"');
+    for (const buttons of [[controllerButtonSchema.parse(button)], []]) {
+      ctx.inputs.accept(controllerButtonsChangedEvent, { deviceId: 'controller-1', buttons });
+      await this.settle();
+    }
+  },
+);
+
 // ---- What happened ---------------------------------------------------------------------------
 
 function tappedOfType(world: RidrsWorld, type: string): EventEnvelope[] {
@@ -299,6 +329,29 @@ Then("the workout's target power was:", function (this: RidrsWorld, table: DataT
     const expected = row.target === 'off' ? null : Number(/^(\d+) W$/.exec(row.target ?? '')?.[1]);
     assert.equal(targetAt(this, at), expected, `The target at ${row.at}`);
   }
+});
+
+Then("the workout's intensity is {int} %", function (this: RidrsWorld, percent: number) {
+  // The latest intensity since the ride started; none means its workout runs at 100 %.
+  const started = this.tapped.findLastIndex(
+    (e) =>
+      e.type === activityStateChangedEvent.id &&
+      (e.payload as ActivityState).state === 'running' &&
+      (e.payload as { resumedAt?: number }).resumedAt === undefined,
+  );
+  assert.ok(started >= 0, 'Expected a ride');
+  const latest = this.tapped
+    .slice(started)
+    .filter((e) => e.type === workoutIntensityChangedEvent.id)
+    .at(-1)?.payload as WorkoutIntensityChangedPayload | undefined;
+  assert.equal(latest?.percent ?? 100, percent);
+});
+
+Then('the latest target power is {int} W', function (this: RidrsWorld, watts: number) {
+  const latest = tappedOfType(this, trainerTargetPowerEvent.id).at(-1)?.payload as
+    | TrainerTargetPowerPayload
+    | undefined;
+  assert.equal(latest?.watts, watts);
 });
 
 Then(

@@ -105,18 +105,22 @@ export class WorkoutRun {
     return [...this.enter(current.segment.index + 1, progress), ...this.advance(progress)];
   }
 
-  /** The ERG target now, in whole watts; null where ERG is off or the workout is over. */
-  target(progress: Progress): number | null {
+  /**
+   * The ERG target now, in whole watts, at `percent` of the workout's intensity; null where ERG is
+   * off or the workout is over.
+   */
+  target(progress: Progress, percent = 100): number | null {
     const current = this.current;
     const erg = current && !this.over ? ergTarget(current.segment.effort) : undefined;
     if (!current || !erg) {
       return null;
     }
+    const scale = percent / 100;
     if (erg.end === undefined) {
-      return Math.round(erg.start);
+      return Math.round(erg.start * scale);
     }
     const share = Math.min(1, Math.max(0, this.shareOf(current, progress)));
-    return Math.round(erg.start + (erg.end - erg.start) * share);
+    return Math.round((erg.start + (erg.end - erg.start) * share) * scale);
   }
 
   private enter(index: number, progress: Progress): StepBegan[] {

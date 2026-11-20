@@ -666,9 +666,12 @@ export {
   workoutTargetUnitSchema,
 } from './workout.ts';
 export {
+  WORKOUT_INTENSITY,
   type WorkoutFinishedPayload,
+  type WorkoutIntensityChangedPayload,
   type WorkoutStepChangedPayload,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
 } from './workout-player.ts';

@@ -23,7 +23,8 @@
         "activity.state-changed",
         "activity.athlete",
         "workout.step-changed",
-        "workout.finished"
+        "workout.finished",
+        "workout.intensity-changed"
       ],
       "publish": []
     },

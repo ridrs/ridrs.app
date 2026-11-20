@@ -124,6 +124,7 @@ import {
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
   worldPositionEvent,
@@ -297,6 +298,7 @@ const EVENTS: readonly EventDefinition[] = [
   worldPositionEvent,
   worldTerrainPreviewEvent,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
 ];

@@ -207,6 +207,7 @@ const SAMPLES: Record<string, unknown> = {
   'trainer.erg-requested': { change: 'up' },
   'trainer.target-power': { watts: null },
   'workout.finished': { at: T + 60_000 },
+  'workout.intensity-changed': { percent: 105 },
   'workout.next-step-requested': {},
   'workout.step-changed': { stepId: '2.1', index: 1, startedAt: T + 600_000 },
   'ui.terrain-observed': {

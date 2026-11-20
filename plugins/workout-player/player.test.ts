@@ -76,6 +76,17 @@ describe('WorkoutRun', () => {
     expect(run.finished).toBe(true);
   });
 
+  it('scales the target by the intensity, a ramp before it rounds', () => {
+    const run = new WorkoutRun(mixed);
+    run.begin(at(0));
+    expect(run.target(at(0), 110)).toBe(220);
+    run.advance(at(120_000));
+    expect(run.target(at(121_000), 110)).toBe(167);
+    expect(run.target(at(121_000), 50)).toBe(76);
+    run.advance(at(180_000));
+    expect(run.target(at(180_000), 150)).toBeNull();
+  });
+
   it('does not drift when a look comes late: the next step starts at the exact end', () => {
     const run = new WorkoutRun(mixed);
     run.begin(at(0));

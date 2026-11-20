@@ -26,6 +26,8 @@ export const en = {
   /** "5/10" read out. */
   positionLabel: (at: number, of: number) => `Segment ${at} of ${of}`,
   totalLeft: 'Time left in the workout',
+  /** The footer: the workout's intensity, changed with plus and minus. */
+  intensity: 'Intensity',
 };
 
 export type Messages = typeof en;

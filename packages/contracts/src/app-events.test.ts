@@ -23,6 +23,7 @@ const SIMULATION = [
   'equipment.bicycle-changed',
   'trainer.control-changed',
   'trainer.erg-requested',
+  'workout.intensity-changed',
   'workout.next-step-requested',
   'workout.step-changed',
 ];

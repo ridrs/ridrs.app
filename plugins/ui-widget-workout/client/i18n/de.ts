@@ -27,4 +27,6 @@ export const de: Messages = {
   /** "5/10" read out. */
   positionLabel: (at: number, of: number) => `Segment ${at} von ${of}`,
   totalLeft: 'Restzeit im Workout',
+  /** The footer: the workout's intensity, changed with plus and minus. */
+  intensity: 'Intensität',
 };

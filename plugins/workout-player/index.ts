@@ -12,7 +12,9 @@ import {
   type TaskId,
   type TemporalSeriesReader,
   trainerTargetPowerEvent,
+  WORKOUT_INTENSITY,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
@@ -27,6 +29,8 @@ const TICK_MS = 1000;
 interface Ride {
   readonly sessionId: string;
   readonly run: WorkoutRun;
+  /** % of the workout's power targets, as the rider set it last. */
+  intensity: number;
   /** ms ridden up to `since`, or up to the pause. */
   ridden: number;
   /** When the ride ran on last; undefined while it is paused. */
@@ -50,8 +54,9 @@ interface Waiting {
  * state on the ridden time of `ctx.clock`, so a pause holds it, and a replay and a continued ride
  * rebuild it from the recorded inputs alone. At every whole second of ridden time it passes the
  * steps that ended and sets the ERG target of the step it is in, as a derived
- * `trainer.target-power`: the target follows from the workout, the clock and the rider's
- * "Next step", so a replay computes it again and compares it. A step without an ERG target leaves
+ * `trainer.target-power`: the target follows from the workout, the clock, the rider's
+ * "Next step" and the workout's intensity (`workout.intensity-changed`, which scales every power
+ * target from then on), so a replay computes it again and compares it. A step without an ERG target leaves
  * ERG, and the trainer rides on the gradient of the route; so does the end of the workout
  * (`workout.finished`). It says where it is in `workout.step-changed`.
  *
@@ -73,6 +78,8 @@ export default definePlugin({
     let target: number | null = null;
     let ride: Ride | undefined;
     let waiting: Waiting | undefined;
+    /** The intensity of the ride that waits for its first pedal stroke; a new ride is at 100 %. */
+    let intensity: number = WORKOUT_INTENSITY.default;
 
     ctx.events.subscribe(trainerTargetPowerEvent, ({ payload }) => {
       target = payload.watts;
@@ -145,7 +152,7 @@ export default definePlugin({
       }
       // A step without an ERG target leaves ERG once, when it begins: then the rider may ride it
       // with ERG of their own. A step with one holds its target against every other source.
-      const erg = run.target(progress);
+      const erg = run.target(progress, current.intensity);
       if (erg !== null || began.length > 0) {
         setTarget(erg);
       }
@@ -174,6 +181,7 @@ export default definePlugin({
       const current: Ride = {
         sessionId,
         run,
+        intensity,
         ridden: 0,
         since: from,
         distance: 0,
@@ -204,6 +212,7 @@ export default definePlugin({
           ride = undefined;
         }
         waiting = undefined;
+        intensity = WORKOUT_INTENSITY.default;
         if (payload.workout) {
           const run = new WorkoutRun(payload.workout.workout);
           if (hasMotion) {
@@ -235,6 +244,20 @@ export default definePlugin({
       } else if (payload.state === 'finished') {
         stop(current);
         ride = undefined;
+      }
+    });
+
+    ctx.events.subscribe(workoutIntensityChangedEvent, ({ payload }) => {
+      intensity = payload.percent;
+      const current = ride;
+      if (!current || current.intensity === payload.percent) {
+        return;
+      }
+      current.intensity = payload.percent;
+      // A step with a power target takes the new intensity at once; one without stays as it is.
+      const erg = current.run.target(progressOf(current), current.intensity);
+      if (erg !== null) {
+        setTarget(erg);
       }
     });
 

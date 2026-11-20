@@ -6,8 +6,10 @@ import {
   athleteProfileState,
   DEFAULT_PROVIDER,
   dataSourceState,
+  WORKOUT_INTENSITY,
   type Workout,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
@@ -25,6 +27,7 @@ import {
   effortLevel,
   elapsedSeconds,
   inkOn,
+  scaledEffort,
   spanOf,
   type StepView,
   stepView,
@@ -65,6 +68,7 @@ function useWorkoutRide(ctx: UiContext) {
   const [finishedAt, setFinishedAt] = useState<number>();
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [intensity, setIntensity] = useState<{ at: number; percent: number }>();
   const track = useRef<Track>({ pausedMs: 0 });
 
   useEffect(() => {
@@ -112,6 +116,9 @@ function useWorkoutRide(ctx: UiContext) {
     const stopFinished = ctx.events.subscribe(workoutFinishedEvent, ({ payload }) =>
       setFinishedAt(payload.at),
     );
+    const stopIntensity = ctx.events.subscribe(workoutIntensityChangedEvent, ({ payload, timestamp }) =>
+      setIntensity({ at: timestamp, percent: payload.percent }),
+    );
     const stopFrames = ctx.frames.onFrame(({ time }) => {
       const { stepStartedAt, pausedAt, pausedMs } = track.current;
       if (stepStartedAt === undefined) return;
@@ -123,6 +130,7 @@ function useWorkoutRide(ctx: UiContext) {
       stopAthlete();
       stopStep();
       stopFinished();
+      stopIntensity();
       stopFrames();
     };
   }, [ctx]);
@@ -131,7 +139,10 @@ function useWorkoutRide(ctx: UiContext) {
   const thisStep = ride && step && step.startedAt >= ride.startedAt ? step : undefined;
   const finished = ride && finishedAt !== undefined && finishedAt >= ride.startedAt;
   const ftp = ride && ftpOf?.sessionId === ride.sessionId ? ftpOf.ftp : undefined;
-  return { ride, ftp, step: thisStep, finished: finished === true, elapsed, paused };
+  // A ride starts at 100 %; an intensity of an earlier ride, replayed late, is not this ride's.
+  const percent =
+    ride && intensity && intensity.at >= ride.startedAt ? intensity.percent : WORKOUT_INTENSITY.default;
+  return { ride, ftp, step: thisStep, finished: finished === true, elapsed, paused, intensity: percent };
 }
 
 /** "288 W", "125 → 188 W", "Free ride", "150 bpm": what a segment asks, watts only. */
@@ -242,6 +253,12 @@ const WORKOUT_CSS = `
   .wk-cur[data-counting] .wk-countdown { animation: none; }
 }
 .wk-done { padding: 6px; font-size: 22px; font-weight: 600; }
+/* The workout's intensity, below the last segment: quiet at 100 %, lit when the rider changed it. */
+.wk-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 6px 0;
+  border-top: 1px solid rgb(255 255 255 / .1); }
+.wk-foot-label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgb(242 245 250 / .62); }
+.wk-foot-value { font-size: 17px; font-weight: 700; color: rgb(242 245 250 / .82); }
+.wk-foot[data-changed] .wk-foot-value { color: #f2f5fa; text-shadow: 0 0 12px rgb(56 189 248 / .55); }
 `;
 
 /** No zone (no FTP, heart rate, free ride): the gauges' neutral blue. */
@@ -385,9 +402,17 @@ const CLOCK_ICON = (
 
 function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
-  const { ride, ftp, step, finished, elapsed, paused } = useWorkoutRide(ctx);
+  const { ride, ftp, step, finished, elapsed, paused, intensity } = useWorkoutRide(ctx);
   const powerZones = usePowerZones(ctx);
-  const timeline = useMemo(() => (ride ? workoutTimeline(ride.workout) : undefined), [ride]);
+  const timeline = useMemo(() => {
+    if (!ride) return undefined;
+    // The targets as the trainer holds them: at the workout's intensity.
+    const plain = workoutTimeline(ride.workout);
+    return {
+      ...plain,
+      segments: plain.segments.map((segment) => ({ ...segment, effort: scaledEffort(segment.effort, intensity) })),
+    };
+  }, [ride, intensity]);
   const levels = useMemo<readonly EffortLevel[]>(
     () => timeline?.segments.map((segment) => effortLevel(segment.effort, ftp)) ?? [],
     [timeline, ftp],
@@ -475,6 +500,14 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
           ))}
         </ol>
       )}
+      <footer
+        className="wk-foot"
+        data-testid="workout-intensity"
+        {...(intensity === WORKOUT_INTENSITY.default ? {} : { 'data-changed': '' })}
+      >
+        <span className="wk-foot-label">{text.intensity}</span>{' '}
+        <span className="wk-foot-value">{`${intensity}${NBSP}%`}</span>
+      </footer>
     </section>
     <div className="wk-cue" data-testid="workout-note" role="status" style={zoneStyle(currentZone, zoneCount)}>
       {note ? (

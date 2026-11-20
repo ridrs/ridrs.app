@@ -42,3 +42,23 @@ export const workoutNextStepRequestedEvent = defineEvent(
   'workout.next-step-requested',
   z.object({}).strict(),
 );
+
+/** The workout's intensity: 100 % rides the workout as planned. */
+export const WORKOUT_INTENSITY = Object.freeze({ min: 50, max: 150, default: 100, step: 1 });
+
+/**
+ * The rider changes the workout's intensity (plus and minus while a step holds the target): every
+ * power target of the ride's workout is scaled by `percent` from then on. Rider input, accepted by
+ * the ERG driver and recorded, so that a replay and a continued ride scale the same (AGENTS.md
+ * rule 13). A new ride starts at 100 %.
+ */
+export const workoutIntensityChangedEvent = defineEvent(
+  'workout.intensity-changed',
+  z
+    .object({
+      percent: z.number().int().min(WORKOUT_INTENSITY.min).max(WORKOUT_INTENSITY.max),
+    })
+    .strict(),
+);
+
+export type WorkoutIntensityChangedPayload = z.infer<typeof workoutIntensityChangedEvent.schema>;

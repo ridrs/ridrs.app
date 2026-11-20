@@ -12,6 +12,7 @@ import {
   effortOf,
   elapsedSeconds,
   rangeText,
+  scaledEffort,
   spanOf,
   vivid,
   zoneColour,
@@ -20,6 +21,20 @@ import {
 const watts = (low: number, high = low, end?: number): WorkoutEffort => ({
   kind: 'target',
   primary: { unit: 'watts', start: { low, high }, ...(end === undefined ? {} : { end: { low: end, high: end } }) },
+});
+
+describe('scaledEffort', () => {
+  it('scales a power target, a range and a ramp by the intensity', () => {
+    expect(scaledEffort(watts(200, 220, 300), 110)).toEqual(watts(220, 242, 330));
+  });
+
+  it('keeps 100 %, a free ride and a heart-rate target as they are', () => {
+    const steady = watts(200);
+    expect(scaledEffort(steady, 100)).toBe(steady);
+    expect(scaledEffort({ kind: 'free' }, 120)).toEqual({ kind: 'free' });
+    const heart: WorkoutEffort = { kind: 'target', primary: { unit: 'bpm', start: { low: 140, high: 150 } } };
+    expect(scaledEffort(heart, 120)).toBe(heart);
+  });
 });
 
 describe('clock', () => {

@@ -7,6 +7,7 @@ import {
   activityStateChangedEvent,
   type Workout,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
 import { mountShell } from '@ridrs/ui-shell';
@@ -413,3 +414,39 @@ Then('the workout HUD offers nothing to focus', async function (this: RidrsWorld
   );
   assert.equal(focusable.length, 0);
 });
+
+// ---- The intensity -----------------------------------------------------------------------------
+
+When(
+  "the workout's intensity changes to {int} %",
+  async function (this: RidrsWorld, percent: number) {
+    this.ensureHost().publishEvent('ui-bridge', workoutIntensityChangedEvent, { percent });
+    await this.settle();
+  },
+);
+
+Given(
+  "the workout's intensity changed to {int} % in an earlier ride",
+  async function (this: RidrsWorld, percent: number) {
+    // The host's clock only goes forward: the earlier ride was an hour before this one.
+    this.ensureHost().publishEvent('ui-bridge', workoutIntensityChangedEvent, { percent });
+    await this.settle();
+    this.fixedTime += 3_600_000;
+  },
+);
+
+Then(
+  'the workout HUD shows {string} as its footer, below the last segment',
+  async function (this: RidrsWorld, text: string) {
+    const widget = await shown(this);
+    await waitFor(() => {
+      const footer = widget.querySelector<HTMLElement>('[data-testid="workout-intensity"]');
+      assert.ok(footer, 'No intensity footer');
+      assert.equal(footer.tagName, 'FOOTER');
+      assert.equal(plain(footer.textContent), text);
+      // The last part of the panel, right after the list of segments.
+      assert.equal(widget.lastElementChild, footer);
+      assert.equal(footer.previousElementSibling?.getAttribute('data-testid'), 'workout-segments');
+    });
+  },
+);

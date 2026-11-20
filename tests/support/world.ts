@@ -159,6 +159,7 @@ import {
   uiRegistryChangedEvent,
   uiTerrainObservedEvent,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
   worldPositionEvent,
@@ -264,6 +265,7 @@ const PHASE_3_EVENTS: readonly EventDefinition[] = [
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
 ];

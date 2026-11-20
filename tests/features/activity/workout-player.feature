@@ -7,7 +7,10 @@ Feature: The workout player rides the workout of a ride
   target, follows a ramp every second, leaves ERG for a step without one and when the workout is
   over, and says where it is in `workout.step-changed` and `workout.finished`. A pause holds the
   workout. "Next step" skips a step and ends an open one. While a step has a power target, only
-  the player sets the target: the plus and minus of ERG are ignored.
+  the player sets the target: the plus and minus of ERG and the power-up buttons of a controller
+  change the workout's intensity instead, in steps of 1 % from 100 % down to 50 % and up to
+  150 %. The ERG driver accepts the intensity as rider input (`workout.intensity-changed`); the
+  player scales every power target of the workout by it, from then on, until the ride ends.
 
   Background:
     Given the workout "Mixed" for the workout player:
@@ -98,3 +101,63 @@ Feature: The workout player rides the workout of a ride
       | at     | target |
       | +190 s | off    |
       | +191 s | 150 W  |
+
+  Scenario: The plus and minus of ERG change the workout's intensity in steps of 1 %
+    When the rider starts a ride with the workout "Mixed"
+    And 10 s pass
+    And the rider asks ERG for "up"
+    And the rider asks ERG for "up"
+    And 175 s pass
+    Then the workout's intensity is 102 %
+    And the workout's target power was:
+      | at     | target |
+      | +9 s   | 200 W  |
+      | +10 s  | 204 W  |
+      | +119 s | 204 W  |
+      | +120 s | 153 W  |
+      | +179 s | 253 W  |
+      | +180 s | off    |
+    When the rider asks ERG for "down"
+    And 1 s passes
+    Then the workout's intensity is 102 %
+    And the workout's target power was:
+      | at     | target |
+      | +186 s | off    |
+
+  Scenario: The intensity stays between 50 % and 150 %
+    When the rider starts a ride with the workout "Mixed"
+    And 10 s pass
+    And the rider asks ERG for "down" 51 times
+    And 1 s passes
+    Then the workout's intensity is 50 %
+    And the workout's target power was:
+      | at    | target |
+      | +11 s | 100 W  |
+    When the rider asks ERG for "up" 101 times
+    And 1 s passes
+    Then the workout's intensity is 150 %
+    And the workout's target power was:
+      | at    | target |
+      | +12 s | 300 W  |
+
+  Scenario: The power-up buttons of a controller change the intensity during a power step
+    When the rider starts a ride with the workout "Mixed"
+    And 10 s pass
+    And the rider presses the controller's "power-up-left"
+    And 1 s passes
+    Then the workout's intensity is 99 %
+    And the workout's target power was:
+      | at    | target |
+      | +11 s | 198 W  |
+
+  Scenario: A new ride starts its workout at 100 %
+    When the rider starts a ride with the workout "Mixed"
+    And 10 s pass
+    And the rider asks ERG for "up"
+    And "test-ui" publishes "activity.finish-requested"
+    And the rider starts a ride with the workout "Mixed"
+    And 1 s passes
+    Then the workout's intensity is 100 %
+    And the workout's target power was:
+      | at   | target |
+      | +1 s | 200 W  |

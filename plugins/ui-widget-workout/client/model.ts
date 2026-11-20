@@ -156,6 +156,24 @@ export function elapsedSeconds(input: {
   return Math.max(0, Math.floor((at - input.stepStartedAt - input.pausedMs) / 1000));
 }
 
+/**
+ * A step at `percent` of the workout's intensity: its power target scaled, as the player scales
+ * what the trainer holds; every other target as it is.
+ */
+export function scaledEffort(effort: WorkoutEffort, percent: number): WorkoutEffort {
+  if (percent === 100 || effort.kind !== 'target') return effort;
+  const { primary } = effort;
+  if (primary.unit !== 'watts' && primary.unit !== 'percent-ftp') return effort;
+  const scale = (range: WorkoutRange): WorkoutRange => ({
+    low: (range.low * percent) / 100,
+    high: (range.high * percent) / 100,
+  });
+  return {
+    ...effort,
+    primary: { ...primary, start: scale(primary.start), ...(primary.end ? { end: scale(primary.end) } : {}) },
+  };
+}
+
 /** How hard a step is, for its bar and its zone. */
 export interface EffortLevel {
   /** In the workout's own scale: % FTP with an FTP or a target in %, else watts. */

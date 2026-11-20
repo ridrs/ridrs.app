@@ -5,7 +5,7 @@ Feature: The workout player on a ride with the physics, a route and the recorder
   as a free ride on the gradient of the route; when the route ends first, the picture stands still
   and the gradient is 0 % beyond its end (the world says so, as the video world does), the
   workout goes on to its end and then a free ride follows at 0 %. Continuing an interrupted ride
-  goes on at the same step, "Next step" is recorded rider input, and a replay gives the same
+  goes on at the same step, "Next step" and the workout's intensity are recorded rider input, and a replay gives the same
   targets and steps at the same times. The workout starts with the ride's time, at the rider's
   first pedal stroke: while the ride waits at its start (the video's lead-in), it holds.
 
@@ -102,3 +102,33 @@ Feature: The workout player on a ride with the physics, a route and the recorder
     And the replay compared every "trainer.target-power" event of the ride, and there was at least one
     And the replay compared every "workout.step-changed" event of the ride, and there was at least one
     And the replay compared every "workout.finished" event of the ride, and there was at least one
+
+  Scenario: The intensity is recorded, and a replay gives the same targets
+    Given the host has started
+    When the rider starts a ride with the workout "Short"
+    And "test-device" delivers only power 200 W every 0.25 s for 5 seconds
+    And the rider asks ERG for "up"
+    And "test-device" delivers only power 200 W every 0.25 s for 25 more seconds
+    And "test-ui" publishes "activity.finish-requested" through the UI bridge
+    Then the recording holds the rider's "workout.intensity-changed" as an input at "+5 s"
+    And the workout's target power was:
+      | at    | target |
+      | +5 s  | 202 W  |
+    When the recording is replayed
+    Then the replay is identical
+    And the replay compared every "trainer.target-power" event of the ride, and there was at least one
+
+  Scenario: Continuing an interrupted ride keeps the intensity
+    Given the host has started
+    And the rider started a ride with the workout "Short"
+    And "test-device" delivered only power 200 W every 0.25 s for 5 seconds
+    And the rider asks ERG for "up"
+    And "test-device" delivers only power 200 W every 0.25 s for 5 more seconds
+    And the machine lost power
+    And 60 s pass
+    And ridrs started again
+    When the rider continues the interrupted ride
+    And "test-ui" publishes "activity.resume-requested" through the UI bridge
+    And "test-device" delivers only power 200 W every 0.25 s for 5 seconds
+    Then the workout's intensity is 101 %
+    And the latest target power is 202 W

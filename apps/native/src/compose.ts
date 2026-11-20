@@ -138,6 +138,7 @@ import {
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
   worldPositionEvent,
@@ -188,6 +189,7 @@ export const RIDRS_EVENTS: readonly EventDefinition[] = [
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
 ];

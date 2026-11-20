@@ -8,7 +8,9 @@ import {
   definePlugin,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  WORKOUT_INTENSITY,
   workoutFinishedEvent,
+  workoutIntensityChangedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
 import { type TimelineSegment, workoutTimeline } from '@ridrs/workout';
@@ -27,9 +29,12 @@ const ERG_DEFAULTS = Object.freeze({
  * starts ERG or raises the target, the left one lowers it. A finished ride leaves ERG.
  *
  * While a step of the ride's workout has a power target, the workout player alone sets the target
- * (structured-workouts.md, section 11a): what the rider asks for then is ignored. The step comes
- * from `workout.step-changed`, its target from the workout of the activity state, so the HUD can
- * tell the same from the same two events.
+ * (structured-workouts.md, section 11a): then plus and minus and the power-up buttons change the
+ * workout's intensity instead, by 1 % between 50 % and 150 %, as the input
+ * `workout.intensity-changed`, which the player scales the workout's targets by; entering and
+ * leaving ERG are ignored. The step comes from `workout.step-changed`, its target from the
+ * workout of the activity state, so the HUD can tell the same from the same two events. A new
+ * ride starts at 100 %.
  */
 export default definePlugin({
   initialize(ctx) {
@@ -48,6 +53,18 @@ export default definePlugin({
     let steps: readonly TimelineSegment[] = [];
     let workoutSession: string | undefined;
     let held = false;
+    /** % of the workout's targets, as this driver set it last or heard it on the bus. */
+    let intensity: number = WORKOUT_INTENSITY.default;
+
+    /** Plus or minus while the workout holds the target: its intensity, within its bounds. */
+    const changeIntensity = (change: 'up' | 'down'): void => {
+      const step = change === 'up' ? WORKOUT_INTENSITY.step : -WORKOUT_INTENSITY.step;
+      const percent = Math.min(WORKOUT_INTENSITY.max, Math.max(WORKOUT_INTENSITY.min, intensity + step));
+      if (percent !== intensity) {
+        intensity = percent;
+        ctx.inputs.accept(workoutIntensityChangedEvent, { percent });
+      }
+    };
 
     const set = (watts: number | null): void => {
       if (watts === target) {
@@ -68,8 +85,15 @@ export default definePlugin({
       target = payload.watts;
     });
 
+    ctx.events.subscribe(workoutIntensityChangedEvent, ({ payload }) => {
+      intensity = payload.percent;
+    });
+
     ctx.events.subscribe(trainerErgRequestedEvent, ({ payload }) => {
       if (held) {
+        if (payload.change === 'up' || payload.change === 'down') {
+          changeIntensity(payload.change);
+        }
         return;
       }
       switch (payload.change) {
@@ -96,13 +120,13 @@ export default definePlugin({
       const before = pressed.get(payload.deviceId) ?? [];
       pressed.set(payload.deviceId, payload.buttons);
       for (const button of payload.buttons) {
-        if (before.includes(button) || held) {
+        if (before.includes(button)) {
           continue;
         }
         if (button === 'power-up-right') {
-          raise();
+          held ? changeIntensity('up') : raise();
         } else if (button === 'power-up-left') {
-          lower();
+          held ? changeIntensity('down') : lower();
         }
       }
     });
@@ -120,10 +144,12 @@ export default definePlugin({
         steps = [];
         workoutSession = undefined;
         held = false;
+        intensity = WORKOUT_INTENSITY.default;
       } else if (payload.sessionId !== workoutSession) {
         workoutSession = payload.sessionId;
         steps = payload.workout ? workoutTimeline(payload.workout.workout).segments : [];
         held = false;
+        intensity = WORKOUT_INTENSITY.default;
       }
       if (payload.state === 'finished') {
         set(null);
