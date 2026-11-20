@@ -10,6 +10,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import cv2
 import numpy as np
 from scipy.ndimage import median_filter
 
@@ -19,8 +20,8 @@ from rsm.odometry import gating, heading
 from rsm.odometry.vms_csv import load_pairs
 
 from . import config as C, cuts as K, osm, resources as R, standstill as SS, tracks as T
-from .common import Worker, ffmpeg_bin, ffprobe_bin, hwaccel_enabled, jdump, jload
-from .vmsx import motion as vm
+from .common import Worker, ffmpeg_bin, ffprobe_bin, file_sig, hwaccel_enabled, jdump, jload, sha
+from .vmsx import extract as EX, interpret as VI, motion as vm
 from .vmsx.decode import probe
 
 
@@ -38,7 +39,9 @@ def motion(d: Path, P: dict, W: Worker):
     # and P["frame0"]: the index of the clip's first frame in the source, which seeds the traffic candidate fits as in the whole source
     cal = jload(Path(P["calibration"]))["horizon_calibration"] if P.get("calibration") else None
     s0 = int(P.get("frame0") or 0)
-    if C.MOTION_PARALLEL and C.VMS["step"] == 1:
+    if C.MOTION_FROM_EXTRACT and C.VMS["step"] == 1:
+        stats = motion_from_extract(d, P, W, cal, s0)
+    elif C.MOTION_PARALLEL and C.VMS["step"] == 1:
         stats = vm.analyse_parallel(P["video"], str(csv), height=C.VMS["height"], workers=R.policy()["workers"], on_progress=cb, log=W.log, calibration=cal, seed0=s0)
     else:
         stats = vm.analyse(P["video"], str(csv), height=C.VMS["height"], step=C.VMS["step"], on_progress=cb, calibration=cal, seed0=s0)
@@ -83,6 +86,37 @@ def motion(d: Path, P: dict, W: Worker):
                  f"{K.mmss(tr['container_s'])} could be decoded; the route ends at {K.mmss(tr['decoded_s'])}")
         W.log("warn", f"video truncated: decoded {tr['decoded_s']:.0f} s of {tr['container_s']:.0f} s (container)")
     return summ
+
+
+#: share of the motion step's progress bar the extraction takes when it runs (it is about ten times longer than the interpretation)
+EXTRACT_SHARE = 0.85
+
+
+def extract_key(video: str, height: int) -> str:
+    """what the stored extraction of a run depends on: the video file, the extraction settings and the OpenCV build (docs/CONCEPT_extraction.md §7)"""
+    return sha(file_sig(video), EX.VERSION, EX.params(), int(height), cv2.__version__)
+
+
+def motion_from_extract(d: Path, P: dict, W: Worker, cal: dict | None, s0: int) -> dict:
+    """the motion statistics of `vm.analyse_parallel`, from run/extract/: extracted once (kept across reruns of the step), then interpreted"""
+    h = C.VMS["height"]
+    t0 = time.perf_counter()
+    split = [EXTRACT_SHARE]                    # the bar: extraction 0..85 %, interpretation the rest (all of it when the extraction is reused)
+    meta, reused = VI.ensure_extract(P["video"], d / "extract", extract_key(P["video"], h), height=h, workers=R.policy()["workers"], log=W.log,
+                                     on_progress=lambda n, total, phase: W.progress(100.0 * split[0] * n / max(total, 1), phase))
+    t_ex = time.perf_counter() - t0
+    if reused:
+        split[0] = 0.0
+        W.log("info", f"motion: the stored extraction is reused ({meta['pairs']} pairs, extracted in {meta['seconds']:.0f} s)")
+
+    def cb2(n, total, phase):
+        W.progress(100.0 * (split[0] + (1 - split[0]) * (0.0 if phase == "horizon" else n / max(total, 1))), phase)
+
+    stats = VI.analyse(d / "extract", str(d / "motion" / "motion.csv"), calibration=cal, seed0=s0, on_progress=cb2)
+    stats["video"] = P["video"]
+    stats["extract"].update(reused=reused, wait_seconds=round(t_ex, 2))
+    stats["seconds"] += t_ex
+    return stats
 
 
 def container_durations(path: str) -> tuple[float | None, float | None]:

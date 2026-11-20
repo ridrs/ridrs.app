@@ -51,8 +51,17 @@ route side run on them (T3 with the motion and band fits injected).
 
 1. **Extraction** (`rsm.pipeline.vmsx.extract`): grid detection, tracking, quantisation, the three streams, chunks in parallel with the seam check
    of `analyse_parallel`, `extract/extract.json` + `extract/chunk_<first frame>.npz`. T0 tests on the synthetic road video. Not yet a pipeline step.
-2. **Motion as interpretation**: calibration, noise, running horizon, fits, candidates and pick from `extract/`; `motion.csv` unchanged in format;
-   the analysis overlay shows the stored points. `extract` becomes the first pipeline step (step hashes, app step list).
+2. **Motion as interpretation** (built 2026-11-20, `rsm.pipeline.vmsx.interpret`): calibration, noise, running horizon, fits, candidates and pick
+   from `extract/`; `motion.csv` and `motion.json` unchanged in format (`motion.json` adds `extract` and `interpret`); the analysis overlay takes
+   the pair's stored points and decodes nothing (`points_from`). Deviation from the first plan: `extract` is **not** a step of its own in the app's
+   step list; the motion step keeps `run/extract/` (outside `run/motion/`, so a rerun of the step keeps it) and reuses it while its key holds
+   (video file, `extract.VERSION` and `params()`, height, OpenCV version), else extracts first. Same effect (an interpretation change reruns
+   the step in about a minute), no change to the app, the Rust side or the mocks. `config.MOTION_FROM_EXTRACT` (default on) switches back to
+   the inline pass. The interpretation uses 1 point per cell (`interpret.USE_NPTS`, E4), the strongest with a usable track.
+   Calibration differs by construction: the stretches use the stored plain pairs (every 3rd pair) and the points of the whole frame grid; on the
+   synthetic straight road it finds the horizon (150.4 for 150), where the inline pass finds no focus of expansion at all.
+   First measurement, Pontaix 10 min from the phase 1 extraction: interpretation 12 s; speed per second against the stage of today ratio
+   1.02, correlation 0.998; usable share 100 %; own calibration 197.0 rows against 194.2 of the stage (whole source).
 3. **Rotation as interpretation**: band fits from `rot`, x0 from the road fit (A25); series, tracks, cuts and vehicle unchanged; the pixel probes stay.
 4. **Test strategy**: stages hold `extract/`; T4 = extraction only; an interpretation change re-interprets the stages; clips extract themselves.
 5. **Re-baseline**: one T4, T1-T3, Pontaix against the verified track (E1), the maintainer's check in the app. The inline image pass is removed
@@ -71,6 +80,9 @@ cadence) and for every pair whose destatic stream has fewer than 40 points in th
 
 ## 7. Risks
 
+- **Known issue, speed (open to-do, HISTORY.md):** the first real run took 341 s for 10 min of Pontaix with 4 workers (177 MB), about 10 h for a T4
+  over the test sources against 5-6 h today. Optimisation (shared LK pyramids, raw eigenvalue map only when stored, worker scaling) is deferred;
+  phase 2 goes first.
 - Bit parity across machines: LK and `cornerMinEigenVal` may differ in the last bits between OpenCV builds; the OpenCV version is part of
   `extract.json` and of the key.
 - Memory: a 40 min video holds about 60 M points; chunks keep a worker under 1 GB.

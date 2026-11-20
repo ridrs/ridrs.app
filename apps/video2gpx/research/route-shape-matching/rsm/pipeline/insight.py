@@ -521,10 +521,9 @@ def traffic_points(mid, flow, cx: float, cy: float, yh: float, scale: float, pla
 
 
 def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
-    """the vms pair at video time t: the points the road-flow fit saw (inlier or outlier), the fit, and the csv row the step stored for it"""
+    """the vms pair at video time t: the points the road-flow fit saw (inlier or outlier), the fit, and the csv row the step stored for it;
+    `points_from`: "extract" (a run of vmsx.interpret: the stored points, no decode) or "video" (an inline run: the frames tracked again)"""
     from .vmsx import motion as vm
-    from .vmsx.decode import frames_from
-    from .common import hwaccel_enabled
     H, step, fps = int(mj["height"]), int(mj.get("step", 1)), float(info.fps)
     width = int(mj.get("width") or round(info.width * H / info.height / 2) * 2)
     hz_area = float(mj.get("horizon_vms") if mj.get("horizon_vms") is not None else mj["horizon"])     # the road area hangs from the calibrated row
@@ -540,33 +539,12 @@ def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
     tracker = vm.Tracker(H, width, top, bottom, hz_area, road_width)
     min_res = vm.MIN_RESIDUAL * tracker.scale
     dt = step / fps
-    first = max(0, idx - step * (DESTATIC_WARM + 1))
-    first -= (idx - first) % step
-    tau = float(mj.get("destatic_tau", 0.0))           # a run before the destatic filter (2026-11-15) has no such key: no filter then
-    filt = vm.Destatic(tau) if tau > 0 else None
-    prev = prev_f = frame = frame_f = None
-    n_dec = 0
-    for k, fr in enumerate(frames_from(video, info, H, first, (idx - first) + 1, hwaccel=hwaccel_enabled())):
-        if k % step:
-            continue
-        prev, prev_f = frame, frame_f
-        frame = fr
-        frame_f = filt(fr) if filt is not None else fr
-        n_dec += 1
-    if prev is None or frame is None:
-        raise ValueError(f"could not decode the frames around t = {t:.2f} s")
-    raw = (prev, frame) if filt is not None else None
-    row = vm.pair_row(tracker, prev_f, frame_f, idx, t_pair, horizon, min_res, dt, width, H, raw=raw)
-    # the same tracking again, keeping the points (pair_row keeps only the fit)
-    used = "gefiltert"
-    corners, mid, flow = tracker.track(prev_f, frame_f)
-    mid, flow = vm.below_horizon(mid, flow, horizon, H)
-    fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
-    if fit is None and raw is not None:
-        corners, mid, flow = tracker.track(*raw)
-        mid, flow = vm.below_horizon(mid, flow, horizon, H)
-        fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
-        used = "roh"
+    if mj.get("extract") and (d / "extract" / "extract.json").exists():
+        row, corners, mid, flow, fit, used = _pair_from_extract(d, mj, idx, t_pair, horizon, tracker, min_res, dt, width, H)
+        n_dec, points_from = 0, "extract"
+    else:
+        row, corners, mid, flow, fit, used, n_dec = _pair_from_video(video, info, mj, idx, t_pair, horizon, tracker, min_res, dt, width, H, step, t)
+        points_from = "video"
     stored = _stored_row(d / "motion" / "motion.csv", idx)
     cols = vm.COLUMNS
     st = dict(zip(cols, stored)) if stored is not None and len(stored) == len(cols) else None
@@ -599,7 +577,68 @@ def motion_pair(d: Path, video: str, mj: dict, t: float, info) -> dict:
     if stored is not None and not same:
         res["diff"] = {c: [m, sv] for c, m, sv in zip(cols, mine, stored) if m != sv}
     res["decoded"] = n_dec
+    res["points_from"] = points_from
     return res
+
+
+def _pair_from_video(video, info, mj, idx, t_pair, horizon, tracker, min_res, dt, width, H, step, t):
+    """the pair tracked again in the decoded frames (a run of the inline pass): (row, corners, midpoints, flow, fit, source, frames decoded)"""
+    from .vmsx import motion as vm
+    from .vmsx.decode import frames_from
+    from .common import hwaccel_enabled
+    first = max(0, idx - step * (DESTATIC_WARM + 1))
+    first -= (idx - first) % step
+    tau = float(mj.get("destatic_tau", 0.0))           # a run before the destatic filter (2026-11-15) has no such key: no filter then
+    filt = vm.Destatic(tau) if tau > 0 else None
+    prev = prev_f = frame = frame_f = None
+    n_dec = 0
+    for k, fr in enumerate(frames_from(video, info, H, first, (idx - first) + 1, hwaccel=hwaccel_enabled())):
+        if k % step:
+            continue
+        prev, prev_f = frame, frame_f
+        frame = fr
+        frame_f = filt(fr) if filt is not None else fr
+        n_dec += 1
+    if prev is None or frame is None:
+        raise ValueError(f"could not decode the frames around t = {t:.2f} s")
+    raw = (prev, frame) if filt is not None else None
+    row = vm.pair_row(tracker, prev_f, frame_f, idx, t_pair, horizon, min_res, dt, width, H, raw=raw)
+    # the same tracking again, keeping the points (pair_row keeps only the fit)
+    used = "gefiltert"
+    corners, mid, flow = tracker.track(prev_f, frame_f)
+    mid, flow = vm.below_horizon(mid, flow, horizon, H)
+    fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
+    if fit is None and raw is not None:
+        corners, mid, flow = tracker.track(*raw)
+        mid, flow = vm.below_horizon(mid, flow, horizon, H)
+        fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
+        used = "roh"
+    return row, corners, mid, flow, fit, used, n_dec
+
+
+def _pair_from_extract(d, mj, idx, t_pair, horizon, tracker, min_res, dt, width, H):
+    """the pair from the stored points of extract/ (a run of vmsx.interpret), fitted as the step fitted it: (row, corners, midpoints, flow, fit, source)"""
+    from .vmsx import interpret as VI, motion as vm
+    P = VI.Points(d / "extract", around=idx)
+    if idx not in P.pos:
+        raise ValueError(f"pair {idx} is not in the extraction")
+    mask = tracker.mask > 0
+    fbm = vm.MAX_FB_ERROR * tracker.scale
+    i, ri = P.pos[idx], P.rpos.get(idx)
+    seed0 = int(round(float(mj.get("track_t0") or 0.0) * P.fps))
+    first = lambda: P.get("des", i, mask, fbm)
+    fallback = (lambda: P.get("raw", ri, mask, fbm)) if ri is not None else None
+    row = vm.fit_row(idx, t_pair, float(P.diff[i]), first, fallback, horizon, min_res, dt, width, H, tracker.scale, seed0=seed0, alt_thr=mj.get("alt_thr"))
+    used = "gefiltert"
+    corners, mid, flow = first()
+    mid, flow = vm.below_horizon(mid, flow, horizon, H)
+    fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
+    if fit is None and fallback is not None:
+        corners, mid, flow = fallback()
+        mid, flow = vm.below_horizon(mid, flow, horizon, H)
+        fit = vm.fit_fixed_horizon(mid, flow, width / 2, H / 2, horizon, min_res) if len(mid) >= vm.MIN_INLIERS else None
+        used = "roh"
+    return row, corners, mid, flow, fit, used
 
 
 def far_window(d: Path, video: str, mj: dict, t: float, info, seed: int = 0) -> dict:

@@ -56,6 +56,7 @@ The method has to be classical (no AI) and run locally.
 ## Open items
 
 **Product and app**
+- [ ] Speed of the image-side extraction (known issue, 20 Nov 2026, docs/CONCEPT_extraction.md §7): `vmsx.extract` needs 341 s for 10 min of Pontaix with 4 workers (spike, one process: 523 s), so a T4 over the 17 h of test video would take about 10 h instead of 5-6 h. Candidates: build the LK pyramids once for the forward and the backward track (`buildOpticalFlowPyramid`), compute the raw eigenvalue map only for pairs that store a raw stream, find why 4 workers scale so poorly. Deferred until phase 2 runs.
 - [ ] A20 curve alignment (`--align-mode posterior`, default on): find out why Pontaix gets worse (8.0 -> 8.7 m along median), confirm the 5 m sd limit on more GPS rides; manual tests in the app.
 - [ ] Verify in the real app (not only the browser mock): the dark-mode map fix, the playback profile, the Incyclist dialog.
 - [ ] POV Drive Atlas round trip (P21, 18 Nov, docs/FEATURE_atlas.md): a real job from the atlas admin (drop, route download, import with a 480p template, run, Atlas card, save dialog, upload in the admin); `pnpm ui-shots` for the scenarios `atlas`, `atlas-uncertain`, `atlas-setup`. Still open on the plan: deep link (C), direct send with a service token (D), atlas map lines (E).

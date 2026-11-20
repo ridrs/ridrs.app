@@ -508,19 +508,28 @@ def pair_row(tracker: Tracker, prev: np.ndarray, frame: np.ndarray, idx: int, t:
     small_a = ra[::4, ::4].astype(np.int16)
     small_b = rb[::4, ::4].astype(np.int16)
     diff = float(np.mean(np.abs(small_b - small_a)))
-    corners, mid, flow = tracker.track(prev, frame)
+    return fit_row(idx, t, diff, lambda: tracker.track(prev, frame), (lambda: tracker.track(ra, rb)) if raw is not None else None, horizon, min_res, dt,
+                   width, height, tracker.scale, seed0=seed0, alt_thr=alt_thr)
+
+
+def fit_row(idx: int, t: float, diff: float, first, fallback, horizon: float, min_res: float, dt: float, width: int, height: int, scale: float,
+            seed0: int = 0, alt_thr: float | None = None) -> list:
+    """The csv row (COLUMNS) of one pair from its tracked points: `first()` / `fallback()` -> (corners, midpoints, flow); the fit takes the points
+    BELOW_HORIZON under `horizon` and falls back to `fallback` (None: none) when `first` gives no fit. Shared by `pair_row` (points tracked in the
+    frames) and vmsx.interpret (points from the extraction)."""
+    corners, mid, flow = first()
     mid, flow = below_horizon(mid, flow, horizon, height)
     fit = fit_fixed_horizon(mid, flow, width / 2, height / 2, horizon, min_res) if len(mid) >= MIN_INLIERS else None
-    if fit is None and raw is not None:
-        corners, mid, flow = tracker.track(ra, rb)
+    if fit is None and fallback is not None:
+        corners, mid, flow = fallback()
         mid, flow = below_horizon(mid, flow, horizon, height)
         fit = fit_fixed_horizon(mid, flow, width / 2, height / 2, horizon, min_res) if len(mid) >= MIN_INLIERS else None
     if fit is None:
         return [idx, f'{t:.4f}', corners, len(mid), 0, '', '', '', '', '', '', f'{diff:.3f}', '', '', '']
     s, c, a, b, r = fit.params[:5]
     alts = ''
-    if ALT_TRIGGER > 0 and fit.rms > ALT_TRIGGER * tracker.scale:
-        cands = candidates(mid, flow, width / 2, height / 2, horizon, tracker.scale, seed=int(idx) + int(seed0), thr=alt_thr)
+    if ALT_TRIGGER > 0 and fit.rms > ALT_TRIGGER * scale:
+        cands = candidates(mid, flow, width / 2, height / 2, horizon, scale, seed=int(idx) + int(seed0), thr=alt_thr)
         if cands:
             alts = ';'.join([_alt_text(fit.params, int(fit.inliers.sum()), fit.rms)] + [_alt_text(p, k, e) for p, k, e in cands])
     return [

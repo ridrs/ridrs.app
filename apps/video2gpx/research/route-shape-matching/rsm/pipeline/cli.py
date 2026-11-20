@@ -15,7 +15,7 @@ from pathlib import Path
 from . import VERSION, config as C
 from .common import Worker, code_hash, emit, frozen_info, file_sig, jdump, jload, sha
 from rsm.odometry.gating import GateParams as _GP
-from rsm.pipeline.vmsx import motion as M_ALT
+from rsm.pipeline.vmsx import extract as EX_ALT, interpret as VI_ALT, motion as M_ALT
 
 GP_DEFAULT = _GP()    # the gate the steps use (rsm.odometry.gating): its rms limit decides which pairs make the tracks (rotation step on)
 
@@ -155,7 +155,8 @@ class Run:
         still = [["still1", C.STILL_WIN_S, C.STILL_GATE_REL, C.STILL_GATE_FAR, C.STILL_BASE_S, C.STILL_NPAIR, C.STILL_THR_PX, C.STILL_GRID, C.STILL_CELL_SHARE, C.STILL_ALL,
                    C.STILL_UP, C.STILL_MIN_S, C.STILL_EDGE_S, C.STILL_SAMPLE_S]] if C.STILL_ON else []   # sure standstill (standstill.py): detected in rotation, held in refine
         parts = dict(motion=[file_sig(P["video"]), C.VMS, C.F360, "motion2", "pick_rel1", M_ALT.ALT_TRIGGER_REL, "alt_thr_rel1", M_ALT.ALT_NOISE_REF, M_ALT.ALT_THR_SLOPE,
-                             ["hz_run1", M_ALT.HZ_EVERY, M_ALT.HZ_WINDOW, M_ALT.HZ_SPAN, M_ALT.HZ_MIN_FOES, M_ALT.HZ_MAX_DEV]],
+                             ["hz_run1", M_ALT.HZ_EVERY, M_ALT.HZ_WINDOW, M_ALT.HZ_SPAN, M_ALT.HZ_MIN_FOES, M_ALT.HZ_MAX_DEV],
+                             *([["extract1", EX_ALT.VERSION, EX_ALT.params(), VI_ALT.params()]] if C.MOTION_FROM_EXTRACT else [])],
                      rotation=[C.FAR, C.F_FAR, C.F_REF, "rotation2", C.ROT_BAND_OFF_VMS, ["gate_rms_rel1", GP_DEFAULT.max_rms_px, GP_DEFAULT.max_rms_rel],
                                *([["same1", C.CUT_SAME_SHARE, C.CUT_SAME_WIN_S, C.CUT_SAME_H]] if (C.CUT_ON and C.CUT_SAME_ON) else []),
                                *([["intro_user1", P["intro_end"]]] if P.get("intro_end") is not None else []),

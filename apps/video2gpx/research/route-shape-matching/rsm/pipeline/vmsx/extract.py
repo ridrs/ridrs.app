@@ -213,8 +213,8 @@ def _write(d: Path, r: dict) -> str:
     return name
 
 
-def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: float = vm.CHUNK_S, hwaccel: bool = True, log=None) -> dict:
-    """extract the video into out_dir (extract.json + chunk_<first frame>.npz); returns the meta. workers 1 (or a video shorter than two chunks, or
+def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: float = vm.CHUNK_S, hwaccel: bool = True, log=None, key=None, on_progress=None) -> dict:
+    """extract the video into out_dir (extract.json + chunk_<first frame>.npz); returns the meta (`key`: the caller's key of video and settings, stored as is). workers 1 (or a video shorter than two chunks, or
     irregular stream timing, or a seam that does not match): one sequential pass, same data."""
     log = log or (lambda level, msg: None)
     d = Path(out_dir)
@@ -243,7 +243,12 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
     chunks, pairs, windows = [], 0, 0
     if why is None:
         with mp.get_context("fork").Pool(min(workers, len(jobs)), initializer=_worker_init) as pool:
-            res = pool.map(_range, [(X, a, b) for a, b in jobs], chunksize=1)
+            res = []
+            for r in pool.imap_unordered(_range, [(X, a, b) for a, b in jobs], chunksize=1):
+                res.append(r)
+                if on_progress is not None:
+                    on_progress(len(res), len(jobs), "extract")
+            res.sort(key=lambda r: r["a"])
             pool.close()
             pool.join()
         for i in range(1, len(res)):
@@ -258,22 +263,27 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
             log("warn", f"extract: parallel extraction not used ({why}); sequential extraction")
     fallback = why if workers > 1 else None
     if not chunks:
+        if on_progress is not None:
+            on_progress(0, 1, "extract")
         r = _range((X, 0, None))
         chunks.append([0, r["last"], _write(d, r)])
         pairs, windows = len(r["data"]["idx"]), len(r["data"]["rot_w"])
     pr = params(k)
-    meta = dict(version=VERSION, params=pr, video=str(path), fps=float(info.fps), width=int(width), height=int(height), pairs=int(pairs), windows=int(windows),
+    meta = dict(version=VERSION, key=key, params=pr, video=str(path), fps=float(info.fps), duration=float(info.duration), width=int(width), height=int(height), pairs=int(pairs), windows=int(windows),
                 n_win=int(n_win), k=int(k), chunks=chunks, opencv=cv2.__version__, seconds=round(time.perf_counter() - t0, 2),
                 parallel=dict(workers=int(workers), chunks=len(chunks), fallback=fallback))
     (d / "extract.json").write_text(json.dumps(meta, indent=1))
     return meta
 
 
-def load(d) -> dict:
-    """all chunks of an extraction concatenated (counts stay aligned with idx / raw_idx / rot_w)"""
+def load(d, around: int | None = None) -> dict:
+    """all chunks of an extraction concatenated (counts stay aligned with idx / raw_idx / rot_w); `around` = a pair's frame j: only its chunk"""
     d = Path(d)
     meta = json.loads((d / "extract.json").read_text())
-    parts = [dict(np.load(d / name)) for _, _, name in meta["chunks"]]
+    chunks = meta["chunks"]
+    if around is not None:
+        chunks = [c for c in chunks if c[0] < around <= c[1]] or chunks[:1]
+    parts = [dict(np.load(d / name)) for _, _, name in chunks]
     return {key: np.concatenate([p[key] for p in parts]) for key in parts[0]}
 
 

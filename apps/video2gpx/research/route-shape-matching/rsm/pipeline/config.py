@@ -318,3 +318,7 @@ STILL_SAMPLE_S = 5.0
 # ffmpeg seek each; motion.csv is byte-identical (overlap frames checked by hash, sequential fallback). Not part of the motion hash: same result.
 # Col de la Cayolle, 98 min 1080p50 AV1: 1429 s sequential, 640 s with 4 workers (2.2x).
 MOTION_PARALLEL = True
+# --- extraction and interpretation (2026-11-20, docs/CONCEPT_extraction.md phase 2): the motion step reads the video once into run/extract/ (vmsx.extract,
+# reused while its key holds: video, extraction settings, OpenCV) and fits motion.csv from the stored points (vmsx.interpret). An interpretation change
+# reruns the step in about a minute per 10 min of video instead of decoding again. False: the inline pass of vmsx.motion (kept for one release, rule 8).
+MOTION_FROM_EXTRACT = True
