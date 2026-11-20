@@ -282,7 +282,30 @@ the YouTube link, the licence note and the truth that exists.
      the verified track on Pontaix only, and events (`cut_at`, `still`: none missed, none false). Bounds per clip (`checks`) from the first run.
    - T1: `tests/test_t1_clips.py`, marker `clips`, deselected by default (`pytest.ini`); `scripts/heavy.sh .venv/bin/python -m pytest -m clips`.
      T0: `tests/test_clips.py` (cut on a synthetic video, events, checks, keys, verified reference).
-4. **Route on stages (C):** `regress.py --stages`, short route cases, T2.
+4. **Route on stages (C):** `regress.py --stages`, short route cases, T2. Built 2026-11-19:
+   - `rsm.bench.regress --stages`: every case with a `stage` (regress_cases.json) starts at `map` with motion/ and rotation/ of its frozen stage; no
+     video is read and the source need not exist; a stale stage stops the case. The route steps are keyed by the source hash (and window) and go
+     through the step cache as before.
+   - Short cases are windows of the stages (`window` [t0, t1)): `gotthard-start` 0-588 s (the old 588 s cut video is no longer needed),
+     `rousset-end` 8531-9471 s, `pennes-descent` 2700-3300 s, `madone-town` 2400-2760 s (5 landmarks). `rsm.bench.stagecut.window` cuts every
+     series of the stage and shifts it to start at 0; the route of a window counts seconds from t0 and the scores add t0 back. A window keeps the
+     horizon calibration, the vehicle vote and the traffic picks of the whole video (the image results the route side gets in the whole run).
+   - Truth by quality: Pontaix is scored timed against the verified track (no clock alignment); the coarse Van Gestel cases get place scores only
+     (`place_road`: share of route seconds within 20 m of the nearest track point, `place_median_m`, `place_p90_m`; no time); checkpoints and
+     landmarks as before.
+   - OSM: `$RSM_OSM_DIR` defaults to `test-data/osm/` (rhone-alpes; alps and sud cloned there from the app's OSM folder with `cp -c`). The Hessen
+     extract of Lahntal and Marburg is missing on this machine: those two cases fail until it is there.
+   - A window that does not start at the video start carries a `start_bbox` (±1 km around the position at t0 of the confident full run of the
+     same stage, never from the GPS), as the app run with a start frame: without it `rousset-end` found no route and `pennes-descent` a road
+     14 km away (10-15 min of road in a 60 km frame are ambiguous).
+   - First T2 (tag `t2base`, 2026-11-19, cold: 98 min for 13 cases, map and route search not cached; a rerun with unchanged route code takes
+     seconds): roanne, pontaix, rousset, grimone, cdp, pennes, amalfi confident; place 99-100 %, p90 ≤ 6 m on the coarse cases; Pontaix
+     verified 100 % on the road, along median 2.2 m, p90 5.4 m. `rousset-end` uncertain, `pennes-descent` confident, both 100 % place, p90 ≤ 5 m.
+     `gotthard-start` 10/10 checkpoints; `madone-start` landmarks 4 s mean.
+   - Known: `madone-town` is on the right road (median 7 m from the full run) but the scale scan of 6 min in town finds f_eff 230 instead of
+     461, so the window comes out 40 % short and the landmarks about 90 s late (case field `known`, shown in the table). The Amalfi tunnel score
+     needs `work/amalfi/evidence.json` (the tunnels judged by eye), local work data that was never versioned: the score is skipped with a note.
+   - Tests: `tests/test_stagecut.py` (window, stage mode without video, landmarks in a window, place score).
 5. **Long videos (D):** cut `pontaix-10m` and `gotthard-start`, repoint `e2e.rs`, rebuild `runs/`, T3.
 6. **Clean up:** no test reads `sources/` any more (a T0 test checks that no test or case path points into it); `sources/` stays for T4 (D1).
 

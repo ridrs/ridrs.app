@@ -11,7 +11,12 @@
 Every case runs in work/regress/<tag>/<case>/. The steps before --from-step are copied from --seed-tag (or, for motion and rotation, from the case's `seed` run), so only
 the changed steps run. The steps are started as `python -m rsm.pipeline _step` workers, one after the other (the checkpoints of the CLI are not used: the bench decides
 what is reused). Every pipeline run is heavy: use scripts/heavy.sh. Output: work/regress/<tag>/table.md and table.json; with --baseline the differences to that table.
---displaced runs route_search on three search frames that do NOT contain the route (verdict check, plan A4) into work/regress/<tag>/<case>@<dir>/."""
+--displaced runs route_search on three search frames that do NOT contain the route (verdict check, plan A4) into work/regress/<tag>/<case>@<dir>/.
+--stages (T2 of docs/CONCEPT_test_strategy.md, step 4): every case with a `stage` starts at `map` with motion/ and rotation/ of its frozen stage
+(test-data/stages/<stage>/, or the time window `window` [t0, t1) of it, rsm.bench.stagecut); no video is read and the source need not exist. A stale
+stage stops the case (run T4: rsm.bench.stages make). The route of a window counts seconds from t0; the scores add t0 back.
+Truth by its quality (clip_sources.json `gps_quality`): the verified Pontaix track gives timed scores (position along the road at the same video
+second); a coarse Van Gestel track gives place scores only (distance from the route to the nearest point of the track, no time)."""
 from __future__ import annotations
 
 import argparse
@@ -32,13 +37,15 @@ ROOT = HERE.parents[1]
 WORK = ROOT / "work" / "regress"
 CACHE = WORK / "_cache"
 STEPS = ["motion", "rotation", "map", "route_search", "plausibility", "refine", "gpx"]
+PLACE_TOL_M = 20.0                  # m: a route position within this of the nearest point of a coarse GPS track is on the right road (place score)
+EPOCH_2000 = 946684800.0            # the verified track counts video seconds from 2000-01-01T00:00:00Z
 # working-tree files laid over the HEAD snapshot by --code overlay (the files of the accuracy work; steps_a, cli, common ... stay at HEAD)
 OVERLAY = ["rsm/pipeline/" + f for f in ("steps_b.py", "steps_c.py", "steps_d.py", "offset.py", "verdict.py", "align.py", "local.py", "osm.py", "hints.py", "config.py", "calib.py", "lane.py",
                                          "line.py")] + ["rsm/network/graph.py", "rsm/hmm_cal/dp.py"]
 
 
 # development data (see docs/README.md): test-data/ of this app (git-ignored), other videos and OSM extracts
-for _k, _d in (("V2G_TEST_DATA", str(Path(__file__).resolve().parents[4] / "test-data")), ("RSM_VIDEOS", str(Path(__file__).resolve().parents[4] / "test-data" / "sources")), ("RSM_OSM_DIR", "~/rsm-data/osm")):
+for _k, _d in (("V2G_TEST_DATA", str(Path(__file__).resolve().parents[4] / "test-data")), ("RSM_VIDEOS", str(Path(__file__).resolve().parents[4] / "test-data" / "sources")), ("RSM_OSM_DIR", str(Path(__file__).resolve().parents[4] / "test-data" / "osm"))):
     os.environ.setdefault(_k, os.path.expanduser(_d))
 
 
@@ -55,9 +62,14 @@ def box(b) -> dict:
     return dict(south=b[0], west=b[1], north=b[2], east=b[3])
 
 
-def params(c: dict) -> dict:
+def params(c: dict, stage: bool = False) -> dict:
     pbf = Path(_x(c["pbf"])) if os.path.isabs(_x(c["pbf"])) else ROOT / c["pbf"]
-    P = dict(video=str(Path(_x(c["video"])).resolve()), bbox=box(c["bbox"]), pbf=str(pbf), vehicle=c.get("vehicle", "auto"), offset_m=None, start_time=None, traffic_side="auto", decoys=0,
+    if stage:                                 # the source of the stage (only its name is used: the route side reads no video)
+        from . import stages as ST
+        video = str(ST.SOURCES / json.loads((ST.STAGES / c["stage"] / "stage.json").read_text())["source"]["path"])
+    else:
+        video = str(Path(_x(c["video"])).resolve())
+    P = dict(video=video, bbox=box(c["bbox"]), pbf=str(pbf), vehicle=c.get("vehicle", "auto"), offset_m=None, start_time=None, traffic_side="auto", decoys=0,
              start_tol_m=150.0, hint_buffer_m=300.0, hint_fallback="auto")
     if c.get("start_bbox"):
         P["start_bbox"] = box(c["start_bbox"])
@@ -133,17 +145,20 @@ def run_step(code: Path, d: Path, sid: str, log) -> dict:
 
 
 def run_case(c: dict, tag: str, code: Path, from_step: str | None, seed_tag: str | None, log=print, d: Path | None = None, P: dict | None = None, until: str = "gpx",
-             cache: bool = True) -> Path:
+             cache: bool = True, stage: bool = False) -> Path:
     """cache (default, block A of docs/CONCEPT_fast_testing.md): every step is taken from the step cache when its key (code closure, config values, params,
     previous step) is there, else run and stored. --from-step / --seed-tag switch back to the old hand-chosen reuse."""
     d = d or WORK / tag / c["name"]
     d.mkdir(parents=True, exist_ok=True)
     (d / "steps").mkdir(exist_ok=True)
-    P = P or params(c)
-    for f in ((P["video"],) if until in ("motion", "rotation") else (P["video"], P["pbf"])):
+    P = P or params(c, stage=stage)
+    need = [] if stage else [P["video"]]
+    for f in need + ([] if until in ("motion", "rotation") else [P["pbf"]]):
         if not Path(f).exists():
             raise FileNotFoundError(f)
     (d / "project.params.json").write_text(json.dumps(P, indent=1))
+    if stage:
+        return _run_cached(c, d, P, code, log, until, keys=stage_in(c, d, P, code, log))
     if cache and not from_step and not seed_tag:
         return _run_cached(c, d, P, code, log, until)
     first = STEPS.index(from_step) if from_step else 0
@@ -172,10 +187,37 @@ def run_case(c: dict, tag: str, code: Path, from_step: str | None, seed_tag: str
     return d
 
 
-def _run_cached(c: dict, d: Path, P: dict, code: Path, log, until: str) -> Path:
+def stage_in(c: dict, d: Path, P: dict, code: Path, log=print) -> dict:
+    """motion/ and rotation/ of the case's frozen stage (or its window) into d -> the step keys of all steps, keyed by the source hash (and window)"""
+    from . import stagecut as SK, stages as ST
+    sd = ST.STAGES / c["stage"]
+    st = ST.status(sd, root=code)
+    if st != "fresh":
+        raise RuntimeError(f"stage {c['stage']} is {st}: run T4 (scripts/heavy.sh .venv/bin/python -m rsm.bench.stages make --only {c['stage']})")
+    s = json.loads((sd / "stage.json").read_text())
+    win = c.get("window")
+    if win:
+        SK.window(sd, float(win[0]), float(win[1]), d)
+    else:
+        for sub in ("motion", "rotation"):
+            if (d / sub).exists():
+                shutil.rmtree(d / sub)
+            shutil.copytree(sd / sub, d / sub)
+    for sid in ("motion", "rotation"):
+        (d / "steps" / f"{sid}.done.json").write_text(json.dumps(dict(id=sid, in_hash="stage", seconds=s["made"]["seconds"].get(sid), peak_gb=None,
+                                                                      summary=json.loads((d / sid / "summary.json").read_text()), statuses=[], stage=c["stage"], window=win)))
+    log(f"  motion, rotation: stage {c['stage']}" + (f" window {win[0]:g}-{win[1]:g} s" if win else ""))
+    sig = s["source"]["sha256"] + (f"@{float(win[0]):g}-{float(win[1]):g}" if win else "")
+    return SC.step_keys(code, P, STEPS, video_sig=sig)
+
+
+def _run_cached(c: dict, d: Path, P: dict, code: Path, log, until: str, keys: dict | None = None) -> Path:
     steps = STEPS[:STEPS.index(until) + 1]
-    keys = SC.step_keys(code, P, steps)
+    staged = keys is not None
+    keys = keys or SC.step_keys(code, P, steps)
     for sid in steps:
+        if staged and sid in ("motion", "rotation"):
+            continue
         if sid == "plausibility":
             (d / "steps" / f"{sid}.done.json").write_text(json.dumps(dict(id=sid, in_hash="bench", skipped=True, seconds=0, peak_gb=None, summary=None, statuses=[])))
             continue
@@ -239,28 +281,65 @@ def base_row(d: Path) -> dict:
     return row
 
 
+def gps_quality(c: dict) -> str:
+    """verified / coarse truth of a GPS case (clip_sources.json `gps_quality`, by the GPS name)"""
+    for x in json.loads((HERE / "clip_sources.json").read_text())["sources"]:
+        if x.get("gps") == c.get("gps"):
+            return x.get("gps_quality", "coarse")
+    return "coarse"
+
+
+def _t0(c: dict) -> float:
+    """the video second at which the route of the case starts (a stage window), 0 otherwise"""
+    return float(c["window"][0]) if c.get("window") else 0.0
+
+
 def score_gps(c: dict, d: Path) -> dict:
-    """GPS scoring as rsm.pipeline.validate.roanne / work/blind/score.py: the GPS is used for scoring only. Lag between GPS and video clock: work/vangestel/align_<name>.json
-    if it exists (dev videos), else estimated from the yaw rates (blind rule, span 5 s)."""
+    """GPS scoring, the GPS is used for scoring only. verified (Pontaix): the route's position at each video second against the verified track at that
+    second (its <time> is the video time: no clock alignment): road share, error along and across the road. coarse (the other Van Gestel tracks, place
+    only; maintainer 2026-11-19): the distance from the route's per-second position to the nearest point of the track, without time."""
+    q = gps_quality(c)
+    return _score_verified(c, d) if q == "verified" else _score_place(c, d)
+
+
+def _score_place(c: dict, d: Path) -> dict:
+    from scipy.spatial import cKDTree
     from rsm.bench import gps_truth as GT
-    from rsm.refine import evaluate
     R = np.load(d / "refine" / "result.npz")
     crs = str(R["crs"])
+    gb = GT.gps_base(c["gps"], crs)
+    ok = ~R["extrap"]
+    tt = R["t"][ok]
+    pos = PathView(R["sg"], R["xy"]).xy_at(R["s"][ok])
+    dist = cKDTree(np.column_stack([gb["x"], gb["y"]])).query(pos)[0]
+    road = dist <= PLACE_TOL_M
+    return dict(truth="coarse", n_scored=int(len(tt)), place_road=float(road.mean()), place_median_m=float(np.median(dist)), place_p90_m=float(np.percentile(dist, 90)),
+                off_place_seconds=_runs(_t0(c) + tt[~road]))
+
+
+def _score_verified(c: dict, d: Path) -> dict:
+    from rsm.bench import gps_truth as GT
+    from rsm.refine import evaluate
+    src = [x for x in json.loads((HERE / "clip_sources.json").read_text())["sources"] if x.get("gps") == c["gps"]][0]
+    lat, lon, tt_v = GT.read_gpx(Path(_x("$V2G_TEST_DATA")) / "sources" / src["verified"])
+    R = np.load(d / "refine" / "result.npz")
+    crs = str(R["crs"])
+    gb = GT.curve(lat, lon, tt_v - EPOCH_2000 - _t0(c), crs)            # track seconds = route seconds
+    tv = np.maximum.accumulate(gb["tg"])
+    gxy_of = lambda t: np.column_stack([np.interp(t, tv, gb["x"]), np.interp(t, tv, gb["y"])])
     rp = json.loads((d / "route_points.json").read_text())["points"]
-    tv, gxy_of, lag = GT.video_time_gps(c["gps"], crs, d / "motion" / "motion.csv")
     path = PathView(R["sg"], R["xy"])
     t_all, ext = R["t"], R["extrap"]
     sel = (t_all >= tv[0]) & (t_all <= tv[-1]) & ~ext
     tt, s = t_all[sel], R["s"][sel]
     g = gxy_of(tt)
     s_gps, cross = evaluate.project_dp(path, g, s)
-    d_pos = np.hypot(*(path.xy_at(s) - g).T)
     road = (cross <= 20.0) & (np.abs(s_gps - s) <= 300.0)
     err = s - s_gps
-    out = dict(n_scored=int(len(tt)), lag=lag, correct_road=float(road.mean()), off_road_seconds=_runs(tt[~road]))
+    out = dict(truth="verified", n_scored=int(len(tt)), lag=0.0, correct_road=float(road.mean()), off_road_seconds=_runs(_t0(c) + tt[~road]))
     if road.any():
         a = np.abs(err[road])
-        sc = evaluate.signed_cross(path, s_gps, g)                                   # GPS offset from the centre line, + = left of travel
+        sc = evaluate.signed_cross(path, s_gps, g)                                   # track offset from the centre line, + = left of travel
         off = np.array([p["offset_m"] for p in rp])[sel]                             # applied driving-line offset, + = right
         out.update(along_median=float(np.median(a)), along_p90=float(np.percentile(a, 90)), along_w10=float((a <= 10).mean()), along_w30=float((a <= 30).mean()),
                    along_signed_median=float(np.median(err[road])),
@@ -284,7 +363,7 @@ def _runs(t, gap=2.0) -> list:
 def score_landmarks(c: dict, d: Path) -> dict:
     """lateness of the route at landmarks with a known video second: time at which the route passes the path point nearest to the landmark (searched within +-150 s) minus the truth"""
     from pyproj import Transformer
-    L = json.loads((HERE / "regress_landmarks.json").read_text())[c["name"]]
+    L = _landmarks(c)
     R = np.load(d / "refine" / "result.npz")
     tr = Transformer.from_crs(4326, str(R["crs"]), always_xy=True)
     t, s = R["t"], R["s"] + 1e-6 * np.arange(len(R["s"]))
@@ -300,11 +379,19 @@ def score_landmarks(c: dict, d: Path) -> dict:
     return dict(landmarks=rows, landmark_mean_abs_s=float(np.abs(late).mean()), landmark_max_abs_s=float(np.abs(late).max()))
 
 
+def _landmarks(c: dict) -> list:
+    """the landmarks or checkpoints of the case (key `landmarks`, default its name), their video seconds moved to route seconds; those outside a window dropped"""
+    L = json.loads((HERE / "regress_landmarks.json").read_text())[c.get("landmarks", c["name"])]
+    t0 = _t0(c)
+    t1 = float(c["window"][1]) if c.get("window") else float("inf")
+    return [dict(x, t=x["t"] - t0) for x in L if t0 <= x["t"] < t1]
+
+
 def score_checkpoints(c: dict, d: Path, L: list | None = None) -> dict:
     """distance between the route's position at the video second of each checkpoint (read from the frames, regress_landmarks.json) and the checkpoint;
     a checkpoint is hit when the distance is within its tolerance tol_m (default 50 m)"""
     from pyproj import Transformer
-    L = L if L is not None else json.loads((HERE / "regress_landmarks.json").read_text())[c["name"]]
+    L = L if L is not None else _landmarks(c)
     R = np.load(d / "refine" / "result.npz")
     tr = Transformer.from_crs(4326, str(R["crs"]), always_xy=True)
     pos = PathView(R["sg"], R["xy"]).xy_at(np.interp([cp["t"] for cp in L], R["t"], R["s"]))
@@ -320,6 +407,8 @@ def score_checkpoints(c: dict, d: Path, L: list | None = None) -> dict:
 
 def score_amalfi(c: dict, d: Path) -> dict:
     from rsm.pipeline import validate
+    if not (ROOT / "work" / "amalfi" / "evidence.json").exists():   # the tunnels judged by eye were local work data, never versioned
+        return dict(score_note="amalfi score skipped: work/amalfi/evidence.json (tunnels by eye) missing")
     r = validate.amalfi(d)
     return dict(tunnels=f"{r['tunnels']['hits']}/{r['tunnels']['n']}", tunnel_p_shift=r["tunnels"]["p_shift"], vietri_m=r["vietri_window_m"], erchie_m=r["erchie_window_m"])
 
@@ -345,7 +434,7 @@ def same_route(d: Path, ref: Path, tol: float = 50.0) -> dict:
 
 
 def score_case(c: dict, d: Path, log=print) -> dict:
-    row = dict(case=c["name"])
+    row = dict(case=c["name"], **({"known": c["known"]} if c.get("known") else {}))
     try:
         row.update(base_row(d))
         kind = c.get("score", "none")
@@ -366,7 +455,8 @@ def score_case(c: dict, d: Path, log=print) -> dict:
 
 
 # ------------------------------------------------------------------ table
-COLS = [("verdict", "verdict", "{}"), ("f_eff", "f_eff", "{:.0f}"), ("kappa", "kappa", "{:.2f}"), ("conf_mean", "post", "{:.3f}"), ("correct_road", "road %", "{:.1%}"),
+COLS = [("verdict", "verdict", "{}"), ("f_eff", "f_eff", "{:.0f}"), ("kappa", "kappa", "{:.2f}"), ("conf_mean", "post", "{:.3f}"), ("place_road", "place %", "{:.1%}"),
+        ("place_median_m", "place med m", "{:.1f}"), ("place_p90_m", "place p90 m", "{:.1f}"), ("correct_road", "road %", "{:.1%}"),
         ("along_median", "along med m", "{:.2f}"), ("along_p90", "p90 m", "{:.1f}"), ("along_w10", "<=10 m", "{:.0%}"), ("along_w30", "<=30 m", "{:.0%}"),
         ("cross_centre_median", "cross centre m", "{:.2f}"), ("cross_line_median", "cross line m", "{:.2f}"), ("cross_line_signed_median", "GPS-line signed m", "{:+.2f}"),
         ("landmark_mean_abs_s", "lm mean s", "{:.1f}"), ("landmark_max_abs_s", "lm max s", "{:.1f}"), ("cp_ok", "cp ok", "{}"), ("cp_median_m", "cp med m", "{:.0f}"), ("cp_max_m", "cp max m", "{:.0f}"), ("line", "line", "{}"), ("min_g", "min g", "{:.2f}")]
@@ -389,7 +479,7 @@ def fmt_table(rows: list[dict], base: dict | None = None) -> str:
             elif bv is not None and isinstance(v, str) and v != bv:
                 s += f" ({bv})"
             cells.append(s)
-        notes = [r[k] for k in ("error",) if k in r]
+        notes = [r[k] for k in ("error", "score_note") if k in r] + ([f"known: {r['known']}"] if r.get("known") else [])
         notes += [f"{k[3:]} {v:.1%}" for k, v in r.items() if k.startswith("vs_") and k.endswith("same_road_share")]
         notes += [f"vs baseline: same road {r['vs_base_same_road_share']:.1%}, position diff median {r['vs_base_position_diff_median_m']:.1f} m"] if "vs_base_same_road_share" in r else []
         notes += [f"tunnels {r['tunnels']}, Vietri {r['vietri_m']:.0f} m, Erchie {r['erchie_m']:.0f} m"] if "tunnels" in r else []
@@ -469,6 +559,7 @@ def main(argv=None) -> int:
     ap.add_argument("--no-cache", action="store_true", help="do not use the step cache (work/regress/_cache)")
     ap.add_argument("--adopt", default=None, help="tag (or path pattern with {case}) whose finished steps go into the step cache under the current keys")
     ap.add_argument("--adopt-steps", default="motion,rotation,map", help="leading steps to adopt (default motion,rotation,map)")
+    ap.add_argument("--stages", action="store_true", help="T2: start every case with a stage at map, on its frozen stage (no video); cases without one are skipped")
     a = ap.parse_args(argv)
     only = a.only.split(",") if a.only else None
     log = lambda m: print(time.strftime("%H:%M:%S"), m, flush=True)
@@ -484,6 +575,9 @@ def main(argv=None) -> int:
         return 0
     rows = []
     for c in cases(only):
+        if a.stages and not c.get("stage"):
+            log(f"case {c['name']}: no stage, skipped")
+            continue
         log(f"case {c['name']}")
         if a.displaced:
             rows += run_displaced(c, a.tag, code, log)
@@ -491,7 +585,7 @@ def main(argv=None) -> int:
         d = WORK / a.tag / c["name"]
         if not a.score_only:
             try:
-                run_case(c, a.tag, code, a.from_step, a.seed_tag, log, cache=not a.no_cache)
+                run_case(c, a.tag, code, a.from_step, a.seed_tag, log, cache=not a.no_cache, stage=a.stages)
             except (RuntimeError, FileNotFoundError) as e:
                 log(f"  FAILED: {e}")
                 rows.append(dict(case=c["name"], error=f"{type(e).__name__}: {e}"))
