@@ -79,8 +79,9 @@ def _config_names(src: str) -> set[str]:
     return names
 
 
-def step_keys(root: Path, P: dict, steps: list[str]) -> dict:
-    """{step: key} for the code under `root` (the directory that holds the rsm package) and the case params P"""
+def step_keys(root: Path, P: dict, steps: list[str], video_sig=None) -> dict:
+    """{step: key} for the code under `root` (the directory that holds the rsm package) and the case params P. `video_sig` replaces the
+    signature of the video file (path, size, mtime), for example by its sha256 for a frozen stage (rsm.bench.stages) whose source may move."""
     root = Path(root)
     cfg = runpy.run_path(str(root / "rsm" / "pipeline" / "config.py"))
     out, prev = {}, VERSION
@@ -92,7 +93,7 @@ def step_keys(root: Path, P: dict, steps: list[str]) -> dict:
         return [str(Path(p).resolve()), s.st_size, int(s.st_mtime)]
 
     hint = P.get("hint")
-    p_all = dict(P, video=sig(P.get("video")), pbf=sig(P.get("pbf")), hint=(hashlib.sha256(Path(hint).read_bytes()).hexdigest()[:16] if hint and Path(hint).exists() else hint))
+    p_all = dict(P, video=video_sig if video_sig is not None else sig(P.get("video")), pbf=sig(P.get("pbf")), hint=(hashlib.sha256(Path(hint).read_bytes()).hexdigest()[:16] if hint and Path(hint).exists() else hint))
     for sid in steps:
         mods = closure(root, STEP_ENTRY[sid], EXCLUDE.get(sid, ()))
         files, names = {}, set()

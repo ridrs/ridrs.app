@@ -83,6 +83,30 @@ test-data/
 
 `vangestel/` moved to `sources/vangestel/`. The tests read `clips/`, `long/` and `stages/` only.
 
+### Truth: verified and coarse (maintainer, 2026-11-19)
+
+| truth | where | good for | not good for |
+|---|---|---|---|
+| **verified** | Pontaix: `sources/vangestel/pontaix-chamaloc/manually_verified_video2gpx.gpx`, a video2gpx result checked by the maintainer, 5 points per second, `<time>` = video time | fine-tuning: speed, heading, turn timing, position along the road against video time; no clock alignment needed | the lateral position (the driving line is the OSM centre line plus a fixed offset, a model, not a measurement) |
+| **coarse** | the other 7 Van Gestel `track.gpx` | coarse localisation: is the route on the right road, where is the camera within about 10-20 m | anything timed to seconds: speed, heading rate, turn timing, the clock-aligned position error |
+| checkpoints / landmarks | Gotthard (10 checkpoints), Madone (landmarks) | the route at given video seconds, with a tolerance | fine-tuning between the points |
+
+Measured on Pontaix: the Van Gestel GPS lies 3.1 m (p50) / 5.1 m (p90) / 10.2 m (max) from the verified track, but its clock against the video drifts
+between about -2 and +2 s over the first 30 minutes and jumps by about 6 s at 31-33 min. Recorded in `clip_sources.json` (`gps_quality`, `verified`)
+and in `sources/vangestel/source.json`.
+
+Consequences:
+- **T1 (clips):** fine metrics (`v_err_med`, `v_fail`, `rot_rms_deg`, `turn_err`) are scored only on Pontaix clips against the verified track.
+  Clips of the other rides are scored on events (cuts, standstills, odometry failure), on parity with the full run (`vs_full_*`) and, if at all,
+  on the GPS speed only as a coarse check with wide tolerances (a scale error such as Lahntal's 3x stays visible).
+- **T2 (route):** coarse GPS cases are scored on the place only: share of time on the same road as the GPS, distance to the GPS track without
+  time (nearest point), with tolerances of 20 m or more; no score that compares positions at the same second. Pontaix is the only case with a
+  timed position score.
+- **No tuning on coarse truth.** A parameter or threshold is tuned on Pontaix (and checked on the coarse cases for regressions), never on the
+  coarse cases alone.
+- The circularity of the verified track: it is a video2gpx result. It is the reference for regressions and for timing, checked by eye; a change
+  that makes the pipeline better than it will look like a regression and needs the maintainer's look.
+
 ## 3. Building blocks
 
 ### A. The contract between image analysis and route (built 2026-11-19, step 1)
@@ -140,24 +164,26 @@ T2 recomputes `code` for the current code. A difference marks the case **stale**
 
   | kind | count | example |
   |---|---|---|
-  | typical straight / curves with GPS | 6 | one per Van Gestel area: Roanne, Pontaix, Rousset, Grimone, CdP, Pennes |
-  | sharp turns with GPS | 3 | hairpins Rousset, Grimone |
+  | typical straight / curves, verified truth | 4 | Pontaix (fine metrics) |
+  | typical straight / curves, coarse GPS | 3 | Roanne, Rousset, Pennes (events and parity only) |
+  | sharp turns | 3 | Pontaix (verified), hairpins Rousset, Grimone (parity only) |
   | known odometry failure | 2 | `lahntal-uniform-35m42` (vms speed about 3x too low), Gotthard valley road 3:50-5:50 |
   | scene cuts and false cuts | 3-4 | Gotthard sun flash 3:00-3:20 and intro cut 0:20, Cayolle intro cut 0:49 (only if they pass on the 480p source, see section 4) |
   | standstill | 2 | a stop and a slow crawl in traffic, chosen from the full runs |
   | traffic / occlusion | 1-2 | passing traffic, Amalfi or Nice-Monaco |
 
-- **Scoring:** secured clips against the aligned GPS with the existing metrics (`v_fail`, `v_err_med`, `rot_rms_deg`, `turn_err`); event clips
+- **Scoring:** Pontaix clips against the verified track with the existing fine metrics (`v_fail`, `v_err_med`, `rot_rms_deg`, `turn_err`); event clips
   with plain assertions (a cut at t, no cut in [a, b], standstill from a to b); every clip also against its own window in the full run
   (`vs_full_*` correlation ≥ 0.95 as a parity check). Expected values and tolerances live in `clip.json`.
-- The GPS alignments (`work/vangestel/align_<name>.json`) are lost; T4 computes them again once and stores them in `stage.json`.
+- The GPS alignments (`work/vangestel/align_<name>.json`) are lost; T4 computes them again once and stores them in `stage.json`. For the coarse
+  rides they only place a clip window; Pontaix needs none (the verified track is in video time).
 
 ### C. Route tests on frozen stages (T2)
 
 - `regress.py` gets a mode `--stages`: the case starts at `map` with `motion/` and `rotation/` copied (or cloned with `cp -c`) from
   `stages/<case>/`. Step cache and scan memo work as before.
 - **Short route cases** cut from the frozen stages (window t0-t1 of the track series, no video): the hard spots, with checkpoints or the GPS as
-  truth, 1-3 min each. Start list: Gotthard start 0:00-9:48 (odometry failure, village vs. bypass; 10 checkpoints exist), Rousset end (last 940 s
+  truth (coarse GPS: on the right road, within tolerance), 1-3 min each. Start list: Gotthard start 0:00-9:48 (odometry failure, village vs. bypass; 10 checkpoints exist), Rousset end (last 940 s
   wrong), Madone town, Bavaria start, Pennes descent.
 - **Full cases** on frozen stages: the 8 Van Gestel rides, Madone, Amalfi, Gotthard, Bavaria. With the scan memo a change after the scan reruns in
   minutes; a change to the HMM reruns the scan (40-120 min for all, as it must).
@@ -167,7 +193,7 @@ T2 recomputes `code` for the current code. A difference marks the case **stale**
 
 | id | window | why | truth |
 |---|---|---|---|
-| `roanne-10m` | Vallée de Roanne 0:00-10:00 | a good GPS ride, the e2e default today (full run in `runs/`) | GPS, cut to the window |
+| `roanne-10m` | Vallée de Roanne 0:00-10:00 | a GPS ride, the e2e default today (full run in `runs/`) | coarse GPS, cut to the window (place only) |
 | `gotthard-start` | Gotthard 480p 0:00-9:48 | the only case with an odometry failure, a disputed start and scene cuts; exercises `odofail.py`, the local pass, islands and the verdict | 10 checkpoints (`regress_landmarks.json`) |
 
 - `e2e.rs` reads `long/roanne-10m/` instead of the full Roanne video (`RSM_E2E_VIDEO`); `runs/vallee-de-roanne` is rebuilt from the 10 minutes.
@@ -230,7 +256,11 @@ the YouTube link, the licence note and the truth that exists.
 
 1. **Contract (A):** standstill to the image side, guard tests, `stage.json` format; route results identical to before (done 2026-11-19).
 2. **T4 once:** frozen stages for all sources with truth (8 Van Gestel, Madone, Amalfi, Gotthard, Bavaria; about 5-6 h in the background through
-   `scripts/heavy.sh`) and the GPS alignments again.
+   `scripts/heavy.sh`) and the GPS alignments again. Built 2026-11-19: `rsm.bench.stages` (`make [--only ids]` runs motion + rotation of the whole
+   source as `_step` workers in `work/stages/<id>/`, computes the GPS clock alignment for the Van Gestel rides with a ±20 s search, writes
+   `test-data/stages/<id>/`; `check [--verify-source]` reports fresh / stale / missing). The sources and their truth come from `clip_sources.json`
+   (ids `roanne`, `pontaix`, `rousset`, `grimone`, `cdp`, `pennes`, `lahntal`, `marburg`, `madone`, `amalfi`, `gotthard`, `bavaria`).
+   `stepcache.step_keys` takes the source sha256 in place of the file signature (`video_sig`). Tests: `tests/test_stages.py`.
 3. **Clips (B):** cutter by stream copy, horizon option, about 20 clips, T1 as pytest marker `clips`; the clip bench reads them.
 4. **Route on stages (C):** `regress.py --stages`, short route cases, T2.
 5. **Long videos (D):** cut `roanne-10m` and `gotthard-start`, repoint `e2e.rs`, rebuild `runs/`, T3.
@@ -267,3 +297,4 @@ the YouTube link, the licence note and the truth that exists.
 | D3 | The two long videos: `roanne-10m` and `gotthard-start` (480p)? Alternative to Gotthard: Madone 0:00-10:00 (4K, landmarks, no odometry failure). | Roanne + Gotthard |
 | D4 | Clips by stream copy (source pixels, about 18-85 MB per 30 s) instead of the bench's grey re-encode? | stream copy |
 | D5 | The removal list of step 0a, including the loss of the Clue cut test. | as listed |
+| D6 | Long video 1: `roanne-10m` (coarse GPS, today's e2e default) or `pontaix-10m` (verified truth, timed scores possible)? | `pontaix-10m` |
