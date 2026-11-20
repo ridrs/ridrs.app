@@ -1,5 +1,5 @@
 // The charts of the Analyse stage: one canvas, five lanes on one time axis (curvature video against map, yaw rate, speed, quality, confidence and events).
-// All lanes share zoom (wheel, pinch, buttons, keys), pan (drag), hover (values of every lane, position on the map) and click (the video seeks); a cursor
+// All lanes share zoom (wheel, pinch, buttons, keys, dragging a time range with the mouse), pan (Shift+drag, one finger), hover (values of every lane, position on the map) and click (the video seeks); a cursor
 // follows playback; the weak stretches are shaded and the one picked in the list is marked. Own canvas code, as elevationChart.ts (no chart library).
 import { MIN_SPAN_S, clampView, confCls, de, fmtClock, indexAt, kappaTickLabel, niceTicks, radiusText, robustRange, timeTicks, zoomAround, type View } from "./analyseStats";
 import { token } from "./app/theme";
@@ -41,7 +41,9 @@ export class AnalyseChart {
   private selected: AnalyseStretch | null = null;
   private raf = 0;
   private pointers = new Map<number, { x: number; y: number }>();
-  private dragFrom: { x: number; v: View } | null = null;
+  /** pan: move the view; brush: mark a time range and zoom into it on release (the mouse without Shift) */
+  private dragFrom: { x: number; v: View; mode: "pan" | "brush" } | null = null;
+  private brushEl: HTMLElement;
   private moved = 0;
   private pinch: { d: number; v: View; at: number } | null = null;
   private plot = { x: LEFT, y: TOP, w: 100, h: 100 };
@@ -54,7 +56,8 @@ export class AnalyseChart {
     this.canvas = el("canvas", { class: "ec-canvas", "aria-hidden": "true" });
     this.tip = el("div", { class: "ec-tip", hidden: true, "aria-hidden": "true" });
     this.live = el("div", { class: "sr-only", "aria-live": "polite" });
-    this.el = el("div", { class: "ec ac", tabIndex: 0, role: "group", "aria-label": "Diagramme der Analyse auf einer gemeinsamen Zeitachse. Pfeil links und rechts: Zeit wählen, Umschalt mit Pfeil: verschieben, Plus und Minus: zoomen, Eingabe: Video dorthin springen, Null: ganzes Video." }, this.canvas, this.tip, this.live);
+    this.brushEl = el("div", { class: "ac-brush", hidden: true, "aria-hidden": "true" });
+    this.el = el("div", { class: "ec ac", tabIndex: 0, role: "group", "aria-label": "Diagramme der Analyse auf einer gemeinsamen Zeitachse. Pfeil links und rechts: Zeit wählen, Umschalt mit Pfeil: verschieben, Plus und Minus: zoomen, Eingabe: Video dorthin springen, Null: ganzes Video." }, this.canvas, this.brushEl, this.tip, this.live);
     const c = this.canvas;
     c.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
     c.addEventListener("pointerdown", (e) => this.onDown(e));
@@ -123,13 +126,13 @@ export class AnalyseChart {
     this.canvas.setPointerCapture(e.pointerId);
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     this.moved = 0;
-    if (this.pointers.size === 1) this.dragFrom = { x: e.clientX, v: { ...this.view } };
+    if (this.pointers.size === 1) this.dragFrom = { x: e.clientX, v: { ...this.view }, mode: e.pointerType === "touch" || e.shiftKey ? "pan" : "brush" };
     else if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
       this.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, v: { ...this.view }, at: this.timeAt((a.x + b.x) / 2) };
-      this.dragFrom = null; this.moved = 99;
+      this.dragFrom = null; this.moved = 99; this.hideBrush();
     }
-    this.el.classList.add("grabbing");
+    if (this.dragFrom?.mode !== "brush") this.el.classList.add("grabbing");
   }
   private onMove(e: PointerEvent) {
     if (!this.S) return;
@@ -143,7 +146,8 @@ export class AnalyseChart {
       } else if (this.dragFrom) {
         const dx = e.clientX - this.dragFrom.x;
         this.moved = Math.max(this.moved, Math.abs(dx));
-        if (this.moved > 4) {
+        if (this.moved > 4 && this.dragFrom.mode === "brush") this.showBrush(this.dragFrom.x, e.clientX);
+        else if (this.moved > 4) {
           const span = this.dragFrom.v.v1 - this.dragFrom.v.v0, d = -(dx / this.plot.w) * span;
           this.view = clampView({ v0: this.dragFrom.v.v0 + d, v1: this.dragFrom.v.v1 + d }, this.t0, this.t1);
           this.hooks.onView(); this.draw();
@@ -159,11 +163,26 @@ export class AnalyseChart {
     if (!this.pointers.size) {
       this.el.classList.remove("grabbing");
       if (had && !cancel && this.moved <= 4 && this.dragFrom) this.hooks.onClick(this.timeAt(e.clientX));
-      this.dragFrom = null;
+      else if (had && !cancel && this.dragFrom?.mode === "brush") {
+        const a = this.timeAt(this.dragFrom.x), b = this.timeAt(e.clientX);
+        this.setView({ v0: Math.min(a, b), v1: Math.max(a, b) }); // clampView keeps at least MIN_SPAN_S
+      }
+      this.dragFrom = null; this.hideBrush();
       if (e.pointerType === "touch") this.setHover(null);
     }
   }
+  /** the marked range between two client x positions, inside the plot */
+  private showBrush(xa: number, xb: number) {
+    const r = this.canvas.getBoundingClientRect(), p = this.plot;
+    const cl = (x: number) => Math.max(p.x, Math.min(p.x + p.w, x - r.left));
+    const a = cl(Math.min(xa, xb)), b = cl(Math.max(xa, xb));
+    const last = this.lanes[this.lanes.length - 1], bottom = last ? last.y + last.h : p.y + p.h;
+    Object.assign(this.brushEl.style, { left: `${a}px`, width: `${Math.max(1, b - a)}px`, top: `${p.y}px`, height: `${bottom - p.y}px` });
+    this.brushEl.hidden = false;
+  }
+  private hideBrush() { this.brushEl.hidden = true; }
   private onKey(e: KeyboardEvent) {
+    if (e.key === "Escape" && this.dragFrom?.mode === "brush") { e.preventDefault(); this.dragFrom = null; this.hideBrush(); return; }
     if (!this.S || e.metaKey || e.ctrlKey || e.altKey) return;
     const span = this.view.v1 - this.view.v0, at = this.hover ?? this.cursor ?? (this.view.v0 + this.view.v1) / 2;
     const move = (d: number) => { const a = Math.max(this.view.v0, Math.min(this.view.v1, at + d)); this.setHover(a); this.live.textContent = this.describe(a).join(". "); };

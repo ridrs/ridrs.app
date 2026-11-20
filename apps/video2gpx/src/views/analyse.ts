@@ -15,6 +15,7 @@ import { el, fmtKm, pointAt } from "../util";
 import { getPlayer } from "../videoPanel";
 
 const LAYER_KEY = "v2g.analyseLayers";
+const OV_OPEN_KEY = "v2g.analyseOverlayOpen";
 const TICK_MS = 2500;       // while the video plays the overlay is asked for this often
 let root: HTMLElement, statusEl: HTMLElement, nextBtn: HTMLButtonElement, notes: HTMLElement, ovBox: HTMLElement, frameInfo: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement;
 let listBox: HTMLElement, figBox: HTMLElement, emptyEl: HTMLElement, rangeEl: HTMLElement;
@@ -28,7 +29,7 @@ const cbs: Record<"motion" | "rotation", HTMLInputElement> = {} as any;
 function loadLayers() { try { const o = JSON.parse(localStorage.getItem(LAYER_KEY) ?? "{}"); layers = { ...DEFAULT_LAYERS, ...o }; } catch { /* the defaults */ } }
 function saveLayers() { try { localStorage.setItem(LAYER_KEY, JSON.stringify(layers)); } catch { /* private mode */ } }
 
-export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement) {
+export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl: HTMLElement) {
   loadLayers();
   overlay = new Overlay(videoHost);
   root = el("div", { class: "an-view", hidden: true });
@@ -42,11 +43,22 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement) {
     return el("label", { class: "check an-sw" }, c, sample, el("span", {}, text));
   };
   const dotSw = (...cols: string[]) => el("span", { class: "an-swatch", "aria-hidden": "true" }, ...cols.map((col) => el("i", { style: `background:${col}` })));
-  ovBox = el("section", { class: "panel stack", "aria-labelledby": "an-ov-h" },
-    el("div", { class: "row wrap between" }, el("h3", { id: "an-ov-h" }, "Overlay auf dem Video"),
+  // the overlay panel sits above video and map (in the head row of the workspace); collapsed it keeps only its title line with the switches
+  let ovOpen = true;
+  try { ovOpen = localStorage.getItem(OV_OPEN_KEY) !== "0"; } catch { /* private mode */ }
+  const ovBody = el("div", { id: "an-ov-body", class: "stack" });
+  const ovToggle = iconBtn("chevron", "Overlay-Erklärung ein- oder ausklappen", () => setOvOpen(!ovOpen), { "aria-controls": "an-ov-body", class: "icon-btn an-ov-toggle" });
+  const setOvOpen = (o: boolean) => {
+    ovOpen = o; ovBody.hidden = !o; ovToggle.setAttribute("aria-expanded", String(o)); ovBox.classList.toggle("collapsed", !o);
+    try { localStorage.setItem(OV_OPEN_KEY, o ? "1" : "0"); } catch { /* private mode */ }
+  };
+  ovBox = el("section", { class: "panel stack an-ov", "aria-labelledby": "an-ov-h", hidden: true },
+    el("div", { class: "row wrap between" }, el("div", { class: "row" }, ovToggle, el("h3", { id: "an-ov-h" }, "Overlay auf dem Video")),
       el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic, COL.ignored)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)))),
-    el("p", { class: "small muted" }, `Die Punkte werden für das Bild unter dem Zeiger neu verfolgt (mit den Parametern der Berechnung, ohne ein Ergebnis zu ändern); das dauert etwa eine Sekunde. Bewegung: Straßenpunkte der Bildbewegung, grün = zählt für Tempo und Gierrate (Inlier), rot = verworfen, magenta gestrichelt und durchgekreuzt = vorbeifahrender Verkehr, vom Tempo ignoriert, Pfeil = Verschiebung zum nächsten Bild (${GAIN.motion}-fach), gestrichelt das Straßenfeld, gelb der Horizont. Rotation: Fernmerkmale über dem Horizont, cyan = Inlier, orange = verworfen, Pfeil = Verschiebung im Fenster (${GAIN.rotation}-fach), gepunktet die Bänder, oben die Gierrate. Beim Abspielen wird alle ${TICK_MS / 1000} s aktualisiert.`),
+    ovBody);
+  ovBody.append(el("p", { class: "small muted" }, `Die Punkte werden für das Bild unter dem Zeiger neu verfolgt (mit den Parametern der Berechnung, ohne ein Ergebnis zu ändern); das dauert etwa eine Sekunde. Bewegung: Straßenpunkte der Bildbewegung, grün = zählt für Tempo und Gierrate (Inlier), rot = verworfen, magenta gestrichelt und durchgekreuzt = vorbeifahrender Verkehr, vom Tempo ignoriert, Pfeil = Verschiebung zum nächsten Bild (${GAIN.motion}-fach), gestrichelt das Straßenfeld, gelb der Horizont. Rotation: Fernmerkmale über dem Horizont, cyan = Inlier, orange = verworfen, Pfeil = Verschiebung im Fenster (${GAIN.rotation}-fach), gepunktet die Bänder, oben die Gierrate. Beim Abspielen wird alle ${TICK_MS / 1000} s aktualisiert.`),
     frameInfo);
+  setOvOpen(ovOpen);
   legendEl = el("div", { class: "elev-legend", role: "group", "aria-label": "Spuren der Diagramme" });
   rangeEl = el("span", { class: "small muted tnum" });
   zoomIn = iconBtn("plus", "Hineinzoomen", () => chart.zoomBy(0.5));
@@ -61,17 +73,18 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement) {
   chartBox = el("section", { class: "panel stack", "aria-labelledby": "an-chart-h" },
     el("div", { class: "row wrap between elev-head" }, el("h3", { id: "an-chart-h" }, "Verlauf im Video"), el("div", { class: "row" }, rangeEl, zoomOut, zoomIn, zoomAll)),
     el("div", { class: "elev-chartwrap" }, chart.el, emptyEl), legendEl,
-    el("p", { class: "small muted" }, "Mausrad, Zwei-Finger-Geste oder die Knöpfe zoomen (bis 10 s Breite), Ziehen verschiebt, ein Klick springt im Video an die Stelle. Rot hinterlegt sind die schwachen Abschnitte. Die Kurvenrate ist die Richtungsänderung je Kilometer über ein Fenster von etwa 30 m, links positiv: aus der Gierrate und dem Tempo des Videos, und aus der Linie der Karte an der gefundenen Stelle. Passen beide nicht zusammen, stimmt entweder die Messung nicht, oder die Position ist falsch."));
+    el("p", { class: "small muted" }, "Mausrad, Zwei-Finger-Geste oder die Knöpfe zoomen (bis 10 s Breite), Ziehen mit der Maus zoomt in den markierten Zeitraum, Umschalt und Ziehen (oder ein Finger) verschiebt, ein Doppelklick zoomt hinein, ein Klick springt im Video an die Stelle. Rot hinterlegt sind die schwachen Abschnitte. Die Kurvenrate ist die Richtungsänderung je Kilometer über ein Fenster von etwa 30 m, links positiv: aus der Gierrate und dem Tempo des Videos, und aus der Linie der Karte an der gefundenen Stelle. Passen beide nicht zusammen, stimmt entweder die Messung nicht, oder die Position ist falsch."));
   listBox = el("section", { class: "panel stack", "aria-labelledby": "an-list-h" });
   figBox = el("section", { class: "panel stack", "aria-labelledby": "an-fig-h" });
   root.append(
     el("div", { class: "row wrap between elev-head" }, el("div", { class: "row wrap" }, el("h2", {}, "Analyse"), statusEl), nextBtn),
-    notes, ovBox, chartBox, el("div", { class: "elev-bottom an-bottom" }, listBox, figBox));
+    notes, chartBox, el("div", { class: "elev-bottom an-bottom" }, listBox, figBox));
   mainEl.append(root);
+  headEl.append(ovBox);
 
   bus.on("stage", (s: string | null) => {
     const on = s === "analyse";
-    root.hidden = !on;
+    root.hidden = !on; ovBox.hidden = !on;
     if (on) void enter(); else leave();
   });
   bus.on("analyse", () => { if (!root.hidden) update(); });

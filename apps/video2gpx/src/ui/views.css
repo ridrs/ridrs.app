@@ -173,6 +173,10 @@
 .ac { height: clamp(380px, 56vh, 560px); }
 .ov-canvas { position: absolute; pointer-events: none; z-index: 2; }
 .an-sw { gap: 8px; }
+.an-ov-toggle .icon-chevron { transition: transform .2s; transform: rotate(90deg); }
+.an-ov.collapsed .an-ov-toggle .icon-chevron { transform: none; }
+.an-ov.collapsed { padding-block: var(--sp-2); }
+.ac-brush { position: absolute; z-index: 3; pointer-events: none; background: color-mix(in srgb, var(--c-accent) 18%, transparent); border-inline: 1px solid var(--c-accent); }
 .an-swatch { display: inline-flex; gap: 2px; } .an-swatch i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .an-frameinfo { display: flex; flex-direction: column; gap: var(--sp-1); min-height: 20px; }
 .an-fl { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); }
