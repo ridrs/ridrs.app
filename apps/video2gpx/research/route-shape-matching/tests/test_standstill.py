@@ -156,3 +156,54 @@ def test_export_adds_edges_and_keeps_the_standstill():
     old = _R(t=t)
     t3, *_ , st3 = X.add_still_edges(old, t, s, np.ones(len(t)))
     assert len(t3) == 20 and not st3.any()
+
+
+def test_fusion_distance_follows_the_odometry_inside_a_step():
+    """a stop inside one 30-m step: the step total stays, but the distance inside the step follows the track (not a flat speed over the step)"""
+    from types import SimpleNamespace
+    # track: 10 m/s for 3 s, standing 10 s, 10 m/s again (4-m samples on distance, as tracks._resample)
+    tt = np.array([0.0, 3.0, 13.0, 16.0]); ss = np.array([0.0, 30.0, 30.4, 60.4])
+    g = np.arange(0.0, 60.4, 4.0)
+    tr = dict(t=np.interp(g, ss, tt), s=g, th=np.zeros(len(g)))
+    st = SimpleNamespace(t=np.array([0.0, 2.0, 15.0, 16.0]), mu=np.array([0.0, 20.0, 30.4, 10.0]), gap=np.zeros(4, bool))
+    Dcum = np.concatenate([[0.0], np.cumsum(st.mu[1:])])
+    ctx = SimpleNamespace(st=st, tracks=[tr], D=lambda t: np.interp(t, st.t, Dcum))
+    t = np.arange(0.0, 16.01, 0.5)
+    D = SC.shaped_D(ctx, t)
+    assert np.allclose(SC.shaped_D(ctx, st.t), Dcum)                                   # step totals unchanged
+    v = np.diff(D) / 0.5
+    stop = (t[1:] > 4.0) & (t[1:] <= 12.5)
+    assert v[stop].max() < 0.5                                                         # held, not 30.4 m / 13 s = 2.3 m/s
+    assert np.all(np.diff(D) >= -1e-9)
+
+
+def test_fusion_fine_profile_beats_the_4m_samples():
+    """with the per-pair profile the stop is held even when one 4-m track sample spans it"""
+    from types import SimpleNamespace
+    tt = np.array([0.0, 3.0, 13.0, 16.0]); ss = np.array([0.0, 30.0, 30.4, 60.4])
+    g = np.arange(0.0, 60.4, 4.0)
+    tr = dict(t=np.interp(g, ss, tt), s=g, th=np.zeros(len(g)))
+    st = SimpleNamespace(t=np.array([0.0, 2.0, 15.0, 16.0]), mu=np.array([0.0, 20.0, 30.4, 10.0]), gap=np.zeros(4, bool))
+    Dcum = np.concatenate([[0.0], np.cumsum(st.mu[1:])])
+    tf = np.arange(0.0, 16.01, 0.1)
+    fine = (tf, np.interp(tf, tt, ss))
+    ctx = SimpleNamespace(st=st, tracks=[tr], D=lambda t: np.interp(t, st.t, Dcum), extra=dict(fine=fine))
+    t = np.arange(0.0, 16.01, 0.5)
+    D = SC.shaped_D(ctx, t)
+    v = np.diff(D) / 0.5
+    assert v[(t[1:] > 3.5) & (t[1:] <= 13.0)].max() < 0.1
+    assert np.allclose(SC.shaped_D(ctx, st.t), Dcum)
+
+
+def test_fusion_shapes_a_gap_step_too():
+    """the stop's pairs are rejected (negative speed) and split the track: the gap step is shaped by the filled per-pair profile, not spread evenly"""
+    from types import SimpleNamespace
+    st = SimpleNamespace(t=np.array([0.0, 4.0, 14.0]), mu=np.array([0.0, 30.0, 32.0]), gap=np.array([False, False, True]))
+    Dcum = np.concatenate([[0.0], np.cumsum(st.mu[1:])])
+    tf = np.arange(0.0, 14.01, 0.1)
+    fine = (tf, np.interp(tf, [0.0, 3.0, 11.0, 14.0], [0.0, 30.0, 30.2, 60.2]))
+    ctx = SimpleNamespace(st=st, tracks=[], D=lambda t: np.interp(t, st.t, Dcum), extra=dict(fine=fine))
+    t = np.arange(0.0, 14.01, 0.5)
+    v = np.diff(SC.shaped_D(ctx, t)) / 0.5
+    assert v[(t[1:] > 5.0) & (t[1:] <= 10.5)].max() < 0.2
+    assert np.allclose(SC.shaped_D(ctx, st.t), Dcum)

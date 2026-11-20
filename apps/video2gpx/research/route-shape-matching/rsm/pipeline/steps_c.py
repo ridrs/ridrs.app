@@ -142,6 +142,93 @@ def hold_still(nodes, dm, dg, meas, still):
     return [m for m in meas if not any(a + 1e-9 < m.t < b - 1e-9 for a, b in still)]
 
 
+def fine_profile(csv: str):
+    """cumulative vms distance per pair (usable pairs only, rejected ones filled from their neighbours, never negative) -> (t, F); relative units, only its
+    shape inside one step is used. Finer than the 4-m track samples, which put a whole stop into one sample and so still gave a flat speed over it."""
+    from rsm.odometry import gating
+    from rsm.odometry.vms_csv import load_pairs
+    from rsm.farrot import series as fser
+    p = load_pairs(csv)
+    ok = gating.pair_flags(p) == 0
+    if ok.sum() < 2:
+        return None
+    sp = np.maximum(np.nan_to_num(fser._fill(np.where(ok, p.rel_speed, np.nan))), 0.0)
+    t = np.concatenate([p.time - p.dt / 2, [p.time[-1] + p.dt / 2]])
+    return t, np.concatenate([[0.0], np.cumsum(sp)])
+
+
+def shaped_D(ctx, t) -> np.ndarray:
+    """ctx.D with the time profile of the odometry INSIDE every step (per-pair profile ctx.extra["fine"] if set, else the 4-m track samples): ctx.D is linear in time between two step times (30 / 15 m nominal), so a stop or a
+    slow-down inside one step is spread evenly over it (Madone 23:45 and 42:22: 2.2-2.4 m/s flat for 16 s while the video says 0.4 m/s). Here a step whose
+    two ends lie in the same vms track gets its distance mu distributed like the track's own distance over time (4 m samples). With the per-pair profile
+    every step is shaped, gap steps too (Madone 43:50: the stop reads -0.04 m/s, those pairs are rejected and split the track, so the stop lies in a gap
+    step); rejected pairs carry the speed filled from their neighbours, the same assumption the gap distance makes. The value at every step time, and so
+    every step total, is unchanged; scene cuts are handled after this by cut_process."""
+    t = np.asarray(t, float)
+    base = ctx.D(t)
+    if not C.FUSE_SHAPE_STEPS:
+        return base
+    st_t, mu, gap = np.asarray(ctx.st.t, float), np.asarray(ctx.st.mu, float), np.asarray(ctx.st.gap, bool)
+    out = base.copy()
+    fine = (getattr(ctx, "extra", None) or {}).get("fine")
+    i = np.clip(np.searchsorted(st_t, t, side="right") - 1, 0, len(st_t) - 2)
+    ta, tb = st_t[i], st_t[i + 1]
+    if fine is not None:
+        Te, Se = fine
+        m = (ta >= Te[0]) & (tb <= Te[-1]) & (tb > ta) & (mu[i + 1] > 0)
+        fa, fb, fn = np.interp(ta[m], Te, Se), np.interp(tb[m], Te, Se), np.interp(t[m], Te, Se)
+        ok = fb - fa > 1e-9
+        k = np.flatnonzero(m)[ok]
+        out[k] = ctx.D(ta[k]) + mu[i[k] + 1] * np.clip((fn[ok] - fa[ok]) / (fb[ok] - fa[ok]), 0.0, 1.0)
+        return out
+    for tr in ctx.tracks or []:
+        T, S = np.asarray(tr["t"], float), np.asarray(tr["s"], float)
+        if len(T) < 2:
+            continue
+        m = (t >= T[0]) & (t <= T[-1]) & (ta >= T[0] - 1e-6) & (tb <= T[-1] + 1e-6) & (tb > ta) & ~gap[i + 1] & (mu[i + 1] > 0)
+        if not m.any():
+            continue
+        Te, Se = T + 1e-9 * np.arange(len(T)), S
+        fa, fb, fn = np.interp(ta[m], Te, Se), np.interp(tb[m], Te, Se), np.interp(t[m], Te, Se)
+        ok = fb - fa > 1e-6
+        k = np.flatnonzero(m)[ok]
+        frac = np.clip((fn[ok] - fa[ok]) / (fb[ok] - fa[ok]), 0.0, 1.0)
+        out[k] = ctx.D(ta[m][ok]) + mu[i[k] + 1] * frac
+    return out
+
+
+def _span_mask(t: np.ndarray, spans) -> np.ndarray:
+    m = np.zeros(len(t), bool)
+    for x in spans:
+        m |= (t >= x["t0"]) & (t <= x["t1"])
+    return m
+
+
+def grid_flags(t, lo, hi, post_, prior_dec, kept, gap_spans, cut_spans, still):
+    """the per-time flags of a result grid (the 1 s grid and the GPX raster use the same rules) -> (conf, extrap, in_gap, in_still, in_prior).
+    lo, hi: decoded span; post_: route posterior (t, p_vit); prior_dec / kept: stretches of the local pass ({t0, t1}); gap_spans: (t_prev, t) of every vms gap step;
+    cut_spans: scene cuts (ta, tb, ...); still: sure standstills (t0, t1)."""
+    t = np.asarray(t, float)
+    okp = np.isfinite(post_["p_vit"])
+    extrap = (t < lo) | (t > hi)
+    conf = np.where(extrap, 0.0, np.interp(t, post_["t"][okp], post_["p_vit"][okp]))
+    # A3: where only the road-class prior of the local pass decided between two parallel streets, the position is not known from the video: confidence <= 0.5
+    in_prior = _span_mask(t, prior_dec) & ~extrap
+    conf = np.where(in_prior, np.minimum(conf, C.PRIOR_DECIDED_CONF), conf)
+    in_kept = _span_mask(t, kept)                     # acceptance test of the local pass: the search route was kept against another road
+    conf = np.where(in_kept & ~extrap, np.minimum(conf, C.LOCAL_KEPT_CONF), conf)
+    in_gap = np.zeros(len(t), bool)
+    for a, b in gap_spans:
+        in_gap |= (t > a) & (t <= b)
+    for ta, tb, *_ in cut_spans:                      # a cut: up to the first whole second after the jump is marked too (the position is not continuous there)
+        in_gap |= (t > ta) & (t <= np.ceil(tb))
+    in_still = np.zeros(len(t), bool)                 # sure standstill: the position is held (measured, not a gap)
+    for a, b in still:
+        in_still |= (t >= a) & (t <= b)
+    in_gap &= ~in_still
+    return conf, extrap, in_gap, in_still, in_prior
+
+
 def fuse(v: Video, anchors, t_out, fp=None, pp=None, extra=None, cut_spans=None, still=None):
     """rsm.fusion.core.fuse. extra (optional): list of (t, s, sd) position measurements of the dense heading alignment, added to the posterior and anchors.
     cut_spans (optional, rsm.pipeline.cuts.spans): (ta, tb[, tc, v]) of every scene cut. From ta to the cut tc the riding goes on at the speed v of the last
@@ -178,7 +265,7 @@ def fuse(v: Video, anchors, t_out, fp=None, pp=None, extra=None, cut_spans=None,
     nodes = np.unique(np.concatenate([t_out, ctx.t_step, [m.t for m in meas], np.ravel(still) if still else []]))
     nodes = nodes[(nodes >= ctx.t_step[0] - 1e-9) & (nodes <= ctx.t_step[-1] + 1e-9)]
     meas = [m for m in meas if ctx.t_step[0] - 1e-9 <= m.t <= ctx.t_step[-1] + 1e-9]
-    D = ctx.D(nodes)
+    D = shaped_D(ctx, nodes)
     G = np.interp(nodes, ctx.tt, ctx._gapcum)
     dm = np.concatenate([[0.0], np.diff(D) * ctx.kappa])
     dg = np.concatenate([[0.0], np.diff(G) * ctx.kappa])
@@ -244,7 +331,8 @@ def align_pieces(sg, xy, tracks, kappa, a_ang, t_prior, s_prior, gap_nom=None):
     parts = [p for p in parts if p is not None]
     if not parts:
         return None
-    return dict(t=np.concatenate([p["t"] for p in parts]), s=np.concatenate([p["s"] for p in parts]), n_obs=sum(p["n_obs"] for p in parts),
+    post = {k: np.concatenate([p[k] for p in parts]) for k in ("s_mean", "s_sd") if all(k in p for p in parts)}
+    return dict(**post, t=np.concatenate([p["t"] for p in parts]), s=np.concatenate([p["s"] for p in parts]), n_obs=sum(p["n_obs"] for p in parts),
                 n_gaps=sum(p["n_gaps"] for p in parts), n_gaps_measured=sum(p["n_gaps_measured"] for p in parts), n_pieces=len(parts))
 
 
@@ -312,6 +400,7 @@ def refine(d: Path, P: dict, W: Worker):
     prog = lambda p_, lab, force=True: W.progress(P0 + (100.0 - P0) * p_ / 100.0, lab, force=force)
     spans = K.spans(st, tracks)                  # scene cuts (rsm.pipeline.cuts): no smoothing and no alignment across them; [] without cuts
     ctx, cell_edge, cell_off = build_ctx(g, E, st, tracks, route)
+    ctx.extra["fine"] = fine_profile(csv)        # per-pair odometry distance over time: shapes the distance inside a step in the fusion (shaped_D)
     k = route["kappa"]
     G = grid.build(g, E, h=route.get("h", C.H * k), sm=10.0 * k,
                    edge_cost=L.minor_cost(g, E, jload(d / "rotation" / "vehicle.json")["effective"]) if route.get("local") else None)
@@ -352,9 +441,19 @@ def refine(d: Path, P: dict, W: Worker):
                 sgi = np.clip(np.rint(al["s"]).astype(int), 0, len(phs) - 1)
                 turn = np.degrees(np.abs(phs[np.minimum(sgi + hw, len(phs) - 1)] - phs[np.maximum(sgi - hw, 0)]))
                 keep, last = [], -1e9
-                for t_, s_, tu in zip(al["t"], al["s"], turn):
-                    if tu >= C.ALIGN_TURN_DEG and s_ - last >= C.ALIGN_MEAS_EVERY_M:
-                        keep.append((t_, s_, C.ALIGN_MEAS_SD_M)); last = s_
+                if C.ALIGN_MEAS_MODE == "posterior" and "s_sd" in al:
+                    # every sample, weighted by how sure the heading alignment is there (align.band_posterior): curves of any size pin the time, straights drop out
+                    # position = the Viterbi path (the posterior mean trails it by ~10 m on long climbs), weight = the posterior spread; samples far from the
+                    # HMM route are dropped (a wrong alignment start is confidently wrong, e.g. Grimone 0-70 s)
+                    sdm = np.sqrt(al["s_sd"] ** 2 + C.ALIGN_POST_FLOOR_M ** 2) * C.ALIGN_POST_INFL
+                    far = np.abs(al["s"] - np.interp(al["t"], ctx.t_step, ctx.s_vit)) > C.ALIGN_POST_GATE_M
+                    for t_, s_, sd_, f_ in zip(al["t"], al["s"], sdm, far):
+                        if not f_ and sd_ <= C.ALIGN_POST_MAX_SD_M and s_ - last >= C.ALIGN_MEAS_EVERY_M:
+                            keep.append((t_, s_, float(sd_))); last = s_
+                else:
+                    for t_, s_, tu in zip(al["t"], al["s"], turn):
+                        if tu >= C.ALIGN_TURN_DEG and s_ - last >= C.ALIGN_MEAS_EVERY_M:
+                            keep.append((t_, s_, C.ALIGN_MEAS_SD_M)); last = s_
                 extra = keep
                 align_info["used"] = True
                 W.log("info", f"dense heading alignment: {al['n_obs']} samples on the path, {len(keep)} position measurements; differs from the HMM route by "
@@ -371,37 +470,27 @@ def refine(d: Path, P: dict, W: Worker):
     ix = np.searchsorted(t_fuse, t_all)
     fd = dict(fd, s=fd["s"][ix], s_sd=fd["s_sd"][ix])
     lo, hi = float(ctx.t_step[0]), float(ctx.t_step[-1])
-    extrap = (t_all < lo) | (t_all > hi)
     post_ = route["post"]
     okp = np.isfinite(post_["p_vit"])
-    conf = np.where(extrap, 0.0, np.interp(t_all, post_["t"][okp], post_["p_vit"][okp]))
-    # A3: where only the road-class prior of the local pass decided between two parallel streets, the position is not known from the video: confidence <= 0.5
     prior_dec = (local_info or {}).get("prior_decided") or []
-    in_prior = np.zeros(len(t_all), bool)
-    for x in prior_dec:
-        in_prior |= (t_all >= x["t0"]) & (t_all <= x["t1"])
-    in_prior &= ~extrap
-    conf = np.where(in_prior, np.minimum(conf, C.PRIOR_DECIDED_CONF), conf)
-    in_kept = np.zeros(len(t_all), bool)              # acceptance test of the local pass: the search route was kept against another road
-    for x in (local_info or {}).get("kept_search") or []:
-        in_kept |= (t_all >= x["t0"]) & (t_all <= x["t1"])
-    conf = np.where(in_kept & ~extrap, np.minimum(conf, C.LOCAL_KEPT_CONF), conf)
+    gap_spans = [(float(st.t[j - 1]), float(st.t[j])) for j in np.flatnonzero(st.gap) if j > 0]
+    flags = lambda t: grid_flags(t, lo, hi, post_, prior_dec, (local_info or {}).get("kept_search") or [], gap_spans, spans, still)
+    conf, extrap, in_gap, in_still, in_prior = flags(t_all)
+    # the GPX raster (C.GPX_HZ points per video second): the smoother is run a second time with these times as nodes, so the points between two seconds
+    # follow the measured motion; the 1 s arrays above stay as they were (validation, benchmarks and the analysis stage read them per second)
+    t_gx = np.arange(int(np.floor(dur)) * C.GPX_HZ + 1) / C.GPX_HZ
+    if C.GPX_HZ > 1:
+        fx = fuse(vid, ad, t_gx, extra=extra, cut_spans=spans, still=still)
+        s_gx, sd_gx = fx["s"], fx["s_sd"]
+    else:
+        s_gx, sd_gx = fd["s"], fd["s_sd"]
+    conf_gx, extrap_gx, in_gap_gx, in_still_gx, _ = flags(t_gx)
     prior_share = float(in_prior.sum() / max(int((~extrap).sum()), 1))
     if prior_dec:
         mmss = lambda t: f"{int(t) // 60}:{int(t) % 60:02d}"
         W.status("parallel_street", "difficult", prior_share, "the video cannot tell two parallel streets apart; the main road was assumed: "
                  + "; ".join(f"{mmss(x['t0'])}-{mmss(x['t1'])} {x['name_with'] or 'unnamed road'} (alternative: {x['name_without'] or 'unnamed road'})" for x in prior_dec[:5])
                  + (f" and {len(prior_dec) - 5} more" if len(prior_dec) > 5 else ""))
-    in_gap = np.zeros(len(t_all), bool)
-    for j in np.flatnonzero(st.gap):
-        if j > 0:
-            in_gap |= (t_all > st.t[j - 1]) & (t_all <= st.t[j])
-    for ta, tb, *_ in spans:                     # a cut: the first second after the jump is marked too (the position is not continuous there)
-        in_gap |= (t_all > ta) & (t_all <= np.ceil(tb))
-    in_still = np.zeros(len(t_all), bool)        # sure standstill: the position is held (measured, not a gap)
-    for a, b in still:
-        in_still |= (t_all >= a) & (t_all <= b)
-    in_gap &= ~in_still
     lo_s, hi_s = (np.array([a for a, _ in still], float), np.array([b for _, b in still], float)) if still else (np.zeros(0), np.zeros(0))
     e_s = dict(zip(edges.tolist(), fd_e["s"].tolist()))
     e_sd = dict(zip(edges.tolist(), fd_e["s_sd"].tolist()))
@@ -420,14 +509,15 @@ def refine(d: Path, P: dict, W: Worker):
     still_out = dict(still_t0=lo_s, still_t1=hi_s, still_s0=np.array([e_s.get(a, np.nan) for a in lo_s]), still_s1=np.array([e_s.get(b, np.nan) for b in hi_s]),
                      still_sd=np.array([e_sd.get(a, np.nan) for a in lo_s]), still_conf=np.array([e_c.get(a, 0.0) for a in lo_s]), in_still=in_still)
     np.savez_compressed(out / "result.npz", t=t_all, s=fd["s"], s_sd=fd["s_sd"], conf=conf, extrap=extrap, in_gap=in_gap, **still_out, sg=path.sg, xy=path.xy, oneway=oneway, tunnel=path.tunnel,
-                        bridge=np.asarray(g.edge_bridge, bool)[path.occ][oi], crs=np.array(g.crs), **lane)
+                        bridge=np.asarray(g.edge_bridge, bool)[path.occ][oi], crs=np.array(g.crs), **lane,
+                        gx_hz=np.array(C.GPX_HZ), gx_t=t_gx, gx_s=s_gx, gx_s_sd=sd_gx, gx_conf=conf_gx, gx_extrap=extrap_gx, gx_in_gap=in_gap_gx, gx_in_still=in_still_gx)
     summ = dict(anchors_candidates=len(cand), anchors_gate_rejected=len(rej_g), anchors_merge_rejected=len(rej_m), anchors_used=len(ad), span_s=[lo, hi], path_km=float(path.length / 1000),
                 n_points=int(len(t_all)), n_extrapolated=int(extrap.sum()), n_in_gap=int(in_gap.sum()), conf_mean=float(conf[~extrap].mean()) if (~extrap).any() else 0.0,
                 sd_m_quantiles=[float(x) for x in np.percentile(fd["s_sd"][~extrap], [10, 50, 90, 99])] if (~extrap).any() else None,
                 fused_vs_viterbi_abs_mean_m=float(sh.mean()), fused_vs_viterbi_p90_m=float(np.percentile(sh, 90)), seconds=time.time() - t0,
                 peak_rss_gb=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2 ** 30, local=local_info, local_used=bool(route.get("local")), align=align_info,
                 prior_decided=prior_dec, prior_decided_share=prior_share,
-                still=[[float(a), float(b)] for a, b in still], n_in_still=int(in_still.sum()))
+                still=[[float(a), float(b)] for a, b in still], n_in_still=int(in_still.sum()), gpx_hz=int(C.GPX_HZ), n_gpx_points=int(len(t_gx)))
     if spans:
         summ["cut_spans"] = [[float(x) for x in sp] for sp in spans]
     jdump(out / "summary.json", summ)

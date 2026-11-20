@@ -154,10 +154,10 @@ class Run:
                      map=[P["bbox"], file_sig(P["pbf"]), P["vehicle"], C.CLASSES_BIKE, C.CLASSES_MOTOR, C.HMM_CAP_GB, "map1", *hint_map, *paths_map],
                      route_search=[C.F_GRID, C.K_GRID, C.REFINE_K, C.REFINE_F, C.H, "search1", C.CUT_PRIOR_SD_M, *cons, *bike_cal, *odo, *bridge, *AN.hash_part(P), *still],
                      plausibility=[C.N_FOREIGN, C.N_SHUFFLE, C.SEED0, C.VERDICT_CONFIDENT_MARGIN, P["decoys"], "plaus1"],
-                     refine=["refine4", "bridge1", *(["hold1"] if C.STILL_ON else []), C.LOCAL_MINOR_NATS_PER_KM, C.LOCAL_ON, C.LOCAL_BUF_M, C.LOCAL_D0, C.LOCAL_EXTRA, C.LOCAL_SAME_M, file_sig(P["pbf"]), C.GAP_MEASURED_SHARE, C.ALIGN_ON, C.ALIGN_DS,
+                     refine=["refine4", "bridge1", *(["hold1"] if C.STILL_ON else []), *(["shape1"] if C.FUSE_SHAPE_STEPS else []), "raster1", C.GPX_HZ, C.LOCAL_MINOR_NATS_PER_KM, C.LOCAL_ON, C.LOCAL_BUF_M, C.LOCAL_D0, C.LOCAL_EXTRA, C.LOCAL_SAME_M, file_sig(P["pbf"]), C.GAP_MEASURED_SHARE, C.ALIGN_ON, C.ALIGN_DS,
                              C.ALIGN_SMOOTH_M, C.ALIGN_REL, C.ALIGN_SIG0_DEG, C.ALIGN_BETA, C.ALIGN_NU, C.ALIGN_VMAX, C.ALIGN_MEAS_SD_M, C.ALIGN_MEAS_EVERY_M, C.ALIGN_MAX_DEV_M, C.ALIGN_TURN_DEG, C.ALIGN_TURN_HALF_M, C.POST_STRAIGHT_EVERY_M, C.POST_STRAIGHT_INFL,
                              "accept1", C.LOCAL_ACCEPT_ON, C.LOCAL_ACCEPT_MIN_S, C.LOCAL_ACCEPT_NATS, C.LOCAL_ACCEPT_R_M, C.LOCAL_KEPT_CONF, C.LM_MIN_DEG, C.LM_WIN_M, C.LM_TOL_DEG, C.LM_TOL_REL, C.LM_EXT_M, *ext],
-                     gpx=[P["decoys"], C.NODECOY, C.PEAK_FLAT, C.COVERAGE, C.YAW_RATIO, P["offset_m"], P["traffic_side"], P["vehicle"], C.OFFSET_M, C.OFFSET_SMOOTH_M, "gpx1", *(["still_pts1"] if C.STILL_ON else [])])
+                     gpx=[P["decoys"], C.NODECOY, C.PEAK_FLAT, C.COVERAGE, C.YAW_RATIO, P["offset_m"], P["traffic_side"], P["vehicle"], C.OFFSET_M, C.OFFSET_SMOOTH_M, "gpx1", *(["still_pts1"] if C.STILL_ON else []), "raster1", C.GPX_HZ])
         for sid in C.STEPS:
             prev = sha(parts[sid], prev)
             h[sid] = prev

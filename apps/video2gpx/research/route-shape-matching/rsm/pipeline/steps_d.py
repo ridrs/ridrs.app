@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Worker of step 7 and the retime command: driving line, GPX (1 point per second), route_points.json (rsm.bench.verify_map), project.json."""
+"""Worker of step 7 and the retime command: driving line, GPX (C.GPX_HZ points per second), route_points.json (rsm.bench.verify_map; points per second,
+gpx_points on the GPX raster), project.json."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -52,8 +53,19 @@ def still_state(R, n: int) -> tuple[np.ndarray, list[tuple[float, float, float, 
     return R["in_still"].astype(bool), [tuple(float(x) for x in r) for r in zip(R["still_t0"], R["still_t1"], R["still_s0"], R["still_s1"], R["still_sd"], R["still_conf"])]
 
 
+def out_grid(R) -> dict:
+    """the GPX raster of a result (C.GPX_HZ points per video second, refine gx_*): t, s, s_sd, conf, extrap, in_gap, in_still, hz.
+    Results made before the raster existed: their 1 s grid (hz 1), so an old result still writes the GPX it wrote before."""
+    if "gx_t" in R.files:
+        return dict(t=R["gx_t"].astype(float), s=R["gx_s"].astype(float), s_sd=R["gx_s_sd"].astype(float), conf=R["gx_conf"].astype(float), extrap=R["gx_extrap"].astype(bool),
+                    in_gap=R["gx_in_gap"].astype(bool), in_still=R["gx_in_still"].astype(bool), hz=int(R["gx_hz"]))
+    n = len(R["t"])
+    return dict(t=R["t"].astype(float), s=R["s"].astype(float), s_sd=R["s_sd"].astype(float), conf=R["conf"].astype(float), extrap=R["extrap"].astype(bool),
+                in_gap=R["in_gap"].astype(bool), in_still=still_state(R, n)[0], hz=1)
+
+
 def with_edges(pts: list[dict], stills: list[dict]) -> list[dict]:
-    """the points plus one point at the start and one at the end of every sure standstill (same position, rsm:edge), in time order; an edge on a whole second
+    """the points plus one point at the start and one at the end of every sure standstill (same position, rsm:edge), in time order; an edge on a raster time
     already present is not doubled"""
     have = {round(p["t"], 3) for p in pts}
     extra = []
@@ -186,23 +198,27 @@ def gpx_step(d: Path, P: dict, W: Worker):
     line_txt = "model" if layer == "model" else "approximation"
     W.progress(30.0, "offset", force=True)
     comp = O.compass(PL)
-    s = R["s"]
-    px = np.interp(s, sg, PL[:, 0]); py = np.interp(s, sg, PL[:, 1])
     tr = Transformer.from_crs(str(R["crs"]), 4326, always_xy=True)
-    lon, lat = tr.transform(px, py)
-    hd = np.interp(s, sg, comp)
-    dd = np.interp(s, sg, dl)
-    osd = np.interp(s, sg, sd_m)
+
+    def points_of(t_, s, conf, in_gap, extrap, s_sd, in_still_):
+        px = np.interp(s, sg, PL[:, 0]); py = np.interp(s, sg, PL[:, 1])
+        lon, lat = tr.transform(px, py)
+        hd, dd, osd = np.interp(s, sg, comp), np.interp(s, sg, dl), np.interp(s, sg, sd_m)
+        return [dict(t=float(t), lat=round(float(a), 7), lon=round(float(b), 7), heading=round(float(h), 1), confidence=round(float(c), 4), in_gap=bool(ig), extrapolated=bool(ex),
+                     sd_m=round(float(sd), 1), arc_m=round(float(ss), 1), offset_m=round(float(o), 2), line_source=layer, motion_state=motion_state(bool(si), bool(ig)),
+                     **({} if not np.isfinite(q) else dict(offset_sd_m=round(float(q), 1))))
+                for t, a, b, h, c, ig, ex, sd, ss, o, q, si in zip(t_, lat, lon, hd, conf, in_gap, extrap, s_sd, s, dd, osd, in_still_)]
+
     if P.get("decoys", 0) > 0 and (d / "plausibility" / "summary.json").exists():
         summ = jload(d / "plausibility" / "summary.json")
     else:
         summ = V.verdict_nodecoy(d)
     verdict, basis = summ["verdict"], summ["basis"]
     in_still, still = still_state(R, len(R["t"]))
-    pts = [dict(t=float(t), lat=round(float(a), 7), lon=round(float(b), 7), heading=round(float(h), 1), confidence=round(float(c), 4), in_gap=bool(ig), extrapolated=bool(ex),
-                sd_m=round(float(sd), 1), arc_m=round(float(ss), 1), offset_m=round(float(o), 2), line_source=layer, motion_state=motion_state(bool(si), bool(ig)),
-                **({} if not np.isfinite(q) else dict(offset_sd_m=round(float(q), 1))))
-           for t, a, b, h, c, ig, ex, sd, ss, o, q, si in zip(R["t"], lat, lon, hd, R["conf"], R["in_gap"], R["extrap"], R["s_sd"], s, dd, osd, in_still)]
+    # route_points.json `points`: one per video second as before (validation, benchmarks, the app's ride panel); the GPX: the raster (gx, C.GPX_HZ per second)
+    pts = points_of(R["t"], R["s"], R["conf"], R["in_gap"], R["extrap"], R["s_sd"], in_still)
+    gx = out_grid(R)
+    gpts = points_of(gx["t"], gx["s"], gx["conf"], gx["in_gap"], gx["extrap"], gx["s_sd"], gx["in_still"])
     # sure standstills: one extra point at the exact start and end (sub-second video time), so the GPX stands still exactly when the video does
     stills = []
     for t0, t1, s0, _s1, sdv, cv in still:
@@ -213,10 +229,10 @@ def gpx_step(d: Path, P: dict, W: Worker):
         stills.append(dict(t0=round(float(t0), 3), t1=round(float(t1), 3), lat=round(float(elat), 7), lon=round(float(elon), 7), heading=round(float(np.interp(s0, sg, comp)), 1),
                            confidence=round(float(cv), 4), sd_m=round(float(sdv), 1), arc_m=round(float(s0), 1), offset_m=round(float(np.interp(s0, sg, dl)), 2), line_source=layer))
     cp = cut_plan(d)
-    pts = apply_cut_plan(pts, cp)
+    pts, gpts = apply_cut_plan(pts, cp), apply_cut_plan(gpts, cp)
     if cp and cp.get("intro_end") is not None:
         stills = [x for x in stills if x["t0"] > cp["intro_end"]]
-    gpx_pts = with_edges(pts, stills)
+    gpx_pts = with_edges(gpts, stills)
     hu = jload(d / "route_search" / "hints.json") if (d / "route_search" / "hints.json").exists() else None
     pipe = frozen_info()["code_hash"]
     meta = dict(name=Path(P["video"]).stem, verdict=verdict, basis=basis, offset_m=off, side=side, vehicle=veh, rule=rule, hints=hu, pipeline=pipe, line=line_txt, cuts=cp)
@@ -228,12 +244,14 @@ def gpx_step(d: Path, P: dict, W: Worker):
                                           f"arc_m = distance along the centre line; offset_m = lateral offset applied (+ = right of travel); line_source = fixed (constant offset) or model (lane model, "
                                           f"not measured); offset_sd_m = its typical uncertainty; motion_state = driving, standstill (a SURE standstill: the camera stands, the "
                                           f"position is held) or gap (the distance is estimated, not measured). standstills = the sure standstills with their exact start and "
-                                          f"end (t0, t1, video seconds); route.gpx carries an extra point at each (rsm:edge)."
+                                          f"end (t0, t1, video seconds); route.gpx carries an extra point at each (rsm:edge). gpx_points = the same fields on the fixed GPX raster "
+                                          f"(gpx_hz points per video second, the smoother evaluated at each raster time), the points of route.gpx without the standstill edges."
                                           + ("" if not cp else f" The video is edited: {len(cp['times'])} scene cuts (cuts.times, video seconds); the position jumps at each "
                                              f"(a new GPX track segment starts at cuts.breaks)" + ("" if cp.get("intro_end") is None else
                                              f"; the intro up to {cp['intro_end']:.1f} s ({'set by hand' if cp.get('intro_source') == 'user' else f'the last cut of the first {C.CUT_INTRO_S / 60:.0f} minutes'}) is not part of the route, so "
                                              f"the points start there") + ".") + f" {ATTRIB}",
-                                          verdict=verdict, verdict_basis=basis, driving_line=line_txt, points=pts, standstills=stills, **({} if not cp else dict(cuts=cp))))
+                                          verdict=verdict, verdict_basis=basis, driving_line=line_txt, points=pts, standstills=stills, **({} if not cp else dict(cuts=cp)),
+                                          gpx_hz=gx["hz"], gpx_points=gpts))
     W.progress(90.0, "write", force=True)
     # in the bundled app the sources are not on disk (PyInstaller archive): the frozen hash is the code hash there
     ch = pipe if (getattr(sys, "frozen", False) and pipe) else code_hash()[0]
@@ -248,7 +266,7 @@ def gpx_step(d: Path, P: dict, W: Worker):
                                   has_loops=bool(loops), video_measured_share=0.0))
     jdump(d / "project.json", proj)
     W.progress(100.0, "done", force=True)
-    return dict(points=len(pts), standstills=len(stills), offset_m=off, side=side, verdict=verdict, min_g=float(g.min()), loops=bool(loops), line=layer, l2=l2)
+    return dict(points=len(pts), gpx_points=len(gpx_pts), gpx_hz=gx["hz"], standstills=len(stills), offset_m=off, side=side, verdict=verdict, min_g=float(g.min()), loops=bool(loops), line=layer, l2=l2)
 
 
 def retime(d: Path, start_time: str) -> dict:
@@ -259,7 +277,7 @@ def retime(d: Path, start_time: str) -> dict:
     start = parse_time(start_time)
     eff = proj["effective"]
     meta = dict(name=Path(proj["params"]["video"]).stem, verdict=rp["verdict"], basis=rp.get("verdict_basis", ""), offset_m=eff["offset_m"], side=eff["traffic_side"], vehicle=eff["vehicle"], rule=proj["driving_line"]["rule"], hints=proj.get("hints_used"), pipeline=proj.get("pipeline_hash"), line=rp.get("driving_line", "approximation"), cuts=rp.get("cuts"))
-    write_gpx(d / "route.gpx", with_edges(rp["points"], rp.get("standstills") or []), start, meta)
+    write_gpx(d / "route.gpx", with_edges(rp.get("gpx_points") or rp["points"], rp.get("standstills") or []), start, meta)
     proj["effective"]["start_time"] = fmt(start)
     proj["params"]["start_time"] = start_time
     jdump(d / "project.json", proj)

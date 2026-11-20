@@ -103,7 +103,69 @@ def align(sg: np.ndarray, xy: np.ndarray, tracks, kappa: float, a_ang: float, s_
     for j in range(len(obs) - 1, 0, -1):
         d = bp_gap[j][path[j]] if j in bp_gap else bp[j][path[j]]
         path[j - 1] = path[j] - int(d)
-    return dict(t=np.array([o[0] for o in obs]), s=grid[path], n_obs=len(obs), n_gaps=len(bp_gap), n_gaps_measured=int(sum(o[3] is not None for o in obs)))
+    out = dict(t=np.array([o[0] for o in obs]), s=grid[path], n_obs=len(obs), n_gaps=len(bp_gap), n_gaps_measured=int(sum(o[3] is not None for o in obs)))
+    if C.ALIGN_POST_BAND_M > 0:
+        a0 = -0.5 * ((grid - s0) / 60.0) ** 2
+        out["s_mean"], out["s_sd"] = band_posterior(ph, obs, path, a0, DS, step, kappa, vmax, amax, sig0, beta, nu, int(round(C.ALIGN_POST_BAND_M / DS)))
+    return out
+
+
+def band_posterior(ph, obs, path, a0, DS, step, kappa, vmax, amax, sig0, beta, nu, B):
+    """How sure the alignment is at each sample: forward-backward on the same lattice as align(), restricted to +-B grid cells around the Viterbi path.
+    In a curve the heading pins the position (narrow posterior); on a straight every shift fits about equally well and the posterior widens to what the advance
+    prior allows between the curves on both sides. -> (mean m, sd m) per observation. Mass beyond the band is cut off, so the sd is at most about B x DS / 2."""
+    N, J = len(ph), len(obs)
+    off = np.arange(-B, B + 1)
+    idx = path[:, None] + off[None, :]
+    valid = (idx >= 0) & (idx < N)
+    idc = np.clip(idx, 0, N - 1)
+
+    def trans(j):
+        _, dth, gap, gmeas = obs[j]
+        d = idx[j][:, None] - idx[j - 1][None, :]                       # advance in cells, target i x source k
+        if dth is None:
+            if gmeas is not None:
+                mu = gmeas * kappa
+                L = -0.5 * ((d * DS - mu) / (0.3 * mu + 10.0)) ** 2
+            else:
+                L = np.where(d <= int(np.ceil(gap * vmax / DS)) + 1, 0.0, -np.inf)
+            L = np.where(d >= 0, L, -np.inf)
+        else:
+            dp = ph[idc[j]][:, None] - ph[idc[j - 1]][None, :]
+            L = -0.5 * ((d * DS - step) / (C.ALIGN_REL * step)) ** 2 + _tlog(dth - dp, sig0 + beta * np.abs(dp), nu)
+            L = np.where((d >= 0) & (d <= amax), L, -np.inf)
+        L[~valid[j], :] = -np.inf
+        L[:, ~valid[j - 1]] = -np.inf
+        return L
+
+    def lse(M, axis):
+        m = M.max(axis=axis, keepdims=True)
+        m = np.where(np.isfinite(m), m, 0.0)
+        with np.errstate(divide="ignore"):
+            return (np.log(np.exp(M - m).sum(axis=axis, keepdims=True)) + m).squeeze(axis)
+
+    fa = np.empty((J, len(off)))
+    fa[0] = np.where(valid[0], a0[idc[0]], -np.inf)
+    fa[0] -= fa[0].max()
+    for j in range(1, J):
+        f = lse(trans(j) + fa[j - 1][None, :], 1)
+        mx = f.max()
+        fa[j] = f - mx if np.isfinite(mx) else np.where(valid[j], 0.0, -np.inf)    # band lost the path (should not happen): restart flat
+    mean, sd = np.empty(J), np.empty(J)
+    bk = np.where(valid[J - 1], 0.0, -np.inf)
+    for j in range(J - 1, -1, -1):
+        lp = fa[j] + bk
+        lp = lp - lp.max() if np.isfinite(lp.max()) else np.where(valid[j], 0.0, -np.inf)
+        w = np.exp(lp)
+        w /= w.sum()
+        x = idx[j] * DS
+        mean[j] = float((w * x).sum())
+        sd[j] = float(np.sqrt(max((w * (x - mean[j]) ** 2).sum(), 0.0)))
+        if j > 0:
+            b = lse(trans(j) + bk[:, None], 0)
+            mx = b.max()
+            bk = b - mx if np.isfinite(mx) else np.where(valid[j - 1], 0.0, -np.inf)
+    return mean, sd
 
 
 def _window_max(a: np.ndarray, W: int):

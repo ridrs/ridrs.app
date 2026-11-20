@@ -14,7 +14,7 @@ import numpy as np
 
 from . import VERSION, dem as D, offset as O
 from .common import emit, frozen_info, jdump, jload
-from .steps_d import ATTRIB, fmt, parse_time
+from .steps_d import ATTRIB, fmt, out_grid, parse_time
 
 VMAX = {"bike": 25.0, "motorcycle": 50.0, "car": 50.0}   # m/s, plausible maximum per vehicle (speed-spike guard)
 STAND_M = 0.5        # standstill thinning: at most one point per 0.5 m of progress
@@ -120,12 +120,13 @@ def elevation_diag(d: dict, z: np.ndarray, st: dict, ds: float = D.SAMPLE_M, s0:
 
 # ------------------------------------------------------------------ pieces (unit-tested)
 def add_still_edges(R, t: np.ndarray, s: np.ndarray, conf: np.ndarray):
-    """the exported seconds plus the exact start and end of every sure standstill inside them (refine/result.npz still_*), in time order
+    """the exported raster times plus the exact start and end of every sure standstill inside them (refine/result.npz still_*), in time order
     -> (t, s, conf, in_still). Old results without standstills: unchanged, in_still all False."""
     t, s, conf = np.asarray(t, float), np.asarray(s, float), np.asarray(conf, float)
     if "in_still" not in R.files or len(t) == 0:
         return t, s, conf, np.zeros(len(t), bool)
-    in_still = np.interp(t, R["t"].astype(float), R["in_still"].astype(float)) > 0.5
+    gt, gs = ("gx_t", "gx_in_still") if "gx_t" in R.files else ("t", "in_still")     # the GPX raster, old results: their 1 s grid
+    in_still = np.interp(t, R[gt].astype(float), R[gs].astype(float)) > 0.5
     et, es, ec = [], [], []
     for t0, t1, s0, cv in zip(R["still_t0"], R["still_t1"], R["still_s0"], R["still_conf"]):
         for te in (float(t0), float(t1)):
@@ -138,7 +139,7 @@ def add_still_edges(R, t: np.ndarray, s: np.ndarray, conf: np.ndarray):
 
 
 def trim_span(extrap: np.ndarray, mode: str = "auto") -> tuple[int, int]:
-    """[i0, i1] inclusive of the exported seconds: the decoded span (extrapolated seconds before and after are dropped)"""
+    """[i0, i1] inclusive of the exported raster points: the decoded span (extrapolated seconds before and after are dropped)"""
     n = len(extrap)
     if mode == "off" or n == 0:
         return 0, n - 1
@@ -306,7 +307,8 @@ def export(out: Path, dest: Path, summary_path: Path, dem_dir: Path | None, fps:
     sg, xy = R["sg"], R["xy"]
     PL, _dl, _g = O.driving_line(xy, off, side, R["oneway"])
     tr = Transformer.from_crs(str(R["crs"]), 4326, always_xy=True)
-    t_all, s_all, conf_all, extrap = R["t"].astype(float), R["s"].astype(float), R["conf"].astype(float), R["extrap"].astype(bool)
+    G = out_grid(R)                                        # the GPX raster (C.GPX_HZ per video second; old results: their 1 s grid)
+    t_all, s_all, conf_all, extrap = G["t"], G["s"], G["conf"], G["extrap"]
     i0, i1 = trim_span(extrap, trim)
     t, s, conf = t_all[i0:i1 + 1], s_all[i0:i1 + 1], conf_all[i0:i1 + 1]
     t, s, conf, still = add_still_edges(R, t, s, conf)
@@ -385,7 +387,7 @@ def export(out: Path, dest: Path, summary_path: Path, dem_dir: Path | None, fps:
     sf = start_frame(float(t_k[0]), fps_) if fps_ else None
     pipe = frozen_info().get("code_hash")
     name = title or Path(proj["params"]["video"]).stem
-    conf_dec = conf_all[i0:i1 + 1][~extrap[i0:i1 + 1]]     # the exported seconds, not the inserted standstill edges
+    conf_dec = conf_all[i0:i1 + 1][~extrap[i0:i1 + 1]]     # the exported raster points, not the inserted standstill edges
     cm = float(conf_dec.mean()) if len(conf_dec) else 0.0
     low = float((conf_dec < 0.5).mean()) if len(conf_dec) else 1.0
     desc = (f"Reconstructed from the video, no GPS. {proj['driving_line']['rule']} Verdict: {proj['verdict']} ({proj.get('verdict_basis', '')}); "
@@ -397,8 +399,8 @@ def export(out: Path, dest: Path, summary_path: Path, dem_dir: Path | None, fps:
                 creator=f"video2gpx {creator_app or '?'} / rsm.pipeline {VERSION} {pipe or ''}".strip())
     write_gpx(Path(dest), rows, meta)
     # country hint: the start (the app reverse-geocodes it)
-    summ = dict(gpx=str(dest), points=len(rows), seconds_exported=int(i1 - i0 + 1), points_thinned=int(len(t) - len(rows)),
-                trimmed_head_s=int(i0), trimmed_tail_s=int(len(t_all) - 1 - i1), t_first=float(t_k[0]), t_last=float(t_k[-1]), fps=fps_, start_frame=sf,
+    summ = dict(gpx=str(dest), points=len(rows), seconds_exported=int(round(t_all[i1] - t_all[i0])) + 1, points_thinned=int(len(t) - len(rows)), points_per_second=G["hz"],
+                trimmed_head_s=int(round(t_all[i0] - t_all[0])), trimmed_tail_s=int(round(t_all[-1] - t_all[i1])), t_first=float(t_k[0]), t_last=float(t_k[-1]), fps=fps_, start_frame=sf,
                 length_m=round(float(s_k[-1] - s_k[0]), 1), ascent_m=ele_info.get("ascent_m"), descent_m=ele_info.get("descent_m"), elevation=ele_info,
                 speed_guard=dict(vmax_ms=vmax, steps_fixed=n_spikes), standstill=dict(step_m=STAND_M, min_step_m=MIN_STEP_M),
                 start=dict(lat=float(lat[0]), lon=float(lon[0])), end=dict(lat=float(lat[-1]), lon=float(lon[-1])),

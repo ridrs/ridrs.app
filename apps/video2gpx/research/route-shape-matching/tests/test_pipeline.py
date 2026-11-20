@@ -1479,3 +1479,72 @@ def test_turn_landmarks_find_a_right_angle_turn_and_explains_checks_the_road():
     t = np.arange(0, 40, 1.0)
     assert L.explains((turning, t * 10.0, t), lms[0]) and not L.explains((straight, t * 10.0, t), lms[0])
     assert C.LOCAL_ACCEPT_ON and C.LOCAL_ACCEPT_NATS == 5.0 and C.LOCAL_ACCEPT_MIN_S == 30.0
+
+
+def test_alignment_posterior_is_narrow_in_the_turn_and_wide_on_the_straight():
+    from scipy.ndimage import gaussian_filter1d
+    from rsm.pipeline import align as AL
+    sg, xy = _corner_path()
+    kappa, v = 2.5, 6.0
+    s_true = np.arange(0, 590.0, 4.0 * kappa)
+    t = s_true / v
+    th = gaussian_filter1d(np.where(s_true < 300, 0.0, np.pi / 2), 12.0 / (4.0 * kappa))
+    al = AL.align(sg, xy, [dict(t=t, s=s_true / kappa, th=th)], kappa, 1.0, t, s_true)
+    sd_turn = float(np.interp(300.0 / v, al["t"], al["s_sd"]))
+    sd_straight = float(np.interp(100.0 / v, al["t"], al["s_sd"]))
+    assert sd_turn < 6.0 and sd_straight > 2.0 * sd_turn
+    assert abs(np.interp(300.0 / v, al["t"], al["s_mean"]) - 300.0) < 8.0
+
+
+# ------------------------------------------------------------------ GPX raster (C.GPX_HZ points per video second)
+def test_grid_flags_same_rules_on_both_grids():
+    from rsm.pipeline.steps_c import grid_flags
+    post_ = dict(t=np.arange(0.0, 31.0), p_vit=np.linspace(0.5, 1.0, 31))
+    args = (2.0, 28.0, post_, [dict(t0=5.0, t1=7.0)], [dict(t0=20.0, t1=21.0)], [(10.0, 12.0)], [(15.0, 15.5)], [(24.0, 26.0)])
+    t1 = np.arange(0.0, 31.0)
+    t5 = np.arange(30 * 5 + 1) / 5
+    a, b = grid_flags(t1, *args), grid_flags(t5, *args)
+    on_sec = np.isclose(t5 % 1.0, 0.0)
+    for x, y in zip(a, b):
+        assert np.array_equal(np.asarray(x), np.asarray(y)[on_sec])       # the raster agrees with the 1 s grid at every whole second
+    conf, extrap, in_gap, in_still, in_prior = b
+    assert in_gap[(t5 > 10) & (t5 <= 12)].all() and not in_gap[np.isclose(t5, 10.0)].any()
+    assert in_gap[(t5 > 15) & (t5 <= 16)].all() and in_still[(t5 >= 24) & (t5 <= 26)].all() and not in_gap[in_still].any()
+    assert (conf[in_prior] <= C.PRIOR_DECIDED_CONF).all() and extrap[t5 < 2].all() and (conf[extrap] == 0).all()
+
+
+def test_export_uses_the_gpx_raster(tmp_path):
+    from rsm.pipeline import export as X
+    d = tmp_path / "run"
+    _fake_export_run(d)
+    f = d / "refine" / "result.npz"
+    R = dict(np.load(f))
+    hz = 5
+    tg = np.arange(int(R["t"][-1]) * hz + 1) / hz
+    R.update(gx_hz=np.array(hz), gx_t=tg, gx_s=np.interp(tg, R["t"], R["s"]), gx_s_sd=np.ones(len(tg)), gx_conf=np.interp(tg, R["t"], R["conf"]),
+             gx_extrap=(tg < 3) | (tg > R["t"][-1] - 2), gx_in_gap=np.zeros(len(tg), bool), gx_in_still=np.zeros(len(tg), bool))
+    np.savez_compressed(f, **R)
+    summ = X.export(d, tmp_path / "r.gpx", tmp_path / "r.json", None)
+    ns = {"g": "http://www.topografix.com/GPX/1/1"}
+    times = [np.datetime64(p.find("g:time", ns).text.rstrip("Z")) for p in ET.parse(tmp_path / "r.gpx").getroot().findall(".//g:trkpt", ns)]
+    ms = np.diff(times).astype("timedelta64[ms]").astype(int)
+    assert (ms == 200).mean() > 0.9 and np.all(ms > 0)                         # five points per second, strictly increasing
+    assert summ["points_per_second"] == 5 and summ["seconds_exported"] == 115 and summ["trimmed_head_s"] == 3 and summ["trimmed_tail_s"] == 2
+
+
+def test_out_grid_falls_back_to_seconds(tmp_path):
+    d = tmp_path / "run"
+    _fake_export_run(d)
+    G = steps_d.out_grid(np.load(d / "refine" / "result.npz"))
+    assert G["hz"] == 1 and np.array_equal(G["t"], np.arange(120.0)) and not G["in_still"].any()
+
+
+def test_retime_writes_the_gpx_raster(tmp_path):
+    _fake_project(tmp_path)
+    rp = json.loads((tmp_path / "route_points.json").read_text())
+    rp["gpx_points"] = [dict(p, t=i / 5) for i, p in enumerate(rp["points"])]
+    (tmp_path / "route_points.json").write_text(json.dumps(rp))
+    steps_d.retime(tmp_path, "2000-01-01T00:00:00Z")
+    ns = {"g": "http://www.topografix.com/GPX/1/1"}
+    tx = [t.text for t in ET.parse(tmp_path / "route.gpx").getroot().findall(".//g:trkpt/g:time", ns)]
+    assert tx == ["2000-01-01T00:00:00Z", "2000-01-01T00:00:00.200Z", "2000-01-01T00:00:00.400Z", "2000-01-01T00:00:00.600Z"]

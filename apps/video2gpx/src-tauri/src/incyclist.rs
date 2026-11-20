@@ -1020,10 +1020,13 @@ pub fn liesmich(title: &str, name: &str, video_file: &str, summary: &Value, plan
     let verdict = summary["verdict"].as_str().unwrap_or("");
     let verdict_de = match verdict { "confident" => "sicher", "uncertain" => "unsicher", "no_route" => "keine verlässliche Route", v => v };
     let enc = plan.mode == "encode";
+    let hz = summary["points_per_second"].as_u64().unwrap_or(1);
+    let rate_de = if hz == 1 { "ein Punkt pro Videosekunde".to_string() } else { format!("{hz} Punkte pro Videosekunde") };
+    let rate_en = if hz == 1 { "one point per video second".to_string() } else { format!("{hz} points per video second") };
     let mut s = String::new();
     s += &format!("{title}\n{}\n\n", "=".repeat(title.chars().count().min(70)));
     s += "DEUTSCH\n\n";
-    s += &format!("Dieses Paket ist eine Videostrecke für Incyclist (Import „Eigenes Video“): {name}.xml (Steuerdatei), {video_file} (Video), {name}.gpx (Strecke, ein Punkt pro Videosekunde{}).\n\n", if has_ele { ", mit Höhen" } else { ", ohne Höhen" });
+    s += &format!("Dieses Paket ist eine Videostrecke für Incyclist (Import „Eigenes Video“): {name}.xml (Steuerdatei), {video_file} (Video), {name}.gpx (Strecke, {rate_de}{}).\n\n", if has_ele { ", mit Höhen" } else { ", ohne Höhen" });
     s += &format!("Position aus dem Video rekonstruiert, kein GPS. Die Strecke wurde mit video2gpx aus der Bewegung im Video und der OpenStreetMap-Karte berechnet. Ergebnis: {verdict_de}; mittlere Sicherheit {:.0} %, {:.0} % der Zeit unter 50 %. Länge {} km{}.\n", conf * 100.0, low * 100.0, de_num(km, 1), asc.map(|a| format!(", Anstieg {a:.0} hm")).unwrap_or_default());
     s += "Die Fahrlinie ist eine Näherung (feste Verschiebung von der Straßenmitte). Die Höhen stammen aus Geländemodellen (Copernicus 30 m, wo vorhanden genauere nationale oder regionale Modelle), nicht aus einer Messung.\n\n";
     s += &format!("Quellen und Lizenzen:\n- Karte: {OSM_ATTRIB}\n");
@@ -1041,7 +1044,7 @@ pub fn liesmich(title: &str, name: &str, video_file: &str, summary: &Value, plan
     }
     s += ". Pakete aus Videos Dritter (z. B. YouTube) sind nur für den privaten Gebrauch bestimmt und dürfen nicht weitergegeben werden.\n\n";
     s += "ENGLISH\n\n";
-    s += &format!("This package is a video route for Incyclist (\"own video\" import): {name}.xml (control file), {video_file} (video), {name}.gpx (track, one point per video second{}).\n\n", if has_ele { ", with elevation" } else { ", no elevation" });
+    s += &format!("This package is a video route for Incyclist (\"own video\" import): {name}.xml (control file), {video_file} (video), {name}.gpx (track, {rate_en}{}).\n\n", if has_ele { ", with elevation" } else { ", no elevation" });
     s += &format!("Position reconstructed from the video, no GPS. The route was computed with video2gpx from the motion in the video and the OpenStreetMap map. Result: {verdict}; mean confidence {:.0} %, {:.0} % of the time below 50 %. Length {km:.1} km{}.\n", conf * 100.0, low * 100.0, asc.map(|a| format!(", ascent {a:.0} m")).unwrap_or_default());
     s += "The driving line is an approximation (a fixed offset from the road centre). The elevation comes from terrain models (Copernicus 30 m and, where available, more detailed national or regional models), not from a measurement.\n\n";
     s += &format!("Sources and licences:\n- Map: {OSM_ATTRIB}\n");

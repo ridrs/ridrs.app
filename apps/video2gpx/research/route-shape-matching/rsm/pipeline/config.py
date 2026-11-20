@@ -6,6 +6,7 @@ STEPS = ["motion", "rotation", "map", "route_search", "plausibility", "refine", 
 MAX_WORKERS = 4
 MEMGUARD = dict(max_gb=12.0, min_free=25.0)
 HMM_CAP_GB = 4.0
+GPX_HZ = 5              # fixed output raster of route.gpx and the Incyclist export: points per video second (the 1 s grid of the result stays for validation)
 
 # --- vms (default flags, as the Amalfi far-yaw chain; the bikes' "refined" flags lost coverage on other horizons, FINDINGS "vms turn detection calibrated")
 VMS = dict(height=360, step=1)
@@ -152,11 +153,18 @@ ALIGN_MEAS_EVERY_M = 20.0    # one measurement per this many metres of path
 ALIGN_MAX_DEV_M = 400.0      # the alignment is rejected (old measurements used) if it leaves the HMM route by more than this
 ALIGN_TURN_DEG = 30.0        # aligned positions are used as measurements only where the path heading changes by this much ...
 ALIGN_TURN_HALF_M = 20       # ... within +- this many metres (on straights the alignment has no heading information)
+ALIGN_POST_BAND_M = 150.0    # m, band around the Viterbi path for the alignment posterior (align.band_posterior); 0 = no posterior
+ALIGN_MEAS_MODE = "turns"    # "turns": measurements only in turns (A7); "posterior": every ALIGN_MEAS_EVERY_M with the sd of the alignment posterior
+ALIGN_POST_FLOOR_M = 3.0     # posterior mode: measurement sd = sqrt(sd_post^2 + floor^2) x ALIGN_POST_INFL ...
+ALIGN_POST_INFL = 1.5        # ... (neighbouring samples share the same heading evidence, so each is inflated)
+ALIGN_POST_MAX_SD_M = 40.0   # ... and dropped if the sd is larger (a straight: no heading information)
+ALIGN_POST_GATE_M = 60.0     # ... and dropped if the alignment is this far from the HMM route
 
 # --- posterior on straights (refine step, Fable fix 3): on a straight the cell posterior carries no heading information; thinned and inflated there so the
 # distance factor rho keeps the value of the last curve instead of being pulled back to the global kappa
 POST_STRAIGHT_EVERY_M = 200.0   # one posterior measurement per this many metres of straight path (0 = off: every step as before)
 POST_STRAIGHT_INFL = 2.0        # sd factor of those measurements
+FUSE_SHAPE_STEPS = True        # fusion: inside a step the distance follows the vms track's own time profile (steps_c.shaped_D), not a straight line in time
 
 # --- calibration candidates (route search; PROVISIONAL). A cell of the f_eff x kappa scan is physically implausible if the video would need more lateral
 # acceleration or speed there than a road vehicle has. Dev evidence: the five true calibrations (Roanne, Pontaix, Amalfi, Madone with and without start frame)

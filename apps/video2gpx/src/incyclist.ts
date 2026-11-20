@@ -192,7 +192,7 @@ export function incyclistCard(): { el: HTMLElement; build(): void; update(): voi
       el("h3", {}, "Höhendaten"), demBox, el("h3", {}, "Video"), videoBox, planLine,
       el("h3", {}, "Vorschaubild"), previewBox,
       fTarget.el, estLine);
-    root.append(el("p", { class: "small muted" }, "Video (als MP4 oder im Original), GPX mit einem Punkt pro Videosekunde und Höhen, Steuerdatei (Incyclist: „Eigenes Video“). Die Position ist aus dem Video rekonstruiert, nicht per GPS gemessen. Die Rechte am Video bleiben bei seiner Urheberin oder seinem Urheber."),
+    root.append(el("p", { class: "small muted" }, "Video (als MP4 oder im Original), GPX mit fünf Punkten pro Videosekunde und Höhen, Steuerdatei (Incyclist: „Eigenes Video“). Die Position ist aus dem Video rekonstruiert, nicht per GPS gemessen. Die Rechte am Video bleiben bei seiner Urheberin oder seinem Urheber."),
       formBox, el("div", { class: "row wrap" }, startBtn, cancelBtn), startWhy, progBox, resultBox);
     renderDem(); renderPreview();
     void refresh(true).then(async () => {
