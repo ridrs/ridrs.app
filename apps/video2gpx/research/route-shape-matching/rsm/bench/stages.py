@@ -4,12 +4,16 @@
     scripts/heavy.sh .venv/bin/python -m rsm.bench.stages make [--only roanne,gotthard]   # T4: motion + rotation of the full sources, then freeze
     .venv/bin/python -m rsm.bench.stages check [--verify-source]                         # fresh / stale / missing per stage (exit 1 if not all fresh)
     .venv/bin/python -m rsm.bench.stages rekey --reason "..."                             # new keys without T4, for a change shown to change no result
+    .venv/bin/python -m rsm.bench.stages truth                                            # copy the truth files of the sources to test-data/truth/ (T4, also done by make)
 
 A stage is the contract between the image side and the route side: motion/ and rotation/ of one whole source video (rotation/ includes the sure
 standstills), plus stage.json (source sha256, window, params, horizon, step keys of motion and rotation by the source hash, frozen.json hash, GPS
 clock alignment for the Van Gestel rides, timings). The route tests (T2) read stages, never the video; a stage whose keys differ from the current
 code is stale, and T4 (`make`) rebuilds it. The sources and their truth come from clip_sources.json; motion and rotation run as
-`python -m rsm.pipeline _step` workers (rsm.bench.regress.run_case) in work/stages/<id>/, which is removed after the freeze."""
+`python -m rsm.pipeline _step` workers (rsm.bench.regress.run_case) in work/stages/<id>/, which is removed after the freeze.
+
+The truth files (the Van Gestel track.gpx, the verified Pontaix track) are copied by `truth` from sources/ to test-data/truth/ under the same relative
+paths; T1 to T3 read them there, so that no test reads sources/ (docs/CONCEPT_test_strategy.md, step 6)."""
 from __future__ import annotations
 
 import argparse
@@ -31,6 +35,7 @@ ROOT = HERE.parents[1]                                    # research/route-shape
 APP = HERE.parents[3]                                     # apps/video2gpx
 SOURCES = APP / "test-data" / "sources"
 STAGES = APP / "test-data" / "stages"
+TRUTH = APP / "test-data" / "truth"
 WORK = ROOT / "work" / "stages"
 VERSION = 1
 IMAGE_STEPS = ["motion", "rotation"]
@@ -103,6 +108,28 @@ def freeze(sid: str, work: Path, src: Path, sources: Path, P: dict, out_root: Pa
     return out
 
 
+def truth(sources: Path = SOURCES, out: Path = TRUTH, log=print) -> list[str]:
+    """copy the truth files of clip_sources.json (vangestel/<gps>/track.gpx, `verified`) from sources/ to truth/ (same relative paths) -> copied paths"""
+    rel = []
+    for c in json.loads((HERE / "clip_sources.json").read_text())["sources"]:
+        if c.get("gps"):
+            rel.append(f"vangestel/{c['gps']}/track.gpx")
+        if c.get("verified"):
+            rel.append(c["verified"])
+    done = []
+    for r in rel:
+        src, dst = Path(sources) / r, Path(out) / r
+        if not src.exists():
+            log(f"truth: {r} missing in the sources")
+            continue
+        if dst.exists() and dst.stat().st_size == src.stat().st_size and dst.read_bytes() == src.read_bytes():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        done.append(r)
+    return done
+
+
 def status(d: Path, root: Path = ROOT) -> str:
     """fresh (keys equal the current code's), stale, or missing"""
     f = Path(d) / "stage.json"
@@ -158,12 +185,17 @@ def main(argv=None) -> int:
     rk = sub.add_parser("rekey", help="new step keys without T4, for a change shown to leave the image results as they are")
     rk.add_argument("--only", default=None, help="comma-separated stage ids (default: all of STAGE_IDS)")
     rk.add_argument("--reason", required=True, help="the change and how it was shown to leave motion/ and rotation/ unchanged")
+    sub.add_parser("truth", help="copy the truth files of the sources to test-data/truth/")
     ch = sub.add_parser("check")
     ch.add_argument("--verify-source", action="store_true", help="also hash the source videos (slow) and compare with stage.json")
     ch.add_argument("--only", default=None, help="comma-separated stage ids (default: all of STAGE_IDS)")
     a = ap.parse_args(argv)
     ids = a.only.split(",") if getattr(a, "only", None) else STAGE_IDS
+    if a.cmd == "truth":
+        print("\n".join(truth()) or "truth up to date")
+        return 0
     if a.cmd == "make":
+        truth()
         failed = []
         for sid in ids:
             try:

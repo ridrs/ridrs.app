@@ -321,7 +321,7 @@ def _score_verified(c: dict, d: Path) -> dict:
     from rsm.bench import gps_truth as GT
     from rsm.refine import evaluate
     src = [x for x in json.loads((HERE / "clip_sources.json").read_text())["sources"] if x.get("gps") == c["gps"]][0]
-    lat, lon, tt_v = GT.read_gpx(Path(_x("$V2G_TEST_DATA")) / "sources" / src["verified"])
+    lat, lon, tt_v = GT.read_gpx(Path(_x("$V2G_TEST_DATA")) / "truth" / src["verified"])
     R = np.load(d / "refine" / "result.npz")
     crs = str(R["crs"])
     gb = GT.curve(lat, lon, tt_v - EPOCH_2000 - _t0(c), crs)            # track seconds = route seconds

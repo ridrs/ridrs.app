@@ -206,7 +206,7 @@ def verified_reference(s: dict, t0: float, n: int) -> dict | None:
         return None
     from scipy.ndimage import gaussian_filter1d
     from rsm.bench import gps_truth as GT
-    lat, lon, tt = GT.read_gpx(_x("$V2G_TEST_DATA/sources") / s["verified"])
+    lat, lon, tt = GT.read_gpx(_x("$V2G_TEST_DATA/truth") / s["verified"])
     gb = GT.curve(lat, lon, tt - EPOCH_2000, _utm(float(np.median(lon))))
     t = t0 + np.arange(n + 1, dtype=float)
     tv = np.maximum.accumulate(gb["tg"])

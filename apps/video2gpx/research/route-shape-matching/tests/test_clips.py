@@ -94,7 +94,7 @@ def test_the_verified_reference_reads_video_time(tmp_path, monkeypatch):
     (tmp_path / "v.gpx").write_text(f'<gpx><trk><trkseg>{pts}</trkseg></trk></gpx>')
     monkeypatch.setenv("V2G_TEST_DATA", str(tmp_path.parent))
     s = dict(gps_quality="verified", verified=f"{tmp_path.name}/v.gpx")
-    monkeypatch.setattr(CL, "_x", lambda p: tmp_path.parent if p == "$V2G_TEST_DATA/sources" else Path(p))
+    monkeypatch.setattr(CL, "_x", lambda p: tmp_path.parent if p == "$V2G_TEST_DATA/truth" else Path(p))
     ref = CL.verified_reference(s, 10.0, 20)
     assert ref["inside"] and len(ref["speed"]) == 20
     assert np.allclose(ref["speed"][3:-3], 7.9, atol=0.3)  # 1e-4 deg of longitude at 44.7 N is about 7.9 m, one per second

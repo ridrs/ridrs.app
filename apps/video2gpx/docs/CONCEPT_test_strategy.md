@@ -77,11 +77,12 @@ test-data/
   clips/<id>/clip.json              source id, t0, duration, class (secured / open), what it tests, expected values
   stages/<case>/motion/ rotation/   frozen image results of the full sources (standstills in rotation/)
   stages/<case>/stage.json          code hash of the image side, sha256 of the source, parameters, horizon, GPS alignment
+  truth/vangestel/<route>/          the truth files of the sources (track.gpx, the verified Pontaix track), copied by `rsm.bench.stages truth`
   osm/ dem/                         as today; later cut per case
   runs/                             finished runs for the app e2e (as today)
 ```
 
-`vangestel/` moved to `sources/vangestel/`. The tests read `clips/`, `long/` and `stages/` only.
+`vangestel/` moved to `sources/vangestel/`. The tests read `clips/`, `long/`, `stages/` and `truth/` only.
 
 ### Truth: verified and coarse (maintainer, 2026-11-19)
 
@@ -327,6 +328,16 @@ the YouTube link, the licence note and the truth that exists.
      (made with `python -m rsm.pipeline run` on that video, the Pontaix search frame and the start time of the test) instead of the whole
      Roanne video and `runs/vallee-de-roanne`.
 6. **Clean up:** no test reads `sources/` any more (a T0 test checks that no test or case path points into it); `sources/` stays for T4 (D1).
+   Built 2026-11-20:
+   - The truth files (the Van Gestel `track.gpx` of every GPS source and the verified Pontaix track) are copied to `test-data/truth/` under the
+     same relative paths by `rsm.bench.stages truth` (also the first thing `make` does, so T4 keeps them current); `rsm.bench.gps_truth`,
+     the verified scores of the clips (T1) and of regress (T2, T3) read them there.
+   - `tests/test_no_sources.py` (T0, runs without data): the data folders of the tests (clips, long, stages, truth, osm) lie outside
+     `sources/`; clip_set.json and long_set.json name no files; the stage cases and the long videos take their extract outside it (the video
+     path of a stage case is a name only); the defaults of `e2e.rs` point outside it; the verified track is read from `truth/`.
+   - Shown on 2026-11-20 with `sources/` renamed: T1 21/21, T3 2/2 and T2 (all 15 stage cases, the same values) run without it.
+     (`e2e.rs` was not run that way; its defaults point at `long/`, `runs/` and `osm/`.)
+   - The Amalfi tunnel score is gone (maintainer, 2026-11-20); the Lahntal odometry failure is an open item in docs/HISTORY.md.
 
 ## 5. Data and time
 
