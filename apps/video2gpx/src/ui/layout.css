@@ -45,6 +45,11 @@ main#main { flex: 1; min-height: 0; outline: none; }
 .ws[data-stage="analyse"] { grid-template-areas: "head head" "video map" "main main"; }
 .ws[data-stage="analyse"] .ws-head { display: block; }
 .ws[data-stage="analyse"] .ws-head > :not(.an-ov) { display: none; }
+/* Analyse: the map box is as tall as the video box, the map fills it, the legend stands beside the map */
+.ws[data-stage="analyse"] .ws-map { align-self: stretch; display: grid; grid-template-columns: minmax(0, 1fr) max-content; grid-template-rows: auto auto minmax(0, 1fr); column-gap: var(--sp-3); row-gap: 0; }
+.ws[data-stage="analyse"] .ws-map > .map-banner { grid-column: 1 / -1; margin-bottom: var(--sp-2); }
+.ws[data-stage="analyse"] .ws-map .mapwrap { grid-column: 1; grid-row: 3; aspect-ratio: auto; max-width: none; min-height: 320px; margin: 0; }
+.ws[data-stage="analyse"] .ws-map .maplegend { grid-column: 2; grid-row: 3; flex-direction: column; flex-wrap: nowrap; align-self: start; max-width: 180px; }
 .ws[data-stage="export"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main"; max-width: 1200px; }
 .ws[data-stage="export"] :is(.ws-head, .ws-map, .ws-video, .ws-side, .ws-info, .ws-timeline) { display: none; }
 .ws-side { padding: 0; display: flex; flex-direction: column; position: sticky; top: calc(var(--bar-h) + var(--stage-h) + var(--sp-4)); max-height: calc(100vh - var(--bar-h) - var(--stage-h) - 2 * var(--sp-4)); }
@@ -54,7 +59,8 @@ main#main { flex: 1; min-height: 0; outline: none; }
   .ws[data-stage="berechnung"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "main" "map" "info"; }
   .ws[data-stage="ergebnis"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "video" "map" "timeline"; }
   .ws:is([data-stage="hoehe"], [data-stage="analyse"]) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "video" "map"; }
-  .ws[data-stage="analyse"] { grid-template-areas: "head" "main" "video" "map"; }
+  .ws[data-stage="analyse"] { grid-template-areas: "head" "video" "main" "map"; }
+  .ws[data-stage="analyse"] .ws-map .mapwrap { aspect-ratio: 1 / 1; }
   .ws-side { position: static; max-height: none; }
   .bar-link > span:not(.dot):not(.sr-only) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }

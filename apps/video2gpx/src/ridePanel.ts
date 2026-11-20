@@ -1,4 +1,6 @@
-// Speed and the local elevation profile (about ±100 m around the current position) under the video, following playback.
+// Speed, grade, elevation, the video position (time and frame) and the local elevation profile (about ±100 m around the current position) under the video, following playback.
+import { A } from "./analyse";
+import { fmtClock } from "./analyseStats";
 import { E, loadDem, loadElevation, missingBytes } from "./elevation";
 import { S, bus } from "./state";
 import type { ElevationProfile, RoutePoint } from "./types";
@@ -9,7 +11,7 @@ const HALF_M = 100;         // the profile shows this many metres before and aft
 const MIN_SPAN_M = 12;      // vertical scale at least this many metres, so a flat road looks flat
 const GRADE_M = 20;         // grade over ±this many metres
 
-let root: HTMLElement, speedEl: HTMLElement, gradeEl: HTMLElement, eleEl: HTMLElement, canvas: HTMLCanvasElement, graphEl: HTMLElement;
+let root: HTMLElement, speedEl: HTMLElement, gradeEl: HTMLElement, eleEl: HTMLElement, timeEl: HTMLElement, frameEl: HTMLElement, canvas: HTMLCanvasElement, graphEl: HTMLElement;
 let profile: ElevationProfile | null = null;
 /** why there is no profile (shown in the elevation track of the timeline). The elevation data are loaded in the Höhe stage; the note links there.
  *  `extra`: a profile exists, but more detailed national / regional elevation data could be loaded for the route */
@@ -24,9 +26,11 @@ export function initRidePanel(container: HTMLElement) {
   speedEl = el("div", { class: "ride-v mono" }, "–");
   gradeEl = el("div", { class: "ride-v mono" }, "–");
   eleEl = el("div", { class: "ride-v mono" }, "–");
+  timeEl = el("div", { class: "ride-v mono" }, "–");
+  frameEl = el("div", { class: "ride-l tnum" }, "Video");
   canvas = el("canvas", { class: "ride-profile", height: 64, role: "img", "aria-label": "Höhenprofil 100 m vor und hinter der Position" });
   const box = (v: HTMLElement, label: string) => el("div", { class: "ride-box" }, v, el("div", { class: "ride-l" }, label));
-  root.append(el("div", { class: "ride-vals" }, box(speedEl, "km/h"), box(gradeEl, "Steigung"), box(eleEl, "Höhe")),
+  root.append(el("div", { class: "ride-vals" }, box(speedEl, "km/h"), box(gradeEl, "Steigung"), box(eleEl, "Höhe"), el("div", { class: "ride-box" }, timeEl, frameEl)),
     graphEl = el("div", { class: "ride-graph" }, canvas));
   root.hidden = true;
   bus.on("result", () => { if (S.result !== lastResult) { lastResult = S.result; void load(); } else sync(); });
@@ -90,6 +94,9 @@ function draw(t: number) {
   if (root.hidden) return;
   const pts = S.result?.points;
   if (!pts?.length) return;
+  timeEl.textContent = fmtClock(t);
+  const fps = A.series?.fps || A.frame?.fps || 0;
+  frameEl.textContent = fps > 0 ? `Video · Frame ${Math.floor(t * fps + 1e-6)}` : "Video";
   const v = speedAt(pts, t);
   speedEl.textContent = Number.isFinite(v) ? v.toFixed(0) : "–";
   const s = arcAt(pts, t);

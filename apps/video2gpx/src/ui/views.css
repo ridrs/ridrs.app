@@ -130,7 +130,7 @@
 .stage { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: var(--r-1); overflow: hidden; }
 .stage video, .stage img.frame { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
 .ride { display: flex; flex-direction: column; gap: var(--sp-2); }
-.ride-vals { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+.ride-vals { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); }
 .ride-box { background: var(--c-surface-2); border-radius: var(--r-1); padding: var(--sp-2) var(--sp-3); }
 .ride-v { font: 600 20px/24px var(--font-mono); font-variant-numeric: tabular-nums; }
 .ride-l { font: var(--t-small); color: var(--c-text-2); }

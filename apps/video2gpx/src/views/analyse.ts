@@ -1,7 +1,7 @@
 // Analyse (stage 4): what the pipeline saw on the weak stretches and why. The video carries an overlay of what was tracked at the current time ("Bewegung",
 // "Rotation"), the charts below put curvature of the video against the map's, rotation, speed and quality on one time axis, and the list names the weak
 // stretches with the causes measured on them. Inspection only (docs/FEATURE_analysis_insight.md, Part A).
-import { A, analyseBusy, loadSeries, overlayOn, requestFrame, setSwitch } from "../analyse";
+import { A, loadSeries, overlayOn, requestFrame, setSwitch } from "../analyse";
 import { AnalyseChart, DEFAULT_LAYERS, type ChartLayers } from "../analyseChart";
 import { Overlay, COL, GAIN, shownBand } from "../analyseOverlay";
 import { de, fmtClock, viewFor } from "../analyseStats";
@@ -9,7 +9,7 @@ import { go, routePath } from "../app/router";
 import { mapMarks } from "../mapPanel";
 import { S, bus } from "../state";
 import type { AnalyseStretch, InspectFrame } from "../types";
-import { banner, btn, chip, iconBtn, toneIcon } from "../ui/components";
+import { banner, btn, chip, iconBtn } from "../ui/components";
 import { icon } from "../ui/icons";
 import { el, fmtKm, pointAt } from "../util";
 import { getPlayer } from "../videoPanel";
@@ -17,7 +17,7 @@ import { getPlayer } from "../videoPanel";
 const LAYER_KEY = "v2g.analyseLayers";
 const OV_OPEN_KEY = "v2g.analyseOverlayOpen";
 const TICK_MS = 2500;       // while the video plays the overlay is asked for this often
-let root: HTMLElement, statusEl: HTMLElement, nextBtn: HTMLButtonElement, notes: HTMLElement, ovBox: HTMLElement, frameInfo: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement;
+let root: HTMLElement, busyEl: HTMLElement, nextBtn: HTMLButtonElement, notes: HTMLElement, ovBox: HTMLElement, frameInfo: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement;
 let listBox: HTMLElement, figBox: HTMLElement, emptyEl: HTMLElement, rangeEl: HTMLElement;
 let zoomIn: HTMLButtonElement, zoomOut: HTMLButtonElement, zoomAll: HTMLButtonElement;
 let chart: AnalyseChart, overlay: Overlay;
@@ -33,10 +33,11 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
   loadLayers();
   overlay = new Overlay(videoHost);
   root = el("div", { class: "an-view", hidden: true });
-  statusEl = el("span", { class: "row small" });
   nextBtn = btn("Weiter: Höhe", () => S.cur && go(routePath.project(S.cur.app.id, "hoehe")), { kind: "primary", icon: "chevron", attrs: { "data-primary": "" } });
   notes = el("div", { class: "stack-s" });
   frameInfo = el("div", { class: "an-frameinfo small", "aria-live": "polite" });
+  // the busy note keeps its place in the title line (shown or not), so the panel does not change height while the points are tracked
+  busyEl = el("span", { class: "muted row small an-busy" }, icon("spinner", "spin"), "aktualisiert …");
   const sw = (k: "motion" | "rotation", text: string, sample: HTMLElement) => {
     const c = el("input", { type: "checkbox", checked: A[k], onchange: () => { setSwitch(k, c.checked); onSwitch(); } });
     cbs[k] = c;
@@ -53,8 +54,8 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
     try { localStorage.setItem(OV_OPEN_KEY, o ? "1" : "0"); } catch { /* private mode */ }
   };
   ovBox = el("section", { class: "panel stack an-ov", "aria-labelledby": "an-ov-h", hidden: true },
-    el("div", { class: "row wrap between" }, el("div", { class: "row" }, ovToggle, el("h3", { id: "an-ov-h" }, "Overlay auf dem Video")),
-      el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic, COL.ignored)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)))),
+    el("div", { class: "row wrap between" }, el("div", { class: "row" }, ovToggle, el("h3", { id: "an-ov-h" }, "Overlay auf dem Video"), busyEl),
+      el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic, COL.ignored)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)), nextBtn)),
     ovBody);
   ovBody.append(el("p", { class: "small muted" }, `Die Punkte werden für das Bild unter dem Zeiger neu verfolgt (mit den Parametern der Berechnung, ohne ein Ergebnis zu ändern); das dauert etwa eine Sekunde. Bewegung: Straßenpunkte der Bildbewegung, grün = zählt für Tempo und Gierrate (Inlier), rot = verworfen, magenta gestrichelt und durchgekreuzt = vorbeifahrender Verkehr, vom Tempo ignoriert, Pfeil = Verschiebung zum nächsten Bild (${GAIN.motion}-fach), gestrichelt das Straßenfeld, gelb der Horizont. Rotation: Fernmerkmale über dem Horizont, cyan = Inlier, orange = verworfen, Pfeil = Verschiebung im Fenster (${GAIN.rotation}-fach), gepunktet die Bänder, oben die Gierrate. Beim Abspielen wird alle ${TICK_MS / 1000} s aktualisiert.`),
     frameInfo);
@@ -77,7 +78,6 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
   listBox = el("section", { class: "panel stack", "aria-labelledby": "an-list-h" });
   figBox = el("section", { class: "panel stack", "aria-labelledby": "an-fig-h" });
   root.append(
-    el("div", { class: "row wrap between elev-head" }, el("div", { class: "row wrap" }, el("h2", {}, "Analyse"), statusEl), nextBtn),
     notes, chartBox, el("div", { class: "elev-bottom an-bottom" }, listBox, figBox));
   mainEl.append(root);
   headEl.append(ovBox);
@@ -161,16 +161,10 @@ function update() {
   if (sg !== sig) {
     const dataChanged = !sig || JSON.parse(sig)[0] !== A.state || JSON.parse(sig)[1] !== A.series?.n || JSON.parse(sig)[2] !== A.series?.result_mtime;
     sig = sg;
-    renderStatus(); renderNotes(); renderFrameInfo();
+    renderNotes(); renderFrameInfo();
     if (dataChanged) { renderChart(); renderList(); renderFigures(); }
   }
   drawOverlay();
-}
-
-function renderStatus() {
-  const st = analyseBusy() ? "run" : A.state === "error" ? "bad" : A.state === "ready" ? "ok" : "info";
-  const text = analyseBusy() ? "Auswertung wird gelesen …" : A.state === "error" ? "Analyse nicht verfügbar" : A.state === "ready" ? `${A.series!.stretches.length} schwache${A.series!.stretches.length === 1 ? "r" : ""} Abschnitt${A.series!.stretches.length === 1 ? "" : "e"}` : "";
-  statusEl.replaceChildren(toneIcon(st), el("span", {}, text));
 }
 
 function renderNotes() {
@@ -184,12 +178,25 @@ function renderNotes() {
 function frameLine(label: string, text: string, ok?: boolean, why?: string): HTMLElement {
   return el("div", { class: "an-fl" }, el("b", {}, label), el("span", {}, text), ok === undefined ? "" : ok ? chip("stimmt mit der Berechnung überein", "ok", "Dieselben Zahlen wie in der gespeicherten Zeile der Berechnung") : chip("weicht von der Berechnung ab", "warn", why ?? ""));
 }
+/** the frame lines grow the panel but never shrink it while the width stays (no jumping while the video plays); a new width, project or switch starts over */
+let infoW = 0, infoH = 0, infoProject = "";
+function holdHeight() {
+  const w = frameInfo.clientWidth, pr = `${S.cur?.app.id ?? ""}|${A.motion}|${A.rotation}`;
+  if (w !== infoW || pr !== infoProject) { infoW = w; infoProject = pr; infoH = 0; frameInfo.style.minHeight = ""; }
+  infoH = Math.max(infoH, frameInfo.scrollHeight);
+  if (infoH) frameInfo.style.minHeight = `${infoH}px`;
+}
 function renderFrameInfo() {
+  busyEl.style.visibility = overlayOn() && A.frameBusy && A.frame ? "visible" : "hidden";
   frameInfo.replaceChildren();
+  renderFrameLines();
+  holdHeight();
+}
+function renderFrameLines() {
   if (!overlayOn()) { frameInfo.append(el("div", { class: "muted" }, "Schalte „Bewegung“ oder „Rotation“ ein, um zu sehen, was die Berechnung im Bild verfolgt hat.")); return; }
   const f = A.frame;
   if (!f) { frameInfo.append(el("div", { class: "muted row" }, ...(A.frameBusy ? [icon("spinner", "spin"), "Punkte werden verfolgt …"] : ["Noch kein Bild berechnet."]))); return; }
-  frameInfo.append(...frameLines(f), A.frameBusy ? el("div", { class: "muted row small" }, icon("spinner", "spin"), "aktualisiert …") : "");
+  frameInfo.append(...frameLines(f));
 }
 function frameLines(f: InspectFrame): HTMLElement[] {
   const out: HTMLElement[] = [];
