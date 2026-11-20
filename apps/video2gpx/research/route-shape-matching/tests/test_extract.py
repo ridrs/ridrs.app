@@ -167,3 +167,15 @@ def test_extraction_reads_no_horizon_or_road_setting():
     code = " ".join(t.string for t in tokenize.generate_tokens(open(EX.__file__).readline) if t.type == tokenize.NAME)    # code only: no comments, no strings
     for word in ("horizon", "BELOW_HORIZON", "ROAD_WIDTH", "band_ends", "band_horizon", "Tracker", "fit_fixed_horizon"):
         assert word not in code.split(), word
+
+
+def test_the_workers_take_short_chunks_with_two_threads_each(video, sequential, tmp_path):
+    """speed (2026-11-20, HISTORY open item): 30 s chunks keep 4 workers busy to the end (120 s chunks: 5 chunks on 4 workers, two rounds), and
+    two OpenCV threads per worker halve the LK time; the workers are spawned, not forked, so they never inherit a used OpenCV thread pool.
+    The data stay those of one sequential pass."""
+    import inspect
+    assert EX.CHUNK_S == 30.0 and inspect.signature(EX.extract).parameters["chunk_s"].default == EX.CHUNK_S
+    meta = EX.extract(str(video), tmp_path / "extract", workers=2, chunk_s=CHUNK_S, hwaccel=False)
+    assert meta["parallel"]["threads"] == EX.THREADS == 2 and meta["parallel"]["start"] == "spawn" and meta["parallel"]["fallback"] is None
+    a, b = EX.load(sequential[0]), EX.load(tmp_path / "extract")
+    assert all(np.array_equal(a[k], b[k]) for k in a)

@@ -48,6 +48,11 @@ FB_MAX = 1.0
 RAW_EVERY = 3
 RAW_LOW_MIN = 40
 STREAMS = ("des", "raw", "rot")
+#: speed (2026-11-20; neither shapes the data): chunks of CHUNK_S s keep every worker busy to the end (with 120 s, 10 min were 5 chunks on 4
+#: workers: two rounds), and THREADS OpenCV threads per worker parallelise the LK tracking (85 % of the time). Pontaix 10 min, 4 workers:
+#: 120 s chunks / 1 thread 261-341 s, 30 s / 1 thread 180 s, 30 s / 2 threads 127 s; 3 workers x 3 threads 153 s, 6 x 2 129 s; data identical.
+CHUNK_S = 30.0
+THREADS = 2
 COLS = ("x", "y", "dx", "dy", "fb", "q")
 
 
@@ -149,7 +154,13 @@ class _Stream:
 
 
 def _worker_init():
+    """one OpenCV thread (the forked rotation workers of vmsx.interpret)"""
     cv2.setNumThreads(1)
+
+
+def _extract_init(threads: int):
+    """THREADS OpenCV threads in a spawned extraction worker"""
+    cv2.setNumThreads(int(threads))
 
 
 def _range(job) -> dict:
@@ -213,7 +224,7 @@ def _write(d: Path, r: dict) -> str:
     return name
 
 
-def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: float = vm.CHUNK_S, hwaccel: bool = True, log=None, key=None, on_progress=None) -> dict:
+def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: float = CHUNK_S, hwaccel: bool = True, log=None, key=None, on_progress=None) -> dict:
     """extract the video into out_dir (extract.json + chunk_<first frame>.npz); returns the meta (`key`: the caller's key of video and settings, stored as is). workers 1 (or a video shorter than two chunks, or
     irregular stream timing, or a seam that does not match): one sequential pass, same data."""
     log = log or (lambda level, msg: None)
@@ -242,7 +253,7 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
         why = vm.timing_problem(path, info.fps)
     chunks, pairs, windows = [], 0, 0
     if why is None:
-        with mp.get_context("fork").Pool(min(workers, len(jobs)), initializer=_worker_init) as pool:
+        with mp.get_context("spawn").Pool(min(workers, len(jobs)), initializer=_extract_init, initargs=(THREADS,)) as pool:
             res = []
             for r in pool.imap_unordered(_range, [(X, a, b) for a, b in jobs], chunksize=1):
                 res.append(r)
@@ -271,7 +282,7 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
     pr = params(k)
     meta = dict(version=VERSION, key=key, params=pr, video=str(path), fps=float(info.fps), duration=float(info.duration), width=int(width), height=int(height), pairs=int(pairs), windows=int(windows),
                 n_win=int(n_win), k=int(k), chunks=chunks, opencv=cv2.__version__, seconds=round(time.perf_counter() - t0, 2),
-                parallel=dict(workers=int(workers), chunks=len(chunks), fallback=fallback))
+                parallel=dict(workers=int(workers), chunks=len(chunks), chunk_s=float(chunk_s), threads=THREADS, start="spawn", fallback=fallback))
     (d / "extract.json").write_text(json.dumps(meta, indent=1))
     return meta
 

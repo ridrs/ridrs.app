@@ -92,9 +92,9 @@ cadence) and for every pair whose destatic stream has fewer than 40 points in th
 
 ## 7. Risks
 
-- **Known issue, speed (open to-do, HISTORY.md):** the first real run took 341 s for 10 min of Pontaix with 4 workers (177 MB), about 10 h for a T4
-  over the test sources against 5-6 h today. Optimisation (shared LK pyramids, raw eigenvalue map only when stored, worker scaling) is deferred;
-  phase 2 goes first.
+- **Speed (solved 2026-11-20, HISTORY.md):** the first real run took 341 s for 10 min of Pontaix with 4 workers. With 30 s chunks and 2 OpenCV
+  threads per spawned worker (`extract.CHUNK_S`, `extract.THREADS`) it takes 143 s with bit-identical data: about 4 h of extraction for a T4
+  over the test sources.
 - Bit parity across machines: LK and `cornerMinEigenVal` may differ in the last bits between OpenCV builds; the OpenCV version is part of
   `extract.json` and of the key.
 - Memory: a 40 min video holds about 60 M points; chunks keep a worker under 1 GB.
