@@ -1,5 +1,6 @@
 // Map frames drawn by the user: search frame (blue), start frame (green, "Start"), end frame (red, "Ende").
-// Own small Leaflet implementation: draw with a drag, move by dragging the frame, resize with the corner handles, delete with the ✕ handle.
+// Own small Leaflet implementation: draw with a drag, move with the handle on the top edge, resize with the corner handles, delete with the ✕ handle.
+// The frame itself takes no pointer input: dragging inside it pans the map.
 import L from "leaflet";
 import type { Bbox } from "./types";
 
@@ -35,7 +36,7 @@ export const clampBox = (b: Bbox, lim: Bbox | null): Bbox =>
 
 export const normBox = (la1: number, lo1: number, la2: number, lo2: number): Bbox => [Math.min(la1, la2), Math.min(lo1, lo2), Math.max(la1, la2), Math.max(lo1, lo2)];
 
-interface Entry { kind: FrameKind; box: Bbox; rect: L.Rectangle; handles: L.Marker[]; del: L.Marker | null }
+interface Entry { kind: FrameKind; box: Bbox; rect: L.Rectangle; handles: L.Marker[]; del: L.Marker | null; mover: L.Marker | null }
 
 export class FrameEditor {
   private entries: Partial<Record<FrameKind, Entry>> = {};
@@ -99,16 +100,16 @@ export class FrameEditor {
   set(kind: FrameKind, box: Bbox | null, size = "") {
     const old = this.entries[kind];
     const hadFocus = !!old && document.activeElement === old.rect.getElement();
-    if (old) { old.rect.remove(); old.handles.forEach((h) => h.remove()); old.del?.remove(); delete this.entries[kind]; }
+    if (old) { old.rect.remove(); old.handles.forEach((h) => h.remove()); old.del?.remove(); old.mover?.remove(); delete this.entries[kind]; }
     if (!box) return;
     const locked = this.hooks.locked();
     const st = FRAME_STYLE[kind];
     const rect = L.rectangle([[box[0], box[1]], [box[2], box[3]]], {
-      renderer: this.renderer, color: st.color, weight: kind === "search" ? 2.5 : 2.5, fillOpacity: locked ? 0.03 : st.fill, dashArray: locked ? "7 6" : undefined, interactive: !locked,
+      renderer: this.renderer, color: st.color, weight: kind === "search" ? 2.5 : 2.5, fillOpacity: locked ? 0.03 : st.fill, dashArray: locked ? "7 6" : undefined, interactive: false,
       className: `frame frame-${kind}`,
     }).addTo(this.map);
     if (kind !== "search") rect.bindTooltip(st.label, { permanent: true, direction: "center", className: `frame-label frame-label-${kind}` });
-    const entry: Entry = { kind, box, rect, handles: [], del: null };
+    const entry: Entry = { kind, box, rect, handles: [], del: null, mover: null };
     this.entries[kind] = entry;
     if (!locked) this.enable(entry);
     // keyboard: the frame is focusable; arrows move it by 5 % of its size, Shift+arrows resize, Delete removes
@@ -164,28 +165,21 @@ export class FrameEditor {
     }
     en.del = L.marker(this.deletePos(en.box), { icon: L.divIcon({ className: `frame-del frame-del-${kind}`, html: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>', iconSize: [28, 28], iconAnchor: [-2, 30] }), zIndexOffset: 900, keyboard: false, title: `${FRAME_STYLE[kind].label} löschen` }).addTo(this.map);
     en.del.on("click", (e) => { L.DomEvent.stopPropagation(e); this.hooks.onChange(kind, null); });
-    // move by dragging the frame itself
+    // move with the handle in the middle of the top edge (the frame's inside pans the map)
+    en.mover = L.marker(this.moverPos(en.box), { icon: L.divIcon({ className: `frame-move frame-move-${kind}`, html: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12M8 2l-2 2M8 2l2 2M8 14l-2-2M8 14l2-2M2 8l2-2M2 8l2 2M14 8l-2-2M14 8l-2 2"/></svg>', iconSize: [28, 28], iconAnchor: [14, 14] }), draggable: true, zIndexOffset: 900, keyboard: false, title: `${FRAME_STYLE[kind].label} verschieben` }).addTo(this.map);
     let start: L.LatLng | null = null, origin: Bbox | null = null;
-    rect.on("mousedown", (e: L.LeafletMouseEvent) => {
-      if (this.drawing) return;
-      L.DomEvent.stop(e.originalEvent);
-      start = e.latlng; origin = en.box; this.map.dragging.disable();
-      const mv = (ev: L.LeafletMouseEvent) => {
-        if (!start || !origin) return;
-        const dLat = ev.latlng.lat - start.lat, dLon = ev.latlng.lng - start.lng;
-        const b = clampMove([origin[0] + dLat, origin[1] + dLon, origin[2] + dLat, origin[3] + dLon], this.hooks.limit(kind));
-        rect.setBounds([[b[0], b[1]], [b[2], b[3]]]);
-        this.placeHandles(en, b);
-      };
-      const end = () => {
-        this.map.off("mousemove", mv); document.removeEventListener("mouseup", end);
-        this.map.dragging.enable();
-        if (!start) return;
-        start = null; origin = null;
-        const bb = rect.getBounds();
-        this.commit(kind, [bb.getSouth(), bb.getWest(), bb.getNorth(), bb.getEast()]);
-      };
-      this.map.on("mousemove", mv); document.addEventListener("mouseup", end);
+    en.mover.on("dragstart", () => { start = en.mover!.getLatLng(); origin = en.box; });
+    en.mover.on("drag", () => {
+      if (!start || !origin) return;
+      const p = en.mover!.getLatLng(), dLat = p.lat - start.lat, dLon = p.lng - start.lng;
+      const b = clampMove([origin[0] + dLat, origin[1] + dLon, origin[2] + dLat, origin[3] + dLon], this.hooks.limit(kind));
+      rect.setBounds([[b[0], b[1]], [b[2], b[3]]]);
+      this.placeHandles(en, b, -1, false);
+    });
+    en.mover.on("dragend", () => {
+      start = null; origin = null;
+      const bb = rect.getBounds();
+      this.commit(kind, [bb.getSouth(), bb.getWest(), bb.getNorth(), bb.getEast()]);
     });
   }
 
@@ -197,9 +191,12 @@ export class FrameEditor {
 
   private deletePos(b: Bbox): [number, number] { return [b[2], b[3]]; }
 
-  private placeHandles(en: Entry, b: Bbox, skip = -1) {
+  private moverPos(b: Bbox): [number, number] { return [b[2], (b[1] + b[3]) / 2]; }
+
+  private placeHandles(en: Entry, b: Bbox, skip = -1, mover = true) {
     en.handles.forEach((h, i) => { if (i !== skip) h.setLatLng(this.corner(b, i)); });
     en.del?.setLatLng(this.deletePos(b));
+    if (mover) en.mover?.setLatLng(this.moverPos(b));
   }
 
   fit(box: Bbox, pad = 30) {

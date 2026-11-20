@@ -113,10 +113,13 @@
 :root:not([data-theme="light"]) .leaflet-bar a, :root:not([data-theme="light"]) .leaflet-control-attribution { background: var(--c-surface); color: var(--c-text); }
 .pos-icon { background: none; border: 0; } .pos-arrow { width: 34px; height: 34px; transition: transform .15s linear; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 .map.drawing, .map.drawing .leaflet-interactive { cursor: crosshair !important; }
-.frame { cursor: move; } .frame:focus-visible { outline: none; stroke-width: 4; stroke-dasharray: 6 3; }
+.frame:focus-visible { outline: none; stroke-width: 4; stroke-dasharray: 6 3; }
 .frame-handle { background: transparent; cursor: nwse-resize; }
 .frame-handle::after { content: ""; position: absolute; inset: 9px; background: #fff; border: 2px solid var(--map-search); border-radius: 2px; }
 .frame-handle-start::after { border-color: var(--map-start); } .frame-handle-end::after { border-color: var(--map-end); }
+.frame-move { display: flex; align-items: center; justify-content: center; cursor: move; }
+.frame-move svg { width: 22px; height: 22px; padding: 3px; border-radius: 50%; background: #fff; stroke: var(--map-search); stroke-width: 1.6; fill: none; stroke-linecap: round; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.frame-move-start svg { stroke: var(--map-start); } .frame-move-end svg { stroke: var(--map-end); }
 .frame-del { display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .frame-del svg { width: 20px; height: 20px; padding: 3px; border-radius: 50%; background: #fff; stroke: #333; stroke-width: 1.8; fill: none; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
 .frame-del:hover svg { stroke: var(--map-end); }
