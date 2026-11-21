@@ -21,6 +21,8 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const narrow = () => matchMedia('(max-width: 760px)').matches;
+// Display width of a ride's picture for srcset: the sheet's width on phones, the dialog's default width (--detail-w) otherwise.
+const PICTURE_SIZES = '(max-width: 760px) 100vw, 440px';
 
 // Lokalisierungsstufe (concept 2.5): [name, description] in the interface language
 export const LEVELS = Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((l) => [l, [t(`level.${l}.name`), t(`level.${l}.desc`)]]));
@@ -485,7 +487,8 @@ async function openVideo(id, start = 0, { stack = null } = {}) {
   fitSheet();
   if (v.ride) {
     // No player: the video is only in the original download. Its picture stands in the player's place.
-    slot.innerHTML = v.image ? `<img class="ride-picture" src="${esc(v.image.url)}" alt="${esc(t('detail.preview_alt'))}">` : '';
+    // Its small web versions (srcset) load fast; the original in full size is for the app only.
+    slot.innerHTML = v.image ? `<img class="ride-picture" src="${esc(v.image.url)}"${v.image.srcset ? ` srcset="${esc(v.image.srcset)}" sizes="${PICTURE_SIZES}"` : ''} alt="${esc(t('detail.preview_alt'))}" decoding="async">` : '';
   } else if (v.embeddable) {
     player = mountPlayer(map, slot, { videoId: id, syncUrl: v.sync?.path, start, readout: body.querySelector('#readout'),
       onTime: (s, km, total) => profileCtl?.at(km, total) });

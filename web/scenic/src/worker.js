@@ -106,7 +106,7 @@ async function video(env, id) {
     sync: sync.results[0] ?? null,
     localization: loc.results[0] ?? null,
     image: im ? { url: `api/images/${im.image_id}`, width: im.width, height: im.height, rights: im.rights, credit: im.credit }
-      : picture ? { url: picture, width: null, height: null, rights: null, credit: v.author } : null,
+      : picture ? { ...picture, width: null, height: null, rights: null, credit: v.author } : null,
     // Incyclist package (concept 4.7): from level 3 on; level 3 with a warning. A ride has its original package (without video).
     incyclist: p ? { available: true, level, warn: false, url: `api/videos/${id}/package.zip`, package: true }
       : { available: level <= MIN_LEVEL && !!(sync.results[0] || r), level, warn: level === MIN_LEVEL, url: `api/videos/${id}/incyclist.zip` },

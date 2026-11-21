@@ -10,11 +10,23 @@ const assetPath = (path) => path.split('/').map(encodeURIComponent).join('/');
 const hashed = (url, sha) => (sha ? `${url}?h=${sha.slice(0, 12)}` : url);
 const isPicture = (path) => /\.(jpe?g|png|webp)$/i.test(path);
 
-/** A ride's picture for the dialog: the overlay's picture in full size, else the small one; null without either. */
+/** Widths of the web versions of a ride's overlay picture, built into vg/<slug>/web/ (scripts/lib/thumbnails.mjs). */
+export const PICTURE_WIDTHS = [640, 1280];
+export const pictureName = (w) => `picture-${w}.jpg`;
+/** The overlay picture among a ride's overlay files (the big one the web versions are made from), or undefined. */
+export const overlayPicture = (overlay) => (overlay ?? []).find((f) => isPicture(f.path));
+
+/**
+ * A ride's picture for the dialog: the web versions of the overlay's picture ({url, srcset}; the original's hash busts
+ * the cache), else the small thumbnail; null without either. The original in full size is for the app's package only.
+ */
 export function ridePicture(id, p) {
-  const overlay = (parse(p.overlay) ?? []).find((f) => isPicture(f.path));
-  if (overlay) return `vg/${slugOf(id)}/overlay/${assetPath(overlay.path)}`;
-  return parse(p.thumbnail) ? `vg/${slugOf(id)}/thumbnail.jpg` : null;
+  const root = `vg/${slugOf(id)}`, overlay = overlayPicture(parse(p.overlay));
+  if (overlay) {
+    const web = (w) => hashed(`${root}/web/${pictureName(w)}`, overlay.sha256);
+    return { url: web(PICTURE_WIDTHS.at(-1)), srcset: PICTURE_WIDTHS.map((w) => `${web(w)} ${w}w`).join(', ') };
+  }
+  return parse(p.thumbnail) ? { url: `${root}/thumbnail.jpg`, srcset: null } : null;
 }
 
 const readme = (p) => `Paket ohne Video / Package without video

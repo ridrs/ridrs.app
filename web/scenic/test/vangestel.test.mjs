@@ -4,6 +4,7 @@
 // offered to the app as the ride catalog (docs/formats/scenic-ride-catalog-v1.md) and never sent to the YouTube API.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -144,7 +145,10 @@ test('dialog record of a Van Gestel route: source, credits, ride data and the pa
   assert.equal(v.ride.level, 'Moderate');
   assert.equal(v.ride.climbs[0].name, 'Col de Test');
   assert.equal(v.ride.download_size, 2000012345);
-  assert.deepEqual(v.image, { url: 'vg/test-climb/overlay/preview.jpg', width: null, height: null, rights: null, credit: 'Test Author' });
+  const h = createHash('sha256').update(readFileSync(join(VG, 'test-climb/overlay/preview.jpg'))).digest('hex').slice(0, 12);
+  assert.deepEqual(v.image, { url: `vg/test-climb/web/picture-1280.jpg?h=${h}`,
+    srcset: `vg/test-climb/web/picture-640.jpg?h=${h} 640w, vg/test-climb/web/picture-1280.jpg?h=${h} 1280w`,
+    width: null, height: null, rights: null, credit: 'Test Author' });
   assert.deepEqual(v.incyclist, { available: true, level: 3, warn: false, url: `api/videos/${ID}/package.zip`, package: true });
   assert.equal(v.route.gpx, `gpx/${ID}.gpx`);
 });

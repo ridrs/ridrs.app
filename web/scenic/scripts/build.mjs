@@ -11,6 +11,8 @@ import { encodeLine } from '../site/lib/lines.js';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 import { PIPELINE, RIDRS, VANGESTEL } from './lib/paths.mjs'; // the data pipeline folder (export/) lives outside the repository
 import { loadVanGestel } from './lib/vangestel.mjs';
+import { makeThumbnails } from './lib/thumbnails.mjs';
+import { overlayPicture } from '../src/rides.js';
 const BASE = 'scenic'; // keep in sync with BASE_PATH in wrangler.jsonc
 const distRoot = join(ROOT, 'dist');
 const dist = join(distRoot, BASE);
@@ -52,11 +54,16 @@ for (const f of readdirSync(gpxSrc)) {
 
 // Van Gestel rides: their files under vg/<slug>/ (served only for visible videos, src/worker.js), the track as GPX.
 const rides = loadVanGestel(VANGESTEL) ?? [];
+const THUMB_CACHE = join(ROOT, 'build/thumbs');
+let thumbs = 0;
 for (const r of rides) {
   const from = join(VANGESTEL, r.slug), to = join(dist, 'vg', r.slug);
   mkdirSync(to, { recursive: true });
   if (r.thumbnail) cpSync(join(from, 'thumbnail.jpg'), join(to, 'thumbnail.jpg'));
   for (const dir of ['overlay', 'package']) if (existsSync(join(from, dir))) cpSync(join(from, dir), join(to, dir), { recursive: true, filter: (f) => !f.split('/').at(-1).startsWith('.') });
+  // Small web versions of the overlay's big picture for the dialog (vg/<slug>/web/), cached by the picture's hash in build/.
+  const pic = overlayPicture(r.overlay);
+  if (pic) thumbs += (await makeThumbnails(join(from, 'overlay', pic.path), join(to, 'web'), { cache: THUMB_CACHE, key: pic.sha256 })).some((m) => !m.cached) ? 1 : 0;
   cpSync(join(from, 'package', r.gpx), join(dist, 'gpx', `${r.id}.gpx`));
 }
 
@@ -87,4 +94,4 @@ const linesJson = JSON.stringify(lines);
 writeFileSync(join(dist, 'lines.json'), linesJson);
 
 console.log(`dist: ${Object.keys(lines).length} route lines (${linePts} points, ${(linesJson.length / 1048576).toFixed(1)} MB)`);
-console.log(`dist: ${gpx} GPX (${tooBig} over 25 MB skipped), ${tracks.length} sync tracks, ${rides.length} Van Gestel rides`);
+console.log(`dist: ${gpx} GPX (${tooBig} over 25 MB skipped), ${tracks.length} sync tracks, ${rides.length} Van Gestel rides (${thumbs} pictures resized, the others from build/thumbs)`);

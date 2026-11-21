@@ -23,6 +23,7 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 | `migrations/` | D1 schema (phase 1 subset of the concept's data model) |
 | `scripts/build.mjs` | `dist/` = site + MapLibre + ridrs fonts (`vendor/fonts`, from `@fontsource`, self-hosted, no Google Fonts) + `gpx/` (from `../export/routes`) + `sync/` (time-synced tracks) |
 | `scripts/lib/vangestel.mjs` | reads the Van Gestel catalog (`<pipeline>/vangestel`) |
+| `scripts/lib/thumbnails.mjs` | web versions (640 and 1280 px JPEG) of a ride's big overlay picture |
 | `scripts/import.mjs` | `../export/` and the Van Gestel catalog → D1 upsert (SQL from `scripts/lib/import-sql.mjs`). Never touches editorial fields, manual fields or verified localizations; `--dry-run` only writes `build/import.sql` |
 | `test/` | `node --test test/` (`pnpm test`): filters, URL, speed; route sync and level rules; import protection (node:sqlite with the migrations); JWT and dev bypass; admin API; Incyclist; video2gpx job and upload (`test/fixtures/video2gpx/`, shared with ridrs_app `apps/video2gpx/tests/atlas/fixtures/`) |
 | `scripts/lib/sync-sources.mjs` | Time-synced tracks; for now the video2gpx tracks of `catalog-web`, matched by YouTube id |
@@ -36,6 +37,7 @@ Besides YouTube, ridrs Scenic lists the rides of Fred Van Gestel ([cycling.vange
 - **Site:** quick chip and panel filter *In ridrs fahrbar* (`ride=1`). The dialog shows the route's picture instead of a player (the video is only in the original download), tour, difficulty, climbs and credits with the license; *Paket ohne Video* (`/api/videos/:id/package.zip`: the package files, the overlay and `LIESMICH.txt`) replaces the generated Incyclist package.
 - **App:** `GET /api/ride/v1/catalog.json`, format in ridrs_app [`docs/formats/scenic-ride-catalog-v1.md`](../../docs/formats/scenic-ride-catalog-v1.md); `test/fixtures/ride-catalog/catalog.example.json` is the answer for the test catalog `test/fixtures/vangestel/`.
 - **Files:** the build copies them to `dist/scenic/vg/<slug>/` and the track to `gpx/vg-<slug>.gpx`; the worker serves them only for visible videos.
+- **Pictures:** the overlay picture (2752×1536, up to 8.6 MB) is too big for the dialog. The build writes web versions of it to `vg/<slug>/web/picture-640.jpg` and `picture-1280.jpg` (`scripts/lib/thumbnails.mjs`, Jimp, [ADR 0104](../../docs/decisions/0104-scenic-ride-pictures-resized-with-jimp.md)); the dialog loads them with `srcset` and never the original, which only the app needs (package, catalog). `build/thumbs/<sha256>/` keeps them by the original's hash, so only new or changed pictures are resized.
 
 ## Filters
 
