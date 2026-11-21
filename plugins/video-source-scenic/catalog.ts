@@ -54,8 +54,8 @@ export interface CachedCatalog {
   readonly catalog: RideCatalog;
 }
 
-/** Where the last catalog is kept, in the app files. */
-export const CACHE_PATH = 'video-source-scenic/catalog.json';
+/** Where the last catalog is kept, in the app files: `training/`, like the intervals.icu plan cache. */
+export const CACHE_PATH = 'training/scenic-ride-catalog.json';
 
 /** A catalog of this format and major version, or none. */
 export function parseCatalog(value: unknown): RideCatalog | undefined {

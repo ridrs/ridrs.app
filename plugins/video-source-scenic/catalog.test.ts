@@ -16,6 +16,13 @@ import {
 const URL = 'https://ridrs.example.org/scenic/api/ride/v1/catalog.json';
 const catalog = parseCatalog(vector) as RideCatalog;
 
+describe('the cache file', () => {
+  it('lies below a folder the native app lets plugins replace files in', () => {
+    // app_file_replace (apps/native/src-tauri/src/app_files.rs) accepts only these folders.
+    expect(CACHE_PATH.split('/')[0]).toMatch(/^(recordings|training|config)$/);
+  });
+});
+
 function http(answer: (request: HttpRequest) => { status: number; headers?: Record<string, string>; body?: string }) {
   const requests: HttpRequest[] = [];
   const client: HttpClient = {
