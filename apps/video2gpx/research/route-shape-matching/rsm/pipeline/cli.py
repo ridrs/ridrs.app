@@ -168,7 +168,7 @@ class Run:
         parts = dict(motion=[file_sig(P["video"]), C.VMS, C.F360, "motion2", "pick_rel1", M_ALT.ALT_TRIGGER_REL, "alt_thr_rel1", M_ALT.ALT_NOISE_REF, M_ALT.ALT_THR_SLOPE,
                              ["hz_run1", M_ALT.HZ_EVERY, M_ALT.HZ_WINDOW, M_ALT.HZ_SPAN, M_ALT.HZ_MIN_FOES, M_ALT.HZ_MAX_DEV],
                              *([["extract1", EX_ALT.VERSION, EX_ALT.params(), VI_ALT.params()]] if C.MOTION_FROM_EXTRACT else []),
-                             *([["hz_fixed1"]] if P.get("horizon", "running") != "running" else [])],
+                             *([["hz_fixed1"], ["hz_spread1", C.HZ_SPREAD_IQR]] if P.get("horizon", "running") != "running" else [])],
                      rotation=[C.FAR, C.F_FAR, C.F_REF, "rotation2", C.ROT_BAND_OFF_VMS,
                                *([["rot_extract1", VI_ALT.params()]] if (C.MOTION_FROM_EXTRACT and C.ROT_FROM_EXTRACT) else []),
                                *([["a25", C.X0_MIN_S, C.X0_MAX_RMS, C.X0_MIN_PAIRS]] if C.ROT_X0_ROAD else []), ["gate_rms_rel1", GP_DEFAULT.max_rms_px, GP_DEFAULT.max_rms_rel],
@@ -317,7 +317,8 @@ class Run:
             i, sid = k + 1, C.STEPS[k]
             k += 1
             if sid == after_search and a.vehicle == "auto" and not second and (d / "route_search" / "vehicle_final.json").exists():
-                want = __import__("rsm.pipeline.calib", fromlist=["x"]).horizon_mode(jload(d / "route_search" / "vehicle_final.json")["vehicle"])
+                CB = __import__("rsm.pipeline.calib", fromlist=["x"])
+                want = CB.horizon_mode(jload(d / "route_search" / "vehicle_final.json")["vehicle"], CB.calibration_spread(d))
                 if want != P["horizon"]:                 # the second pass: the horizon of the calibrated vehicle, from the stored extraction
                     emit({"type": "log", "level": "info", "message": f"the calibration says {'a motor vehicle' if want == 'running' else 'a bike'}: motion to route_search "
                                                                      f"run once more with the {want} horizon (from the stored extraction, no video decode)"})

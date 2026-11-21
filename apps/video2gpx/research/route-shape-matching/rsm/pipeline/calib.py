@@ -51,9 +51,21 @@ def vmax_for(vehicle: str | None) -> float:
     return C.CAL_VMAX_BIKE if vehicle == "bike" else C.CAL_VMAX
 
 
-def horizon_mode(vehicle: str | None) -> str:
-    """the horizon of the road-flow fit for this vehicle: "running" (A24) for a motor vehicle, "fixed" (the calibrated row) for a bike (C.HZ_RUNNING_VEHICLES)"""
-    return "running" if vehicle in C.HZ_RUNNING_VEHICLES else "fixed"
+def horizon_mode(vehicle: str | None, iqr: float | None = None) -> str:
+    """the horizon of the road-flow fit for this vehicle: "running" (A24) for a motor vehicle, "fixed" (the calibrated row) for a bike (C.HZ_RUNNING_VEHICLES);
+    "running" for a bike too when its horizon calibration spreads more than C.HZ_SPREAD_IQR rows (`iqr`, A27)"""
+    return "running" if vehicle in C.HZ_RUNNING_VEHICLES or (iqr is not None and iqr > C.HZ_SPREAD_IQR) else "fixed"
+
+
+def calibration_spread(d) -> float | None:
+    """the interquartile range (rows) of the horizon calibration of the run in d (motion/motion.json), None without one"""
+    import json
+    from pathlib import Path
+    f = Path(d) / "motion" / "motion.json"
+    if not f.exists():
+        return None
+    iqr = (json.loads(f.read_text()).get("horizon_calibration") or {}).get("iqr")
+    return None if iqr is None else float(iqr)
 
 
 def plausible_mask(stats: dict, fg, kg, vmax: float | None = None) -> np.ndarray:

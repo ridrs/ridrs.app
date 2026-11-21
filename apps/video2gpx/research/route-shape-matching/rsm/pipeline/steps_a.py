@@ -112,7 +112,11 @@ def motion_from_extract(d: Path, P: dict, W: Worker, cal: dict | None, s0: int) 
     def cb2(n, total, phase):
         W.progress(100.0 * (split[0] + (1 - split[0]) * (0.0 if phase == "horizon" else n / max(total, 1))), phase)
 
-    stats = VI.analyse(d / "extract", str(d / "motion" / "motion.csv"), calibration=cal, seed0=s0, on_progress=cb2, running=P.get("horizon", "running") == "running")
+    stats = VI.analyse(d / "extract", str(d / "motion" / "motion.csv"), calibration=cal, seed0=s0, on_progress=cb2, running=P.get("horizon", "running") == "running",
+                       spread_iqr=C.HZ_SPREAD_IQR)
+    sp = stats.get("horizon_spread")
+    if sp and sp["running"]:
+        W.log("info", f"horizon calibration scattered over {sp['iqr']:.0f} rows (limit {sp['limit']:.0f}): no fixed row fits the video, the running horizon is used")
     stats["video"] = P["video"]
     stats["extract"].update(reused=reused, wait_seconds=round(t_ex, 2))
     stats["seconds"] += t_ex

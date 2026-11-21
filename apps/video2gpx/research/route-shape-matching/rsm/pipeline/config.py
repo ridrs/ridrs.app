@@ -338,3 +338,8 @@ X0_MIN_PAIRS = 100
 # 16.8 m with it, 5.3 m without). The vehicle is known only after route_search (kappa): the first pass runs with the running horizon; when the calibration
 # says another vehicle class (auto only), motion to route_search run once more from the stored extraction (cli.Run.run, rsm.bench.regress._run_cached).
 HZ_RUNNING_VEHICLES = ("motorcycle", "car")
+# --- a scattered horizon calibration gives a bike the running horizon too (docs/DECISIONS.md A27, 2026-11-22): when the focus-of-expansion rows of the
+# calibration stretches spread more than this (interquartile range, rows at 360), no fixed row fits the video. Lahntal (Van Gestel, bike): 67 rows, the fixed
+# row left the route at the start (no_route), the running one followed it (along median 24 m against the coarse GPS). Every other project: <= 39 (Pontaix,
+# Roanne 8-9). From one failing video: between 39 and 67, PROVISIONAL.
+HZ_SPREAD_IQR = 50.0

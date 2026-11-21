@@ -238,8 +238,8 @@ def _run_cached(c: dict, d: Path, P: dict, code: Path, log, until: str, keys: di
         sid = steps[k]
         k += 1
         if sid == "plausibility" and P.get("vehicle", "auto") == "auto" and not second and (d / "route_search" / "vehicle_final.json").exists():
-            from rsm.pipeline.calib import horizon_mode
-            want = horizon_mode(json.loads((d / "route_search" / "vehicle_final.json").read_text())["vehicle"])
+            from rsm.pipeline.calib import calibration_spread, horizon_mode
+            want = horizon_mode(json.loads((d / "route_search" / "vehicle_final.json").read_text())["vehicle"], calibration_spread(d))
             if want != P.get("horizon", "running"):
                 log(f"  the calibration says {'a motor vehicle' if want == 'running' else 'a bike'}: second pass with the {want} horizon")
                 P, second, k = dict(P, horizon=want), True, 0

@@ -76,8 +76,9 @@ def test_the_bench_keys_of_the_motion_step_name_a_fixed_horizon(tmp_path):
 
 
 # ------------------------------------------------------------------ the second pass of a run
-def _fake_run(tmp_path, monkeypatch, argv_extra, vehicles):
-    """a run whose workers only write what the parent reads; route_search says the vehicles in turn -> [(step, horizon)] in order"""
+def _fake_run(tmp_path, monkeypatch, argv_extra, vehicles, iqr=None):
+    """a run whose workers only write what the parent reads; route_search says the vehicles in turn -> [(step, horizon)] in order;
+    with iqr the motion step writes a motion.json whose horizon calibration spreads iqr rows"""
     from rsm.pipeline import cli, memguard
     run, _ = _run(tmp_path)
     a = cli.parse_args(["run", "--video", str(tmp_path / "v.mp4"), "--bbox", "1,2,3,4", "--pbf", str(tmp_path / "p.pbf"), "--out", str(tmp_path / "o"), *argv_extra])
@@ -89,6 +90,9 @@ def _fake_run(tmp_path, monkeypatch, argv_extra, vehicles):
     def worker(sid, i):
         P = json.loads((run.d / "project.params.json").read_text())
         calls.append((sid, P.get("horizon")))
+        if sid == "motion" and iqr is not None:
+            (run.d / "motion").mkdir(exist_ok=True)
+            (run.d / "motion" / "motion.json").write_text(json.dumps(dict(horizon_calibration=dict(CAL, iqr=iqr))))
         summ = dict(f_eff=500.0, kappa=1.0, conf_mean=0.9, path_km=1.0)
         if sid == "route_search":
             (run.d / "route_search" / "vehicle_final.json").write_text(json.dumps(dict(vehicle=said.pop(0), from_kappa=True)))
@@ -201,3 +205,65 @@ def test_the_stage_in_takes_the_fixed_image_side_from_its_subdirectory(tmp_path,
 
 
 P_BENCH = dict(video="discarded:v.mp4", bbox=[0, 0, 1, 1], pbf="/x.pbf", vehicle="auto")
+
+
+# ------------------------------------------------------------------ a scattered horizon calibration: the running horizon for a bike too (A27)
+# Lahntal (Van Gestel, bike, 2026-11-21): the focus of expansion of the calibration stretches spread 67 rows (others <= 39, Pontaix / Roanne 8-9).
+# No fixed row fits it (249: distance right, yaw at half gain; 194: yaw right, 60 % of the distance) and the route stayed at the start (no_route);
+# with the running horizon it followed the route (along median 24 m against the coarse GPS).
+@pytest.mark.parametrize("vehicle, iqr, mode", [("bike", None, "fixed"), ("bike", 9.0, "fixed"), ("bike", C.HZ_SPREAD_IQR, "fixed"),
+                                                ("bike", C.HZ_SPREAD_IQR + 0.1, "running"), ("bike", 67.0, "running"), ("car", 9.0, "running")])
+def test_a_scattered_calibration_gives_a_bike_the_running_horizon(vehicle, iqr, mode):
+    assert CB.horizon_mode(vehicle, iqr) == mode
+
+
+@pytest.mark.parametrize("iqr, running", [(9.0, False), (67.0, True)])
+def test_a_fixed_horizon_turns_running_when_the_calibration_is_scattered(ex, tmp_path, iqr, running):  # noqa: F811
+    t = np.arange(vm.HZ_WINDOW / 2, 400.0, vm.HZ_EVERY)
+    cal = dict(CAL, iqr=iqr, rms_median=0.4, rms_pairs=500, track=dict(t=[float(x) for x in t], row=[140.0 if x < 200 else 180.0 for x in t]))
+    seen = []
+    real = vm.below_horizon
+    VI.vm.below_horizon = lambda mid, flow, yh, h: seen.append(yh) or real(mid, flow, yh, h)
+    try:
+        st = VI.analyse(ex, str(tmp_path / "m.csv"), calibration=json.loads(json.dumps(cal)), seed0=int(300 * FPS), running=False, spread_iqr=C.HZ_SPREAD_IQR)
+    finally:
+        VI.vm.below_horizon = real
+    assert st["horizon_mode"] == ("running" if running else "fixed")
+    assert set(np.round(seen, 6)) == ({180.0} if running else {float(CAL["horizon"])})   # the clip lies after 300 s: the track says 180 there
+    assert st["horizon_spread"] == dict(iqr=iqr, limit=C.HZ_SPREAD_IQR, running=running)
+
+
+def test_the_motion_step_passes_the_spread_limit(tmp_path, monkeypatch):
+    got = []
+    monkeypatch.setattr(SA, "extract_key", lambda video, height: "k")
+    monkeypatch.setattr(VI, "ensure_extract", lambda *a, **k: (dict(pairs=1, seconds=1.0), True))
+    monkeypatch.setattr(VI, "analyse", lambda *a, **k: got.append(k.get("spread_iqr")) or dict(extract={}, seconds=0.0))
+    W = type("W", (), dict(log=lambda *a: None, progress=lambda *a, **k: None))()
+    SA.motion_from_extract(tmp_path, dict(video="v.mp4", horizon="fixed"), W, None, 0)
+    assert got == [C.HZ_SPREAD_IQR]
+
+
+def test_the_spread_limit_is_part_of_the_key_of_a_fixed_horizon(tmp_path, monkeypatch):
+    run, base = _run(tmp_path)
+    h0, hf = run.hashes(dict(base, horizon="running")), run.hashes(dict(base, horizon="fixed"))
+    monkeypatch.setattr(C, "HZ_SPREAD_IQR", C.HZ_SPREAD_IQR + 1)
+    assert run.hashes(dict(base, horizon="running")) == h0 and run.hashes(dict(base, horizon="fixed"))["motion"] != hf["motion"]
+
+
+
+
+def test_an_estimated_bike_with_a_scattered_calibration_keeps_the_running_horizon(tmp_path, monkeypatch):
+    seen = []
+    real_mode = CB.horizon_mode
+    monkeypatch.setattr(CB, "horizon_mode", lambda v, iqr=None: seen.append(iqr) or real_mode(v, iqr))
+    calls, run = _fake_run(tmp_path, monkeypatch, [], ["bike", "bike"], iqr=67.0)
+    assert [s for s, _ in calls] == ["motion", "rotation", "map", "route_search", "refine", "gpx"] and {h for _, h in calls} == {"running"}
+    assert 67.0 in seen
+
+
+def test_the_route_tests_keep_the_running_horizon_of_a_scattered_bike(tmp_path, monkeypatch):
+    d = tmp_path / "d"
+    (d / "motion").mkdir(parents=True)
+    (d / "motion" / "motion.json").write_text(json.dumps(dict(horizon_calibration=dict(CAL, iqr=67.0))))
+    staged, ran = _staged(tmp_path, monkeypatch, ["bike"])
+    assert staged == ["running"] and [s for s, _ in ran] == ["map", "route_search", "refine", "gpx"]

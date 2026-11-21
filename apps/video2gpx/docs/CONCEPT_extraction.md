@@ -107,6 +107,8 @@ route side run on them (T3 with the motion and band fits injected).
    (kappa), so a run interprets with the running horizon first. When `vehicle_final.json` says bike, motion to route_search run once more from
    the stored extraction with the fixed horizon (no second decode), then refine and gpx. An explicit `--vehicle` picks its horizon at once.
    Stages hold both image sides (`fixed/` and `code_fixed`); the route tests take the same second pass.
+   Exception (A27, 2026-11-22): a bike whose horizon calibration spreads more than `HZ_SPREAD_IQR` (50 rows) keeps the running horizon
+   (Lahntal: 67 rows, no fixed row fits it).
 
    Measured with B (2026-11-21; all stages re-interpreted with both sides in 81 min, Sa Calobra adopted again; T2 tag `b2`, `--code work`,
    against `p5t2`; 8 cases got the second pass):

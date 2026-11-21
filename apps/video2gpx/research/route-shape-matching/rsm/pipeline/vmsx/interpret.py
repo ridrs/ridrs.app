@@ -191,16 +191,23 @@ def horizon_track(P: Points, horizon: float) -> dict:
     return dict(t=t, row=row)
 
 
-def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 0, road_width=vm.ROAD_WIDTH, on_progress=None, running: bool = True) -> dict:
+def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 0, road_width=vm.ROAD_WIDTH, on_progress=None, running: bool = True,
+            spread_iqr: float | None = None) -> dict:
     """motion.csv of the extraction in ex_dir and the run statistics of `vmsx.motion.analyse_parallel`. `calibration`, `seed0`: as there (a clip
     of a source passes the source's calibration with its track in source seconds and the index of its first source frame). running=False: every pair
-    is fitted with the calibrated row (no running horizon, A24 off; the calibration's track is None)."""
+    is fitted with the calibrated row (no running horizon, A24 off; the calibration's track is None). `spread_iqr` (with running=False): when the
+    calibration's focus-of-expansion rows spread more than this (iqr), no fixed row fits the video and the running horizon is used after all (A27);
+    the result says so in `horizon_spread`."""
     t0 = time.perf_counter()
     if on_progress is not None:
         on_progress(0, 1, "horizon")
     P = Points(ex_dir)
     H, W, fps, sc = P.height, P.width, P.fps, _scale(P)
     cal = dict(calibration) if calibration is not None else calibrate_horizon(P)
+    spread = None
+    if not running and spread_iqr is not None:
+        spread = dict(iqr=float(cal["iqr"]), limit=float(spread_iqr), running=bool(float(cal["iqr"]) > spread_iqr))
+        running = spread["running"]
     horizon = float(cal["horizon"])
     top = int(max(H * 0.45, horizon + vm.BELOW_HORIZON * H))
     bottom = H - round(vm.ABOVE_BOTTOM * H)
@@ -244,6 +251,7 @@ def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 
         "horizon_calibration": cal, "horizon_mode": "running" if running else "fixed", "roi": [top, bottom], "alt_thr": alt_thr, "track_t0": t_src, "pairs": n, "traffic": traffic,
         "seconds": elapsed, "calibration_seconds": t_cal, "seconds_per_video_hour": elapsed / (P.duration / 3600),
         "extract": dict(version=m["version"], key=m.get("key"), seconds=m.get("seconds")), "interpret": params(),
+        **({"horizon_spread": spread} if spread is not None else {}),
     }
 
 
