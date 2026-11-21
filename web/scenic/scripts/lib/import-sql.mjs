@@ -9,9 +9,18 @@
 //   - a route, localization or sync row whose video has manual_field 'route', 'localization' or 'sync'
 //     (manual route, discarded route, anchors, Prüfmodus result),
 //   - a localization a person verified (verified_at set).
+//
+// Van Gestel rides (scripts/lib/vangestel.mjs, migrations/0007) come in beside the export as `rides`: each a video of its source
+// with a route from the creator's GPX track, Lokalisierungsstufe 3 and its ride package. `rides: null` (no catalog folder)
+// leaves their rows as they are; a list removes the rides that left it.
+import { addedDate, elevation, thin } from './vangestel.mjs';
+import { FTS_INSERT } from '../../src/search-index.js';
 
 /** Video columns the admin can edit and the export also sets. */
 export const MANUAL_VIDEO_COLS = ['place', 'region', 'lat', 'lon', 'position_exact', 'country', 'country_name'];
+
+const GERMAN = new Intl.DisplayNames('de', { type: 'region' });
+const germanName = (code) => { try { return code ? GERMAN.of(code) : null; } catch { return null; } };
 
 export const q = (v) => {
   if (v === null || v === undefined) return 'NULL';
@@ -31,10 +40,10 @@ export const upsert = (table, key, row, { keep = [], guard = null } = {}) => {
 };
 
 /**
- * @param {{videos: object[], yt: Map<string, object>, sync: Map<string, object>, today: string, at?: string}} o
+ * @param {{videos: object[], yt: Map<string, object>, sync: Map<string, object>, rides?: object[]|null, today: string, at?: string}} o
  * @returns {{sql: string[], routes: number, channels: number, countries: Map<string|null, number>}}
  */
-export function buildImportSql({ videos, yt, sync, today, at = new Date().toISOString() }) {
+export function buildImportSql({ videos, yt, sync, rides = null, today, at = new Date().toISOString() }) {
   const sql = [];
   const channels = new Map();
   for (const s of yt.values()) {
@@ -101,10 +110,48 @@ export function buildImportSql({ videos, yt, sync, today, at = new Date().toISOS
     }
   }
 
+  // Van Gestel rides: their source, then per ride the video, its route, level 3 and the ride package.
+  const rideRows = [];
+  for (const s of new Map((rides ?? []).map((r) => [r.source.id, r.source])).values()) {
+    sql.push(upsert('source', 'source_id', { source_id: s.id, name: s.name, author: s.author, url: s.url,
+      license_id: s.license?.id, license_name: s.license?.name, license_url: s.license?.url }));
+  }
+  for (const r of rides ?? []) {
+    const rt = r.route, el = elevation(rt.sparkline, rt.distance);
+    const [lat, lon] = r.line[0] ?? [rt.start?.latitude, rt.start?.longitude];
+    const pin = { video_id: r.id, place: rt.tour?.name ?? rt.title.split(' - ')[0], region: null, lat, lon, position_exact: 1,
+      country: r.country, country_name: germanName(r.country) };
+    rideRows.push(pin);
+    countries.set(r.country ?? null, (countries.get(r.country ?? null) ?? 0) + 1);
+    sql.push(upsert('video', 'video_id', {
+      ...pin, source: r.source.id, channel_id: null, title: rt.title, published_at: addedDate(rt.added), duration_s: rt.duration,
+      definition: null, projection: 'rectangular', embeddable: 0, status: null, footage: 'real', topics: [], added_at: today, updated_at: today,
+    }, { keep: ['added_at', ...MANUAL_VIDEO_COLS] }));
+    routes++;
+    sql.push(upsert('route', 'video_id', {
+      video_id: r.id, distance_km: Math.round(rt.distance / 100) / 10, method: 'creator_gpx', polyline: thin(r.line, 150), gpx_path: `gpx/${r.id}.gpx`,
+      creator_links: [rt.page], check_status: null, check_note: null, built_at: today,
+      ascent_m: rt.ascent, descent_m: el.descent, min_ele_m: rt.elevation?.min ?? null, max_ele_m: rt.elevation?.max ?? null,
+      max_gradient: el.maxGradient, profile: el.profile, ele_source: 'creator_gpx',
+      main_road_class: null, unpaved_share: null, tunnel_km: null, bridge_km: null,
+    }, { guard: 'route' }));
+    // The creator's track runs with the video (its control file maps it), but nobody checked it: level 3.
+    sql.push(`INSERT INTO localization (video_id, loc_level, loc_key, method, rules_version, updated_at) VALUES (${q(r.id)}, 3, 'estimated', 'creator_gpx', 0, ${q(today)})
+      ON CONFLICT(video_id) DO UPDATE SET loc_level=excluded.loc_level, loc_key=excluded.loc_key, method=excluded.method, updated_at=excluded.updated_at
+      WHERE localization.verified_at IS NULL AND ${notManual('localization')};`);
+    sql.push(upsert('ride_package', 'video_id', {
+      video_id: r.id, page_url: rt.page, download_url: rt.download.url, download_format: rt.download.format, download_size: rt.download.size,
+      download_etag: rt.download.etag ?? null, tour_name: rt.tour?.name ?? null, tour_part: rt.tour?.part ?? null, level: rt.level ?? null,
+      track_type: rt.trackType ?? null, bike_type: rt.bikeType ?? null, distance_m: rt.distance, ascent_m: rt.ascent, sparkline: rt.sparkline, climbs: rt.climbs ?? [],
+      thumbnail: r.thumbnail, overlay: r.overlay, package: r.package, built_at: today,
+    }));
+  }
+
   // Manual video columns: existing rows get the export's value only where the column is not manual.
+  const manualRows = [...videos, ...rideRows];
   sql.push(`CREATE TABLE IF NOT EXISTS _import_video (video_id TEXT PRIMARY KEY, ${MANUAL_VIDEO_COLS.join(', ')});`, 'DELETE FROM _import_video;');
-  for (let i = 0; i < videos.length; i += 250) { // D1: at most 100 KB per statement
-    sql.push(`INSERT INTO _import_video (video_id, ${MANUAL_VIDEO_COLS.join(', ')}) VALUES ${videos.slice(i, i + 250)
+  for (let i = 0; i < manualRows.length; i += 250) { // D1: at most 100 KB per statement
+    sql.push(`INSERT INTO _import_video (video_id, ${MANUAL_VIDEO_COLS.join(', ')}) VALUES ${manualRows.slice(i, i + 250)
       .map((v) => `(${[v.video_id, ...MANUAL_VIDEO_COLS.map((c) => (c === 'country' || c === 'country_name' ? v[c] ?? null : v[c]))].map(q).join(', ')})`).join(',')};`);
   }
   for (const c of MANUAL_VIDEO_COLS) {
@@ -115,18 +162,19 @@ export function buildImportSql({ videos, yt, sync, today, at = new Date().toISOS
   // Videos that left the export, and channels that opted out, are removed with all their pipeline rows.
   // D1 limits a statement to 100 KB, so the id list goes into a scratch table in batches.
   sql.push('CREATE TABLE IF NOT EXISTS _import_ids (video_id TEXT PRIMARY KEY);', 'DELETE FROM _import_ids;');
-  for (let i = 0; i < videos.length; i += 500) {
-    sql.push(`INSERT INTO _import_ids VALUES ${videos.slice(i, i + 500).map((v) => `(${q(v.video_id)})`).join(',')};`);
+  for (let i = 0; i < manualRows.length; i += 500) {
+    sql.push(`INSERT INTO _import_ids VALUES ${manualRows.slice(i, i + 500).map((v) => `(${q(v.video_id)})`).join(',')};`);
   }
-  const gone = 'SELECT video_id FROM video WHERE video_id NOT IN (SELECT video_id FROM _import_ids) OR channel_id IN (SELECT channel_id FROM channel_optout)';
+  const sources = rides ? "source IN ('youtube', 'vangestel')" : "source = 'youtube'"; // without a catalog folder the rides stay
+  const gone = `SELECT video_id FROM video WHERE (${sources} AND video_id NOT IN (SELECT video_id FROM _import_ids)) OR channel_id IN (SELECT channel_id FROM channel_optout)`;
   // sync_anchor and localization_log reference video (D1 enforces foreign keys); manual_field, edit_log and the
   // other phase-4 tables keep their rows, so a video that comes back keeps its manual data.
-  for (const t of ['video_tech', 'route_road', 'route', 'route_sync', 'localization', 'sync_anchor', 'localization_log', 'sync_track']) sql.push(`DELETE FROM ${t} WHERE video_id IN (${gone});`);
+  for (const t of ['video_tech', 'route_road', 'route', 'route_sync', 'localization', 'sync_anchor', 'localization_log', 'sync_track', 'ride_package']) sql.push(`DELETE FROM ${t} WHERE video_id IN (${gone});`);
   sql.push(`DELETE FROM video WHERE video_id IN (${gone});`, 'DROP TABLE _import_ids;');
 
   sql.push('DELETE FROM video_fts;');
-  sql.push('INSERT INTO video_fts (video_id, title, place, region, channel) SELECT v.video_id, v.title, v.place, v.region, c.name FROM video v LEFT JOIN channel c ON c.channel_id = v.channel_id;');
-  sql.push(`INSERT INTO import_run (at, source, videos, routes, note) VALUES (${q(at)}, 'export', ${videos.length}, ${routes}, ${q(`${sync.size} sync tracks`)});`);
+  sql.push(`${FTS_INSERT};`);
+  sql.push(`INSERT INTO import_run (at, source, videos, routes, note) VALUES (${q(at)}, 'export', ${manualRows.length}, ${routes}, ${q(`${sync.size} sync tracks${rides ? `, ${rides.length} Van Gestel rides` : ''}`)});`);
   return { sql, routes, channels: channels.size, countries };
 }
 

@@ -80,6 +80,7 @@ export function mountPanel({ panel, quick, active, toggle, badge, videos, countr
         ${seg('views', t('f.views_min'), VIEWS_OPTIONS.map((v) => ({ v, text: viewsLabel(v) })))}
         ${multi('ch', t('f.channel'), t('f.channel_search'), channels, (c) => esc(chNames[c]))}
         ${check('emb', t('f.emb_only'))}
+        ${check('ride', t('f.ride_only'))}
         ${has.stars ? seg('stars', t('f.stars_min'), STARS_OPTIONS.map((s) => ({ v: s, text: s ? `${s} ★` : t('common.all') }))) : ''}
         ${has.pick ? check('pick', t('f.pick_only')) : ''}`)}
       ${sec('inhalt', t('sec.content'), `${check('vr', t('f.vr_show'))}${check('sim', t('f.sim_show'))}`)}

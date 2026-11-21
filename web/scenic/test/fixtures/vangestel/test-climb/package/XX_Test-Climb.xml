@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<gpx-import>
+    <name>XX_Test_Climb</name>
+    <id>00000000-0000-4000-8000-000000000001</id>
+    <country>FR</country>
+    <title>Test Climb - Part 1</title>
+    <video-file-path>XX_Test_Climb.mp4</video-file-path>
+    <gpx-file-path>XX_Test_Climb.gpx</gpx-file-path>
+    <framerate>30.0</framerate>
+    <start-frame>1</start-frame>
+    <end-frame>9000</end-frame>
+</gpx-import>

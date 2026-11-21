@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Imports ../export (scripts/export_public.py) into D1 (concept 4.3).
+// Imports ../export (scripts/export_public.py) and the Van Gestel catalog (<pipeline>/vangestel, scripts/lib/vangestel.mjs) into D1 (concept 4.3).
 //   node scripts/import.mjs            -> local D1 (wrangler dev)
 //   node scripts/import.mjs --remote   -> the Cloudflare D1 database
 // Writes build/import.sql first, then runs it with wrangler. Pipeline and YouTube API fields are
@@ -13,9 +13,10 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { loadSyncTracks } from './lib/sync-sources.mjs';
 import { buildImportSql } from './lib/import-sql.mjs';
+import { loadVanGestel } from './lib/vangestel.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-import { PIPELINE, RIDRS, STATE } from './lib/paths.mjs'; // the data pipeline folder (export/) lives outside the repository
+import { PIPELINE, RIDRS, STATE, VANGESTEL } from './lib/paths.mjs'; // the data pipeline folder (export/) lives outside the repository
 const remote = process.argv.includes('--remote');
 const today = new Date().toISOString().slice(0, 10);
 
@@ -23,8 +24,10 @@ const ndjson = (f) => readFileSync(join(PIPELINE, 'export', f), 'utf8').split('\
 const videos = ndjson('videos.ndjson');
 const yt = new Map(ndjson('youtube_snapshot.ndjson').map((r) => [r.video_id, r]));
 const sync = new Map(loadSyncTracks(RIDRS).map((t) => [t.videoId, t]));
+const rides = loadVanGestel(VANGESTEL); // null without the folder: the Van Gestel rows stay as they are
+console.log(rides ? `Van Gestel: ${rides.length} rides from ${VANGESTEL}` : `Van Gestel: no catalog in ${VANGESTEL}, rides left as they are`);
 
-const { sql, routes, channels: channelCount, countries } = buildImportSql({ videos, yt, sync, today });
+const { sql, routes, channels: channelCount, countries } = buildImportSql({ videos, yt, sync, rides, today });
 
 mkdirSync(join(ROOT, 'build'), { recursive: true });
 const file = join(ROOT, 'build/import.sql');

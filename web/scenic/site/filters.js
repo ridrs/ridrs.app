@@ -38,12 +38,13 @@ export function defaults() {
     res: 0, fps: 0, hdr: false, br: 0,
     yr: [null, null], views: 0, ch: [], emb: false, stars: 0, pick: false,
     vr: false, sim: false,
+    ride: false, // only entries rideable in the ridrs app (a ride package, migrations/0007)
     view: false, // only the map viewport (the viewport itself is passed as ctx.bbox, not part of the URL)
   };
 }
 
 // Order defines the bit of each filter. 'q' and 'view' are filters without a facet.
-export const DIMS = ['q', 'c', 'reg', 'tp', 'loc', 'km', 'dur', 'asc', 'road', 'unp', 'res', 'fps', 'hdr', 'br', 'yr', 'views', 'ch', 'emb', 'stars', 'pick', 'vr', 'sim', 'view'];
+export const DIMS = ['q', 'c', 'reg', 'tp', 'loc', 'km', 'dur', 'asc', 'road', 'unp', 'res', 'fps', 'hdr', 'br', 'yr', 'views', 'ch', 'emb', 'stars', 'pick', 'vr', 'sim', 'ride', 'view'];
 const BIT = Object.fromEntries(DIMS.map((d, i) => [d, 1 << i]));
 
 /** Adds derived fields once after loading: search text (with region, topic and country names in the interface language), year.
@@ -87,6 +88,7 @@ export function predicates(s, ctx = {}) {
   if (s.emb) P.push(['emb', (v) => !!v.embeddable]);
   if (s.stars) P.push(['stars', (v) => (v.stars ?? 0) >= s.stars]);
   if (s.pick) P.push(['pick', (v) => !!v.pick]);
+  if (s.ride) P.push(['ride', (v) => !!v.ride]);
   if (!s.vr) P.push(['vr', (v) => v.projection !== '360']);
   if (!s.sim) P.push(['sim', (v) => (v.footage ?? 'real') === 'real']);
   if (s.view && ctx.bbox) {
@@ -108,7 +110,7 @@ const inc = (m, k) => m.set(k, (m.get(k) ?? 0) + 1);
  * One pass: the result, the result without the viewport filter (what the map shows), and facet counts.
  * facets[dim] holds counts over "all filters except dim":
  *   c, reg, ch, tp: Map value -> count;  loc, res, br, views, stars: {option: count} for "at least";
- *   fps: {0: all, 50: at least 50 fps};  hdr, emb, pick: count with the flag;  vr, sim: count of 360° / non-real videos it would add;
+ *   fps: {0: all, 50: at least 50 fps};  hdr, emb, pick, ride: count with the flag;  vr, sim: count of 360° / non-real videos it would add;
  *   km, dur, yr: count of videos that have a value at all (base for the range).
  */
 export function compute(videos, s, ctx = {}) {
@@ -121,7 +123,7 @@ export function compute(videos, s, ctx = {}) {
   const f = {
     c: new Map(), reg: new Map(), ch: new Map(), tp: new Map(), road: new Map(), unp: [0, 0, 0],
     loc: new Array(8).fill(0), res: new Map(), br: new Map(), views: new Map(), stars: new Array(6).fill(0),
-    hdr: 0, fps: 0, fpsBase: 0, emb: 0, pick: 0, vr: 0, sim: 0, km: 0, dur: 0, asc: 0, yr: 0,
+    hdr: 0, fps: 0, fpsBase: 0, emb: 0, pick: 0, ride: 0, vr: 0, sim: 0, km: 0, dur: 0, asc: 0, yr: 0,
   };
   const all = (v) => {
     inc(f.c, v.country ?? null); inc(f.reg, v.region ?? null); inc(f.ch, chKey(v));
@@ -132,6 +134,7 @@ export function compute(videos, s, ctx = {}) {
     f.fpsBase++;
     if (v.embeddable) f.emb++;
     if (v.pick) f.pick++;
+    if (v.ride) f.ride++;
     if (v.projection === '360') f.vr++;
     if ((v.footage ?? 'real') !== 'real') f.sim++;
     if (v.km != null) f.km++;
@@ -149,7 +152,7 @@ export function compute(videos, s, ctx = {}) {
     loc: (v) => { f.loc[v.loc ?? 7]++; }, res: (v) => inc(f.res, v.height ?? 0), br: (v) => inc(f.br, v.kbps ?? 0),
     views: (v) => inc(f.views, v.views ?? 0), stars: (v) => { f.stars[v.stars ?? 0]++; },
     hdr: (v) => { if (v.hdr) f.hdr++; }, fps: (v) => { f.fpsBase++; if ((v.fps ?? 0) >= 49) f.fps++; }, emb: (v) => { if (v.embeddable) f.emb++; },
-    pick: (v) => { if (v.pick) f.pick++; }, vr: (v) => { if (v.projection === '360') f.vr++; },
+    pick: (v) => { if (v.pick) f.pick++; }, ride: (v) => { if (v.ride) f.ride++; }, vr: (v) => { if (v.projection === '360') f.vr++; },
     sim: (v) => { if ((v.footage ?? 'real') !== 'real') f.sim++; },
     km: (v) => { if (v.km != null) f.km++; }, asc: (v) => { if (v.asc != null) f.asc++; }, dur: (v) => { if (v.dur != null) f.dur++; }, yr: (v) => { if (v.year != null) f.yr++; },
   };
@@ -179,7 +182,7 @@ export function compute(videos, s, ctx = {}) {
 }
 
 // --- URL: ?c=IT,FR&res=2160&km=20-80 … Only non-default values are written. ---
-const LIST = ['c', 'tp', 'ch', 'road'], RANGE = ['km', 'dur', 'asc', 'yr'], NUM = ['loc', 'res', 'fps', 'br', 'views', 'stars', 'unp'], BOOL = ['hdr', 'emb', 'pick', 'vr', 'sim', 'view'];
+const LIST = ['c', 'tp', 'ch', 'road'], RANGE = ['km', 'dur', 'asc', 'yr'], NUM = ['loc', 'res', 'fps', 'br', 'views', 'stars', 'unp'], BOOL = ['hdr', 'emb', 'pick', 'ride', 'vr', 'sim', 'view'];
 const enc = (x) => encodeURIComponent(x).replace(/%20/g, '+');
 const dec = (x) => { try { return decodeURIComponent(x.replace(/\+/g, ' ')); } catch { return ''; } };
 const URL_KEY = { view: 'map' };
@@ -252,6 +255,7 @@ export function activeChips(s, names = {}, chNames = {}) {
   if (s.emb) out.push({ label: t('chip.emb'), patch: { emb: false } });
   if (s.stars) out.push({ label: t('chip.stars', { x: s.stars }), patch: { stars: 0 } });
   if (s.pick) out.push({ label: t('chip.pick'), patch: { pick: false } });
+  if (s.ride) out.push({ label: t('chip.ride'), patch: { ride: false } });
   if (s.vr) out.push({ label: t('chip.vr'), patch: { vr: false } });
   if (s.sim) out.push({ label: t('chip.sim'), patch: { sim: false } });
   if (s.view) out.push({ label: t('chip.view'), patch: { view: false } });
@@ -266,6 +270,7 @@ export const QUICK = [
   { id: 'fps', label: null, text: '50/60 fps', on: (s) => s.fps >= 50, set: (s, on) => ({ fps: on ? 50 : 0 }), count: (f) => f.fps[50] },
   { id: 'hdr', label: null, text: 'HDR', on: (s) => s.hdr, set: (s, on) => ({ hdr: on }), count: (f) => f.hdr },
   { id: 'emb', label: 'chip.emb', on: (s) => s.emb, set: (s, on) => ({ emb: on }), count: (f) => f.emb },
+  { id: 'ride', label: 'chip.ride', on: (s) => s.ride, set: (s, on) => ({ ride: on }), count: (f) => f.ride },
 ];
 
 export const PRESETS = [

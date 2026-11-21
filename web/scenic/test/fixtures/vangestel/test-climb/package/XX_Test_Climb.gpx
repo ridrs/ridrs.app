@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="ridrs-scenic test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Test Climb</name>
+    <trkseg>
+      <trkpt lat="45.000000" lon="6.000000">
+        <ele>1000</ele>
+        <time>1999-01-01T00:00:00.000Z</time>
+      </trkpt>
+      <trkpt lat="45.001000" lon="6.001000">
+        <ele>1010</ele>
+        <time>1999-01-01T00:00:30.000Z</time>
+      </trkpt>
+      <trkpt lat="45.002000" lon="6.002000">
+        <ele>1020</ele>
+        <time>1999-01-01T00:01:00.000Z</time>
+      </trkpt>
+      <trkpt lat="45.003000" lon="6.003000">
+        <ele>1030</ele>
+        <time>1999-01-01T00:01:30.000Z</time>
+      </trkpt>
+      <trkpt lat="45.004000" lon="6.004000">
+        <ele>1040</ele>
+        <time>1999-01-01T00:02:00.000Z</time>
+      </trkpt>
+      <trkpt lat="45.005000" lon="6.005000">
+        <ele>1050</ele>
+        <time>1999-01-01T00:02:30.000Z</time>
+      </trkpt>
+      <trkpt lat="45.006000" lon="6.006000">
+        <ele>1060</ele>
+        <time>1999-01-01T00:03:00.000Z</time>
+      </trkpt>
+      <trkpt lat="45.007000" lon="6.007000">
+        <ele>1070</ele>
+        <time>1999-01-01T00:03:30.000Z</time>
+      </trkpt>
+      <trkpt lat="45.008000" lon="6.008000">
+        <ele>1080</ele>
+        <time>1999-01-01T00:04:00.000Z</time>
+      </trkpt>
+      <trkpt lat="45.009000" lon="6.009000">
+        <ele>1090</ele>
+        <time>1999-01-01T00:04:30.000Z</time>
+      </trkpt>
+      <trkpt lat="45.010000" lon="6.010000">
+        <ele>1100</ele>
+        <time>1999-01-01T00:05:00.000Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

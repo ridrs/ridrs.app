@@ -19,4 +19,6 @@ function findPipeline() {
 
 export const PIPELINE = findPipeline();
 export const RIDRS = resolve(PIPELINE, '..'); // catalog-web (time-synced tracks) sits next to it
-export const STATE = join(PIPELINE, 'dev-state'); // wrangler --persist-to: local D1 and R2, shared by every checkout
+export const STATE = join(PIPELINE, 'dev-state');
+// The Van Gestel catalog (ridrs_app: pnpm fetch:video-catalog --out <pipeline>/vangestel); SCENIC_VANGESTEL overrides it.
+export const VANGESTEL = process.env.SCENIC_VANGESTEL ? resolve(process.env.SCENIC_VANGESTEL) : join(PIPELINE, 'vangestel'); // wrangler --persist-to: local D1 and R2, shared by every checkout

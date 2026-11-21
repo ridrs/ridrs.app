@@ -11,7 +11,8 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 | Path | What |
 |---|---|
 | `site/` | Front end: `index.html`, `app.js` (full-screen map, search mask top centre with suggestions and filters, route dialog on the left; on phones a bottom sheet; no route list; only wiring), `filters.js` (filter state, URL, predicates, facet counts; pure, unit-tested), `panel.js` (filter panel, quick chips, active-filter chips), `player.js` (two-click YouTube player with the synced route pointer, from `catalog-web/site/video.js`), legal pages |
-| `src/worker.js` | `/api/points`, `/api/videos/:id`, `/api/search`, `/api/sync/:id.json`, `/api/videos/:id/route.gpx`, `/api/videos/:id/incyclist.zip`, `/api/videos/:id/video2gpx-job.json`, `/api/images/:id`, `/admin` + `/api/admin/*`, and the daily YouTube API refresh (`scheduled`) |
+| `src/worker.js` | `/api/points`, `/api/videos/:id`, `/api/search`, `/api/sync/:id.json`, `/api/videos/:id/route.gpx`, `/api/videos/:id/incyclist.zip`, `/api/videos/:id/video2gpx-job.json`, `/api/images/:id`, `/api/videos/:id/package.zip`, `/api/ride/v1/catalog.json`, `/vg/:slug/…`, `/admin` + `/api/admin/*`, and the daily YouTube API refresh (`scheduled`, YouTube entries only) |
+| `src/rides.js` | Van Gestel rides: package without video (ZIP), ride catalog of the app |
 | `src/auth.js` | Cloudflare Access JWT check for the admin, local dev bypass |
 | `src/admin.js` | admin API: edits with `edit_log` and undo, anchors and sync tracks, Prüfmodus, route editing (OSRM), images (R2), collections, opt-out, export |
 | `src/video2gpx.js` | video2gpx round trip: job, validation of an uploaded result, route agreement (contract: [../VIDEO2GPX-INTEGRATION.md](../VIDEO2GPX-INTEGRATION.md) section 8) |
@@ -21,9 +22,20 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 | `scripts/pull_manual.mjs` | admin export → `../data/manual.json` |
 | `migrations/` | D1 schema (phase 1 subset of the concept's data model) |
 | `scripts/build.mjs` | `dist/` = site + MapLibre + ridrs fonts (`vendor/fonts`, from `@fontsource`, self-hosted, no Google Fonts) + `gpx/` (from `../export/routes`) + `sync/` (time-synced tracks) |
-| `scripts/import.mjs` | `../export/` → D1 upsert (SQL from `scripts/lib/import-sql.mjs`). Never touches editorial fields, manual fields or verified localizations; `--dry-run` only writes `build/import.sql` |
+| `scripts/lib/vangestel.mjs` | reads the Van Gestel catalog (`<pipeline>/vangestel`) |
+| `scripts/import.mjs` | `../export/` and the Van Gestel catalog → D1 upsert (SQL from `scripts/lib/import-sql.mjs`). Never touches editorial fields, manual fields or verified localizations; `--dry-run` only writes `build/import.sql` |
 | `test/` | `node --test test/` (`pnpm test`): filters, URL, speed; route sync and level rules; import protection (node:sqlite with the migrations); JWT and dev bypass; admin API; Incyclist; video2gpx job and upload (`test/fixtures/video2gpx/`, shared with ridrs_app `apps/video2gpx/tests/atlas/fixtures/`) |
 | `scripts/lib/sync-sources.mjs` | Time-synced tracks; for now the video2gpx tracks of `catalog-web`, matched by YouTube id |
+
+## Van Gestel rides
+
+Besides YouTube, ridrs Scenic lists the rides of Fred Van Gestel ([cycling.vangestel.online](https://cycling.vangestel.online/indoor/videos/), CC BY-NC-SA 4.0). They are the video routes the ridrs app can ride: the app reads them from Scenic instead of a catalog bundled with a plugin.
+
+- **Data:** `<pipeline>/vangestel/` (`SCENIC_VANGESTEL` overrides it), written by ridrs_app `pnpm fetch:video-catalog --out <pipeline>/vangestel`: `index.json`, per route `package/` (the package without its video, ADR 0095), `thumbnail.jpg` (made by hand), `overlay/`. Without the folder the import leaves the Van Gestel rows as they are.
+- **Model** (migration 0007): `video.source` (`youtube` or `vangestel`), table `source` (author and license per source), table `ride_package` (download, sparkline, climbs, files with their hashes). Ids are `vg-<slug>`. Each route gets its route from the creator's GPX track (`method = creator_gpx`) and Lokalisierungsstufe 3: the track runs with the video, but nobody checked it. The YouTube refresh never touches these videos.
+- **Site:** quick chip and panel filter *In ridrs fahrbar* (`ride=1`). The dialog shows the route's picture instead of a player (the video is only in the original download), tour, difficulty, climbs and credits with the license; *Paket ohne Video* (`/api/videos/:id/package.zip`: the package files, the overlay and `LIESMICH.txt`) replaces the generated Incyclist package.
+- **App:** `GET /api/ride/v1/catalog.json`, format in ridrs_app [`docs/formats/scenic-ride-catalog-v1.md`](../../docs/formats/scenic-ride-catalog-v1.md); `test/fixtures/ride-catalog/catalog.example.json` is the answer for the test catalog `test/fixtures/vangestel/`.
+- **Files:** the build copies them to `dist/scenic/vg/<slug>/` and the track to `gpx/vg-<slug>.gpx`; the worker serves them only for visible videos.
 
 ## Filters
 
@@ -114,7 +126,7 @@ Videos located only from the title (Lokalisierungsstufe 7) or pinned to the same
 ```bash
 python3 scripts/export_public.py     # in Ridrs/pov-atlas: refresh export/
 pnpm install                          # here, in web/scenic (own pnpm project, not part of the app workspace)
-pnpm migrate:local                    # once, and after new migrations (0005 phase-4 tables, 0006 publication)
+pnpm migrate:local                    # once, and after new migrations (0005 phase-4 tables, 0006 publication, 0007 sources and rides)
 pnpm import                           # export/ -> local D1
 pnpm dev:site                         # build + ridrs.app and ridrs Scenic together: http://localhost:8787/ and /scenic/
 pnpm dev                              # ridrs Scenic alone: http://localhost:8788/scenic/
@@ -128,7 +140,7 @@ pnpm test                             # node --test test/
 The public site shows only videos the editors published in the admin (`video.site_published`, migration 0006; checkbox „Veröffentlicht“, list filter „veröffentlicht“ / „nicht veröffentlicht“). Every public endpoint uses the same condition (`VISIBLE` in `src/worker.js`: published, not hidden, public on YouTube, no channel opt-out), and so do the static files of the build: `lines.json`, `gpx/<id>.gpx` and `sync/<id>.json` go through the worker (`run_worker_first`), which filters `lines.json` and answers 404 for the files of unpublished videos.
 
 - New videos from the import start unpublished; the import never writes the flag.
-- Start set: every video at Lokalisierungsstufe 1 or 2 (track secured by video2gpx). Migration 0006 publishes them in a database that already holds data; on an empty database (first deploy) run `pnpm publish:initial` once after the first import.
+- Start set: every video at Lokalisierungsstufe 1 or 2 (track secured by video2gpx), and every Van Gestel ride. Migration 0006 publishes the first in a database that already holds data; on an empty database (first deploy) run `pnpm publish:initial` once after the first import. A database that had videos before the Van Gestel rides came gets them published once with `pnpm publish:vangestel`.
 - `hidden` (phase 4) still blocks a video even when it is published; the admin shows that checkbox only for videos that have it set.
 
 ## Admin (phase 4, „Redaktion“)

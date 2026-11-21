@@ -1,0 +1,107 @@
+{
+  "format": "ridrs-video-catalog",
+  "version": 1,
+  "source": {
+    "id": "vangestel",
+    "name": "Van Gestel – Cycling pages",
+    "url": "https://cycling.example.org/indoor/videos/",
+    "author": "Test Author",
+    "license": {
+      "id": "CC-BY-NC-SA-4.0",
+      "name": "CC BY-NC-SA 4.0",
+      "url": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+    }
+  },
+  "routes": [
+    {
+      "id": "test-climb",
+      "title": "Test Climb - Part 1 - Col de Test",
+      "page": "https://cycling.example.org/indoor/videos/france/test-climb/",
+      "tour": {
+        "name": "Test Climb",
+        "part": 1
+      },
+      "country": "France",
+      "level": "Moderate",
+      "trackType": "Tour-Segment",
+      "bikeType": "Road bike",
+      "added": "Dec 23",
+      "distance": 1400,
+      "ascent": 100,
+      "duration": 300,
+      "elevation": {
+        "min": 1000,
+        "max": 1100
+      },
+      "start": {
+        "latitude": 45,
+        "longitude": 6
+      },
+      "sparkline": [
+        1000,
+        1010,
+        1020,
+        1030,
+        1040,
+        1050,
+        1060,
+        1070,
+        1080,
+        1090,
+        1085,
+        1095
+      ],
+      "climbs": [
+        {
+          "category": "4",
+          "start": 0,
+          "end": 1400,
+          "gain": 100,
+          "grade": 7.1,
+          "summit": 1100,
+          "name": "Col de Test"
+        }
+      ],
+      "stated": {
+        "distance": 1400,
+        "ascent": 100,
+        "duration": 300,
+        "size": 2000000000
+      },
+      "thumbnail": "test-climb/thumbnail.jpg",
+      "overlay": [
+        {
+          "path": "preview.jpg",
+          "size": 26,
+          "sha256": "4f7f82530690d07736f877ec2ee2cbb0e0d3579974c61b0bf32734a4e57672a9"
+        }
+      ],
+      "download": {
+        "url": "https://cycling.example.org/rlv/XX_Test_Climb.zip",
+        "format": "incyclist-gpx-import",
+        "size": 2000012345,
+        "etag": "\"abc-123\"",
+        "files": [
+          {
+            "name": "XX_Test-Climb.xml",
+            "size": 1
+          },
+          {
+            "name": "XX_Test_Climb.gpx",
+            "size": 1
+          },
+          {
+            "name": "XX_Test_Climb.mp4",
+            "size": 2000000000
+          }
+        ]
+      },
+      "video": {
+        "file": "XX_Test_Climb.mp4",
+        "framerate": 30,
+        "startFrame": 1,
+        "endFrame": 9000
+      }
+    }
+  ]
+}

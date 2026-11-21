@@ -28,15 +28,26 @@ const METHOD = (m) => {
   if (!m) return '';
   const src = { komoot: 'Komoot', rwgps: 'Ride with GPS', mymaps: 'Google My Maps' }[m.split('_')[1]];
   if (m === 'osrm_waypoints') return t('method.osrm_waypoints');
+  if (m === 'creator_gpx') return t('method.creator_gpx');
   if (m.startsWith('mapmatched_')) return t('method.mapmatched', { src });
   if (m.startsWith('routed_')) return t('method.routed', { src });
   return m;
 };
 const SYNC_METHOD = (m) => ({ video2gpx: t('sync.video2gpx'), anchors: t('sync.anchors') }[m] ?? m);
 // Incyclist package (concept 4.7): from Lokalisierungsstufe 3 on, otherwise greyed out with a note below.
-const incyclistButton = (v) => (!v.incyclist ? '' : v.incyclist.available
+// A ride (Van Gestel) has its original package without video instead (src/rides.js).
+const incyclistButton = (v) => (!v.incyclist ? '' : v.incyclist.package
+  ? `<a class="btn" href="${esc(v.incyclist.url)}" download title="${esc(t('detail.package_title'))}">${t('detail.package')}</a>`
+  : v.incyclist.available
   ? `<a class="btn" href="${esc(v.incyclist.url)}" download title="${esc(t('incyclist.title'))}">${t('incyclist.label')}</a>`
   : `<button type="button" class="btn" disabled title="${esc(t('incyclist.disabled_title'))}">${t('incyclist.label')}</button>`);
+// What a ride (a video with a ride package) adds to the dialog: tour, difficulty, climbs, the size of the original download.
+const climbText = (c) => `${c.name ? `${esc(c.name)} – ` : ''}${esc(t('detail.climb', { cat: c.category, km: km1((c.end - c.start) / 1000), g: km1(c.grade) }))}`;
+const rideRows = (r) => !r ? '' : `${r.tour ? `<dt>${t('dt.tour')}</dt><dd>${esc(t('detail.tour', { name: r.tour.name, part: r.tour.part }))}</dd>` : ''}
+  ${r.level ? `<dt>${t('dt.difficulty')}</dt><dd>${esc(t(`difficulty.${r.level}`) === `difficulty.${r.level}` ? r.level : t(`difficulty.${r.level}`))}</dd>` : ''}
+  ${r.climbs?.length ? `<dt>${t('dt.climbs')}</dt><dd>${r.climbs.map(climbText).join('<br>')}</dd>` : ''}`;
+const credits = (v) => (!v.source?.license ? '' : `<p class="meta">${esc(t('detail.credits', { author: v.source.author, source: v.source.name, license: '\u0000' }))
+  .replace('\u0000', `<a href="${esc(v.source.license.url)}" target="_blank" rel="noopener license">${esc(v.source.license.name)}</a>`)}</p>`);
 const lvlTag = (l) => `<span class="lvl" style="--c:var(--l${l})">${l} · ${LEVELS[l]?.[0] ?? ''}</span>`;
 const dur = (s) => (s >= 3600 ? t('dur.hm', { h: Math.floor(s / 3600), m: Math.round((s % 3600) / 60) }) : t('dur.m', { m: Math.round((s || 0) / 60) }));
 const num = (n) => fmtNum(n);
@@ -73,9 +84,18 @@ const hoverDot = (() => { let m = null; return (lngLat) => {
   if (!m) { const el = document.createElement('div'); el.className = 'profile-dot'; m = new Marker({ element: el }); }
   m.setLngLat(lngLat).addTo(map);
 }; })();
-function mountProfile(box, p, line) {
+// Categorised climbs (ADR 0070) as a small circle with the category above each summit; the name and the figures as its tooltip.
+// HTML over the SVG, so the circles keep their size however wide the dialog draws the chart.
+const climbMarks = (climbs, X, Y) => climbs.map((c) => {
+  const label = climbText(c);
+  return `<span class="climb-mark" role="img" title="${label}" aria-label="${label}" style="left:${((X(c.end / 1000) / PW) * 100).toFixed(2)}%;top:${((Y(c.summit) / PH) * 100).toFixed(2)}%">${esc(c.category)}</span>`;
+}).join('');
+function mountProfile(box, p, line, climbs = []) {
   const { kmMax, X, Y, svg } = profileSvg(p);
-  box.innerHTML = svg + '<p class="meta profile-read" aria-live="off"></p>';
+  // Summits beyond the chart (a climb measured on another track) are left out rather than drawn at its edge.
+  const shown = climbs.filter((c) => c.end / 1000 <= kmMax * 1.01);
+  box.classList.toggle('has-climbs', shown.length > 0);
+  box.innerHTML = `<div class="profile-plot">${svg}${climbMarks(shown, (k) => X(Math.min(kmMax, k)), Y)}</div><p class="meta profile-read" aria-live="off"></p>`;
   const el = box.querySelector('svg'), cur = el.querySelector('.cur'), hov = el.querySelector('.hov'), read = box.querySelector('.profile-read');
   const eleAt = (k) => { let i = p.findIndex((x) => x[0] >= k); if (i <= 0) return p[Math.max(0, i)][1];
     const [a, b] = [p[i - 1], p[i]]; return a[1] + ((k - a[0]) / (b[0] - a[0] || 1)) * (b[1] - a[1]); };
@@ -136,7 +156,7 @@ $('#legend-items').innerHTML = Object.keys(LEVELS).map((l) => lvlTag(+l)).join('
 const padding = () => {
   const top = Math.round(Math.min($('#search .bar').getBoundingClientRect().bottom + 60, innerHeight * 0.3));
   return detailOpen()
-    ? (narrow() ? { top: Math.min(top, 90), right: 30, bottom: Math.round(innerHeight * 0.62) + 20, left: 30 } : { top, right: 60, bottom: 40, left: 480 })
+    ? (narrow() ? { top: Math.min(top, 90), right: 30, bottom: Math.round(innerHeight * 0.62) + 20, left: 30 } : { top, right: 60, bottom: 40, left: Math.round(dialog.getBoundingClientRect().right) + 28 })
     : { top, right: 60, bottom: 40, left: 60 };
 };
 
@@ -331,6 +351,43 @@ function pick(id) { $('#suggest').hidden = true; $('#q').setAttribute('aria-expa
 const dialog = $('#detail');
 const detailOpen = () => dialog.open;
 
+// Width of the dialog on wide screens: drag its right edge, or focus the handle and use the arrow keys (Shift: bigger steps,
+// Home/End: narrowest/widest); a double click gives the default. Kept per browser; the map keeps at least about 400 px.
+const DETAIL_W = { min: 320, def: 440, max: 900, key: 'scenic.detailWidth' };
+const handle = dialog.querySelector('.resize-handle');
+let detailW = DETAIL_W.def;
+const maxDetailW = () => Math.max(DETAIL_W.min, Math.min(DETAIL_W.max, innerWidth - 420));
+function setDetailWidth(w, save = false) {
+  detailW = Math.round(Math.max(DETAIL_W.min, Math.min(maxDetailW(), w)));
+  document.documentElement.style.setProperty('--detail-w', `${detailW}px`);
+  handle.setAttribute('aria-valuemin', DETAIL_W.min); handle.setAttribute('aria-valuemax', maxDetailW()); handle.setAttribute('aria-valuenow', detailW);
+  if (save) try { localStorage.setItem(DETAIL_W.key, String(detailW)); } catch { /* storage blocked: the width lasts this visit */ }
+}
+try { setDetailWidth(+localStorage.getItem(DETAIL_W.key) || DETAIL_W.def); } catch { setDetailWidth(DETAIL_W.def); }
+addEventListener('resize', () => setDetailWidth(detailW));
+handle.addEventListener('pointerdown', (ev) => {
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  handle.setPointerCapture(ev.pointerId);
+  document.body.classList.add('resizing');
+  const left = dialog.getBoundingClientRect().left, grab = ev.clientX - dialog.getBoundingClientRect().right;
+  const move = (e) => setDetailWidth(e.clientX - grab - left);
+  const end = () => {
+    handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', end); handle.removeEventListener('pointercancel', end);
+    document.body.classList.remove('resizing');
+    setDetailWidth(detailW, true);
+  };
+  handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', end); handle.addEventListener('pointercancel', end);
+});
+handle.addEventListener('dblclick', () => setDetailWidth(DETAIL_W.def, true));
+handle.addEventListener('keydown', (ev) => {
+  const step = ev.shiftKey ? 80 : 20;
+  const to = { ArrowLeft: detailW - step, ArrowRight: detailW + step, Home: DETAIL_W.min, End: maxDetailW() }[ev.key];
+  if (to == null) return;
+  ev.preventDefault();
+  setDetailWidth(to, true);
+});
+
 // Several videos at one position: choose in the dialog (only these videos, no general route list).
 function openStack(key, move = true) {
   const vs = [...(stacks.get(key) ?? [])].sort((a, b) => (a.loc ?? 7) - (b.loc ?? 7) || (b.views ?? 0) - (a.views ?? 0));
@@ -378,8 +435,8 @@ async function openVideo(id, start = 0, { stack = null } = {}) {
   const l = v.localization?.loc_level ?? 7;
   const tech = v.tech;
   const regionTxt = regionName(v.region);
-  body.innerHTML = `${back}${v.region ? `<p class="eyebrow">${esc(regionTxt)}</p>` : ''}<h2 id="detail-title">${esc(v.title || v.place || id)}</h2>
-    <p class="meta">${esc(v.channel.name)}${v.channel.country ? ` (${esc(v.channel.country)})` : ''} · ${v.published ? date(v.published) : ''}</p>
+  body.innerHTML = `${back}${v.region ? `<p class="eyebrow">${esc(regionTxt)}</p>` : ''}<h2 id="detail-title" title="${esc(v.title || v.place || id)}">${esc(v.title || v.place || id)}</h2>
+    <p class="meta">${esc(v.channel.name)}${v.channel.country ? ` (${esc(v.channel.country)})` : ''}${v.published && !v.ride ? ` · ${date(v.published)}` : ''}</p>
     <div class="video" id="slot"></div>
     <div class="readout" id="readout"></div>
     ${v.route?.elevation?.profile?.length > 1 ? '<div class="profile-box" id="profile"></div>' : ''}
@@ -392,23 +449,29 @@ async function openVideo(id, start = 0, { stack = null } = {}) {
       ${v.route?.roads ? `<dt>${t('dt.road')}</dt><dd>${roadBar(v.route.roads.class_share)}</dd>
         <dt>${t('dt.surface')}</dt><dd>${esc(surfaceText(v.route.roads))}${v.route.roads.tunnel_km >= 0.1 || v.route.roads.bridge_km >= 0.1 ? `<br><span class="meta">${[v.route.roads.tunnel_km >= 0.1 ? t('detail.tunnel', { km: km1(v.route.roads.tunnel_km) }) : '', v.route.roads.bridge_km >= 0.1 ? t('detail.bridges', { km: km1(v.route.roads.bridge_km) }) : ''].filter(Boolean).join(' · ')}</span>` : ''}</dd>` : ''}
       <dt>${t('dt.duration')}</dt><dd>${dur(v.duration_s)}</dd>
-      <dt>${t('dt.views')}</dt><dd>${num(v.views)}</dd>
-      ${tech ? `<dt>${t('dt.picture')}</dt><dd>${res(tech.max_height)} (${tech.max_width}×${tech.max_height}), ${Math.round(tech.fps)} fps${tech.hdr ? ', HDR' : ''}${tech.bitrate_kbps ? `, ${km1(tech.bitrate_kbps / 1000)} Mbit/s` : ''}</dd>` : `<dt>${t('dt.picture')}</dt><dd class="meta">${t('detail.no_tech')}</dd>`}
+      ${rideRows(v.ride)}
+      ${v.views != null ? `<dt>${t('dt.views')}</dt><dd>${num(v.views)}</dd>` : ''}
+      ${v.ride && !tech ? '' : tech ? `<dt>${t('dt.picture')}</dt><dd>${res(tech.max_height)} (${tech.max_width}×${tech.max_height}), ${Math.round(tech.fps)} fps${tech.hdr ? ', HDR' : ''}${tech.bitrate_kbps ? `, ${km1(tech.bitrate_kbps / 1000)} Mbit/s` : ''}</dd>` : `<dt>${t('dt.picture')}</dt><dd class="meta">${t('detail.no_tech')}</dd>`}
       ${v.projection === '360' ? `<dt>${t('dt.format')}</dt><dd>${t('detail.vr')}</dd>` : ''}
       ${v.footage !== 'real' ? `<dt>${t('dt.footage')}</dt><dd>${t(v.footage === 'simulator' ? 'detail.simulator' : 'detail.game')}</dd>` : ''}
       ${v.route ? `<dt>${t('dt.route')}</dt><dd>${esc(METHOD(v.route.method))}.</dd>` : ''}
       ${v.route?.check ? `<dt>${t('dt.check')}</dt><dd lang="en">${esc(v.route.check.note)}</dd>` : ''}
     </dl>
     <p>${v.route?.gpx ? `<a class="btn btn-primary" href="${esc(v.route.gpx)}" download>${t('detail.gpx')}</a>` : ''}
-      <a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">${t('detail.youtube')}</a>
+      <a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">${v.ride ? esc(t('detail.source_page', { author: v.channel.name })) : t('detail.youtube')}</a>
       ${incyclistButton(v)}</p>
+    ${v.ride ? `<p class="meta">${esc(t('detail.ride_in_app'))} ${esc(t('detail.download', { gb: km1(v.ride.download_size / 1e9) }))}</p>` : ''}
+    ${credits(v)}
     ${v.incyclist && !v.incyclist.available ? `<p class="meta">${t('incyclist.unavailable')}</p>`
       : v.incyclist?.warn ? `<p class="meta warn">${t('incyclist.warn')}</p>` : ''}
-    ${v.image ? `<figure class="preview"><img src="${esc(v.image.url)}" alt="${esc(t('detail.preview_alt'))}" loading="lazy"${v.image.width ? ` width="${v.image.width}" height="${v.image.height}"` : ''}>
+    ${v.image && !v.ride ? `<figure class="preview"><img src="${esc(v.image.url)}" alt="${esc(t('detail.preview_alt'))}" loading="lazy"${v.image.width ? ` width="${v.image.width}" height="${v.image.height}"` : ''}>
       ${v.image.credit ? `<figcaption class="meta">${esc(v.image.credit)}</figcaption>` : ''}</figure>` : ''}
     ${v.route?.creator_links?.length ? `<p class="meta">${t('detail.creator_route')} ${v.route.creator_links.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener nofollow">${t('detail.link', { i: i + 1 })}</a>`).join(', ')}</p>` : ''}`;
   const slot = body.querySelector('#slot');
-  if (v.embeddable) {
+  if (v.ride) {
+    // No player: the video is only in the original download. Its picture stands in the player's place.
+    slot.innerHTML = v.image ? `<img class="ride-picture" src="${esc(v.image.url)}" alt="${esc(t('detail.preview_alt'))}">` : '';
+  } else if (v.embeddable) {
     player = mountPlayer(map, slot, { videoId: id, syncUrl: v.sync?.path, start, readout: body.querySelector('#readout'),
       onTime: (s, km, total) => profileCtl?.at(km, total) });
   } else {
@@ -417,7 +480,7 @@ async function openVideo(id, start = 0, { stack = null } = {}) {
   }
   let line = v.route?.line?.map(([la, lo]) => [lo, la]);
   const pbox = body.querySelector('#profile');
-  profileCtl = pbox ? mountProfile(pbox, v.route.elevation.profile, line) : null;
+  profileCtl = pbox ? mountProfile(pbox, v.route.elevation.profile, line, v.ride?.climbs ?? []) : null;
   if (!line && v.sync) line = (await fetch(v.sync.path).then((x) => x.json())).c;
   if (current !== id) return;
   if (line) drawRoute(line);

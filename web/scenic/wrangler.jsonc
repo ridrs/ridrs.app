@@ -12,8 +12,8 @@
     "directory": "./dist",
     "binding": "ASSETS",
     // API and admin run through the worker: it strips the base and checks the Access identity before serving the admin page.
-    // Route lines, GPX and sync tracks too: the worker serves them only for videos published in the admin (src/worker.js VISIBLE).
-    "run_worker_first": ["/", "/scenic", "/scenic/api/*", "/scenic/admin", "/scenic/admin/*", "/scenic/lines.json", "/scenic/gpx/*", "/scenic/sync/*"]
+    // Route lines, GPX, sync tracks and the files of rides (vg/) too: the worker serves them only for videos published in the admin (src/worker.js VISIBLE).
+    "run_worker_first": ["/", "/scenic", "/scenic/api/*", "/scenic/admin", "/scenic/admin/*", "/scenic/lines.json", "/scenic/gpx/*", "/scenic/sync/*", "/scenic/vg/*"]
   },
   "d1_databases": [
     {

@@ -6,5 +6,7 @@ import { ROOT, STATE } from './lib/paths.mjs';
 
 const args = process.argv.slice(2);
 const local = !args.includes('--remote');
-const r = spawnSync('npx', ['wrangler', ...args, ...(local ? ['--persist-to', STATE] : [])], { cwd: ROOT, stdio: 'inherit' });
+// wrangler d1 takes --persist-to only together with --local (pnpm publish:initial, publish:vangestel).
+const d1Local = local && args[0] === 'd1' && !args.includes('--local') ? ['--local'] : [];
+const r = spawnSync('npx', ['wrangler', ...args, ...d1Local, ...(local ? ['--persist-to', STATE] : [])], { cwd: ROOT, stdio: 'inherit' });
 process.exit(r.status ?? 1);

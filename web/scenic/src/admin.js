@@ -6,14 +6,15 @@
 //
 // Fields the pipeline also writes (place, region, pin, country, route, localization, sync) get a row in
 // manual_field; scripts/import.mjs never overwrites those ("manual fields always win").
-import { basePath } from './base.js';
+import { basePath, VIDEO_ID } from './base.js';
+import { FTS_INSERT } from './search-index.js';
 import { buildTrack, anchorLevel, evaluateReview, kmAlong, project, LOC_RULES, KEYS } from '../site/lib/route-sync.js';
 import { sniffImage, contentId, MAX_IMAGE_BYTES, RIGHTS } from './images.js';
 import { buildJob, validateResult, resultMeta, routeAgreement, uploadLevel, MAX_RESULT_BYTES, ROUTE_OFFER_M } from './video2gpx.js';
 
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const bad = (msg) => { throw new HttpError(400, msg); };
-const ID = /^[\w-]{11}$/;
+const ID = VIDEO_ID;
 const now = () => new Date().toISOString();
 const parse = (s) => { try { return s == null ? null : JSON.parse(s); } catch { return null; } };
 const J = (v) => (v === undefined || v === null ? null : JSON.stringify(v));
@@ -75,8 +76,7 @@ const H = {
       if (spec.manual) for (const c of spec.cols) out.push(v.manual ? mark(env, id, c, who) : unmark(env, id, c));
       if (field === 'place' || field === 'region') {
         out.push(env.DB.prepare('DELETE FROM video_fts WHERE video_id = ?1').bind(id),
-          env.DB.prepare(`INSERT INTO video_fts (video_id, title, place, region, channel) SELECT v.video_id, v.title, v.place, v.region, c.name
-            FROM video v LEFT JOIN channel c ON c.channel_id = v.channel_id WHERE v.video_id = ?1`).bind(id));
+          env.DB.prepare(`${FTS_INSERT} WHERE v.video_id = ?1`).bind(id));
       }
       return out;
     },

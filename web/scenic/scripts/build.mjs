@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Builds dist/scenic/ (the site lives under ridrs.app/scenic, BASE_PATH in wrangler.jsonc): the static site, vendored MapLibre, the GPX files from ../export/routes (OSM-derived
-// only, see ../scripts/export_public.py) and the time-synced tracks (sync/<videoId>.json).
-import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, statSync } from 'node:fs';
+// only, see ../scripts/export_public.py), the time-synced tracks (sync/<videoId>.json) and the Van Gestel rides (vg/<slug>/: thumbnail,
+// overlay and the package without its video; gpx/vg-<slug>.gpx, the creator's track; their lines in lines.json).
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSyncTracks } from './lib/sync-sources.mjs';
 import { encodeLine } from '../site/lib/lines.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-import { PIPELINE, RIDRS } from './lib/paths.mjs'; // the data pipeline folder (export/) lives outside the repository
+import { PIPELINE, RIDRS, VANGESTEL } from './lib/paths.mjs'; // the data pipeline folder (export/) lives outside the repository
+import { loadVanGestel } from './lib/vangestel.mjs';
 const BASE = 'scenic'; // keep in sync with BASE_PATH in wrangler.jsonc
 const distRoot = join(ROOT, 'dist');
 const dist = join(distRoot, BASE);
@@ -48,6 +50,16 @@ for (const f of readdirSync(gpxSrc)) {
   cpSync(join(gpxSrc, f), join(dist, 'gpx', f)); gpx++;
 }
 
+// Van Gestel rides: their files under vg/<slug>/ (served only for visible videos, src/worker.js), the track as GPX.
+const rides = loadVanGestel(VANGESTEL) ?? [];
+for (const r of rides) {
+  const from = join(VANGESTEL, r.slug), to = join(dist, 'vg', r.slug);
+  mkdirSync(to, { recursive: true });
+  if (r.thumbnail) cpSync(join(from, 'thumbnail.jpg'), join(to, 'thumbnail.jpg'));
+  for (const dir of ['overlay', 'package']) if (existsSync(join(from, dir))) cpSync(join(from, dir), join(to, dir), { recursive: true, filter: (f) => !f.split('/').at(-1).startsWith('.') });
+  cpSync(join(from, 'package', r.gpx), join(dist, 'gpx', `${r.id}.gpx`));
+}
+
 const tracks = loadSyncTracks(RIDRS);
 mkdirSync(join(dist, 'sync'));
 for (const t of tracks) writeFileSync(join(dist, 'sync', `${t.videoId}.json`), t.raw);
@@ -65,6 +77,7 @@ for (const row of readFileSync(join(PIPELINE, 'export/videos.ndjson'), 'utf8').s
 // Synced videos without an exported OSM route still get a line: the sync track ({c: [[lon, lat], …]}).
 // Lines set in the admin (D1: manual routes, uploaded video2gpx tracks) are added by the worker (src/worker.js linesJson).
 for (const t of tracks) if (!lines[t.videoId]) addLine(t.videoId, JSON.parse(t.raw).c);
+for (const r of rides) addLine(r.id, r.line.map(([la, lo]) => [lo, la]));
 function addLine(id, lonLat) {
   const flat = encodeLine(lonLat);
   if (!flat) return;
@@ -74,4 +87,4 @@ const linesJson = JSON.stringify(lines);
 writeFileSync(join(dist, 'lines.json'), linesJson);
 
 console.log(`dist: ${Object.keys(lines).length} route lines (${linePts} points, ${(linesJson.length / 1048576).toFixed(1)} MB)`);
-console.log(`dist: ${gpx} GPX (${tooBig} over 25 MB skipped), ${tracks.length} sync tracks`);
+console.log(`dist: ${gpx} GPX (${tooBig} over 25 MB skipped), ${tracks.length} sync tracks, ${rides.length} Van Gestel rides`);
