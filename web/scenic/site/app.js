@@ -156,7 +156,7 @@ $('#legend-items').innerHTML = Object.keys(LEVELS).map((l) => lvlTag(+l)).join('
 const padding = () => {
   const top = Math.round(Math.min($('#search .bar').getBoundingClientRect().bottom + 60, innerHeight * 0.3));
   return detailOpen()
-    ? (narrow() ? { top: Math.min(top, 90), right: 30, bottom: Math.round(innerHeight * 0.62) + 20, left: 30 } : { top, right: 60, bottom: 40, left: Math.round(dialog.getBoundingClientRect().right) + 28 })
+    ? (narrow() ? { top: Math.min(top, 90), right: 30, bottom: Math.round(dialog.getBoundingClientRect().height) + 20, left: 30 } : { top, right: 60, bottom: 40, left: Math.round(dialog.getBoundingClientRect().right) + 28 })
     : { top, right: 60, bottom: 40, left: 60 };
 };
 
@@ -351,6 +351,18 @@ function pick(id) { $('#suggest').hidden = true; $('#q').setAttribute('aria-expa
 const dialog = $('#detail');
 const detailOpen = () => dialog.open;
 
+// Phones: the route sheet is only as tall as its top down to the end of the video (or a ride's picture), so scrolled to
+// the top the video is whole and the map keeps the rest; everything below scrolls inside the sheet. A list of videos at one
+// point, or a video that has not loaded yet, keeps the sheet's default height (62vh, style.css). At most that height.
+const SHEET_GAP = 12; // px below the video
+function fitSheet() {
+  const body = $('#detail-body'), slot = body.querySelector('#slot');
+  if (!narrow() || !slot) { dialog.style.height = ''; return; }
+  const end = slot.getBoundingClientRect().bottom - dialog.getBoundingClientRect().top + body.scrollTop + SHEET_GAP;
+  dialog.style.height = `${Math.round(Math.min(end, innerHeight * 0.62))}px`;
+}
+addEventListener('resize', () => { if (dialog.open) fitSheet(); });
+
 // Width of the dialog on wide screens: drag its right edge, or focus the handle and use the arrow keys (Shift: bigger steps,
 // Home/End: narrowest/widest); a double click gives the default. Kept per browser; the map keeps at least about 400 px.
 const DETAIL_W = { min: 320, def: 440, max: 900, key: 'scenic.detailWidth' };
@@ -406,6 +418,7 @@ function openStack(key, move = true) {
   if (!dialog.open) dialog.show();
   document.body.classList.add('detail-open');
   $('#detail-body').scrollTop = 0;
+  fitSheet();
   if (move) map.easeTo({ center: [v0.lon, v0.lat], zoom: Math.max(map.getZoom(), 9), padding: padding() });
 }
 $('#detail-body').addEventListener('click', (e) => {
@@ -468,6 +481,8 @@ async function openVideo(id, start = 0, { stack = null } = {}) {
       ${v.image.credit ? `<figcaption class="meta">${esc(v.image.credit)}</figcaption>` : ''}</figure>` : ''}
     ${v.route?.creator_links?.length ? `<p class="meta">${t('detail.creator_route')} ${v.route.creator_links.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener nofollow">${t('detail.link', { i: i + 1 })}</a>`).join(', ')}</p>` : ''}`;
   const slot = body.querySelector('#slot');
+  body.scrollTop = 0;
+  fitSheet();
   if (v.ride) {
     // No player: the video is only in the original download. Its picture stands in the player's place.
     slot.innerHTML = v.image ? `<img class="ride-picture" src="${esc(v.image.url)}" alt="${esc(t('detail.preview_alt'))}">` : '';
