@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // node --test test/ — Van Gestel rides on ridrs Scenic (migrations/0007_sources_and_rides.sql): the catalog of
-// <pipeline>/vangestel (scripts/lib/vangestel.mjs) is imported beside the YouTube export, shown on the site once published,
+// content/vangestel (scripts/lib/vangestel.mjs) is imported beside the YouTube export, shown on the site once published,
 // offered to the app as the ride catalog (docs/formats/scenic-ride-catalog-v1.md) and never sent to the YouTube API.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

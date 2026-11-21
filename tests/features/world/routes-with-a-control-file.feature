@@ -15,15 +15,15 @@ Feature: Routes on the device are folders with a control file
   start, as an older ridrs left them.
 
   Background:
-    Given the ridrs plugins "video-source-vangestel, video-source-local, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "video-source-scenic, video-source-local, data-archive-node, storage-media-node" together with the simulated downloads
 
   Scenario: A downloaded route in the unified format gets a control file at start
     Given the media storage holds the Van Gestel route "col-de-pennes" in the unified format
     When the host has started
-    Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "preview.jpg, route.xml, track.gpx, video.mp4"
-    And the route offer "video-source-vangestel/col-de-pennes" names the files "preview.jpg, route.xml, track.gpx, video.mp4"
-    And the control file of "video-source-vangestel/col-de-pennes" names the video "video.mp4" at 30 frames per second from frame 12
+    Then the route offer "video-source-scenic/vg-col-de-pennes" is "ready"
+    And the route folder "video-source-scenic/vg-col-de-pennes" holds "preview.jpg, route.xml, track.gpx, video.mp4"
+    And the route offer "video-source-scenic/vg-col-de-pennes" names the files "preview.jpg, route.xml, track.gpx, video.mp4"
+    And the control file of "video-source-scenic/vg-col-de-pennes" names the video "video.mp4" at 30 frames per second from frame 12
 
   Scenario: An imported route in the unified format keeps its picture through its control file
     Given the media storage holds the own route "col-de-test" titled "Col de Test" with a picture in the unified format
@@ -37,26 +37,26 @@ Feature: Routes on the device are folders with a control file
   Scenario: A route moved before is not moved again
     Given the media storage holds the Van Gestel route "col-de-pennes" in the unified format
     And the host has started
-    And the route offer "video-source-vangestel/col-de-pennes" is "ready"
+    And the route offer "video-source-scenic/vg-col-de-pennes" is "ready"
     When ridrs restarted
-    Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "preview.jpg, route.xml, track.gpx, video.mp4"
+    Then the route offer "video-source-scenic/vg-col-de-pennes" is "ready"
+    And the route folder "video-source-scenic/vg-col-de-pennes" holds "preview.jpg, route.xml, track.gpx, video.mp4"
 
   Scenario: A downloaded package with a compressed video is unpacked into its route's folder
     Given the host has started
-    When the UI bridge calls "route.fetch" with '{"key":"video-source-vangestel/col-de-pennes"}'
-    Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
-    And the route offer "video-source-vangestel/col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
+    When the UI bridge calls "route.fetch" with '{"key":"video-source-scenic/vg-col-de-pennes"}'
+    Then the route offer "video-source-scenic/vg-col-de-pennes" is "ready"
+    And the route folder "video-source-scenic/vg-col-de-pennes" holds "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
+    And the route offer "video-source-scenic/vg-col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
     And the media storage holds no downloaded package
 
   Scenario: A downloaded package with a stored video is kept as it is and played from the ZIP
     Given the simulated downloads serve packages with a stored video
     And the host has started
-    When the UI bridge calls "route.fetch" with '{"key":"video-source-vangestel/col-de-pennes"}'
-    Then the route offer "video-source-vangestel/col-de-pennes" is "ready"
-    And the route folder "video-source-vangestel/col-de-pennes" holds "preview.jpg, route.ride"
-    And the route offer "video-source-vangestel/col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
+    When the UI bridge calls "route.fetch" with '{"key":"video-source-scenic/vg-col-de-pennes"}'
+    Then the route offer "video-source-scenic/vg-col-de-pennes" is "ready"
+    And the route folder "video-source-scenic/vg-col-de-pennes" holds "preview.jpg, route.ride"
+    And the route offer "video-source-scenic/vg-col-de-pennes" names the files "FR_Test.gpx, FR_Test.mp4, FR_Test.xml, preview.jpg"
     And the media storage holds no downloaded package
 
   Scenario: Own routes are offered from their folders when the index of them is lost

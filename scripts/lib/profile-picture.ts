@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { Climb, Profile } from './climbs.ts';
+import type { Climb, Profile } from '@ridrs/ride';
 
 /**
  * The colour of a km by its gradient (ADR 0070), the front of the profile and its lighter top,

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Builds the catalog of the video rides of cycling.vangestel.online, shipped with the video
-// source plugin: what the site lists for each video, the route from its Incyclist control file
+// Builds the catalog of the video rides of cycling.vangestel.online, which ridrs Scenic imports and
+// serves to the app (content/vangestel, ADR 0103): what the site lists for each video, the route from its Incyclist control file
 // and GPX track with its categorised climbs, a thumbnail and a picture of the elevation profile.
 // No video is downloaded: each ZIP's central directory and its small entries are read with HTTP
 // range requests: the control file, the track and any picture, about 1 MB per route.
 //
 //   pnpm fetch:video-catalog [--out <folder>] [--only <route id> …]
 //
-// The folder defaults to `plugins/video-source-vangestel/catalog`. It gets `index.json` (every
+// The folder defaults to `content/vangestel`. It gets `index.json` (every
 // route, light enough for a list, its climbs with their summit names) and per route `<id>/package/`
 // (the package without its video, every other file byte for byte, ADR 0095), `<id>/peaks.txt`
 // (the names of the summits along the route), `<id>/thumbnail.jpg` and `<id>/profile.svg`
@@ -20,9 +20,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, resolve } from 'node:path';
 import { configure, type Entry, HttpRangeReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 import { Window } from 'happy-dom';
-import { categoriseClimbs, nameClimbs } from '../plugins/video-source-vangestel/climbs.ts';
-import { drawProfile } from '../plugins/video-source-vangestel/profile-picture.ts';
-import { parseControl } from '@ridrs/ride';
+import { categoriseClimbs, nameClimbs, parseControl } from '@ridrs/ride';
+import { drawProfile } from './lib/profile-picture.ts';
 import { parseGpx, xml } from '../plugins/ui-world-video/client/library.ts';
 import { plausibleTrack } from '../plugins/ui-world-video/client/plausible-track.ts';
 import { placeAt, type Track } from '../plugins/ui-world-video/client/track.ts';
@@ -391,7 +390,7 @@ async function build(listed: Listed, tours: readonly string[], out: string) {
 
 const args = process.argv.slice(2);
 const outIndex = args.indexOf('--out');
-const out = resolve(outIndex >= 0 ? (args.splice(outIndex, 2)[1] ?? '') : join(import.meta.dirname, '../plugins/video-source-vangestel/catalog'));
+const out = resolve(outIndex >= 0 ? (args.splice(outIndex, 2)[1] ?? '') : join(import.meta.dirname, '../content/vangestel'));
 const only = new Set<string>();
 for (let i = args.indexOf('--only'); i >= 0; i = args.indexOf('--only')) {
   only.add(args.splice(i, 2)[1] ?? '');

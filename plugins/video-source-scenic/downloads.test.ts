@@ -22,16 +22,23 @@ function setup(options: { failFetch?: string; noControl?: boolean; storedVideo?:
   const removed: string[] = [];
   const package_ = options.noControl ? PACKAGE.slice(1) : PACKAGE;
   const media = {
-    exists: async (path: string) => files.has(path),
+    // A file, or a folder with files below it.
+    exists: async (path: string) => files.has(path) || [...files].some((file) => file.startsWith(`${path}/`)),
     read: async () => new TextEncoder().encode(CONTROL),
     write: async (path: string) => void files.add(path),
+    // A file, or a folder with everything below it.
     move: async (from: string, to: string) => {
-      files.delete(from);
-      files.add(to);
+      for (const file of [...files]) {
+        if (file === from || file.startsWith(`${from}/`)) {
+          files.delete(file);
+          files.add(`${to}${file.slice(from.length)}`);
+        }
+      }
     },
     remove: async (path: string) => {
       removed.push(path);
-      for (const file of [...files]) if (file.startsWith(path)) files.delete(file);
+      // A file, or a folder with everything below it (not `pass.zip` beside the folder `pass`).
+      for (const file of [...files]) if (file === path || file.startsWith(`${path}/`)) files.delete(file);
     },
     url: (path: string) => `media:${path}`,
     // A route.ride in a folder lists the package's files, its video stored where it was made so.
@@ -126,6 +133,29 @@ describe('VideoDownloads', () => {
     await downloads.connect(services);
     expect(downloads.availability(ROUTE.id).state).toBe('ready');
     expect(changed).toEqual([ROUTE.id]);
+  });
+
+  it('moves a route a former source downloaded into its own folder', async () => {
+    const { downloads, route, files, services } = setup();
+    route('videos/old/pass');
+    await downloads.connect(services);
+    await downloads.setRoutes([ROUTE, { ...ROUTE, id: 'source/other', former: 'videos/old/pass' }]);
+    expect(downloads.availability('source/other').state).toBe('ready');
+    expect([...files].filter((file) => file.startsWith('videos/old/'))).toEqual([]);
+    expect([...files].filter((file) => file.startsWith('videos/source/other/')).sort()).toEqual([
+      'videos/source/other/route.xml',
+      'videos/source/other/track.gpx',
+      'videos/source/other/video.mp4',
+    ]);
+  });
+
+  it("fetches the catalog's overlay from where ridrs Scenic serves it, beside the downloaded route", async () => {
+    const { downloads, fetches, services } = setup();
+    await downloads.connect(services);
+    const overlay = [{ path: 'preview.jpg', size: 3, sha256: 'abc', url: 'https://scenic.example/vg/pass/overlay/preview.jpg' }];
+    await downloads.setRoutes([{ ...ROUTE, overlay }]);
+    await downloads.fetch(ROUTE.id);
+    expect(fetches).toContainEqual({ url: overlay[0]?.url, target: 'videos/source/pass/preview.jpg', expected: { size: 3 } });
   });
 
   it('says why a download cannot start, before it starts', async () => {

@@ -2,7 +2,7 @@
 
 # ADR 0095: Video Packages without Their Video
 
-Status: proposed on 2026-11-13. Builds on [ADR 0094](0094-video-routes-stored-as-ride-packages.md).
+Status: proposed on 2026-11-13. Builds on [ADR 0094](0094-video-routes-stored-as-ride-packages.md). The app's catalog moved to `content/vangestel/` and is served by ridrs Scenic ([ADR 0103](0103-video-routes-from-ridrs-scenic.md)).
 
 ## Context
 

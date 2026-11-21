@@ -6,12 +6,12 @@ import type { Messages } from './en.ts';
 /** The ride area's texts in German (ADR 0072). */
 export const de: Messages = {
   title: 'Fahren',
-  intro: 'Frei fahren: Welten, Routen und echte Videos. Route wählen, dann Los.',
+  intro: 'Frei fahren: Welten, Routen und Scenic-Videos. Route wählen, dann Los.',
   filters: 'Filter',
   filter: { flat: 'Flach', hilly: 'Hügelig', short: 'Unter 45 min', favourites: 'Favoriten' },
   worlds: 'Welten und Routen',
   noWorld: 'Keine Welt bietet eine Route an.',
-  videos: 'Echte Videos',
+  videos: 'Scenic',
   noVideo: 'Keine Videoquelle bietet eine Route an.',
   noMatch: 'Keine Route passt zu den Filtern.',
   later: 'Karte, Pacer und Gruppen',

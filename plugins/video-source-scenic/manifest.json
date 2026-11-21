@@ -1,6 +1,6 @@
 {
-  "id": "video-source-vangestel",
-  "name": "Van Gestel Video Rides",
+  "id": "video-source-scenic",
+  "name": "Video routes from ridrs Scenic",
   "version": "0.1.0",
   "types": [
     "transport"
@@ -8,6 +8,8 @@
   "provides": [],
   "requires": [],
   "optionalRequires": [
+    "net.http",
+    "storage.app-files",
     "storage.media",
     "data.fetch",
     "data.archive",

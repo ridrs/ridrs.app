@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Imports ../export (scripts/export_public.py) and the Van Gestel catalog (<pipeline>/vangestel, scripts/lib/vangestel.mjs) into D1 (concept 4.3).
+// Imports ../export (scripts/export_public.py) and the Van Gestel catalog (content/vangestel of the repository, scripts/lib/vangestel.mjs) into D1 (concept 4.3).
 //   node scripts/import.mjs            -> local D1 (wrangler dev)
 //   node scripts/import.mjs --remote   -> the Cloudflare D1 database
 // Writes build/import.sql first, then runs it with wrangler. Pipeline and YouTube API fields are

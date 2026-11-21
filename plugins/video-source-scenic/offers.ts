@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import type { RouteOffer } from '@ridrs/contracts';
+import type { CatalogRoute, RideCatalog } from './catalog.ts';
+import type { Availability, Downloadable } from './downloads.ts';
+
+export const PLUGIN = 'video-source-scenic';
+
+type Category = NonNullable<RouteOffer['climbs']>[number]['category'];
+
+/** The offer's id of a route of the catalog: `video-source-scenic/<Scenic's id>`. */
+export const offerId = (route: { readonly id: string }) => `${PLUGIN}/${route.id}`;
+
+/**
+ * Where the former plugin `video-source-vangestel` kept a route it downloaded (ADR 0094): its id
+ * there was the route's slug, Scenic's id less `vg-`.
+ */
+export const formerFolder = (route: CatalogRoute) =>
+  route.source === 'vangestel' && route.id.startsWith('vg-')
+    ? `videos/video-source-vangestel/${route.id.slice(3)}`
+    : undefined;
+
+/** A picture by its name: the overlay file a card's and a route's details show. */
+const isPicture = (path: string) => /\.(jpe?g|png)$/i.test(path);
+
+/** A route's picture in full size: the overlay's picture, else its small one. */
+const pictureOf = (route: CatalogRoute) => route.overlay.find((file) => isPicture(file.path))?.url ?? route.tile;
+
+/** The country's English name by its ISO code, as the ride page names countries (`tags.country`). */
+const COUNTRIES = new Intl.DisplayNames('en', { type: 'region' });
+function countryName(code: string | undefined): string | undefined {
+  if (!code) return undefined;
+  try {
+    return COUNTRIES.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Every route of the catalog and what its download takes, its overlay and a former download included. */
+export function downloadables(catalog: RideCatalog): Downloadable[] {
+  return catalog.routes.map((route) => {
+    const former = formerFolder(route);
+    return {
+      id: offerId(route),
+      url: route.download.url,
+      size: route.download.size,
+      etag: route.download.etag,
+      overlay: route.overlay.map(({ path, size, sha256, url }) => ({ path, size, sha256, url })),
+      ...(former ? { former } : {}),
+    };
+  });
+}
+
+/**
+ * Every route of the catalog as an offer. Each needs its download first: `availability` says how
+ * far it is (fetchable without it). Its picture is the overlay's picture in full size, its card's
+ * Scenic's small one; a route on the device shows its own (the plugin lays them over these).
+ */
+export function catalogOffers(
+  catalog: RideCatalog,
+  availability: (id: string) => Availability | undefined = () => undefined,
+): RouteOffer[] {
+  return catalog.routes.map((route) => {
+    const id = offerId(route);
+    const source = catalog.sources[route.source];
+    const thumbnail = pictureOf(route);
+    return {
+      id,
+      kind: 'video',
+      title: route.title,
+      distance: route.distance,
+      ascent: route.ascent,
+      duration: route.duration,
+      sparkline: [...route.sparkline],
+      ...(thumbnail ? { thumbnail } : {}),
+      ...(route.tile ? { tile: route.tile } : {}),
+      climbs: route.climbs.map((climb) => ({ ...climb, category: climb.category as Category })),
+      tags: { country: countryName(route.country), level: route.level, tour: route.tour },
+      ...(source
+        ? { credits: { author: source.author, source: source.name, url: route.page, license: source.license.name } }
+        : {}),
+      availability: availability(id) ?? { state: 'fetchable', size: route.download.size },
+      world: { landscape: 'ui-world-video/landscape', route: id },
+    };
+  });
+}

@@ -12,7 +12,7 @@ Feature: Downloading a video route
   and media storage are the real plugins on a media folder of the scenario.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-vangestel, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-scenic, data-archive-node, storage-media-node" together with the simulated downloads
     And the host has started
     And the main screen is 1400 px wide
     And the ridrs UI is shown
@@ -27,11 +27,11 @@ Feature: Downloading a video route
     Then the route details offer a "Go" button
     # The package is kept as it came (ADR 0094): its control file names its own title; the
     # catalog's is the offer's.
-    And the media storage holds the route "video-source-vangestel/col-de-pennes" titled "Test route"
+    And the media storage holds the route "video-source-scenic/vg-col-de-pennes" titled "Test route"
     And the media storage holds no downloaded package
     When I press "Go"
     Then the "activity" screen is shown
-    And the ride was requested in the world "ui-world-video/landscape" on the route "video-source-vangestel/col-de-pennes"
+    And the ride was requested in the world "ui-world-video/landscape" on the route "video-source-scenic/vg-col-de-pennes"
 
   Scenario: Progress changes only the downloading route
     Given the simulated downloads stop halfway
@@ -41,7 +41,7 @@ Feature: Downloading a video route
     Then the route details read "Downloading: 50 %"
     When the simulated download goes on
     Then the route details offer a "Go" button
-    And after the start only "video-source-vangestel/col-de-pennes" of the "route.offer" state changed, in at least 3 steps
+    And after the start only "video-source-scenic/vg-col-de-pennes" of the "route.offer" state changed, in at least 3 steps
 
   Scenario: A downloaded route stays on the device
     When I press "Ride"
@@ -72,7 +72,7 @@ Feature: Downloading a video route
     Then the route details offer a "Go" button
     When I press "Remove from this device"
     Then the route details read "Not on this device yet: 11.2 GB to download"
-    And the media storage holds no route "video-source-vangestel/col-de-pennes"
+    And the media storage holds no route "video-source-scenic/vg-col-de-pennes"
 
   Scenario: A download can be cancelled
     Given the simulated downloads stop halfway
@@ -83,7 +83,7 @@ Feature: Downloading a video route
     When I press "Cancel download"
     Then the route details read "Not on this device yet: 11.2 GB to download"
     And the route details offer a "Download" button
-    And the media storage holds no route "video-source-vangestel/col-de-pennes"
+    And the media storage holds no route "video-source-scenic/vg-col-de-pennes"
 
   Scenario: The route card downloads, shows the progress, cancels and shows a downloaded route
     Given the simulated downloads stop halfway

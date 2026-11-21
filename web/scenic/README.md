@@ -22,7 +22,7 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 | `scripts/pull_manual.mjs` | admin export → `../data/manual.json` |
 | `migrations/` | D1 schema (phase 1 subset of the concept's data model) |
 | `scripts/build.mjs` | `dist/` = site + MapLibre + ridrs fonts (`vendor/fonts`, from `@fontsource`, self-hosted, no Google Fonts) + `gpx/` (from `../export/routes`) + `sync/` (time-synced tracks) |
-| `scripts/lib/vangestel.mjs` | reads the Van Gestel catalog (`<pipeline>/vangestel`) |
+| `scripts/lib/vangestel.mjs` | reads the Van Gestel catalog (`content/vangestel` of the repository) |
 | `scripts/lib/thumbnails.mjs` | web versions (640 and 1280 px JPEG) of a ride's big overlay picture |
 | `scripts/import.mjs` | `../export/` and the Van Gestel catalog → D1 upsert (SQL from `scripts/lib/import-sql.mjs`). Never touches editorial fields, manual fields or verified localizations; `--dry-run` only writes `build/import.sql` |
 | `test/` | `node --test test/` (`pnpm test`): filters, URL, speed; route sync and level rules; import protection (node:sqlite with the migrations); JWT and dev bypass; admin API; Incyclist; video2gpx job and upload (`test/fixtures/video2gpx/`, shared with ridrs_app `apps/video2gpx/tests/atlas/fixtures/`) |
@@ -32,7 +32,7 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 
 Besides YouTube, ridrs Scenic lists the rides of Fred Van Gestel ([cycling.vangestel.online](https://cycling.vangestel.online/indoor/videos/), CC BY-NC-SA 4.0). They are the video routes the ridrs app can ride: the app reads them from Scenic instead of a catalog bundled with a plugin.
 
-- **Data:** `<pipeline>/vangestel/` (`SCENIC_VANGESTEL` overrides it), written by ridrs_app `pnpm fetch:video-catalog --out <pipeline>/vangestel`: `index.json`, per route `package/` (the package without its video, ADR 0095), `thumbnail.jpg` (made by hand), `overlay/`. Without the folder the import leaves the Van Gestel rows as they are.
+- **Data:** [`content/vangestel/`](../../content/vangestel/) of this repository (`SCENIC_VANGESTEL` overrides it), written by `pnpm fetch:video-catalog`: `index.json`, per route `package/` (the package without its video, ADR 0095), `thumbnail.jpg` (made by hand), `overlay/`. Without the folder the import leaves the Van Gestel rows as they are.
 - **Model** (migration 0007): `video.source` (`youtube` or `vangestel`), table `source` (author and license per source), table `ride_package` (download, sparkline, climbs, files with their hashes). Ids are `vg-<slug>`. Each route gets its route from the creator's GPX track (`method = creator_gpx`) and Lokalisierungsstufe 3: the track runs with the video, but nobody checked it. The YouTube refresh never touches these videos.
 - **Site:** quick chip and panel filter *In ridrs fahrbar* (`ride=1`). The dialog shows the route's picture instead of a player (the video is only in the original download), tour, difficulty, climbs and credits with the license; *Paket ohne Video* (`/api/videos/:id/package.zip`: the package files, the overlay and `LIESMICH.txt`) replaces the generated Incyclist package.
 - **App:** `GET /api/ride/v1/catalog.json`, format in ridrs_app [`docs/formats/scenic-ride-catalog-v1.md`](../../docs/formats/scenic-ride-catalog-v1.md); `test/fixtures/ride-catalog/catalog.example.json` is the answer for the test catalog `test/fixtures/vangestel/`.

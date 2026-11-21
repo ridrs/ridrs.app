@@ -106,7 +106,10 @@ Then(
     await waitFor(() => {
       const picture = card(this, title).querySelector('img');
       assert.ok(
-        picture?.getAttribute('src')?.endsWith('col-de-pennes/thumbnail.jpg'),
+        // Without its query: ridrs Scenic adds `?h=<hash>` to its files.
+        new URL(picture?.getAttribute('src') ?? '', 'file:///').pathname.endsWith(
+          'col-de-pennes/thumbnail.jpg',
+        ),
         picture?.getAttribute('src') ?? 'no picture',
       );
       within(card(this, title)).getByRole('img', { name: `Elevation profile of ${title}` });
@@ -222,7 +225,8 @@ Then(
       assert.ok(hero);
       const picture = hero.querySelector('img');
       assert.ok(
-        picture?.getAttribute('src')?.endsWith(path),
+        // Without its query: ridrs Scenic adds `?h=<hash>` to its files.
+        new URL(picture?.getAttribute('src') ?? '', 'file:///').pathname.endsWith(path),
         picture?.getAttribute('src') ?? 'no picture',
       );
     });

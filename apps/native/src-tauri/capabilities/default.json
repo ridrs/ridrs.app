@@ -136,6 +136,9 @@
           "url": "https://ridrs.app/intervals/oauth/result"
         },
         {
+          "url": "https://ridrs.app/scenic/api/ride/*"
+        },
+        {
           "url": "https://ridrs.app/devices"
         },
         {

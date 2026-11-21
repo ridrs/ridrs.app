@@ -1,7 +1,7 @@
 @ui
 Feature: Importing an own video route from an Incyclist package
   A rider brings own routes into ridrs as Incyclist packages: a ZIP with the video, its GPX track
-  and the control file. On the ride page the first card of real video imports one: the system's
+  and the control file. On the ride page the first card of the section Scenic imports one: the system's
   open dialog chooses the ZIP (`data.pick`), and the local video source stores it as a route's
   folder (ADR 0094): a package whose video is stored, not compressed, is copied as `route.ride` and
   played from the ZIP; any other is unpacked into the folder from the chosen file. Nothing is
@@ -23,17 +23,17 @@ Feature: Importing an own video route from an Incyclist package
     And the main screen is 1400 px wide
     And the ridrs UI is shown
 
-  Scenario: The import is the first card of real video
+  Scenario: The import is the first card of the section Scenic
     When I press "Ride"
-    Then the section "Real video" lists "Import video" first
-    And the section "Real video" lists 1 routes
+    Then the section "Scenic" lists "Import video" first
+    And the section "Scenic" lists 1 routes
 
   Scenario: An imported package can be ridden
     Given the rider chooses the Incyclist package "Col de Test.zip"
     When I press "Ride"
     And I press "Import video"
-    Then the section "Real video" lists "Col de Test"
-    And the section "Real video" lists "Import video" first
+    Then the section "Scenic" lists "Col de Test"
+    And the section "Scenic" lists "Import video" first
     And the route "Col de Test" reads "0.3 km"
     And the route "Col de Test" reads "12 m"
     And the route "Col de Test" shows the status "On this device"
@@ -51,7 +51,7 @@ Feature: Importing an own video route from an Incyclist package
     And storing the chosen package waits
     When I press "Ride"
     And I press "Import video"
-    Then the section "Real video" lists "Col de Test"
+    Then the section "Scenic" lists "Col de Test"
     And the route "Col de Test" shows the status "Importing"
     When I press "Col de Test"
     Then the route details offer no "Go" button
@@ -90,14 +90,14 @@ Feature: Importing an own video route from an Incyclist package
     When I press "Ride"
     And I press "Import video"
     Then the route "Import video" reads "Import failed: The package has no control file"
-    And the section "Real video" does not list "Holiday"
+    And the section "Scenic" does not list "Holiday"
 
   Scenario: A .ride file is an Incyclist package
     Given the rider chooses the Incyclist package "Col_de_Test.ride"
     When I press "Ride"
     And I press "Import video"
     Then the open dialog offered Incyclist packages as "zip, ride"
-    And the section "Real video" lists "Col de Test"
+    And the section "Scenic" lists "Col de Test"
     And the route "Col de Test" shows the status "On this device"
     And the media storage holds the route "video-source-local/col-de-test" titled "Col de Test"
     And the media storage holds no downloaded package
@@ -106,22 +106,22 @@ Feature: Importing an own video route from an Incyclist package
     Given the rider chooses the Incyclist package "Col de Test.zip"
     When I press "Ride"
     And I press "Import video"
-    Then the section "Real video" lists "Col de Test"
+    Then the section "Scenic" lists "Col de Test"
     And the route "Col de Test" shows the status "On this device"
     When ridrs restarted
     And I reload the UI
     And I press "Ride"
-    Then the section "Real video" lists "Col de Test"
+    Then the section "Scenic" lists "Col de Test"
     And the route "Col de Test" reads "0.3 km"
 
   Scenario: The same package imported twice is two routes
     Given the rider chooses the Incyclist package "Col de Test.zip"
     When I press "Ride"
     And I press "Import video"
-    Then the section "Real video" lists "Col de Test"
+    Then the section "Scenic" lists "Col de Test"
     And the route "Col de Test" shows the status "On this device"
     When I press "Import video"
-    Then the section "Real video" lists 3 routes
+    Then the section "Scenic" lists 3 routes
     And the route offer "video-source-local/col-de-test-2" is "ready"
     And the media storage holds the route "video-source-local/col-de-test-2" titled "Col de Test"
 
@@ -129,7 +129,7 @@ Feature: Importing an own video route from an Incyclist package
     Given the rider cancels the open dialog
     When I press "Ride"
     And I press "Import video"
-    Then the section "Real video" lists 1 routes
+    Then the section "Scenic" lists 1 routes
     And the route "Import video" does not read "failed"
 
   Scenario: A package that is not an Incyclist package says why
@@ -137,7 +137,7 @@ Feature: Importing an own video route from an Incyclist package
     When I press "Ride"
     And I press "Import video"
     Then the route "Import video" reads "Import failed: The package has no control file"
-    And the section "Real video" lists 1 routes
+    And the section "Scenic" lists 1 routes
     And the media storage holds no route "video-source-local/holiday"
     And the media storage holds no downloaded package
 
@@ -147,5 +147,5 @@ Feature: Importing an own video route from an Incyclist package
     And I press "Import video"
     And I press "Col de Test"
     And I press "Remove from this device"
-    Then the section "Real video" does not list "Col de Test"
+    Then the section "Scenic" does not list "Col de Test"
     And the media storage holds no route "video-source-local/col-de-test"

@@ -3,12 +3,12 @@
 /** The ride area's texts in English (ADR 0072): the shape of every language. */
 export const en = {
   title: 'Ride',
-  intro: 'Ride freely: worlds, routes and real video. Pick a route, then Go.',
+  intro: 'Ride freely: worlds, routes and Scenic videos. Pick a route, then Go.',
   filters: 'Filters',
   filter: { flat: 'Flat', hilly: 'Hilly', short: 'Under 45 min', favourites: 'Favourites' },
   worlds: 'Worlds and routes',
   noWorld: 'No world offers a route.',
-  videos: 'Real video',
+  videos: 'Scenic',
   noVideo: 'No video source offers a route.',
   noMatch: 'No route matches the filters.',
   later: 'Map, pacers and groups',

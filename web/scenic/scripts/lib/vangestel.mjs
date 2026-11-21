@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The rides of Fred Van Gestel (cycling.vangestel.online) as ridrs Scenic imports and builds them. The catalog lives in
-// <pipeline>/vangestel, written by ridrs_app `pnpm fetch:video-catalog --out <pipeline>/vangestel`
-// (scripts/fetch-video-catalog.ts): index.json, <slug>/package/ (the package without its video, ADR 0095),
+// ridrs_app content/vangestel, written by `pnpm fetch:video-catalog` (scripts/fetch-video-catalog.ts): index.json, <slug>/package/ (the package without its video, ADR 0095),
 // <slug>/thumbnail.jpg (made by hand, never overwritten by the tool), <slug>/overlay/ (ADR 0094).
 // Content license: CC BY-NC-SA 4.0 of its author; Scenic shows the credits with every route.
 import { createHash } from 'node:crypto';

@@ -2,7 +2,7 @@
 Feature: The ride page lists the routes that plugins offer
   Plugins offer routes as data (docs/ideas/video-sources.md): a world offers its courses, a video
   source the videos of its catalog, each offer as a key of the app state `route.offer` (ADR 0068).
-  The ride page watches the topic and lists every offer alike: worlds and routes, then real video.
+  The ride page watches the topic and lists every offer alike: worlds and routes, then Scenic.
   An offer that is not on this device yet says so and cannot be ridden; a download that cannot
   start says why at once; third-party content names its author, source and license in its details.
   A route's card shows its picture, what it is, its title, its distance and its climb, and leaves
@@ -11,14 +11,14 @@ Feature: The ride page lists the routes that plugins offer
   categorised summit marked with its category and, where the catalog names it, its name.
 
   Background:
-    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-vangestel" running
+    Given the ridrs plugins "activity-session, ui-main-screen, ui-main-menu, ui-main-top-bar, ui-tile-ride-start, ui-activity-screen, ui-landscape-demo, ui-area-ride, ui-route-profile, video-source-scenic" running
     And the main screen is 1400 px wide
     And the ridrs UI is shown
 
   Scenario: The demo course and the Van Gestel videos are listed
     When I press "Ride"
     Then the section "Worlds and routes" lists "Demo course"
-    And the section "Real video" lists 23 routes
+    And the section "Scenic" lists 23 routes
     And the route "Col de Pennes - Climb it twice!" reads "46.1 km"
     And the route "Col de Pennes - Climb it twice!" reads "1216 m"
     And the route "Col de Pennes - Climb it twice!" does not read "France"
@@ -66,7 +66,7 @@ Feature: The ride page lists the routes that plugins offer
     And the route details offer a "Back" button
     And the route details offer no "All routes" button
     When I press "Back"
-    Then the section "Real video" lists "Col de Pennes - Climb it twice!"
+    Then the section "Scenic" lists "Col de Pennes - Climb it twice!"
 
   Scenario: A route's profile names its summits and colours its gradients
     When I press "Ride"
@@ -99,17 +99,17 @@ Feature: The ride page lists the routes that plugins offer
     When I press "Ride"
     And I press "Flat"
     Then the section "Worlds and routes" lists 0 routes
-    And the section "Real video" lists "Marburg - Lahntal"
-    And the section "Real video" does not list "Col de Pennes - Climb it twice!"
+    And the section "Scenic" lists "Marburg - Lahntal"
+    And the section "Scenic" does not list "Col de Pennes - Climb it twice!"
     When I press "Flat"
     And I press "Hilly"
     Then the section "Worlds and routes" lists "Demo course"
-    And the section "Real video" lists "Col de Pennes - Climb it twice!"
-    And the section "Real video" does not list "Marburg - Lahntal"
+    And the section "Scenic" lists "Col de Pennes - Climb it twice!"
+    And the section "Scenic" does not list "Marburg - Lahntal"
 
-  Scenario: Without a video source there is no real video
-    Given ridrs restarted without the plugin "video-source-vangestel"
+  Scenario: Without a video source the section Scenic is empty
+    Given ridrs restarted without the plugin "video-source-scenic"
     And I reload the UI
     When I press "Ride"
     Then the section "Worlds and routes" lists "Demo course"
-    And the section "Real video" lists 0 routes
+    And the section "Scenic" lists 0 routes

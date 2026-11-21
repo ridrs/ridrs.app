@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { DataFetch, DataFetchJob } from '@ridrs/contracts';
 import { configure, Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { withStoredVideo } from './simulated-file.ts';
+import { scenicFile } from './simulated-scenic.ts';
 
 configure({ useWebWorkers: false });
 
@@ -78,6 +79,9 @@ export class SimulatedDownloads {
 
   readonly fetch: DataFetch = {
     fetch: async (job: DataFetchJob, onProgress, signal) => {
+      // A file of ridrs Scenic, such as a route's overlay picture: served as Scenic serves it.
+      const fromScenic = scenicFile(job.url);
+      if (fromScenic) return this.write(job.target, fromScenic, onProgress);
       this.requested.push(job.url);
       if (this.failure) {
         throw new Error(this.failure);
@@ -96,13 +100,21 @@ export class SimulatedDownloads {
           signal?.addEventListener('abort', () => fail(signal.reason), { once: true });
         });
       }
-      const file = join(this.mediaRoot, ...job.target.split('/'));
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, bytes);
-      onProgress?.({ received: bytes.length, size: bytes.length });
-      return { size: bytes.length };
+      return this.write(job.target, bytes, onProgress);
     },
   };
+
+  private async write(
+    target: string,
+    bytes: Uint8Array,
+    onProgress: ((progress: { received: number; size?: number }) => void) | undefined,
+  ): Promise<{ size: number }> {
+    const file = join(this.mediaRoot, ...target.split('/'));
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, bytes);
+    onProgress?.({ received: bytes.length, size: bytes.length });
+    return { size: bytes.length };
+  }
 
   goOn(): void {
     this.stopHalfway = false;

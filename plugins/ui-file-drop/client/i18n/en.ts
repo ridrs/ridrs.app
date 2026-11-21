@@ -17,7 +17,7 @@ export const en = {
   alreadyThere: 'Already in your workouts',
   adding: 'Adding…',
   added: (n: number) => `Added ${workouts(n)} to your workouts`,
-  importingRoutes: (n: number) => `Importing ${routes(n)}: see Ride › Real video`,
+  importingRoutes: (n: number) => `Importing ${routes(n)}: see Ride › Scenic`,
   failed: (n: number) => `${n} could not be added`,
   more: (n: number) => `+ ${n} more`,
   video: 'Video',

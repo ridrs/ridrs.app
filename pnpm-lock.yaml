@@ -1703,7 +1703,7 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
-  plugins/video-source-vangestel:
+  plugins/video-source-scenic:
     dependencies:
       '@ridrs/contracts':
         specifier: workspace:*

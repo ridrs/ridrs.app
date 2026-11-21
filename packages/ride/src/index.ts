@@ -7,6 +7,7 @@
  * its GPX track runs. Headless: no
  * clock, and no I/O but through the `storage.media` it is given.
  */
+export * from './climbs.ts';
 export * from './control.ts';
 export * from './folder.ts';
 export * from './package.ts';

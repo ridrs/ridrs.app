@@ -77,13 +77,19 @@ function rises(elevations: readonly number[]): { foot: number; top: number }[] {
  * least `FALSE_FLAT` %; then, if the climb from there averages less than `MIN_GRADE` %, the first
  * point from which the rest of it does.
  */
-function footOf({ foot, top }: { foot: number; top: number }, { spacing, elevations }: Profile): number {
+function footOf(
+  { foot, top }: { foot: number; top: number },
+  { spacing, elevations }: Profile,
+): number {
   const at = (i: number) => elevations[i] ?? 0;
   const run = Math.max(1, Math.round(RUN_IN / spacing));
   const below = (grade: number, from: number, to: number) =>
     at(to) - at(from) < (grade / 100) * (to - from) * spacing - 1e-9;
   let start = foot;
-  while (start < top && (below(FALSE_FLAT, start, start + 1) || below(FALSE_FLAT, start, Math.min(start + run, top)))) {
+  while (
+    start < top &&
+    (below(FALSE_FLAT, start, start + 1) || below(FALSE_FLAT, start, Math.min(start + run, top)))
+  ) {
     start += 1;
   }
   while (start < top && below(MIN_GRADE, start, top)) {
@@ -122,7 +128,8 @@ const AT_SUMMIT = 300;
 const ANNOUNCED = 500;
 
 /** First lines that say where the rider is, not what the place is called. */
-const NOT_A_NAME = /^(top of ascent|next\b|more\b|climb\b|first climb|second climb|cycling\.)|to the top|length:/i;
+const NOT_A_NAME =
+  /^(top of ascent|next\b|more\b|climb\b|first climb|second climb|cycling\.)|to the top|length:/i;
 /** An ascent's announcement, e.g. `Rimberg - ascent ca. 6 %` or `Next 3.2 km - Ascent: 186 m`. */
 const ASCENT = /\b(ascent|slope)\b/i;
 
@@ -132,7 +139,12 @@ const ABOUT_THE_ROUTE = /length:|licen[sc]e/i;
 /** The lines of a note, in English where it has English; none for a note about the whole route. */
 function linesOf(note: Note): string[] {
   const text = note.text.en ?? Object.values(note.text)[0] ?? '';
-  return ABOUT_THE_ROUTE.test(text) ? [] : text.split('\n').map((line) => line.trim()).filter(Boolean);
+  return ABOUT_THE_ROUTE.test(text)
+    ? []
+    : text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
 }
 
 /** A place's name in a line: `Col de Pennes (alt. 1040m)` is the Col de Pennes; none for `Top of ascent`. */

@@ -49,7 +49,7 @@ export interface MediaFiles {
    */
   read(path: string): Promise<Uint8Array>;
   write(path: string, bytes: Uint8Array): Promise<void>;
-  /** Moves a file, creating the target's directories; replaces a file there. */
+  /** Moves a file or a folder with everything in it, creating the target's directories; replaces a file there. */
   move(from: string, to: string): Promise<void>;
   /** A file, or a directory with everything in it; a missing one is not an error. */
   remove(path: string): Promise<void>;

@@ -1,2 +1,2 @@
 # Packages without video are kept byte for byte (ADR 0095): no line ending conversion.
-plugins/video-source-vangestel/catalog/*/package/** -text
+content/vangestel/*/package/** -text

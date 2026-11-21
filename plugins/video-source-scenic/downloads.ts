@@ -24,9 +24,14 @@ export interface Downloadable {
   readonly etag?: string;
   /**
    * The catalog's files that improve the route's package (ADR 0094), by their paths in its folder:
-   * their hashes, and the URLs the app ships them at.
+   * their sizes and hashes, and the URLs ridrs Scenic serves them at.
    */
-  readonly overlay?: readonly { readonly path: string; readonly sha256: string; readonly url: string }[];
+  readonly overlay?: readonly { readonly path: string; readonly size: number; readonly sha256: string; readonly url: string }[];
+  /**
+   * The media folder where a former source kept this route's download: moved to the route's own
+   * folder when that has none, so that the rider need not download it again.
+   */
+  readonly former?: string;
 }
 
 /** A route's pictures on the device: its picture and its small one for a card, as URLs. */
@@ -60,6 +65,8 @@ const reasonOf = (error: unknown) => (error instanceof Error ? error.message : S
  * offer at a time).
  */
 export class VideoDownloads {
+  private routes: readonly Downloadable[];
+  private connected = false;
   private readonly states = new Map<string, Availability>();
   /** The pictures of the routes on the device. */
   private readonly pictures = new Map<string, RoutePictures>();
@@ -68,30 +75,53 @@ export class VideoDownloads {
   private services: DownloadServices = {};
 
   constructor(
-    private readonly routes: readonly Downloadable[],
+    routes: readonly Downloadable[],
     private readonly changed: (id: string) => void,
-  ) {}
+  ) {
+    this.routes = routes;
+  }
 
   /** Connects the services and finds the routes already on the device. */
   async connect(services: DownloadServices): Promise<void> {
     this.services = services;
-    const { media } = services;
-    if (!media) {
-      return;
+    this.connected = true;
+    for (const route of this.routes) await this.findOnDevice(route);
+  }
+
+  /**
+   * The routes of a new catalog. Once connected, finds those new to it on the device; a route on
+   * its way or on the device keeps its state.
+   */
+  async setRoutes(routes: readonly Downloadable[]): Promise<void> {
+    const known = new Set(this.routes.map((route) => route.id));
+    this.routes = routes;
+    if (!this.connected) return;
+    for (const route of routes) {
+      if (!known.has(route.id)) await this.findOnDevice(route);
     }
-    for (const route of this.routes) {
-      const folder = folderOf(route.id);
-      // A route downloaded before ADR 0094 gets its control file; one without is a broken route
-      // and can be downloaded again.
-      await moveToControlFile(media, folder).catch(() => false);
-      if (!(await this.ready(media, route.id).catch(() => undefined))) continue;
-      // A route downloaded before the catalog changed gets its current overlay; its offer then
-      // names the overlay's files too.
-      await this.improve(media, route).catch(() => undefined);
-      const ready = await this.ready(media, route.id).catch(() => undefined);
-      if (ready) {
-        this.set(route.id, ready);
-      }
+  }
+
+  /**
+   * A route already on the device: in its own folder, or in the folder of a former source, moved
+   * into its own (`former`).
+   */
+  private async findOnDevice(route: Downloadable): Promise<void> {
+    const { media } = this.services;
+    if (!media) return;
+    const folder = folderOf(route.id);
+    if (route.former && !(await media.exists(folder).catch(() => true)) && (await media.exists(route.former).catch(() => false))) {
+      await media.move(route.former, folder).catch(() => undefined);
+    }
+    // A route downloaded before ADR 0094 gets its control file; one without is a broken route
+    // and can be downloaded again.
+    await moveToControlFile(media, folder).catch(() => false);
+    if (!(await this.ready(media, route.id).catch(() => undefined))) return;
+    // A route downloaded before the catalog changed gets its current overlay; its offer then
+    // names the overlay's files too.
+    await this.improve(media, route).catch(() => undefined);
+    const ready = await this.ready(media, route.id).catch(() => undefined);
+    if (ready) {
+      this.set(route.id, ready);
     }
   }
 
@@ -233,9 +263,10 @@ export class VideoDownloads {
    * (ADR 0094); none when its folder holds no control file naming a video and a track it holds.
    */
   /**
-   * Copies the catalog's overlay files the route's folder lacks or has older (by their hashes) and
-   * removes those the catalog dropped; then finds the route's picture and makes its small one
-   * where it has none, or anew after its overlay changed (ADR 0094).
+   * Fetches the catalog's overlay files the route's folder lacks or has older (by their hashes)
+   * from ridrs Scenic and removes those the catalog dropped; then finds the route's picture and
+   * makes its small one where it has none, or anew after its overlay changed (ADR 0094). Without
+   * `data.fetch` the folder keeps the overlay it has.
    */
   private async improve(media: MediaFiles, route: Downloadable): Promise<void> {
     const folder = folderOf(route.id);
@@ -247,9 +278,13 @@ export class VideoDownloads {
     }
     const overlay = route.overlay ?? [];
     let changed = false;
+    const { fetch } = this.services;
     for (const file of overlay) {
-      if (copied[file.path] === file.sha256) continue;
-      await media.writeFrom(file.url, `${folder}/${file.path}`);
+      if (copied[file.path] === file.sha256 || !fetch) continue;
+      const target = `${folder}/${file.path}`;
+      await media.remove(target);
+      await fetch.fetch({ url: file.url, target, expected: { size: file.size } });
+      copied[file.path] = file.sha256;
       changed = true;
     }
     for (const path of Object.keys(copied)) {
@@ -258,7 +293,9 @@ export class VideoDownloads {
       changed = true;
     }
     if (changed || Object.keys(copied).length !== overlay.length) {
-      const hashes = Object.fromEntries(overlay.map((file) => [file.path, file.sha256]));
+      const hashes = Object.fromEntries(
+        overlay.filter((file) => copied[file.path] === file.sha256).map((file) => [file.path, file.sha256]),
+      );
       await media.write(`${folder}/${OVERLAY_FILE}`, new TextEncoder().encode(`${JSON.stringify(hashes)}\n`));
     }
     const picture = await routePicture(media, folder);

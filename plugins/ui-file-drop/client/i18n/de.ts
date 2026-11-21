@@ -19,7 +19,7 @@ export const de: Messages = {
   alreadyThere: 'Schon in deinen Workouts',
   adding: 'Wird hinzugefügt …',
   added: (n) => `${workouts(n)} zu deinen Workouts hinzugefügt`,
-  importingRoutes: (n) => `${routes(n)} ${n === 1 ? 'wird' : 'werden'} importiert: siehe Fahren › Echte Videos`,
+  importingRoutes: (n) => `${routes(n)} ${n === 1 ? 'wird' : 'werden'} importiert: siehe Fahren › Scenic`,
   failed: (n) => `${n} konnte${n === 1 ? '' : 'n'} nicht hinzugefügt werden`,
   more: (n) => `+ ${n} weitere`,
   video: 'Video',

@@ -4,15 +4,9 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type DataTable, Given, Then, When } from '@cucumber/cucumber';
+import { type Climb, categoriseClimbs, type Note, nameClimbs, type Profile } from '@ridrs/ride';
 import { Window } from 'happy-dom';
-import {
-  type Climb,
-  categoriseClimbs,
-  type Note,
-  nameClimbs,
-  type Profile,
-} from '../../plugins/video-source-vangestel/climbs.ts';
-import { drawProfile } from '../../plugins/video-source-vangestel/profile-picture.ts';
+import { drawProfile } from '../../scripts/lib/profile-picture.ts';
 import type { RidrsWorld } from '../support/world.ts';
 
 /*
@@ -20,7 +14,7 @@ import type { RidrsWorld } from '../support/world.ts';
  * from 500 m up, or a route of the shipped Van Gestel catalog.
  */
 
-const CATALOG = join(import.meta.dirname, '../../plugins/video-source-vangestel/catalog');
+const CATALOG = join(import.meta.dirname, '../../content/vangestel');
 const SPACING = 100;
 const FOOT = 500;
 

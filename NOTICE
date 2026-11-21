@@ -75,5 +75,6 @@ Third-party content (LICENSING.md, section 6a). Distributions that bundle it are
 
 | Folder | Author | Origin | SPDX License |
 |---|---|---|---|
-| `plugins/video-source-vangestel/catalog/` | Fred Van Gestel | https://cycling.vangestel.online/indoor/videos/ | CC-BY-NC-SA-4.0 (profiles and paths derived from his GPX tracks, under the same license) |
+| `content/vangestel/` | Fred Van Gestel | https://cycling.vangestel.online/indoor/videos/ (served by ridrs Scenic, not bundled with the app) | CC-BY-NC-SA-4.0 (profiles and paths derived from his GPX tracks, under the same license) |
+| `tests/fixtures/scenic/` | Fred Van Gestel | https://cycling.vangestel.online/indoor/videos/ (catalog of ridrs Scenic, scenarios only) | CC-BY-NC-SA-4.0 (catalog of ridrs Scenic, derived from his GPX tracks) |
 | `plugins/ui-area-training/client/assets/pictures/` | Munbaik Cycling Clothing | https://unsplash.com/photos/gPXh9Nl7KHk | LicenseRef-Unsplash (Unsplash License, https://unsplash.com/license) |

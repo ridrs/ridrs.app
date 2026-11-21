@@ -15,6 +15,7 @@ import {
   measurementPowerEvent,
 } from '@ridrs/contracts';
 import { BleSimulator, type SimulatedPeripheral, SimulatedTauriBridge } from '@ridrs/testing';
+import { simulateScenic } from '../support/simulated-scenic.ts';
 import type { RidrsWorld } from '../support/world.ts';
 
 const METRIC_PLUGIN_CAPABILITIES: Record<string, string> = {
@@ -75,6 +76,8 @@ function currentTrainer(world: RidrsWorld): SimulatedPeripheral {
 
 export async function useRealPlugins(world: RidrsWorld, ids: string[]): Promise<void> {
   world.realPluginIds = [...ids];
+  // No scenario reaches ridrs Scenic: its video source always gets the simulated one.
+  if (ids.includes('video-source-scenic')) await simulateScenic(world);
   await world.writeProbePluginFolder({
     folder: 'test-observer',
     id: 'test-observer',

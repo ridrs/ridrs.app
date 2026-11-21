@@ -61,7 +61,7 @@ function filesBelow(directory: string, prefix = ''): string[] {
 Given(
   'the media storage holds the Van Gestel route {string} in the unified format',
   function (this: RidrsWorld, id: string) {
-    unifiedRoute(`video-source-vangestel/${id}`, 'Col de Pennes', false);
+    unifiedRoute(`video-source-scenic/vg-${id}`, 'Col de Pennes', false);
   },
 );
 
@@ -153,8 +153,12 @@ Given('the media storage holds no index of own routes', function (this: RidrsWor
   if (existsSync(index)) rmSync(index);
 });
 
-/** The catalog the Van Gestel source ships. */
-const CATALOG = join(import.meta.dirname, '../../plugins/video-source-vangestel/catalog');
+/** A picture's URL without its query: ridrs Scenic adds `?h=<hash>` to its files (docs/formats/scenic-ride-catalog-v1.md). */
+const pathOf = (url: string | undefined) =>
+  url === undefined ? undefined : decodeURI(new URL(url, 'file:///').pathname);
+
+/** The Van Gestel catalog (content/vangestel), the source of ridrs Scenic's rides. */
+const CATALOG = join(import.meta.dirname, '../../content/vangestel');
 
 /** Unpacks the small Incyclist package into the route folder of `key`, with `preview.jpg` where `picture`. */
 async function unpackedRoute(key: string, picture = false): Promise<void> {
@@ -179,7 +183,7 @@ Given(
 Given(
   'the media storage holds the Van Gestel route {string} with the overlay of an older catalog',
   async function (this: RidrsWorld, id: string) {
-    const key = `video-source-vangestel/${id}`;
+    const key = `video-source-scenic/vg-${id}`;
     await unpackedRoute(key);
     writeFileSync(join(folderOf(key), 'preview.jpg'), new TextEncoder().encode('an older picture'));
     writeFileSync(
@@ -224,7 +228,7 @@ Then(
       const offer = this.ensureHost().getState('route.offer').get(key) as
         | { tile?: string }
         | undefined;
-      return offer?.tile?.endsWith(ending) === true;
+      return pathOf(offer?.tile)?.endsWith(ending) === true;
     }, `"${key}" to show the tile picture ${ending}`);
   },
 );
@@ -236,7 +240,7 @@ Then(
       const offer = this.ensureHost().getState('route.offer').get(key) as
         | { thumbnail?: string }
         | undefined;
-      return offer?.thumbnail?.endsWith(ending) === true;
+      return pathOf(offer?.thumbnail)?.endsWith(ending) === true;
     }, `"${key}" to show the full picture ${ending}`);
   },
 );
