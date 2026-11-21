@@ -332,3 +332,9 @@ ROT_X0_ROAD = True
 X0_MIN_S = 1e-4
 X0_MAX_RMS = 0.8
 X0_MIN_PAIRS = 100
+
+# --- the running horizon by vehicle (docs/STUDY_curve_distance_balance.md, variant B, maintainer 2026-11-21): A24 only for motor vehicles. A motor vehicle on a
+# pass road needs it (Gotthard: without it the checkpoints reach 84 m); on a bike the speed follows the horizon's noise and the route lags (Pontaix: along p90
+# 16.8 m with it, 5.3 m without). The vehicle is known only after route_search (kappa): the first pass runs with the running horizon; when the calibration
+# says another vehicle class (auto only), motion to route_search run once more from the stored extraction (cli.Run.run, rsm.bench.regress._run_cached).
+HZ_RUNNING_VEHICLES = ("motorcycle", "car")

@@ -191,9 +191,10 @@ def horizon_track(P: Points, horizon: float) -> dict:
     return dict(t=t, row=row)
 
 
-def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 0, road_width=vm.ROAD_WIDTH, on_progress=None) -> dict:
+def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 0, road_width=vm.ROAD_WIDTH, on_progress=None, running: bool = True) -> dict:
     """motion.csv of the extraction in ex_dir and the run statistics of `vmsx.motion.analyse_parallel`. `calibration`, `seed0`: as there (a clip
-    of a source passes the source's calibration with its track in source seconds and the index of its first source frame)."""
+    of a source passes the source's calibration with its track in source seconds and the index of its first source frame). running=False: every pair
+    is fitted with the calibrated row (no running horizon, A24 off; the calibration's track is None)."""
     t0 = time.perf_counter()
     if on_progress is not None:
         on_progress(0, 1, "horizon")
@@ -207,7 +208,9 @@ def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 
         cal.update(calibrate_noise(P, horizon, top, bottom, road_width))
     alt_thr = vm.alt_threshold(cal["rms_median"], sc)
     t_src = seed0 / fps
-    if "track" not in cal:
+    if not running:
+        cal["track"] = None
+    elif "track" not in cal:
         cal["track"] = vm.shift_track(horizon_track(P, horizon), t_src)
     t_cal = time.perf_counter() - t0
     mask = road_mask(P, horizon, top, bottom, road_width)
@@ -238,7 +241,7 @@ def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 
     return {
         "video": m.get("video"), "height": H, "width": W, "step": 1, "fps": fps, "start": 0.0, "duration": P.duration,
         "horizon": cal["horizon_free"], "horizon_vms": horizon, "destatic_tau": m["params"]["destatic_tau"], "horizon_offset": 0.0, "road_width": road_width,
-        "horizon_calibration": cal, "roi": [top, bottom], "alt_thr": alt_thr, "track_t0": t_src, "pairs": n, "traffic": traffic,
+        "horizon_calibration": cal, "horizon_mode": "running" if running else "fixed", "roi": [top, bottom], "alt_thr": alt_thr, "track_t0": t_src, "pairs": n, "traffic": traffic,
         "seconds": elapsed, "calibration_seconds": t_cal, "seconds_per_video_hour": elapsed / (P.duration / 3600),
         "extract": dict(version=m["version"], key=m.get("key"), seconds=m.get("seconds")), "interpret": params(),
     }

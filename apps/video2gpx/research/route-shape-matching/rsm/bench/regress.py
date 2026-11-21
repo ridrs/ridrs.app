@@ -66,7 +66,8 @@ def params(c: dict, stage: bool = False) -> dict:
     pbf = Path(_x(c["pbf"])) if os.path.isabs(_x(c["pbf"])) else ROOT / c["pbf"]
     if stage:                                 # the source of the stage (only its name is used: the route side reads no video)
         from . import stages as ST
-        video = str(ST.SOURCES / json.loads((ST.STAGES / c["stage"] / "stage.json").read_text())["source"]["path"])
+        so = json.loads((ST.STAGES / c["stage"] / "stage.json").read_text())["source"]
+        video = f"discarded:{so.get('name')}" if so.get("discarded") else str(ST.SOURCES / so["path"])
     else:
         video = str(Path(_x(c["video"])).resolve())
     P = dict(video=video, bbox=box(c["bbox"]), pbf=str(pbf), vehicle=c.get("vehicle", "auto"), offset_m=None, start_time=None, traffic_side="auto", decoys=0,
@@ -200,30 +201,51 @@ def stage_in(c: dict, d: Path, P: dict, code: Path, log=print) -> dict:
     if st == "reinterpret":
         raise RuntimeError(f"stage {c['stage']} is reinterpret: its extraction is current, re-interpret it (minutes): "
                            f"scripts/heavy.sh .venv/bin/python -m rsm.bench.stages reinterp --only {c['stage']}")
-    if st != "fresh":
+    if st == "retire":
+        raise RuntimeError(f"stage {c['stage']} is retire: its source is discarded and the extraction code changed; retire the case and take the next "
+                           f"verified video (docs/CONCEPT_test_strategy.md, rolling set)")
+    if st == "frozen":                         # source-free: the image side stays as frozen, the route side is tested on it
+        log(f"  stage {c['stage']} is frozen: no source, its image side is the one of its freeze")
+    elif st != "fresh":
         raise RuntimeError(f"stage {c['stage']} is {st}: run T4 (scripts/heavy.sh .venv/bin/python -m rsm.bench.stages make --only {c['stage']})")
     s = json.loads((sd / "stage.json").read_text())
     win = c.get("window")
+    side = None if P.get("horizon", "running") == "running" else P["horizon"]     # the fixed horizon: the image side under fixed/ (a bike's second pass)
     if win:
-        SK.window(sd, float(win[0]), float(win[1]), d)
+        SK.window(sd, float(win[0]), float(win[1]), d, side=side)
     else:
         for sub in ("motion", "rotation"):
             if (d / sub).exists():
                 shutil.rmtree(d / sub)
-            shutil.copytree(sd / sub, d / sub)
+            shutil.copytree((sd / side if side else sd) / sub, d / sub)
     for sid in ("motion", "rotation"):
         (d / "steps" / f"{sid}.done.json").write_text(json.dumps(dict(id=sid, in_hash="stage", seconds=s["made"]["seconds"].get(sid), peak_gb=None,
                                                                       summary=json.loads((d / sid / "summary.json").read_text()), statuses=[], stage=c["stage"], window=win)))
-    log(f"  motion, rotation: stage {c['stage']}" + (f" window {win[0]:g}-{win[1]:g} s" if win else ""))
+    log(f"  motion, rotation: stage {c['stage']}" + (f" window {win[0]:g}-{win[1]:g} s" if win else "") + (f" ({side} horizon)" if side else ""))
     sig = s["source"]["sha256"] + (f"@{float(win[0]):g}-{float(win[1]):g}" if win else "")
     return SC.step_keys(code, P, STEPS, video_sig=sig)
 
 
 def _run_cached(c: dict, d: Path, P: dict, code: Path, log, until: str, keys: dict | None = None) -> Path:
+    """the steps up to `until`, each from the step cache or run and stored. As cli.Run.run: for vehicle auto, when route_search says a vehicle whose
+    horizon (config HZ_RUNNING_VEHICLES) is not the one of this pass, motion to route_search run once more with that horizon (a stage: its image side
+    of that horizon)"""
     steps = STEPS[:STEPS.index(until) + 1]
     staged = keys is not None
     keys = keys or SC.step_keys(code, P, steps)
-    for sid in steps:
+    second, k = False, 0
+    while k < len(steps):
+        sid = steps[k]
+        k += 1
+        if sid == "plausibility" and P.get("vehicle", "auto") == "auto" and not second and (d / "route_search" / "vehicle_final.json").exists():
+            from rsm.pipeline.calib import horizon_mode
+            want = horizon_mode(json.loads((d / "route_search" / "vehicle_final.json").read_text())["vehicle"])
+            if want != P.get("horizon", "running"):
+                log(f"  the calibration says {'a motor vehicle' if want == 'running' else 'a bike'}: second pass with the {want} horizon")
+                P, second, k = dict(P, horizon=want), True, 0
+                (d / "project.params.json").write_text(json.dumps(P, indent=1))
+                keys = stage_in(c, d, P, code, log) if staged else SC.step_keys(code, P, steps)
+                continue
         if staged and sid in ("motion", "rotation"):
             continue
         if sid == "plausibility":
@@ -289,12 +311,26 @@ def base_row(d: Path) -> dict:
     return row
 
 
-def gps_quality(c: dict) -> str:
-    """verified / coarse truth of a GPS case (clip_sources.json `gps_quality`, by the GPS name)"""
+def truth_source(c: dict) -> dict:
+    """the source entry of clip_sources.json whose GPS truth the case uses (by the GPS name), {} if none"""
     for x in json.loads((HERE / "clip_sources.json").read_text())["sources"]:
         if x.get("gps") == c.get("gps"):
-            return x.get("gps_quality", "coarse")
-    return "coarse"
+            return x
+    return {}
+
+
+def gps_quality(c: dict) -> str:
+    """verified / coarse truth of a GPS case (clip_sources.json `gps_quality`, by the GPS name)"""
+    return truth_source(c).get("gps_quality", "coarse")
+
+
+def inexact_mask(t, ranges) -> np.ndarray:
+    """the video seconds t inside an inexact range [t0, t1, why] of a verified track (both ends included): not scored"""
+    t = np.asarray(t, float)
+    m = np.zeros(len(t), bool)
+    for r in ranges or []:
+        m |= (t >= float(r[0])) & (t <= float(r[1]))
+    return m
 
 
 def _t0(c: dict) -> float:
@@ -328,7 +364,7 @@ def _score_place(c: dict, d: Path) -> dict:
 def _score_verified(c: dict, d: Path) -> dict:
     from rsm.bench import gps_truth as GT
     from rsm.refine import evaluate
-    src = [x for x in json.loads((HERE / "clip_sources.json").read_text())["sources"] if x.get("gps") == c["gps"]][0]
+    src = truth_source(c)
     lat, lon, tt_v = GT.read_gpx(Path(_x("$V2G_TEST_DATA")) / "truth" / src["verified"])
     R = np.load(d / "refine" / "result.npz")
     crs = str(R["crs"])
@@ -339,16 +375,22 @@ def _score_verified(c: dict, d: Path) -> dict:
     path = PathView(R["sg"], R["xy"])
     t_all, ext = R["t"], R["extrap"]
     sel = (t_all >= tv[0]) & (t_all <= tv[-1]) & ~ext
+    inexact = sel & inexact_mask(_t0(c) + t_all, src.get("inexact"))      # ranges of the track marked inexact by the maintainer: not scored
+    sel &= ~inexact
     tt, s = t_all[sel], R["s"][sel]
     g = gxy_of(tt)
     s_gps, cross = evaluate.project_dp(path, g, s)
     road = (cross <= 20.0) & (np.abs(s_gps - s) <= 300.0)
     err = s - s_gps
-    out = dict(truth="verified", n_scored=int(len(tt)), lag=0.0, correct_road=float(road.mean()), off_road_seconds=_runs(_t0(c) + tt[~road]))
+    out = dict(truth="verified", n_scored=int(len(tt)), n_inexact=int(inexact.sum()), lag=0.0, correct_road=float(road.mean()), off_road_seconds=_runs(_t0(c) + tt[~road]))
     if road.any():
         a = np.abs(err[road])
         sc = evaluate.signed_cross(path, s_gps, g)                                   # track offset from the centre line, + = left of travel
-        off = np.array([p["offset_m"] for p in rp])[sel]                             # applied driving-line offset, + = right
+        if len(rp) == len(t_all):                                                    # applied driving-line offset, + = right
+            off = np.array([p["offset_m"] for p in rp])[sel]
+        else:                                                                        # the points start after an intro: by time
+            tp = np.array([p["t"] for p in rp], float)
+            off = np.array([p["offset_m"] for p in rp])[np.clip(np.searchsorted(tp, tt - 1e-6), 0, len(tp) - 1)]
         out.update(along_median=float(np.median(a)), along_p90=float(np.percentile(a, 90)), along_w10=float((a <= 10).mean()), along_w30=float((a <= 30).mean()),
                    along_signed_median=float(np.median(err[road])),
                    cross_centre_median=float(np.median(np.abs(sc[road]))), cross_line_median=float(np.median(np.abs(sc[road] + off[road]))),
@@ -574,6 +616,9 @@ def main(argv=None) -> int:
     for c in cases(only):
         if a.stages and not c.get("stage"):
             log(f"case {c['name']}: no stage, skipped")
+            continue
+        if not a.stages and not a.score_only and not c.get("video"):
+            log(f"case {c['name']}: source-free (its source is discarded), runs only on its stage (--stages), skipped")
             continue
         log(f"case {c['name']}")
         if a.displaced:

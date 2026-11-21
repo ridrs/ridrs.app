@@ -114,6 +114,52 @@ Consequences:
 - The circularity of the verified track: it is a video2gpx result. It is the reference for regressions and for timing, checked by eye; a change
   that makes the pipeline better than it will look like a regression and needs the maintainer's look.
 
+### Direction: a rolling set of verified videos (maintainer, 2026-11-21)
+
+The set of test videos will move toward more cases with a precise, verified GPX, taken from different videos.
+- **No sources are kept.** A video's source is discarded after its video analysis. The case keeps its extraction (`extract/`), its stages and the
+  verified GPX.
+- **The set rolls forward** with the most recently verified videos.
+- **An extraction change retires cases.** A change to the extraction (the first step, status `stale`) does not lead to a T4 over old sources.
+  It retires the data of those cases, and testing continues with the next verified videos.
+- **Interpretation changes stay cheap.** They keep using `reinterp` on the stored extraction.
+
+**Built (2026-11-21): source-free stages and inexact ranges.** Sa Calobra (YouTube 4NgYtX5PiVo) is the first case.
+- **Adopting a stage.** `rsm.bench.stages adopt --id <id> --run <project>/out --video <source> [--scenic <id>.scenic.json]` takes the extraction
+  of an app run and rebuilds `motion/` and `rotation/` from it with the current code. The source is needed this one time, for the pixel
+  probes. Then it freezes the stage with `source.discarded` (file name and sha256 only). `--scenic` writes the atlas result checked by the
+  maintainer as the verified track (`truth/scenic/<video id>/verified.gpx`, `<time>` = video time).
+- **Status of a source-free stage** (`SOURCE_FREE_IDS`):
+  - `fresh`;
+  - `frozen` after an interpretation change: there is no `reinterp`, because the pixel probes need the source. T2 keeps running the route
+    side on the frozen image side and says so in its log;
+  - `retire` after an extraction change: T2 stops the case.
+- **Inexact ranges.** A verified source may list ranges of the track that are not to be checked against future runs: `inexact`
+  [[t0, t1, why]] in video seconds in `clip_sources.json`. The timed score (`regress._score_verified`) leaves those seconds out and reports
+  them as `n_inexact`. Sa Calobra: 1010-1040 s (frames 30264-31179 viewed by the maintainer), the cut at 1032 s at the turn at the bottom.
+
+First T2 (tag `sacal1`, 2026-11-21, branch `feat/v2g-extraction`; adopt 132 s, route side 8 min), scored with 1010-1040 s inexact:
+- verdict confident, kappa 1.51 (motorcycle scale);
+- right road 98.5 %; along median 2.1 m, p90 6.0 m; ≤ 10 m 96 %.
+
+Off the road: 164-168 s, 1000-1009 s and 1041-1058 s.
+- 164-168 s is the cut at 166.5 s that video2gpx misses. The track chosen as truth (`scenic.json` without the hand-added cut) does not have it
+  either.
+- The other two are right before and after the cut at the turn, where the maintainer found the track good: errors of the pipeline.
+
+**Screening, then the full set (maintainer, 2026-11-21).** Studies of variants run in two rounds:
+1. **Screening.** Every variant runs T2 on the verified cases only (today Pontaix and Sa Calobra, `--only pontaix,sacalobra`): about
+   15-20 min instead of about 1 h 45 min for all 16 cases.
+2. **Full set.** Only the best two or three run T2 on all cases and T3, to show their side effects.
+
+The reinterpretation from the stages is cheap (about 13 min for all stages); the route search on the map is the expensive part and runs one
+case at a time (peak about 7 GB).
+
+Still open:
+- T1 clips and T3 still need sources;
+- a `frozen` stage does not follow image-side changes, which needs reinterp without the pixel probes' source (short stored windows, or probes
+  that read the extraction).
+
 ## 3. Building blocks
 
 ### A. The contract between image analysis and route (built 2026-11-19, step 1)

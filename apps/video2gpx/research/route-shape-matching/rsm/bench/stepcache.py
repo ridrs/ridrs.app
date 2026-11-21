@@ -109,7 +109,8 @@ def step_keys(root: Path, P: dict, steps: list[str], video_sig=None) -> dict:
                 files[m] = hashlib.sha256(src.encode()).hexdigest()[:16]
         vals = {n: repr(cfg[n]) for n in sorted(names) if n in cfg}
         params = (dict(video=p_all["video"], **({"calibration": _file_hash(P["calibration"])} if P.get("calibration") else {}),
-                       **({"frame0": int(P["frame0"])} if P.get("frame0") else {}))
+                       **({"frame0": int(P["frame0"])} if P.get("frame0") else {}),
+                       **({"horizon": P["horizon"]} if P.get("horizon", "running") != "running" else {}))
                   if sid in VIDEO_ONLY else p_all)
         h = hashlib.sha256(json.dumps([prev, sid, files, vals, params], sort_keys=True, default=str).encode()).hexdigest()[:16]
         out[sid] = prev = h

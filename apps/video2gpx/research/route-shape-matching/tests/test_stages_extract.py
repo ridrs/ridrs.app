@@ -27,7 +27,7 @@ def _frozen(tmp_path, extract=True):
     work = _run_dir(tmp_path)
     if extract:
         _with_extract(work)
-    out = ST.freeze("x", work, src, tmp_path / "sources", dict(P, video=str(src)), tmp_path / "stages", root=code)
+    out = ST.freeze("x", work, src, tmp_path / "sources", dict(P, video=str(src)), tmp_path / "stages", root=code, fixed=_run_dir(tmp_path / "fixed"))
     return code, src, out
 
 
@@ -38,7 +38,7 @@ def _edit(code: Path, rel: str):
 
 def test_freeze_keeps_the_extraction_and_names_it_in_stage_json(tmp_path):
     code, src, out = _frozen(tmp_path)
-    assert sorted(p.name for p in out.iterdir()) == ["extract", "motion", "rotation", "stage.json"]
+    assert sorted(p.name for p in out.iterdir()) == ["extract", "fixed", "motion", "rotation", "stage.json"]
     assert (out / "extract" / "chunk_00000000.npz").read_bytes() == b"npz"
     s = json.loads((out / "stage.json").read_text())
     assert s["extract"] == ST.extract_identity(s["source"]["sha256"], root=code)
@@ -74,7 +74,8 @@ def test_reinterp_runs_the_image_side_from_the_stored_extraction_and_freezes_aga
     def run_case(c, tag, root, from_step, seed, log, d, P, until, cache):
         m = json.loads((d / "extract" / "extract.json").read_text())
         seen.update(key=m["key"], until=until, files=sorted(p.name for p in (d / "extract").iterdir()))
-        fake = _run_dir(tmp_path / "fake")
+        seen["n"] = seen.get("n", 0) + 1                                 # once per image side (running, then fixed)
+        fake = _run_dir(tmp_path / f"fake{seen['n']}")
         for sub in ("motion", "rotation", "steps"):
             shutil.copytree(fake / sub, d / sub)
         return d

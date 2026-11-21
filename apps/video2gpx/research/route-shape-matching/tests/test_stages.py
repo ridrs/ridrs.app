@@ -65,7 +65,8 @@ def test_freeze_writes_the_contract_and_stage_json(tmp_path):
 def test_a_stage_is_fresh_until_the_image_side_code_changes(tmp_path):
     code = _copy_code(tmp_path)
     src = _source(tmp_path)
-    out = ST.freeze("x", _run_dir(tmp_path), src, tmp_path / "sources", dict(P, video=str(src)), tmp_path / "stages", root=code)
+    out = ST.freeze("x", _run_dir(tmp_path), src, tmp_path / "sources", dict(P, video=str(src)), tmp_path / "stages", root=code,
+                    fixed=_run_dir(tmp_path / "fixed"))
     assert ST.status(out, root=code) == "fresh"
     f = code / "rsm" / "pipeline" / "local.py"                    # route side only: the stage stays fresh
     f.write_text(f.read_text() + "\n# edit\n")
@@ -86,7 +87,8 @@ def test_the_stage_list_names_existing_sources():
 def test_rekey_gives_a_stale_stage_the_current_keys_and_keeps_the_old(tmp_path):
     code = _copy_code(tmp_path)
     src = _source(tmp_path)
-    out = ST.freeze("x", _run_dir(tmp_path), src, tmp_path / "sources", dict(P, video=str(src)), tmp_path / "stages", root=code)
+    out = ST.freeze("x", _run_dir(tmp_path), src, tmp_path / "sources", dict(P, video=str(src)), tmp_path / "stages", root=code,
+                    fixed=_run_dir(tmp_path / "fixed"))
     old = json.loads((out / "stage.json").read_text())["code"]
     f = code / "rsm" / "pipeline" / "standstill.py"
     f.write_text(f.read_text() + "\n# a comment\n")
@@ -94,4 +96,6 @@ def test_rekey_gives_a_stale_stage_the_current_keys_and_keeps_the_old(tmp_path):
     s = ST.rekey("x", "a comment only", root=code, out_root=tmp_path / "stages")
     assert ST.status(out, root=code) == "fresh"
     assert s["rekeyed"][0]["old"] == old and s["rekeyed"][0]["reason"] == "a comment only"
+    assert s["code_fixed"] == SC.step_keys(code, dict(P, video=str(ST.SOURCES / s["source"]["path"]), horizon="fixed"), ["motion", "rotation"],
+                                           video_sig=s["source"]["sha256"]) and s["rekeyed"][0]["old_fixed"] != s["code_fixed"]
     assert len(ST.rekey("x", "again", root=code, out_root=tmp_path / "stages")["rekeyed"]) == 1     # nothing to do: no second entry

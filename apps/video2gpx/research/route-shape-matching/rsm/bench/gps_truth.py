@@ -35,6 +35,21 @@ def read_gpx(path: Path):
     return np.array(lat), np.array(lon), np.array(tt)
 
 
+def write_scenic_gpx(sc: dict, out: Path, epoch: float = 946684800.0) -> Path:
+    """the route of an atlas result (`<id>.scenic.json`: `t` video seconds, `c` [lon, lat]) as a GPX whose <time> is the video time counted from
+    2000-01-01T00:00:00Z (the convention of the verified Pontaix track, rsm.bench.regress.EPOCH_2000)"""
+    from datetime import timezone
+    pts = []
+    for t, (lon, lat) in zip(sc["t"], sc["c"]):
+        ts = datetime.fromtimestamp(epoch + float(t), timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        pts.append(f'<trkpt lat="{float(lat):.7f}" lon="{float(lon):.7f}"><time>{ts}</time></trkpt>')
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="rsm.bench.gps_truth" xmlns="http://www.topografix.com/GPX/1/1">\n'
+                   f'<trk><name>{sc.get("video_id", "")}</name><trkseg>\n' + "\n".join(pts) + "\n</trkseg></trk></gpx>\n")
+    return out
+
+
 def gps_base(name: str, crs: str, step: float = 1.0, sm: float = 2.0) -> dict:
     """GPS curve in the CRS `crs` on a 1 m grid: s, theta (unwrapped heading), tg (GPS seconds), x, y (2 m Gaussian)"""
     return curve(*load_gpx(name), crs, step, sm)

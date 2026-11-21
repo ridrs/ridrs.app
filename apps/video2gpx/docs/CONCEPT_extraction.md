@@ -78,6 +78,45 @@ route side run on them (T3 with the motion and band fits injected).
    in their run. The stages of today hold no extraction yet: the one re-baseline T4 of phase 5 makes them.
 5. **Re-baseline**: one T4, T1-T3, Pontaix against the verified track (E1), the maintainer's check in the app. The inline image pass is removed
    after one release (rule 8).
+   **Run 2026-11-20/21 (branch `feat/v2g-extraction` at 0fa1547):** T4 made all 12 stages with their extraction (`fresh`, 21 GB together; Pontaix
+   750 s, Amalfi 6806 s partly on battery). T2 (tag `p5t2`, 104 min cold) passes its checks; against `t2base` (2026-11-19):
+   - Pontaix along median / p90 2.21 / 5.4 m → **3.60 / 16.8 m**, ≤ 10 m 100 % → 76 %; kappa 1.06 → 0.99. The scale regression of phase 3
+     shows on the route of the one verified truth. **Open, blocks the merge.**
+   - Better: madone-town landmarks mean / max 89 / 150 s → 4.4 / 8.0 s (f_eff 230 → 298); gotthard-start checkpoints max 62 → 31 m, median
+     18 → 12 m; madone-start and madone-nohint uncertain → confident.
+   - About equal: roanne, rousset, grimone, pennes, pennes-descent, rousset-end, amalfi. cdp place 99.7 % → 97.6 %, p90 5.0 → 5.4 m.
+     lahntal-marburg and marburg-lahntal stay no_route (known).
+   T3 runs and its parity holds (speed corr 0.9999 / 0.9996, yaw corr 0.999 / 0.993, no unmatched cut). It compares with T2 tag `t2base`, which
+   only the main checkout holds; against `p5t2` both cases pass (same road 100 %).
+   T1: 20 of 21 clips pass. `grimone-traffic-47m30` fails `vs_full_v_corr` 0.89 (min 0.96). The extracted points are the same; the traffic
+   pick differs. Its trigger follows the median plain rms of the run (`ALT_TRIGGER_REL`, A20-A24 on main, 2026-11-20). In the 30 s clip that
+   median is above `ALT_TRIGGER` and keeps 403 plain fits. In the whole video it is not, and the stage replaces them. Without the window's own
+   trigger the clip gives corr 0.999. So the gap comes from A20-A24, not from the extraction. The last T1 on main (2026-11-19 20:20) is older
+   than that commit. Open.
+
+   **Cause of the Pontaix regression and its fix (2026-11-21).** It is A24, not the extraction: the running horizon (`horizon_track`) follows the
+   noise of a bike's horizon. On the climb at 28-43 min it drops from about 194 to 186 rows, the speed reads 5-7 % low, and the global kappa
+   lands at 0.99 instead of 1.06. Re-interpreted with a fixed horizon, the same extraction gives the speed of `t2base` again. A study of the
+   balance between curves and distance (`docs/STUDY_curve_distance_balance.md`) tried A24 off (A), A24 for motor
+   vehicles only (B), A24 damped (C), route-side weights (D) and combinations, screened on the two verified tracks:
+   - A and B: Pontaix 1.7 / 5.3 m, ≤ 10 m 100 %; Sa Calobra unchanged (2.09 / 6.0 m).
+   - A breaks Gotthard (checkpoint max 84 m, parity speed ratio 0.954): a motor vehicle on a steep pass needs A24.
+   - No route-side weight improves both verified tracks.
+
+   Built: **B** (config `HZ_RUNNING_VEHICLES = ("motorcycle", "car")`, `calib.horizon_mode`). The vehicle is known only after the route search
+   (kappa), so a run interprets with the running horizon first. When `vehicle_final.json` says bike, motion to route_search run once more from
+   the stored extraction with the fixed horizon (no second decode), then refine and gpx. An explicit `--vehicle` picks its horizon at once.
+   Stages hold both image sides (`fixed/` and `code_fixed`); the route tests take the same second pass.
+
+   Measured with B (2026-11-21; all stages re-interpreted with both sides in 81 min, Sa Calobra adopted again; T2 tag `b2`, `--code work`,
+   against `p5t2`; 8 cases got the second pass):
+   - Pontaix along median / p90 3.60 / 16.8 m → **1.72 / 5.3 m**, ≤ 10 m 76 % → 100 %, kappa 0.99 → 1.06. The verdict is uncertain: the share of
+     seconds with a posterior below 0.5 is just above the 5 % of the confident verdict (the study: 5.04 %). Open, the maintainer decides.
+   - Sa Calobra unchanged (2.09 / 6.0 m, ≤ 10 m 96 %). Gotthard checkpoints 10/10, max 31 m.
+   - The other bike cases keep place and road (same road 97.7-100 %). rousset-end and pennes-descent move along the road against `p5t2`
+     (position difference median 41 m and 175 m) at the same distance to their coarse GPS line; their GPS cannot tell along errors.
+   - T3 with `--t2 b2`: both long videos pass. pontaix-10m along 7.2 / 29.4 m (was 18.3 / 37.6 m), parity speed corr 0.999, ratio 1.00;
+     gotthard-start 10/10, max 33 m.
 
 ## 6. Format of `extract/` (phase 1)
 

@@ -118,6 +118,17 @@ def worker_main(step: str, d: Path) -> int:
 
 
 # ------------------------------------------------------------------ parent side
+def horizon_first(a, d: Path) -> str:
+    """the horizon of the first pass: the chosen vehicle's; for --vehicle auto the running one (A24), or on --resume the one the run last used"""
+    from .calib import horizon_mode
+    if a.vehicle != "auto":
+        return horizon_mode(a.vehicle)
+    prev = d / "project.params.json"
+    if a.resume and prev.exists():
+        return jload(prev).get("horizon", "running")
+    return "running"
+
+
 class Run:
     def __init__(self, a):
         self.a = a
@@ -156,7 +167,8 @@ class Run:
                    C.STILL_UP, C.STILL_MIN_S, C.STILL_EDGE_S, C.STILL_SAMPLE_S]] if C.STILL_ON else []   # sure standstill (standstill.py): detected in rotation, held in refine
         parts = dict(motion=[file_sig(P["video"]), C.VMS, C.F360, "motion2", "pick_rel1", M_ALT.ALT_TRIGGER_REL, "alt_thr_rel1", M_ALT.ALT_NOISE_REF, M_ALT.ALT_THR_SLOPE,
                              ["hz_run1", M_ALT.HZ_EVERY, M_ALT.HZ_WINDOW, M_ALT.HZ_SPAN, M_ALT.HZ_MIN_FOES, M_ALT.HZ_MAX_DEV],
-                             *([["extract1", EX_ALT.VERSION, EX_ALT.params(), VI_ALT.params()]] if C.MOTION_FROM_EXTRACT else [])],
+                             *([["extract1", EX_ALT.VERSION, EX_ALT.params(), VI_ALT.params()]] if C.MOTION_FROM_EXTRACT else []),
+                             *([["hz_fixed1"]] if P.get("horizon", "running") != "running" else [])],
                      rotation=[C.FAR, C.F_FAR, C.F_REF, "rotation2", C.ROT_BAND_OFF_VMS,
                                *([["rot_extract1", VI_ALT.params()]] if (C.MOTION_FROM_EXTRACT and C.ROT_FROM_EXTRACT) else []),
                                *([["a25", C.X0_MIN_S, C.X0_MAX_RMS, C.X0_MIN_PAIRS]] if C.ROT_X0_ROAD else []), ["gate_rms_rel1", GP_DEFAULT.max_rms_px, GP_DEFAULT.max_rms_rel],
@@ -292,13 +304,28 @@ class Run:
             P["bike_paths"] = a.bike_paths
         if a.align_mode is not None:
             P["align_mode"] = a.align_mode
+        P["horizon"] = horizon_first(a, d)
         jdump(d / "project.params.json", P)
         signal.signal(signal.SIGTERM, self.cancel)
         signal.signal(signal.SIGINT, self.cancel)
         H = self.hashes(P)
         (d / "steps").mkdir(exist_ok=True)
         results, statuses_all = {}, []
-        for i, sid in enumerate(C.STEPS, 1):
+        after_search = C.STEPS[C.STEPS.index("route_search") + 1]
+        from_step, second, k = a.from_step, False, 0
+        while k < len(C.STEPS):
+            i, sid = k + 1, C.STEPS[k]
+            k += 1
+            if sid == after_search and a.vehicle == "auto" and not second and (d / "route_search" / "vehicle_final.json").exists():
+                want = __import__("rsm.pipeline.calib", fromlist=["x"]).horizon_mode(jload(d / "route_search" / "vehicle_final.json")["vehicle"])
+                if want != P["horizon"]:                 # the second pass: the horizon of the calibrated vehicle, from the stored extraction
+                    emit({"type": "log", "level": "info", "message": f"the calibration says {'a motor vehicle' if want == 'running' else 'a bike'}: motion to route_search "
+                                                                     f"run once more with the {want} horizon (from the stored extraction, no video decode)"})
+                    P["horizon"], second, from_step, k = want, True, None, 0
+                    jdump(d / "project.params.json", P)
+                    H = self.hashes(P)
+                    results, statuses_all = {}, []
+                    continue
             done_f = d / "steps" / f"{sid}.done.json"
             dd = d / sid
             if sid == "plausibility" and P["decoys"] == 0:
@@ -307,15 +334,15 @@ class Run:
                 self.step_event(sid, i, "skipped", 100.0)
                 results[sid] = jload(done_f)
                 continue
-            forced = bool(a.from_step) and i >= C.STEPS.index(a.from_step) + 1
-            if a.from_step and not forced:       # before --from-step: reuse as it is, never recompute
+            forced = bool(from_step) and i >= C.STEPS.index(from_step) + 1
+            if from_step and not forced:       # before --from-step: reuse as it is, never recompute
                 if not done_f.exists():
                     self.step_event(sid, i, "failed")
-                    emit({"type": "log", "level": "error", "message": f"step {sid} has no result to reuse; run again without --from-step {a.from_step}"})
+                    emit({"type": "log", "level": "error", "message": f"step {sid} has no result to reuse; run again without --from-step {from_step}"})
                     return EXIT["args"]
                 if jload(done_f).get("in_hash") != H[sid]:
-                    emit({"type": "log", "level": "warn", "message": f"the inputs of step {sid} changed but its result is reused as requested (--from-step {a.from_step})"})
-            if a.resume and done_f.exists() and not forced and (a.from_step or jload(done_f).get("in_hash") == H[sid]):
+                    emit({"type": "log", "level": "warn", "message": f"the inputs of step {sid} changed but its result is reused as requested (--from-step {from_step})"})
+            if a.resume and done_f.exists() and not forced and (from_step or jload(done_f).get("in_hash") == H[sid]):
                 rec = jload(done_f)
                 self.step_event(sid, i, "skipped", 100.0, reused=True)
                 for s in rec.get("statuses", []):
@@ -351,7 +378,7 @@ class Run:
         dec = dict(rank=pl["rank"], decoys=pl["n"], margin_nats_per_km=pl["margin"], best_decoy=pl["best_decoy_name"]) if "rank" in pl else dict(decoys=0, reasons=pl["reasons"], signals=pl["signals"])
         summary = dict(**dec, verdict_basis=pl["basis"], vehicle=proj["effective"]["vehicle"], offset_m=proj["effective"]["offset_m"],
                        traffic_side=proj["effective"]["traffic_side"], f_eff=results["route_search"]["summary"]["f_eff"], kappa=results["route_search"]["summary"]["kappa"],
-                       hints_used=proj.get("hints_used"), anchors=(results["route_search"].get("summary") or {}).get("anchors"), pipeline_hash=proj.get("pipeline_hash"), confidence_mean=results["refine"]["summary"]["conf_mean"], route_km=results["refine"]["summary"]["path_km"],
+                       hints_used=proj.get("hints_used"), horizon=P["horizon"], second_pass=second, anchors=(results["route_search"].get("summary") or {}).get("anchors"), pipeline_hash=proj.get("pipeline_hash"), confidence_mean=results["refine"]["summary"]["conf_mean"], route_km=results["refine"]["summary"]["path_km"],
                        step_seconds={s: results[s]["seconds"] for s in C.STEPS}, step_peak_gb={s: results[s]["peak_gb"] for s in C.STEPS})
         emit({"type": "result", "verdict": pl["verdict"], "verdict_basis": pl["basis"], "gpx": str(d / "route.gpx"), "project": str(d / "project.json"), "route_points": str(d / "route_points.json"), "summary": summary})
         return 0

@@ -133,10 +133,12 @@ def _rotation_json(src: Path, dst: Path, t0: float, t1: float) -> None:
         shutil.copy2(src / f, dst / f)
 
 
-def window(stage: Path, t0: float, t1: float, out: Path) -> Path:
-    """motion/ and rotation/ of the window [t0, t1) of `stage` under `out` (replaced) -> out"""
+def window(stage: Path, t0: float, t1: float, out: Path, side: str | None = None) -> Path:
+    """motion/ and rotation/ of the window [t0, t1) of `stage` under `out` (replaced) -> out. side: an image side kept under that subdirectory of the
+    stage (fixed: the fixed horizon)"""
     stage, out = Path(stage), Path(out)
     dur = json.loads((stage / "stage.json").read_text())["source"]["duration_s"]
+    stage = stage / side if side else stage
     if not (0 <= t0 < t1 <= dur + 1e-6):
         raise ValueError(f"window [{t0}, {t1}) outside the stage (0 to {dur:.1f} s)")
     for sub in FILES:

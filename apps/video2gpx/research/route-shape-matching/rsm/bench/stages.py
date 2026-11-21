@@ -43,6 +43,9 @@ VERSION = 1
 IMAGE_STEPS = ["motion", "rotation"]
 # the sources with a truth (GPS, checkpoints or landmarks); Cayolle has none and no stage (docs/CONCEPT_test_strategy.md, step 2)
 STAGE_IDS = ["roanne", "pontaix", "rousset", "grimone", "cdp", "pennes", "lahntal", "marburg", "madone", "amalfi", "gotthard", "bavaria"]
+# source-free stages (docs/CONCEPT_test_strategy.md, "a rolling set of verified videos"): adopted from an app run's extraction (`adopt`), the source
+# discarded afterwards; fresh -> frozen after an interpretation change (the route tests keep running on them) -> retire after an extraction change
+SOURCE_FREE_IDS = ["sacalobra"]
 
 for _k, _d in (("V2G_TEST_DATA", str(APP / "test-data")), ("RSM_VIDEOS", str(SOURCES))):
     os.environ.setdefault(_k, _d)
@@ -84,14 +87,19 @@ def gps_align(c: dict, motion_csv: Path) -> dict:
                 used=[list(u) for u in used])
 
 
-def freeze(sid: str, work: Path, src: Path, sources: Path, P: dict, out_root: Path, root: Path = ROOT, gps_align: dict | None = None) -> Path:
-    """copy motion/ and rotation/ of a finished image side (work) to out_root/<sid>/ and write stage.json -> that directory"""
+def freeze(sid: str, work: Path, src: Path, sources: Path | None, P: dict, out_root: Path, root: Path = ROOT, gps_align: dict | None = None,
+           discarded: bool = False, fixed: Path | None = None) -> Path:
+    """copy motion/ and rotation/ of a finished image side (work) to out_root/<sid>/ and write stage.json -> that directory. discarded: the source
+    will not be kept (a source-free stage, `adopt`): stage.json names it by file name and hash only. fixed: the image side of the same extraction
+    with the fixed horizon (the second pass of a bike, config HZ_RUNNING_VEHICLES), kept under fixed/"""
     out = Path(out_root) / sid
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     for sub in IMAGE_STEPS:
         shutil.copytree(Path(work) / sub, out / sub)
+        if fixed is not None:
+            shutil.copytree(Path(fixed) / sub, out / "fixed" / sub)
     has_extract = (Path(work) / "extract" / "extract.json").exists()
     if has_extract:                                    # the motion step's extraction (docs/CONCEPT_extraction.md phase 4): re-interpretable without T4
         shutil.copytree(Path(work) / "extract", out / "extract")
@@ -99,12 +107,14 @@ def freeze(sid: str, work: Path, src: Path, sources: Path, P: dict, out_root: Pa
     sha = sha256(Path(src))
     fz = json.loads((Path(root) / "rsm" / "pipeline" / "frozen.json").read_text())
     secs = {s: json.loads((Path(work) / "steps" / f"{s}.done.json").read_text()).get("seconds") for s in IMAGE_STEPS}
+    so = (dict(id=sid, path=None, name=Path(src).name, discarded=True) if discarded else
+          dict(id=Path(src).parent.name, path=str(Path(src).resolve().relative_to(Path(sources).resolve()))))
     stage = dict(version=VERSION, case=sid,
-                 source=dict(id=Path(src).parent.name, path=str(Path(src).resolve().relative_to(Path(sources).resolve())), sha256=sha,
-                             duration_s=float(mj["duration_s"]), fps=float(mj["fps"])),
+                 source=dict(so, sha256=sha, duration_s=float(mj["duration_s"]), fps=float(mj["fps"])),
                  window=[0.0, float(mj["duration_s"])],
                  params=dict(vehicle=P.get("vehicle", "auto"), intro_end=P.get("intro_end"), bbox=P["bbox"]),
                  code=SC.step_keys(root, P, IMAGE_STEPS, video_sig=sha),
+                 code_fixed=SC.step_keys(root, dict(P, horizon="fixed"), IMAGE_STEPS, video_sig=sha) if fixed is not None else None,
                  frozen=dict(code_hash=fz.get("code_hash"), version=fz.get("version")),
                  horizon=mj.get("horizon"),
                  gps_align=gps_align,
@@ -118,6 +128,8 @@ def truth(sources: Path = SOURCES, out: Path = TRUTH, log=print) -> list[str]:
     """copy the truth files of clip_sources.json (vangestel/<gps>/track.gpx, `verified`) from sources/ to truth/ (same relative paths) -> copied paths"""
     rel = []
     for c in json.loads((HERE / "clip_sources.json").read_text())["sources"]:
+        if c.get("video") is None:                       # source-free: its truth lives only in truth/ (written by `adopt --scenic`)
+            continue
         if c.get("gps"):
             rel.append(f"vangestel/{c['gps']}/track.gpx")
         if c.get("verified"):
@@ -160,12 +172,29 @@ def status(d: Path, root: Path = ROOT) -> str:
     if not f.exists():
         return "missing"
     s = json.loads(f.read_text())
-    P = dict(s["params"], video=str(SOURCES / s["source"]["path"]))
-    if SC.step_keys(root, P, IMAGE_STEPS, video_sig=s["source"]["sha256"]) == s["code"]:
+    gone = bool(s["source"].get("discarded"))
+    P = dict(s["params"], video="" if gone else str(SOURCES / s["source"]["path"]))
+    if (SC.step_keys(root, P, IMAGE_STEPS, video_sig=s["source"]["sha256"]) == s["code"] and (Path(d) / "fixed").is_dir()
+            and SC.step_keys(root, dict(P, horizon="fixed"), IMAGE_STEPS, video_sig=s["source"]["sha256"]) == s.get("code_fixed")):
         return "fresh"
-    if s.get("extract") and (Path(d) / "extract" / "extract.json").exists() and s["extract"] == extract_identity(s["source"]["sha256"], root=root):
-        return "reinterpret"
-    return "stale"
+    current = s.get("extract") and (Path(d) / "extract" / "extract.json").exists() and s["extract"] == extract_identity(s["source"]["sha256"], root=root)
+    if gone:                                       # source-free: no reinterp (the pixel probes need the source), no T4
+        return "frozen" if current else "retire"
+    return "reinterpret" if current else "stale"
+
+
+def image_sides(sid: str, work: Path, P: dict, root: Path, log) -> Path:
+    """motion and rotation into work with the running horizon, then from the same extraction (work/extract, no second decode) with the fixed one into
+    <work>-fixed -> that directory. The route side's second pass of a bike (config HZ_RUNNING_VEHICLES) starts from the fixed one."""
+    from . import regress as R
+    R.run_case(dict(name=f"stage-{sid}"), "stages", root, None, None, log, d=work, P=P, until="rotation", cache=False)
+    fixed = Path(work).parent / f"{Path(work).name}-fixed"
+    if fixed.exists():
+        shutil.rmtree(fixed)
+    fixed.mkdir(parents=True)
+    shutil.copytree(Path(work) / "extract", fixed / "extract")
+    R.run_case(dict(name=f"stage-{sid}"), "stages", root, None, None, log, d=fixed, P=dict(P, horizon="fixed"), until="rotation", cache=False)
+    return fixed
 
 
 def reinterp(sid: str, root: Path = ROOT, out_root: Path = STAGES, log=print) -> Path:
@@ -176,6 +205,8 @@ def reinterp(sid: str, root: Path = ROOT, out_root: Path = STAGES, log=print) ->
     from . import regress as R
     sd = Path(out_root) / sid
     s = json.loads((sd / "stage.json").read_text())
+    if s["source"].get("discarded"):
+        raise RuntimeError(f"stage {sid} has no source (discarded): it cannot be re-interpreted (the pixel probes read the source); it stays frozen")
     if not (s.get("extract") and (sd / "extract" / "extract.json").exists() and s["extract"] == extract_identity(s["source"]["sha256"], root=root)):
         raise RuntimeError(f"stage {sid}: its extraction is missing or made by other extraction code: run T4 (rsm.bench.stages make --only {sid})")
     c = case(sid)
@@ -193,15 +224,54 @@ def reinterp(sid: str, root: Path = ROOT, out_root: Path = STAGES, log=print) ->
     m = json.loads(mf.read_text())
     m["key"] = SA.extract_key(str(src), PC.VMS["height"])      # the same extraction (source hash checked above), keyed for this run's video path
     mf.write_text(json.dumps(m, indent=1))
-    R.run_case(dict(name=f"stage-{sid}"), "stages", root, None, None, log, d=work, P=P, until="rotation", cache=False)
+    fixed = image_sides(sid, work, P, root, log)
     ga = gps_align(c, work / "motion" / "motion.csv") if c.get("truth") == "gps" else s.get("gps_align")
-    out = freeze(sid, work, src, SOURCES, P, out_root, root=root, gps_align=ga)
+    out = freeze(sid, work, src, SOURCES, P, out_root, root=root, gps_align=ga, fixed=fixed)
     st = json.loads((out / "stage.json").read_text())
     st["made"]["reinterpreted"] = dict(date=st["made"]["date"], extracted=s["made"].get("extracted", s["made"]["date"]))
     st["made"]["extracted"] = st["made"]["reinterpreted"]["extracted"]
     (out / "stage.json").write_text(json.dumps(st, indent=1, default=float) + "\n")
     shutil.rmtree(work)
+    shutil.rmtree(fixed)
     log(f"{sid}: re-interpreted in {time.time() - t0:.0f} s -> {out}")
+    return out
+
+
+def adopt(sid: str, run: Path, video: Path, root: Path = ROOT, out_root: Path = STAGES, log=print) -> Path:
+    """a source-free stage from an app run (a project's out/): its stored extraction is interpreted again with the code under root (the pixel
+    probes read the source, which must still be there), then frozen with `discarded`; afterwards the source can go. The run's extraction must
+    be made by the current extraction code (version, settings, OpenCV)."""
+    import cv2
+
+    from rsm.pipeline import config as PC, steps_a as SA
+    from rsm.pipeline.vmsx import extract as EX
+
+    from . import regress as R
+    run, video = Path(run), Path(video).resolve()
+    m = json.loads((run / "extract" / "extract.json").read_text())
+    want = json.loads(json.dumps(EX.params((m.get("params") or {}).get("k"))))      # k follows the video's frame rate
+    if m.get("version") != EX.VERSION or m.get("params", want) != want or m.get("opencv", cv2.__version__) != cv2.__version__:
+        raise RuntimeError(f"{run}: its extraction is made by other extraction code ({m.get('version')}, OpenCV {m.get('opencv')}): run the app again first")
+    c = case(sid)
+    b = c["bbox"]
+    P = dict(video=str(video), bbox=dict(south=b[0], west=b[1], north=b[2], east=b[3]), pbf=None, vehicle=c.get("vehicle", "auto"), offset_m=None,
+             start_time=None, traffic_side="auto", decoys=0, start_tol_m=150.0, hint_buffer_m=300.0, hint_fallback="auto")
+    work = WORK / sid
+    t0 = time.time()
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
+    shutil.copytree(run / "extract", work / "extract")
+    m["key"] = SA.extract_key(str(video), PC.VMS["height"])              # keyed for this video path, so that the motion step takes it
+    (work / "extract" / "extract.json").write_text(json.dumps(m, indent=1))
+    fixed = image_sides(sid, work, P, root, log)
+    out = freeze(sid, work, video, None, P, out_root, root=root, discarded=True, fixed=fixed)
+    st = json.loads((out / "stage.json").read_text())
+    st["made"]["adopted"] = dict(run=str(run), extracted=time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime((run / "extract" / "extract.json").stat().st_mtime)))
+    (out / "stage.json").write_text(json.dumps(st, indent=1, default=float) + "\n")
+    shutil.rmtree(work)
+    shutil.rmtree(fixed)
+    log(f"{sid}: adopted from {run} in {time.time() - t0:.0f} s -> {out}; the source may now be discarded")
     return out
 
 
@@ -212,9 +282,10 @@ def rekey(sid: str, reason: str, root: Path = ROOT, out_root: Path = STAGES) -> 
     s = json.loads(f.read_text())
     P = dict(s["params"], video=str(SOURCES / s["source"]["path"]))
     new = SC.step_keys(root, P, IMAGE_STEPS, video_sig=s["source"]["sha256"])
-    if new != s["code"]:
-        s.setdefault("rekeyed", []).append(dict(date=time.strftime("%Y-%m-%dT%H:%M:%S"), old=s["code"], reason=reason))
-        s["code"] = new
+    new_fixed = SC.step_keys(root, dict(P, horizon="fixed"), IMAGE_STEPS, video_sig=s["source"]["sha256"])     # the fixed horizon's image side
+    if new != s["code"] or new_fixed != s.get("code_fixed"):
+        s.setdefault("rekeyed", []).append(dict(date=time.strftime("%Y-%m-%dT%H:%M:%S"), old=s["code"], old_fixed=s.get("code_fixed"), reason=reason))
+        s["code"], s["code_fixed"] = new, new_fixed
         f.write_text(json.dumps(s, indent=1, default=float) + "\n")
     return s
 
@@ -230,13 +301,15 @@ def make(sid: str, root: Path = ROOT, out_root: Path = STAGES, log=print, reuse_
         raise FileNotFoundError(src)
     work = WORK / sid
     t0 = time.time()
-    if not (reuse_work and all((work / "steps" / f"{s}.done.json").exists() for s in IMAGE_STEPS)):
+    fixed = work.parent / f"{sid}-fixed"
+    if not (reuse_work and all((w / "steps" / f"{s}.done.json").exists() for s in IMAGE_STEPS for w in (work, fixed))):
         if work.exists():
             shutil.rmtree(work)
-        R.run_case(dict(name=f"stage-{sid}"), "stages", root, None, None, log, d=work, P=P, until="rotation", cache=False)
+        fixed = image_sides(sid, work, P, root, log)
     ga = gps_align(c, work / "motion" / "motion.csv") if c.get("truth") == "gps" else None
-    out = freeze(sid, work, src, SOURCES, P, out_root, root=root, gps_align=ga)
+    out = freeze(sid, work, src, SOURCES, P, out_root, root=root, gps_align=ga, fixed=fixed)
     shutil.rmtree(work)
+    shutil.rmtree(fixed)
     log(f"{sid}: frozen in {time.time() - t0:.0f} s -> {out}" + (f" (GPS clock: {len(ga['used'])} of {len(ga['windows'])} windows)" if ga else ""))
     return out
 
@@ -252,12 +325,23 @@ def main(argv=None) -> int:
     rk.add_argument("--reason", required=True, help="the change and how it was shown to leave motion/ and rotation/ unchanged")
     ri = sub.add_parser("reinterp", help="motion and rotation again from the stored extraction of the stages whose status is reinterpret (minutes, no T4)")
     ri.add_argument("--only", default=None, help="comma-separated stage ids (default: every stage whose status is reinterpret)")
+    ad = sub.add_parser("adopt", help="a source-free stage from an app run's extraction (the source may be discarded afterwards)")
+    ad.add_argument("--id", required=True, help="the source id (clip_sources.json, in SOURCE_FREE_IDS)")
+    ad.add_argument("--run", required=True, help="the run directory with extract/ (an app project's out/)")
+    ad.add_argument("--video", required=True, help="the source video of that run (still needed once: the pixel probes)")
+    ad.add_argument("--scenic", default=None, help="an atlas result <id>.scenic.json checked by the maintainer: written as the verified track")
     sub.add_parser("truth", help="copy the truth files of the sources to test-data/truth/")
     ch = sub.add_parser("check")
     ch.add_argument("--verify-source", action="store_true", help="also hash the source videos (slow) and compare with stage.json")
     ch.add_argument("--only", default=None, help="comma-separated stage ids (default: all of STAGE_IDS)")
     a = ap.parse_args(argv)
-    ids = a.only.split(",") if getattr(a, "only", None) else STAGE_IDS
+    ids = a.only.split(",") if getattr(a, "only", None) else STAGE_IDS + (SOURCE_FREE_IDS if a.cmd == "check" else [])
+    if a.cmd == "adopt":
+        if a.scenic:
+            from . import gps_truth as GT
+            print(GT.write_scenic_gpx(json.loads(Path(a.scenic).read_text()), TRUTH / case(a.id)["verified"]))
+        adopt(a.id, Path(a.run), Path(a.video))
+        return 0
     if a.cmd == "truth":
         print("\n".join(truth()) or "truth up to date")
         return 0
@@ -291,12 +375,12 @@ def main(argv=None) -> int:
     for sid in ids:
         st = status(STAGES / sid)
         note = ""
-        if st != "missing" and a.verify_source:
+        if st != "missing" and a.verify_source and not json.loads((STAGES / sid / "stage.json").read_text())["source"].get("discarded"):
             s = json.loads((STAGES / sid / "stage.json").read_text())
             p = SOURCES / s["source"]["path"]
             if not p.exists() or sha256(p) != s["source"]["sha256"]:
                 st, note = "stale", " (source changed or missing)"
-        bad += st != "fresh"
+        bad += st not in ("fresh", "frozen")            # frozen: a source-free stage the route tests still run on
         print(f"{sid:10s} {st}{note}")
     return 1 if bad else 0
 

@@ -51,6 +51,11 @@ def vmax_for(vehicle: str | None) -> float:
     return C.CAL_VMAX_BIKE if vehicle == "bike" else C.CAL_VMAX
 
 
+def horizon_mode(vehicle: str | None) -> str:
+    """the horizon of the road-flow fit for this vehicle: "running" (A24) for a motor vehicle, "fixed" (the calibrated row) for a bike (C.HZ_RUNNING_VEHICLES)"""
+    return "running" if vehicle in C.HZ_RUNNING_VEHICLES else "fixed"
+
+
 def plausible_mask(stats: dict, fg, kg, vmax: float | None = None) -> np.ndarray:
     """bool (len fg, len kg). If no cell is plausible the mask is all True (nothing is excluded; the caller reports it)."""
     M = np.array([[plausible(stats, f, k, vmax=vmax) for k in kg] for f in fg], bool)
