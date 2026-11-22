@@ -488,6 +488,14 @@ mod tests {
         assert!(hint_read(&ctx, "p1", &path).is_err());
         let _ = std::fs::remove_dir_all(d);
     }
+
+    #[test]
+    fn reroute_args_waypoints_and_reset() {
+        let a = reroute_args(Path::new("/o"), Some(r#"{"vias":[]}"#), false);
+        assert_eq!(a, vec!["reroute", "--out", "/o", "--waypoints", r#"{"vias":[]}"#]);
+        let b = reroute_args(Path::new("/o"), None, true);
+        assert_eq!(b, vec!["reroute", "--out", "/o", "--reset"]);
+    }
 }
 
 /// Start the pipeline as a child process in its own process group. Events go to `pipeline-event` (and to the project's
@@ -656,6 +664,39 @@ pub fn retime(ctx: &Ctx, project: &str, start_time: &str) -> Result<Value, Strin
     if !o.status.success() || result.is_none() {
         let err = stdout.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|v| v["level"] == "error").map(|v| v["message"].as_str().unwrap_or("").to_string()).last();
         return Err(format!("Zeit ändern fehlgeschlagen (Code {:?}): {}", o.status.code(), err.unwrap_or_else(|| String::from_utf8_lossy(&o.stderr).lines().last().unwrap_or("").to_string())));
+    }
+    Ok(result.unwrap())
+}
+
+pub fn reroute_args(out: &Path, waypoints_json: Option<&str>, reset: bool) -> Vec<String> {
+    let mut a = vec!["reroute".to_string(), "--out".to_string(), out.to_string_lossy().into()];
+    if reset {
+        a.push("--reset".to_string());
+    } else if let Some(w) = waypoints_json {
+        a.extend(["--waypoints".to_string(), w.to_string()]);
+    }
+    a
+}
+
+/// `rsm.pipeline reroute --out OUT (--waypoints JSON | --reset)`: fast interactive route adjustment + timeline fit.
+pub fn reroute(ctx: &Ctx, project: &str, waypoints: Option<Value>, reset: bool) -> Result<Value, String> {
+    let s = require_env(ctx)?;
+    let out = ctx.project_dir(project)?.join("out");
+    let wp_str = if reset {
+        None
+    } else {
+        let v = waypoints.ok_or_else(|| "Keine Wegpunkte angegeben.".to_string())?;
+        Some(serde_json::to_string(&v).map_err(|e| e.to_string())?)
+    };
+    let o = pipeline_cmd(ctx, &s)
+        .args(reroute_args(&out, wp_str.as_deref(), reset))
+        .output()
+        .map_err(|e| e.to_string())?;
+    let stdout = String::from_utf8_lossy(&o.stdout);
+    let result = stdout.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|v| v["type"] == "result").last();
+    if !o.status.success() || result.is_none() {
+        let err = stdout.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|v| v["level"] == "error").map(|v| v["message"].as_str().unwrap_or("").to_string()).last();
+        return Err(err.unwrap_or_else(|| format!("Route neu berechnen fehlgeschlagen (Code {:?}): {}", o.status.code(), String::from_utf8_lossy(&o.stderr).lines().last().unwrap_or(""))));
     }
     Ok(result.unwrap())
 }

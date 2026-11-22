@@ -114,6 +114,23 @@
 :root:not([data-theme="light"]) .leaflet-bar a, :root:not([data-theme="light"]) .leaflet-control-attribution { background: var(--c-surface); color: var(--c-text); }
 .pos-icon { background: none; border: 0; } .pos-arrow { width: 34px; height: 34px; transition: transform .15s linear; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 .map.drawing, .map.drawing .leaflet-interactive { cursor: crosshair !important; }
+.map.route-grab, .map.route-grab .leaflet-interactive { cursor: grab !important; }
+.map.route-dragging, .map.route-dragging .leaflet-interactive { cursor: grabbing !important; }
+.re-handle { background: none; border: 0; display: flex; align-items: center; justify-content: center; cursor: grab; }
+.re-handle:active { cursor: grabbing; }
+.re-dot { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.45); font: 700 10px/1 var(--font-sans, system-ui); color: #fff; transition: transform .1s ease; }
+.re-handle:hover .re-dot { transform: scale(1.18); }
+.re-start .re-dot { background: #1f8a4c; }
+.re-end .re-dot { background: #111827; }
+.re-via .re-dot { background: #2563eb; width: 18px; height: 18px; }
+.re-hover .re-dot { width: 13px; height: 13px; background: #fff; border: 3px solid #2563eb; box-shadow: 0 1px 4px rgba(37,99,235,.45); }
+.re-drag .re-dot { width: 18px; height: 18px; background: #2563eb; border-color: #fff; transform: scale(1.15); box-shadow: 0 2px 8px rgba(37,99,235,.6); }
+.re-bar { align-items: center; gap: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--c-border); }
+.re-left { align-items: center; gap: var(--sp-2); }
+.re-chips { gap: var(--sp-1); }
+.re-chip { display: inline-flex; align-items: center; gap: 4px; }
+.re-chip-x { border: 0; background: transparent; color: inherit; cursor: pointer; font: 700 13px/1 var(--font-sans, system-ui); padding: 0 2px; opacity: .75; }
+.re-chip-x:hover { opacity: 1; }
 .frame:focus-visible { outline: none; stroke-width: 4; stroke-dasharray: 6 3; }
 .frame-handle { background: transparent; cursor: nwse-resize; }
 .frame-handle::after { content: ""; position: absolute; inset: 9px; background: #fff; border: 2px solid var(--map-search); border-radius: 2px; }

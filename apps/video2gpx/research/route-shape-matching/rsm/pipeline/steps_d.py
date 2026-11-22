@@ -260,10 +260,13 @@ def gpx_step(d: Path, P: dict, W: Worker):
         f = d / "steps" / f"{sid}.done.json"
         if f.exists():
             steps[sid] = jload(f)
+    rr_f = d / "refine" / "reroute.json"
+    reroute_info = jload(rr_f) if rr_f.exists() else None
     proj = dict(version=VERSION, params=P, effective=dict(vehicle=veh, vehicle_from_kappa=fin["from_kappa"], traffic_side=side, traffic_region=region, offset_m=off, start_time=fmt(start)),
                 verdict=verdict, verdict_basis=basis, verdict_detail=summ, code_hash=ch, pipeline_hash=pipe, hints_used=hu, steps=steps, outputs=dict(gpx="route.gpx", route_points="route_points.json"),
                 driving_line=dict(rule=meta["rule"], layer=layer, l2=l2, source=line_txt, tagged_share=tagged, min_length_element=float(g.min()), max_abs_delta_m=float(np.abs(dl).max()),
-                                  has_loops=bool(loops), video_measured_share=0.0))
+                                  has_loops=bool(loops), video_measured_share=0.0),
+                **({} if reroute_info is None else dict(reroute=reroute_info)))
     jdump(d / "project.json", proj)
     W.progress(100.0, "done", force=True)
     return dict(points=len(pts), gpx_points=len(gpx_pts), gpx_hz=gx["hz"], standstills=len(stills), offset_m=off, side=side, verdict=verdict, min_g=float(g.min()), loops=bool(loops), line=layer, l2=l2)

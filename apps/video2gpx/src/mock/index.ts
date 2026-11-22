@@ -284,6 +284,34 @@ export function createMockApi(): Api {
   if (SC.offline) (window as any).__v2gTiles = "http://127.0.0.1:9/{z}/{x}/{y}.png";
   bootRun(); bootImport(); bootExport();
   let dlTimer: any;
+  let mockReroute: import("../types").RouteEditState | null = null;
+  let mockRoute = ROUTE.map((p) => ({ ...p }));
+  const rebuildMockRoute = (wp: import("../types").RouteEditState | null) => {
+    mockReroute = wp && (wp.start || wp.end || wp.vias.length) ? structuredClone(wp) : null;
+    mockRoute = ROUTE.map((p) => ({ ...p }));
+    if (!mockReroute || mockRoute.length < 2) return;
+    const n = mockRoute.length;
+    const anchors: { idx: number; lat: number; lon: number }[] = [];
+    if (mockReroute.start) anchors.push({ idx: 0, lat: mockReroute.start.lat, lon: mockReroute.start.lon });
+    for (const v of mockReroute.vias) {
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < n; i++) {
+        const d = (mockRoute[i].lat - v.lat) ** 2 + (mockRoute[i].lon - v.lon) ** 2;
+        if (d < bd) { bd = d; best = i; }
+      }
+      anchors.push({ idx: best, lat: v.lat, lon: v.lon });
+    }
+    if (mockReroute.end) anchors.push({ idx: n - 1, lat: mockReroute.end.lat, lon: mockReroute.end.lon });
+    for (const a of anchors) {
+      const dLat = a.lat - mockRoute[a.idx].lat, dLon = a.lon - mockRoute[a.idx].lon;
+      const rad = Math.max(8, Math.round(n * 0.12));
+      for (let i = Math.max(0, a.idx - rad); i <= Math.min(n - 1, a.idx + rad); i++) {
+        const w = 0.5 * (1 + Math.cos((Math.PI * (i - a.idx)) / rad));
+        mockRoute[i].lat += dLat * w;
+        mockRoute[i].lon += dLon * w;
+      }
+    }
+  };
   return {
     mock: true,
     settingsGet: async () => structuredClone(settings),
@@ -344,13 +372,19 @@ export function createMockApi(): Api {
       if (SC.run && runProject === "demo-1" && !cancelReq) { cancelReq = true; later(() => exit("demo-1", 130, true), frozen ? 0 : 400); return true; }
       cancelReq = true; return true;
     },
-    pipelineRetime: async (_p, t) => ({ type: "result", gpx: "/mock/out/route.gpx", start_time: t, points: ROUTE.length }),
+    pipelineRetime: async (_p, t) => ({ type: "result", gpx: "/mock/out/route.gpx", start_time: t, points: mockRoute.length }),
+    pipelineReroute: async (_p, waypoints, reset = false) => {
+      await wait(frozen ? 0 : 250);
+      rebuildMockRoute(reset ? null : waypoints);
+      return { gpx: "/mock/out/route.gpx", route_points: "/mock/out/route_points.json", project: "/mock/out/project.json", path_km: 1.62, seconds: 0.25, waypoints: mockReroute };
+    },
     resultLoad: async () => ({
-      route_points: JSON.stringify({ meta: "mock", verdict: VERDICT, verdict_basis: "without decoy check", points: ROUTE, cuts: { times: [20], intro_end: 20, breaks: [] } }),
+      route_points: JSON.stringify({ meta: "mock", verdict: VERDICT, verdict_basis: "without decoy check", points: mockRoute, cuts: { times: [20], intro_end: 20, breaks: [] } }),
       project: JSON.stringify({
         verdict: VERDICT, verdict_basis: "without decoy check",
         verdict_detail: { reasons: VERDICT === "uncertain" ? ["mean posterior 0.84 < 0.9", "18 % of the time with posterior < 0.5"] : VERDICT === "no_route" ? ["calibration peak at the edge of the scan and flat", "heading noise 3.9x the bike level"] : [] },
         effective: { vehicle: "bike", traffic_side: "right", offset_m: 1.5, start_time: "2000-01-01T00:00:00Z" }, steps: { refine: { summary: { path_km: 1.62 } } }, pipeline_hash: "0123456789abcdef",
+        ...(mockReroute ? { reroute: mockReroute } : {}),
         hints_used: SC.hints === "hints" ? { start_bbox: [44.742, 5.245, 44.754, 5.262], end_bbox: null, frames_applied: true, tol_m: 150, hint_file: "tour.gpx", buffer_m: 300, fallback_used: false, route_hint_applied: true } : null,
       }),
       gpx: "/mock/out/route.gpx", gpx_bytes: 262144,

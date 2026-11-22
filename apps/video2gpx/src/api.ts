@@ -1,6 +1,6 @@
 import type {
   DownloadProgress, EnvCheck, GeoHit, GeofabrikCandidate, OpenProject, PbfInfo, PipelineEvent, ProjectApp,
-  Settings, Suggestion, VideoProbe, Bbox, ImportTemplate, ImportRequest, ImportResolved, ImportProgress, ImportDone, IncyclistOptions, IncyclistInfo, IncyclistProgress, IncyclistDone, DemStatus, DemFile, ProfileLoad, ElevationDiag, InspectSeriesLoad, InspectFrame,
+  Settings, Suggestion, VideoProbe, Bbox, ImportTemplate, ImportRequest, ImportResolved, ImportProgress, ImportDone, IncyclistOptions, IncyclistInfo, IncyclistProgress, IncyclistDone, DemStatus, DemFile, ProfileLoad, ElevationDiag, InspectSeriesLoad, InspectFrame, RouteEditState, RerouteResult,
 } from "./types";
 
 export interface RunParams {
@@ -52,6 +52,8 @@ export interface Api {
   pipelineStatus(): Promise<string | null>;
   pipelineCancel(): Promise<boolean>;
   pipelineRetime(project: string, startTime: string): Promise<any>;
+  /** fast interactive reroute on the Ergebnis page through dragged start/end/via dots (reset: restore original route) */
+  pipelineReroute(project: string, waypoints: RouteEditState | null, reset?: boolean): Promise<RerouteResult>;
   resultLoad(project: string): Promise<{ route_points: string; project: string; gpx: string; gpx_bytes: number }>;
   /** saves the GPX; `ele` (default true): with the heights of the elevation profile. `note`: why it was saved without them */
   gpxExport(project: string, dest: string, ele?: boolean): Promise<{ bytes: number; ele: boolean; note: string | null }>;

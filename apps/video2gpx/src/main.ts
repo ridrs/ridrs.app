@@ -20,6 +20,7 @@ import { mountElevation } from "./views/elevation";
 import { mountExport } from "./views/export";
 import { initMapData, mountMaps } from "./views/maps";
 import { mountResult } from "./views/result";
+import { mountRouteEditor } from "./routeEditor";
 import { mountAnchors } from "./anchorPanel";
 import { mountRun } from "./views/run";
 import { mountSettings, showSettings } from "./views/settings";
@@ -34,7 +35,7 @@ async function main() {
   initRun(); initImport(); initMapData(); initElevation(); initAnalyse(); wireIncyclistEvents();
   initMapPanel(R.map); initVideoPanel(R.video);
   mountStart(R.views.start); mountTools(R.views.tools); mountMaps(R.views.maps); mountSettings(R.views.settings);
-  mountSetup(R.side, R.ws); mountRun(R.main, R.info); mountAnalyse(R.main, R.video, R.head); mountElevation(R.main); mountExport(R.main); mountResult(R.head, R.timeline); mountAnchors(R.timeline);
+  mountSetup(R.side, R.ws); mountRun(R.main, R.info); mountAnalyse(R.main, R.video, R.head); mountElevation(R.main); mountExport(R.main); mountResult(R.head, R.timeline); mountRouteEditor(R.timeline); mountAnchors(R.timeline);
   onShow("start", showStart); onShow("settings", showSettings); onShow("tools", () => void recheck());
   if (api.mock) { const m = await import("./mock/selfcheck"); m.mountSelfcheck(R.views.selfcheck); }
 

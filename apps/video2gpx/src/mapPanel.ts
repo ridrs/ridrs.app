@@ -389,7 +389,7 @@ export function sizeWarning(b: Bbox): string | null {
 
 // ---------- result: route coloured by confidence, position marker ----------
 
-function drawRoute() {
+function drawRoute(opts?: { preserveView?: boolean }) {
   routeLayer.clearLayers(); marker?.remove(); marker = null;
   const r = S.result;
   noteEl.hidden = true;
@@ -413,8 +413,8 @@ function drawRoute() {
   dot(pts[0], "#1f8a4c", "Start");
   dot(pts[pts.length - 1], "#111827", "Ende");
   markProgrammatic();
-  map.fitBounds(L.latLngBounds(pts.map((p) => [p.lat, p.lon] as [number, number])), { padding: [30, 30], animate: false });
-  placeMarker(pts[0]);
+  if (!opts?.preserveView) map.fitBounds(L.latLngBounds(pts.map((p) => [p.lat, p.lon] as [number, number])), { padding: [30, 30], animate: false });
+  placeMarker(pointAt(pts, lastT) ?? pts[0]);
 }
 
 function placeMarker(p: RoutePoint) {
@@ -454,5 +454,6 @@ export const mapMarks = {
 };
 let stretchLines: L.Polyline[] = [];
 
-/** the Leaflet map (the anchor editor of the result view draws on it, anchorPanel.ts) */
+/** the Leaflet map (the anchor editor and route drag editor of the result view draw on it) */
 export const getMap = (): L.Map => map;
+export const isRouteVisible = (): boolean => routeVisible();

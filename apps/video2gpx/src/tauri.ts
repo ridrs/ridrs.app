@@ -35,6 +35,7 @@ export function createTauriApi(): Api {
     pipelineStatus: () => invoke("pipeline_status"),
     pipelineCancel: () => invoke("pipeline_cancel"),
     pipelineRetime: (project, startTime) => invoke("pipeline_retime", { project, startTime }),
+    pipelineReroute: (project, waypoints, reset = false) => invoke("pipeline_reroute", { project, waypoints, reset }),
     resultLoad: (project) => invoke("result_load", { project }),
     gpxExport: (project, dest, ele = true) => invoke("gpx_export", { project, dest, ele }),
     hintImport: (project, src) => invoke("hint_import", { project, src }),

@@ -6,6 +6,7 @@ import type { BikePaths, EnvCheck, PipelineEvent, ResultData, RoutePoint, RunPar
 import { anchorsParam, rerunArgs } from "../anchors";
 import { resultSig } from "../atlas";
 import { introParam } from "../intro";
+import { normalizeEdit } from "../routeEdit";
 import { importPct, importingFor } from "./import";
 
 /** the running job: the project it belongs to and its state (the same object as S.run while that project is open) */
@@ -87,7 +88,7 @@ export async function afterOpen() {
   if (S.cur === cur) bus.emit("run");
 }
 
-export async function loadResult() {
+export async function loadResult(preserveView = false) {
   const cur = S.cur;
   if (!cur) return;
   try {
@@ -104,6 +105,7 @@ export async function loadResult() {
       intro_end: typeof rp.cuts?.intro_end === "number" ? rp.cuts.intro_end : null,
       cut_times: Array.isArray(rp.cuts?.times) ? rp.cuts.times.filter((x: unknown) => typeof x === "number") : [],
       standstills: Array.isArray(rp.standstills) ? rp.standstills.filter((x: any) => typeof x?.t0 === "number" && typeof x?.t1 === "number").map((x: any) => [x.t0, x.t1] as [number, number]) : [],
+      reroute: pj.reroute ? normalizeEdit(pj.reroute) : null,
       sig,
     };
     S.result = res;
@@ -111,7 +113,7 @@ export async function loadResult() {
     if (pj.effective?.start_time && !cur.app.start_time && pj.effective.start_time !== "2000-01-01T00:00:00Z") cur.app.start_time = pj.effective.start_time;
     cur.has_result = true; cur.app.has_result = true;
     if (cur.app.verdict !== res.verdict) void saveCur({ verdict: res.verdict });
-    bus.emit("result");
+    bus.emit("result", { preserveView });
   } catch (e) {
     S.result = null;
     S.run.error = `Ergebnis konnte nicht geladen werden: ${e}`;

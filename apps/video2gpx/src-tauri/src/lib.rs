@@ -166,6 +166,11 @@ async fn pipeline_retime(ctx: State<'_, Ctx>, project: String, start_time: Strin
     tauri::async_runtime::spawn_blocking(move || pipeline::retime(&c, &project, &start_time)).await.map_err(|e| e.to_string())?
 }
 #[tauri::command]
+async fn pipeline_reroute(ctx: State<'_, Ctx>, project: String, waypoints: Option<Value>, reset: Option<bool>) -> R<Value> {
+    let c = ctx.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || pipeline::reroute(&c, &project, waypoints, reset.unwrap_or(false))).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
 fn result_load(ctx: State<Ctx>, project: String) -> R<Value> {
     projects::result_load(&ctx, &project)
 }
@@ -366,7 +371,7 @@ pub fn run() {
             allow_video, media_url, video_probe, video_poster, video_playback, video_frames,
             pbf_list, pbf_link, pbf_remove, geofabrik_candidates, pbf_download, pbf_download_cancel,
             geo_search, geo_suggest,
-            pipeline_start, pipeline_status, pipeline_cancel, pipeline_retime, result_load, gpx_export,
+            pipeline_start, pipeline_status, pipeline_cancel, pipeline_retime, pipeline_reroute, result_load, gpx_export,
             hint_import, hint_read, hint_remove, atlas_job_read, atlas_hint_download, atlas_result_write, import_templates, import_resolve, import_preview, import_start, import_cancel, import_status, reveal,
             incyclist_info, incyclist_export, incyclist_cancel, incyclist_preview_set, incyclist_preview_clear, dem_status, dem_download, dem_cancel, dem_list, dem_remove, geo_country, profile_load, profile_diag, inspect_series, inspect_frame,
         ])

@@ -202,6 +202,10 @@ export interface RoutePoint {
   motion_state?: string;
 }
 
+export interface RouteDot { lat: number; lon: number; orig_s?: number }
+export interface RouteEditState { start: RouteDot | null; end: RouteDot | null; vias: RouteDot[] }
+export interface RerouteResult { gpx: string; route_points: string; project: string; path_km: number; seconds: number; waypoints: RouteEditState | null }
+
 export interface ResultData {
   points: RoutePoint[];
   verdict: Verdict;
@@ -216,6 +220,8 @@ export interface ResultData {
   cut_times: number[];
   /** the sure standstills [t0, t1] in video seconds (route_points.json standstills) */
   standstills: [number, number][];
+  /** manual route drag/drop edits active on this result (project.json reroute), or null */
+  reroute?: RouteEditState | null;
   /** signature of this result (src/atlas.ts resultSig of route_points.json): the Atlas checklist belongs to one result */
   sig: string;
 }

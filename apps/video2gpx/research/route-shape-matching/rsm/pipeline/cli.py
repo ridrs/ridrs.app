@@ -87,6 +87,11 @@ def parse_args(argv):
     t = sub.add_parser("retime")
     t.add_argument("dir")
     t.add_argument("--start-time", required=True)
+    rr = sub.add_parser("reroute", help="reroute a finished run through user-dragged waypoints (start/end/vias) and fit the timeline")
+    rr.add_argument("--out", required=True, help="the finished run directory")
+    rr_g = rr.add_mutually_exclusive_group(required=True)
+    rr_g.add_argument("--waypoints", default=None, help="JSON file or inline JSON: {start, end, vias}")
+    rr_g.add_argument("--reset", action="store_true", help="restore the original detected route before manual edits")
     s = sub.add_parser("_step")
     s.add_argument("step")
     s.add_argument("--dir", required=True)
@@ -406,6 +411,18 @@ def main(argv=None) -> int:
         except (FileNotFoundError, ValueError) as e:
             emit({"type": "log", "level": "error", "message": str(e)})
             return EXIT["args"]
+    if a.cmd == "reroute":
+        from .reroute import reroute, reset_reroute
+        try:
+            res = reset_reroute(Path(a.out)) if a.reset else reroute(Path(a.out), a.waypoints)
+            emit({"type": "result", **res})
+            return 0
+        except (FileNotFoundError, ValueError) as e:
+            emit({"type": "log", "level": "error", "message": str(e)})
+            return EXIT["args"]
+        except RuntimeError as e:
+            emit({"type": "log", "level": "error", "message": str(e)})
+            return EXIT["data"]
     if a.cmd == "profile":
         from .export import elevation_profile
         from .dem import env_dem_dir
