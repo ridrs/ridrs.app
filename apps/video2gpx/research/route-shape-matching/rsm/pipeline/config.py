@@ -79,7 +79,10 @@ NODECOY = dict(conf_mean=0.9, below_half=0.05, conf_mean_min=0.5)
 DECOY_ORDER = ("foreign", "mirror", "foreign+shuffle", "shuffle")   # used when fewer than 19 decoys are requested
 
 # --- area hints (start / end frame, route hint corridor)
-START_TOL_M = 150.0        # tolerance of the start / end frame (the first seconds may be gaps)
+START_TOL_M = 150.0        # tolerance of the start / end frame (the first seconds may be gaps): the outer limit of the decoded start / end
+# A30 (maintainer 2026-11-22): within the tolerance, every metre the decoded start / end lies outside its frame costs this (Lahntal: 144 m outside a 93 x 70 m
+# frame were free and absorbed about 100 m of distance the video measured too much; 144 m now cost 72 nats). PROVISIONAL.
+FRAME_COST_NATS_PER_M = 0.5
 HINT_BUFFER_M = 300.0      # corridor half-width of a route hint; the app allows 100 m - 2 km
 HINT_BUFFER_RANGE = (100.0, 2000.0)
 HINT_BRIDGE_MIN_M = 2000.0 # longest road connection added between separate corridor pieces: max(this, 5 buffers)

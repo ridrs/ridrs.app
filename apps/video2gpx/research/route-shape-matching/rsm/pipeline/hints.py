@@ -285,3 +285,51 @@ def cost_key() -> str:
 def cost_hash_part(P: dict) -> list:
     """the distance cost in the hashes of route_search onward ([] without a hint: old hashes unchanged)"""
     return [["hint_cost1", C.HINT_COST_FREE_M, C.HINT_COST_NATS_PER_KM_PER_M, C.HINT_COST_MAX_NATS_PER_KM]] if P.get("hint") else []
+
+
+# ------------------------------------------------------------------ the start / end frame cost (A30)
+_FRAMES: dict = {}       # the active frames: crs, projected rectangles, key
+
+
+def _rect(frame: dict, crs: str):
+    from pyproj import Transformer
+    tr = Transformer.from_crs(4326, crs, always_xy=True)
+    xs, ys = tr.transform([frame["west"], frame["east"], frame["west"], frame["east"]], [frame["south"], frame["south"], frame["north"], frame["north"]])
+    return min(xs), max(xs), min(ys), max(ys)
+
+
+def _outside_cost(xy, rect) -> np.ndarray:
+    x0, x1, y0, y1 = rect
+    dx = np.maximum(np.maximum(x0 - xy[:, 0], xy[:, 0] - x1), 0.0)
+    dy = np.maximum(np.maximum(y0 - xy[:, 1], xy[:, 1] - y1), 0.0)
+    return (-C.FRAME_COST_NATS_PER_M * np.hypot(dx, dy)).astype(np.float32)
+
+
+def frame_prior(G):
+    """the decoder hook (rsm.hmm_cal.dp.FRAME_PRIOR_HOOK): (start, end) log prior per cell of grid G, 0 inside the frame and -C.FRAME_COST_NATS_PER_M per metre
+    outside it (the hard tolerance stays with the frame masks); None for a missing frame or a graph in another CRS"""
+    if not _FRAMES or G.g is None or str(G.g.crs) != _FRAMES["crs"]:
+        return None, None
+    return tuple(None if r is None else _outside_cost(np.asarray(G.xy, float), r) for r in (_FRAMES["start"], _FRAMES["end"]))
+
+
+def activate_frame_cost(cons: dict | None, crs: str | None = None):
+    """put the cost of the start / end frame of `cons` (dict(start, end, tol), as steps_b._cons_of) in effect for every decode of this process; None: off"""
+    from rsm.hmm_cal import dp
+    _FRAMES.clear()
+    if not cons or crs is None or not (cons.get("start") or cons.get("end")):
+        dp.FRAME_PRIOR_HOOK = None
+        return
+    st, en = (None if not cons.get(k) else _rect(cons[k], crs) for k in ("start", "end"))
+    _FRAMES.update(crs=str(crs), start=st, end=en, key=hashlib.sha256(repr((crs, st, en, C.FRAME_COST_NATS_PER_M)).encode()).hexdigest()[:16])
+    dp.FRAME_PRIOR_HOOK = frame_prior
+
+
+def frame_cost_key() -> str:
+    """for cache keys of scores (steps_b._memo_key); "" when off"""
+    return _FRAMES.get("key", "")
+
+
+def frame_cost_hash_part(P: dict) -> list:
+    """the frame cost in the hashes of route_search onward ([] without frames: old hashes unchanged)"""
+    return [["frame_cost1", C.FRAME_COST_NATS_PER_M]] if (P.get("start_bbox") or P.get("end_bbox")) else []

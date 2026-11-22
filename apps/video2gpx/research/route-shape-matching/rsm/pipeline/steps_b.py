@@ -305,6 +305,7 @@ def _memo_key(pre, st, masks) -> str:
     h.update(repr(C.F_REF).encode())
     h.update(AN.key().encode())
     h.update(HI.cost_key().encode())
+    h.update(HI.frame_cost_key().encode())
     return h.hexdigest()[:20]
 
 
@@ -662,12 +663,14 @@ def route_search(d: Path, P: dict, W: Worker):
 
     def solve(E_, cons_, label):
         """-> (res, cons_used). Infeasible frames: clear status and the same search without them."""
+        HI.activate_frame_cost(cons_, getattr(g, "crs", None))        # A30: a start / end outside its frame costs per metre in every decode of this search
         r = _search(d, P, W, g, E_, st, cons_, label)
         if r is None and cons_:
             msg = "the start / end frame cannot be reached by any route of this video in the search area; the frames are ignored for this run"
             W.status("start_frame" if cons_.get("start") else "end_frame", "problem", None, msg)
             W.log("warn", msg)
             notes.append("frames_infeasible")
+            HI.activate_frame_cost(None)
             r = _search(d, P, W, g, E_, st, None, label)
             cons_ = None
         if r is None:
@@ -701,6 +704,7 @@ def route_search(d: Path, P: dict, W: Worker):
                 W.status("hint_corridor", "difficult", None,
                          f"the route search in the hint corridor was {v1['verdict']} ({hint_info['corridor_score_per_km']:.1f} nats/km); the full search frame gave {v2['verdict']} "
                          f"({res2['score_per_km']:.1f} nats/km): the {'full-frame' if better else 'corridor'} result is used")
+    HI.activate_frame_cost(cons_used, getattr(g, "crs", None))         # the frames of the chosen search for every later decode of this step
     paths_info = None
     if (d / "map" / "edges_paths.npy").exists():   # bike-path fallback (map_step, bike_paths_mode): the road result is not confident -> once more with paths
         v1 = V.verdict_from(res, ms, rot)

@@ -52,7 +52,7 @@ def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None):
     if not hasattr(pre, "_border"):
         dp._prep_border(pre)
     al = np.empty((T_, N), np.float16)
-    a = np.full(N, -np.log(N), np.float32) if start_ok is None else dp._log_uniform(start_ok)
+    a = dp.start_prior(G, np.full(N, -np.log(N), np.float32) if start_ok is None else dp._log_uniform(start_ok))   # + the start frame cost (A30)
     so = dp.STEP_OK_HOOK(G, st, None) if dp.STEP_OK_HOOK else None      # user anchors (anchors.py)
     al[0] = a
     for j in range(1, T_):
@@ -76,6 +76,9 @@ def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None):
             progress(50.0 * j / T_)
     out = [None] * T_
     beta = np.zeros(N, np.float32) if end_ok is None else np.where(end_ok, np.float32(0), NEG).astype(np.float32)
+    e_lp = dp.end_prior(G)                       # the end frame cost (A30)
+    if e_lp is not None:
+        beta = (beta + e_lp).astype(np.float32)
     for j in range(T_ - 1, -1, -1):
         if so and j in so:
             beta = np.where(so[j], beta, NEG).astype(np.float32)
@@ -369,6 +372,7 @@ def refine(d: Path, P: dict, W: Worker):
         HI.start_cost(P, g.crs)
     else:
         HI.activate_cost(None)
+    HI.activate_frame_cost(route.get("cons"), getattr(g, "crs", None))  # A30: the start / end frame cost of the route search in every decode below
     if route.get("edge_set") == "full":          # the hint fallback decoded on the full search frame
         E = np.load(d / "map" / "edges_full.npy")
     elif route.get("edge_set") == "paths":       # the bike-path fallback decoded on the map with paths (steps_b.route_search)

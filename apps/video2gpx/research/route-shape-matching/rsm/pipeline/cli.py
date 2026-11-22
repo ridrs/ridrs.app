@@ -150,6 +150,7 @@ class Run:
         from . import anchors as AN
         from . import align as AL
         from .hints import cost_hash_part as HI_COST
+        from .hints import frame_cost_hash_part as HI_FRAMES
         h, prev = {}, ""
         hint_map = [["hint", P["hint_hash"], P["hint_buffer_m"]]] if P.get("hint") else []
         cons = [["frames", P.get("start_bbox"), P.get("end_bbox"), P["start_tol_m"]]] if (P.get("start_bbox") or P.get("end_bbox")) else []
@@ -177,7 +178,7 @@ class Run:
                                *([["intro_user1", P["intro_end"]]] if P.get("intro_end") is not None else []),
                                *([["strong2", C.CUT_STRONG_IMPULSE, C.CUT_STRONG_FACTOR, C.CUT_STRONG_MIN_DIFF, C.CUT_STRONG_AROUND, C.CUT_STRONG_NB_SHARE]] if C.CUT_ON else []), *still],
                      map=[P["bbox"], file_sig(P["pbf"]), P["vehicle"], C.CLASSES_BIKE, C.CLASSES_MOTOR, C.HMM_CAP_GB, "map1", *hint_map, *paths_map],
-                     route_search=[C.F_GRID, C.K_GRID, C.REFINE_K, C.REFINE_F, C.H, "search1", C.CUT_PRIOR_SD_M, *cons, *bike_cal, *odo, *bridge, *AN.hash_part(P), *HI_COST(P)],
+                     route_search=[C.F_GRID, C.K_GRID, C.REFINE_K, C.REFINE_F, C.H, "search1", C.CUT_PRIOR_SD_M, *cons, *bike_cal, *odo, *bridge, *AN.hash_part(P), *HI_COST(P), *HI_FRAMES(P)],
                      plausibility=[C.N_FOREIGN, C.N_SHUFFLE, C.SEED0, C.VERDICT_CONFIDENT_MARGIN, P["decoys"], "plaus1"],
                      refine=["refine4", "bridge1", "bikepath_free1", *HI_COST(P), *(["hold1"] if C.STILL_ON else []), *(["shape1"] if C.FUSE_SHAPE_STEPS else []), *([["align_post1", C.ALIGN_POST_BAND_M, C.ALIGN_POST_FLOOR_M, C.ALIGN_POST_INFL, C.ALIGN_POST_MAX_SD_M, C.ALIGN_POST_GATE_M]] if AL.meas_mode(P) == "posterior" else []), "raster1", C.GPX_HZ, C.LOCAL_MINOR_NATS_PER_KM, C.LOCAL_ON, C.LOCAL_BUF_M, C.LOCAL_D0, C.LOCAL_EXTRA, C.LOCAL_SAME_M, file_sig(P["pbf"]), C.GAP_MEASURED_SHARE, C.ALIGN_ON, C.ALIGN_DS,
                              C.ALIGN_SMOOTH_M, C.ALIGN_REL, C.ALIGN_SIG0_DEG, C.ALIGN_BETA, C.ALIGN_NU, C.ALIGN_VMAX, C.ALIGN_MEAS_SD_M, C.ALIGN_MEAS_EVERY_M, C.ALIGN_MAX_DEV_M, C.ALIGN_TURN_DEG, C.ALIGN_TURN_HALF_M, C.POST_STRAIGHT_EVERY_M, C.POST_STRAIGHT_INFL,

@@ -20,6 +20,7 @@ from rsm.hmm.seq import Steps
 
 NEG = np.float32(-np.inf)
 STEP_OK_HOOK = None   # callable(grid, st, step_ok) -> step_ok with the user anchors merged in (rsm.pipeline.anchors.activate); None: off
+FRAME_PRIOR_HOOK = None   # callable(grid) -> (start log prior, end log prior) per cell, each or None (rsm.pipeline.hints.activate_frame_cost, A30); None: off
 
 
 @dataclass
@@ -109,6 +110,9 @@ def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0,
     a = np.zeros(N, np.float32) if start_ok is None else np.where(start_ok, np.float32(0), NEG).astype(np.float32)
     if step_ok and 0 in step_ok:
         a = np.where(step_ok[0], a, NEG).astype(np.float32)
+    s_lp, e_lp = FRAME_PRIOR_HOOK(grid) if FRAME_PRIOR_HOOK is not None else (None, None)
+    if s_lp is not None:
+        a = (a + s_lp).astype(np.float32)
     bps = [] if backptr else None
     if backptr:
         check_budget(N, st.T, bp_bytes=2, forward_backward=False)
@@ -137,6 +141,8 @@ def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0,
             bps.append(code)
     if end_ok is not None:
         a = np.where(end_ok, a, NEG).astype(np.float32)
+    if e_lp is not None:
+        a = (a + e_lp).astype(np.float32)
     c = int(np.argmax(a))
     if not np.isfinite(a[c]):
         return dict(score=float("-inf"), final_cell=-1, cell_path=None)
@@ -180,6 +186,7 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
     a = np.full(N, -np.log(N), np.float32) if start_ok is None else _log_uniform(start_ok)
     if step_ok and 0 in step_ok:
         a = _log_uniform(step_ok[0] if start_ok is None else (step_ok[0] & start_ok))
+    a = start_prior(grid, a)
     al[0] = a
     logev = 0.0
     for j in range(1, T):
@@ -206,6 +213,9 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
     es = grid.estart[:-1]
     p_vit = np.full(T, np.nan); p_max = np.zeros(T); e_max = np.zeros(T, np.int64); ent = np.zeros(T)
     beta = np.zeros(N, np.float32) if end_ok is None else np.where(end_ok, np.float32(0), NEG).astype(np.float32)
+    e_lp = end_prior(grid)
+    if e_lp is not None:
+        beta = (beta + e_lp).astype(np.float32)
     for j in range(T - 1, -1, -1):
         if step_ok and j in step_ok:
             beta = np.where(step_ok[j], beta, NEG).astype(np.float32)
@@ -235,6 +245,22 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
         mx = nb.max()
         beta = nb - mx
     return dict(logev=logev, p_vit=p_vit, p_max=p_max, e_max=e_max, ent=ent)
+
+
+def start_prior(grid, a: np.ndarray) -> np.ndarray:
+    """the normalised log weight of the first cell: `a` plus the start frame cost (FRAME_PRIOR_HOOK, A30); `a` unchanged without it"""
+    s_lp = FRAME_PRIOR_HOOK(grid)[0] if FRAME_PRIOR_HOOK is not None else None
+    if s_lp is None:
+        return a
+    a = a + s_lp
+    fin = np.isfinite(a)
+    mx = a[fin].max()
+    return np.where(fin, a - (mx + np.log(np.exp(a[fin] - mx).sum())), NEG).astype(np.float32)
+
+
+def end_prior(grid):
+    """the end frame cost (FRAME_PRIOR_HOOK, A30) or None"""
+    return FRAME_PRIOR_HOOK(grid)[1] if FRAME_PRIOR_HOOK is not None else None
 
 
 def _log_uniform(ok) -> np.ndarray:
