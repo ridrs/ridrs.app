@@ -62,9 +62,8 @@ const TARGET_ORANGE = '#ff5a1f';
 const TARGET_OUTER = 96.8;
 const TARGET_LINE_WIDTH = 2.3;
 const TARGET_SPOTLIGHT_OUTER = TARGET_OUTER - TARGET_LINE_WIDTH / 2;
-const TARGET_SPOTLIGHT_INNER = 72;
-const TARGET_RAY_INNER = 74;
-const TARGET_TICK_MARGIN = 1.8;
+const TARGET_SPOTLIGHT_INNER = 81.3;
+const TARGET_RAY_INNER = 82.3;
 const TARGET_POINTER = `${C - 4.5},${(C - TARGET_OUTER + 0.15).toFixed(2)} ${C + 4.5},${(C - TARGET_OUTER + 0.15).toFixed(2)} ${C},7.4`;
 
 function point(radius: number, degrees: number): [number, number] {
@@ -270,10 +269,10 @@ export function Gauge({
                 r={TARGET_SPOTLIGHT_OUTER}
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="75%" stopColor={TARGET_ORANGE} stopOpacity={0} />
-                <stop offset="81%" stopColor={TARGET_ORANGE} stopOpacity={0.12} />
-                <stop offset="87%" stopColor={TARGET_ORANGE} stopOpacity={0.28} />
-                <stop offset="94%" stopColor={TARGET_ORANGE} stopOpacity={0.5} />
+                <stop offset="85%" stopColor={TARGET_ORANGE} stopOpacity={0} />
+                <stop offset="89%" stopColor={TARGET_ORANGE} stopOpacity={0.14} />
+                <stop offset="93%" stopColor={TARGET_ORANGE} stopOpacity={0.32} />
+                <stop offset="97%" stopColor={TARGET_ORANGE} stopOpacity={0.54} />
                 <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.72} />
               </radialGradient>
               <radialGradient
@@ -283,8 +282,8 @@ export function Gauge({
                 r={TARGET_SPOTLIGHT_OUTER}
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="77%" stopColor={TARGET_ORANGE} stopOpacity={0} />
-                <stop offset="86%" stopColor={TARGET_ORANGE} stopOpacity={0.45} />
+                <stop offset="86%" stopColor={TARGET_ORANGE} stopOpacity={0} />
+                <stop offset="93%" stopColor={TARGET_ORANGE} stopOpacity={0.45} />
                 <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.85} />
               </radialGradient>
             </defs>
@@ -322,7 +321,7 @@ export function Gauge({
           </>
         ) : null}
 
-        {/* The zones, dimmed; the scale lights up from its start to the value. */}
+        {/* 3. Scale lines (dimmed zone track and tick lines) and scale numbers. */}
         {scale.bands.length === 0 ? (
           <path
             d={arc(ARC_RADIUS, start, angleOf(scale, scale.max))}
@@ -347,45 +346,23 @@ export function Gauge({
             <title>{`${zoneName(item.zone)}${item.name ? ` · ${item.name}` : ''}`}</title>
           </path>
         ))}
-        {lights ? (
-          <path
-            data-testid="active-arc"
-            data-value={display.text}
-            d={arc(ARC_RADIUS, start + CAP_ANGLE, Math.max(angle - CAP_ANGLE, start + CAP_ANGLE + 0.01))}
-            fill="none"
-            stroke={accent}
-            strokeWidth={ARC_WIDTH}
-            strokeLinecap="round"
-          />
-        ) : null}
-
-        {/* The ticks inside the scale and their numbers. */}
-        {ticksOf(scale)
-          .filter((tick) => {
-            if (!targetAngles) return true;
-            const at = angleOf(scale, tick.value);
-            return (
-              at < targetAngles.low - TARGET_TICK_MARGIN ||
-              at > targetAngles.high + TARGET_TICK_MARGIN
-            );
-          })
-          .map((tick) => {
-            const at = angleOf(scale, tick.value);
-            const [x0, y0] = point(TICK_OUTER, at);
-            const [x1, y1] = point(tick.major ? TICK_INNER_MAJOR : TICK_INNER_MINOR, at);
-            return (
-              <line
-                key={tick.value}
-                x1={x0}
-                y1={y0}
-                x2={x1}
-                y2={y1}
-                stroke={tick.major ? WHITE : GREY_DARK}
-                strokeWidth={tick.major ? 1.47 : 0.87}
-                strokeLinecap="round"
-              />
-            );
-          })}
+        {ticksOf(scale).map((tick) => {
+          const at = angleOf(scale, tick.value);
+          const [x0, y0] = point(TICK_OUTER, at);
+          const [x1, y1] = point(tick.major ? TICK_INNER_MAJOR : TICK_INNER_MINOR, at);
+          return (
+            <line
+              key={tick.value}
+              x1={x0}
+              y1={y0}
+              x2={x1}
+              y2={y1}
+              stroke={tick.major ? WHITE : GREY_DARK}
+              strokeWidth={tick.major ? 1.47 : 0.87}
+              strokeLinecap="round"
+            />
+          );
+        })}
         {ticksOf(scale)
           .filter((tick) => tick.major)
           .map((tick) => {
@@ -406,7 +383,90 @@ export function Gauge({
             );
           })}
 
-        {/* The workout target (Spotlight 3): an outer arc and a center triangle; the other triangles hide. */}
+        {/* 4. Gauge: current lit arc, value large at the centre, unit below it, gear or average at the bottom. */}
+        {lights ? (
+          <path
+            data-testid="active-arc"
+            data-value={display.text}
+            d={arc(ARC_RADIUS, start + CAP_ANGLE, Math.max(angle - CAP_ANGLE, start + CAP_ANGLE + 0.01))}
+            fill="none"
+            stroke={accent}
+            strokeWidth={ARC_WIDTH}
+            strokeLinecap="round"
+          />
+        ) : null}
+        <text
+          data-testid="value"
+          x={C}
+          y={C}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={display.text.length > 3 ? SIZE.valueLong : SIZE.value}
+          fontWeight={WEIGHT.medium}
+          letterSpacing={-1.5}
+          fill={live ? WHITE : GREY_DARK}
+        >
+          {display.text}
+        </text>
+        {display.reason === undefined ? (
+          <text
+            data-testid="unit"
+            x={C}
+            y={134}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={SIZE.unit}
+            fontWeight={WEIGHT.medium}
+            fill={GREY}
+          >
+            {unit}
+          </text>
+        ) : (
+          // Why there is no value, in the unit's place: the dash above says the rest.
+          <text
+            data-testid="reason"
+            x={C}
+            y={134}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={SIZE.unit}
+            fontWeight={WEIGHT.medium}
+            fill={WARN}
+          >
+            {display.reason}
+          </text>
+        )}
+        {gear ?? average ? (
+          <>
+            <text
+              x={C}
+              y={157}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={SIZE.label}
+              fontWeight={WEIGHT.medium}
+              letterSpacing={1.1}
+              fill={GREY_DARK}
+            >
+              {(gear ?? average)?.label.toUpperCase()}
+            </text>
+            <text
+              data-testid={gear ? 'gear' : 'average'}
+              x={C}
+              y={175}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={SIZE.secondary}
+              fontWeight={WEIGHT.medium}
+              letterSpacing={-0.5}
+              fill={GREY_LIGHT}
+            >
+              {gear ? gear.text : averageText}
+            </text>
+          </>
+        ) : null}
+
+        {/* 5. Outer part of the marker (workout target arc and center triangle; else FTP and average marks). */}
         {targetAngles && target && targetSpan ? (
           <g
             data-testid="target-marker"
@@ -484,80 +544,6 @@ export function Gauge({
               strokeLinejoin="round"
             />
           </g>
-        ) : null}
-
-        {/* The value large at the centre, the unit below it. */}
-        <text
-          data-testid="value"
-          x={C}
-          y={C}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={display.text.length > 3 ? SIZE.valueLong : SIZE.value}
-          fontWeight={WEIGHT.medium}
-          letterSpacing={-1.5}
-          fill={live ? WHITE : GREY_DARK}
-        >
-          {display.text}
-        </text>
-        {display.reason === undefined ? (
-          <text
-            data-testid="unit"
-            x={C}
-            y={134}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={SIZE.unit}
-            fontWeight={WEIGHT.medium}
-            fill={GREY}
-          >
-            {unit}
-          </text>
-        ) : (
-          // Why there is no value, in the unit's place: the dash above says the rest.
-          <text
-            data-testid="reason"
-            x={C}
-            y={134}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={SIZE.unit}
-            fontWeight={WEIGHT.medium}
-            fill={WARN}
-          >
-            {display.reason}
-          </text>
-        )}
-
-        {/* At the bottom, in the opening of the scale: the gear, else the average. */}
-        {gear ?? average ? (
-          <>
-            <text
-              x={C}
-              y={157}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={SIZE.label}
-              fontWeight={WEIGHT.medium}
-              letterSpacing={1.1}
-              fill={GREY_DARK}
-            >
-              {(gear ?? average)?.label.toUpperCase()}
-            </text>
-            <text
-              data-testid={gear ? 'gear' : 'average'}
-              x={C}
-              y={175}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={SIZE.secondary}
-              fontWeight={WEIGHT.medium}
-              letterSpacing={-0.5}
-              fill={GREY_LIGHT}
-            >
-              {gear ? gear.text : averageText}
-            </text>
-          </>
         ) : null}
       </svg>
       <canvas

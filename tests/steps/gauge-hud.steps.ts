@@ -502,11 +502,79 @@ Then(
       const stops = [...element.querySelectorAll(`#target-glow-${kind} stop`)];
       assert.ok(stops.length >= 2, 'Expected radial gradient stops for the target spotlight');
       assert.equal(stops[0]?.getAttribute('stop-opacity'), '0');
+      const startOffset = Number.parseFloat(stops[0]?.getAttribute('offset') ?? '0');
+      assert.ok(
+        startOffset >= 84,
+        `Expected the inner spotlight fade to start at >= 84% of the outer radius, got ${startOffset}%`,
+      );
       const colors = new Set(stops.map((stop) => stop.getAttribute('stop-color')));
       assert.equal(
         colors.size,
         1,
         `Expected the spotlight to fade one colour to transparent, got ${[...colors].join(', ')}`,
+      );
+    });
+  },
+);
+
+Then(
+  'the {word} gauge keeps all {int} scale lines across the target',
+  async function (this: RidrsWorld, kind: string, expectedCount: number) {
+    const element = await gauge(this, kind);
+    await eventually(this, () => {
+      const tickLines = element.querySelectorAll('svg > line');
+      assert.equal(
+        tickLines.length,
+        expectedCount,
+        `Expected ${expectedCount} scale tick lines on the ${kind} gauge, got ${tickLines.length}`,
+      );
+    });
+  },
+);
+
+Then(
+  'the {word} gauge stacks the inner target, the scale lines and numbers, the current reading and the outer target in that order',
+  async function (this: RidrsWorld, kind: string) {
+    const element = await gauge(this, kind);
+    await eventually(this, () => {
+      const svg = element.querySelector('svg');
+      assert.ok(svg, 'Expected the gauge SVG');
+      const all = [...svg.querySelectorAll('*')];
+      const indexOf = (node: Element) => all.indexOf(node);
+      const spotlight = within(element).getByTestId('target-spotlight');
+      const tickLines = [...svg.querySelectorAll(':scope > line')];
+      const tickNumbers = [...svg.querySelectorAll(':scope > text')].filter(
+        (text) => !text.hasAttribute('data-testid') && text.textContent !== 'AVG',
+      );
+      const activeArc = within(element).getByTestId('active-arc');
+      const value = within(element).getByTestId('value');
+      const unit = within(element).getByTestId('unit');
+      const marker = within(element).getByTestId('target-marker');
+
+      assert.ok(tickLines.length > 0, 'Expected scale tick lines');
+      assert.ok(tickNumbers.length > 0, 'Expected scale numbers');
+
+      const spotlightEnd = Math.max(
+        indexOf(spotlight),
+        ...[...spotlight.querySelectorAll('*')].map(indexOf),
+      );
+      const scaleStart = Math.min(...tickLines.map(indexOf), ...tickNumbers.map(indexOf));
+      const scaleEnd = Math.max(...tickLines.map(indexOf), ...tickNumbers.map(indexOf));
+      const gaugeStart = Math.min(indexOf(activeArc), indexOf(value), indexOf(unit));
+      const gaugeEnd = Math.max(indexOf(activeArc), indexOf(value), indexOf(unit));
+      const markerStart = indexOf(marker);
+
+      assert.ok(
+        spotlightEnd < scaleStart,
+        `Expected inner target (${spotlightEnd}) before scale lines and numbers (${scaleStart})`,
+      );
+      assert.ok(
+        scaleEnd < gaugeStart,
+        `Expected scale lines and numbers (${scaleEnd}) before current reading (${gaugeStart})`,
+      );
+      assert.ok(
+        gaugeEnd < markerStart,
+        `Expected current reading (${gaugeEnd}) before outer target (${markerStart})`,
       );
     });
   },

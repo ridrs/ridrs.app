@@ -31,6 +31,9 @@ Feature: During a workout the power and cadence gauges mark their targets on the
     And the heart-rate gauge marks its average at 150 on its scale
     And the target spotlight of the power gauge fades to transparent
     And the target spotlight of the cadence gauge fades to transparent
+    And the power gauge keeps all 26 scale lines across the target
+    And the cadence gauge keeps all 16 scale lines across the target
+    And the power gauge stacks the inner target, the scale lines and numbers, the current reading and the outer target in that order
     And everything the power gauge draws is fully opaque
     And everything the cadence gauge draws is fully opaque
 
