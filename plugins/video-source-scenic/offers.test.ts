@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import scenic from '../../tests/fixtures/scenic/ride-catalog.json' with { type: 'json' };
 import vector from '../../web/scenic/test/fixtures/ride-catalog/catalog.example.json' with { type: 'json' };
 import { parseCatalog, type RideCatalog } from './catalog.ts';
-import { catalogOffers, downloadables } from './offers.ts';
+import { catalogOffers, routeDownloads } from './offers.ts';
 
 const catalogOf = (value: unknown) => parseCatalog(value) as RideCatalog;
 
@@ -47,17 +47,27 @@ describe('catalogOffers', () => {
   });
 });
 
-describe('downloadables', () => {
-  it('names the download, the overlay with sizes and hashes, and where the former Van Gestel source kept it', () => {
-    const [route] = downloadables(catalogOf(vector));
+describe('routeDownloads', () => {
+  it('describes each download by its kind: a package with its URL, ETag and overlay, and where the former Van Gestel source kept it', () => {
+    const [route] = routeDownloads(catalogOf(vector));
     expect(route).toMatchObject({
       id: 'video-source-scenic/vg-test-climb',
-      url: 'https://cycling.example.org/rlv/XX_Test_Climb.zip',
+      kind: 'ride-package',
       size: 2_000_012_345,
-      etag: '"abc-123"',
       former: 'videos/video-source-vangestel/test-climb',
-      overlay: [{ path: 'preview.jpg', size: 26, url: expect.stringContaining('/vg/test-climb/overlay/preview.jpg?h=') }],
+      details: {
+        url: 'https://cycling.example.org/rlv/XX_Test_Climb.zip',
+        etag: '"abc-123"',
+        overlay: [{ path: 'preview.jpg', size: 26, url: expect.stringContaining('/vg/test-climb/overlay/preview.jpg?h=') }],
+      },
     });
-    expect(route?.overlay?.[0]?.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect((route?.details.overlay as { sha256: string }[])[0]?.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("takes a route's kind from the catalog where it names one", () => {
+    const catalog = catalogOf(vector);
+    const [first] = catalog.routes;
+    const named = { ...catalog, routes: [{ ...first, download: { ...first?.download, kind: 'other' } }] } as RideCatalog;
+    expect(routeDownloads(named)[0]?.kind).toBe('other');
   });
 });

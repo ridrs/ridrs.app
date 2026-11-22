@@ -24,6 +24,7 @@ const CSS = `
 .br-button { padding: 10px 20px; border: 0; border-radius: var(--ridrs-radius); box-shadow: var(--ridrs-edge);
   background: var(--ridrs-surface-raised); color: inherit; font: inherit; font-weight: 500; cursor: pointer; }
 .br-button:disabled { opacity: .5; cursor: default; }
+.br-choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .br-primary { box-shadow: none; background: var(--ridrs-accent);
   color: var(--ridrs-accent-text); font-size: 20px; font-weight: 500; padding: 14px 40px; }
 .br-options { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none;

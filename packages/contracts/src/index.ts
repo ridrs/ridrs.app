@@ -437,10 +437,18 @@ export {
   rideScreenshotService,
 } from './recording.ts';
 export {
+  type RouteDownload,
+  type RouteDownloader,
+  type RouteDownloadOption,
+  type RouteDownloads,
   type RouteImport,
   type RouteImportPreview,
   type RouteOffer,
+  type RoutePictures,
   routeCancelService,
+  routeDownloaderCapability,
+  routeDownloadOptionSchema,
+  routeDownloadOptionsService,
   routeFetchService,
   routeImportPreviewSchema,
   routeImportPreviewService,

@@ -2,7 +2,7 @@
 
 # ADR 0103: Video Routes from ridrs Scenic
 
-Status: proposed on 2026-11-21, on the maintainer's request that the app ship no catalog of video routes in a plugin and read them from ridrs Scenic, and that the section "Real video" of the ride page be "Scenic". Changes ADR 0095 (the app's catalog) and the place of the catalog of ADR 0070.
+Status: proposed on 2026-11-21, on the maintainer's request that the app ship no catalog of video routes in a plugin and read them from ridrs Scenic, and that the section "Real video" of the ride page be "Scenic". Changes ADR 0095 (the app's catalog) and the place of the catalog of ADR 0070. Since ADR 0105 the downloads are `download-ride-package`'s; the source hands its routes to it.
 
 ## Context
 

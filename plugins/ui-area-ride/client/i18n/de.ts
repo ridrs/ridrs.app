@@ -36,6 +36,8 @@ export const de: Messages = {
   go: 'Los',
   download: 'Herunterladen',
   downloadOf: (title: string) => `${title} herunterladen`,
+  chooseQuality: 'Qualität wählen',
+  recommendedQuality: (label: string) => `Empfohlen: ${label}`,
   cancelDownload: 'Download abbrechen',
   cancelDownloadOf: (title: string) => `Download von ${title} abbrechen`,
   remove: 'Von diesem Gerät entfernen',

@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { rideWorldSchema } from './activity.ts';
 import { defineState } from './app-state.ts';
+import { defineCapability } from './capabilities.ts';
 import { defineService } from './services.ts';
 
 /**
@@ -122,13 +123,36 @@ export const routeOfferState = defineState('route.offer', routeOfferSchema);
 
 const routeKeyRequest = z.object({ key: routeOfferSchema.shape.id }).strict();
 
+/** A quality a route can be downloaded in (ADR 0105): `size` in bytes where it is known. */
+export const routeDownloadOptionSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    size: z.number().int().positive().optional(),
+    recommended: z.boolean().optional(),
+  })
+  .strict();
+
+export type RouteDownloadOption = z.infer<typeof routeDownloadOptionSchema>;
+
 /**
- * Downloads a `fetchable` or `failed` offer: answered by the offer's provider once the download
- * started (its progress and a failure are the offer's state), rejected with the reason when it
- * cannot start. An offer that is `ready` or `fetching` stays as it is.
+ * The qualities a `fetchable` or `failed` offer can be downloaded in, answered by its provider
+ * (ADR 0105). With one, Download starts it at once; with several, the rider chooses.
+ */
+export const routeDownloadOptionsService = defineService('route.download-options', {
+  request: routeKeyRequest,
+  response: z.object({ options: z.array(routeDownloadOptionSchema) }).strict(),
+  keyedBy: routeOfferState,
+});
+
+/**
+ * Downloads a `fetchable` or `failed` offer, in the quality `option` of `route.download-options`
+ * (the first without one): answered by the offer's provider once the download started (its
+ * progress and a failure are the offer's state), rejected with the reason when it cannot start.
+ * An offer that is `ready` or `fetching` stays as it is.
  */
 export const routeFetchService = defineService('route.fetch', {
-  request: routeKeyRequest,
+  request: routeKeyRequest.extend({ option: z.string().min(1).optional() }).strict(),
   response: z.object({}).strict(),
   keyedBy: routeOfferState,
 });
@@ -235,3 +259,58 @@ export const routeImportPreviewService = defineService('route.import-preview', {
   response: routeImportPreviewSchema,
   keyedBy: routeImportState,
 });
+
+/**
+ * A route's download as its source describes it to a downloader (ADR 0105): `kind` picks the
+ * downloader, `details` are the source's description of it, read by the downloader of that kind.
+ */
+export interface RouteDownload {
+  /** The offer's id, `<pluginId>/<route>`: also its folder below `videos/` in the media storage. */
+  readonly id: string;
+  readonly kind: string;
+  /** Bytes, as far as the source knows them. */
+  readonly size: number;
+  readonly details: Readonly<Record<string, unknown>>;
+  /**
+   * The media folder where a former source kept this route's download: moved to the route's own
+   * folder when that has none, so that the rider need not download it again.
+   */
+  readonly former?: string;
+}
+
+/** A route's pictures on the device, as URLs: its picture and the small one of its card. */
+export interface RoutePictures {
+  readonly thumbnail?: string;
+  readonly tile?: string;
+}
+
+/**
+ * The downloads of one source with one downloader: which of its routes is on the device, on its
+ * way or failed. `changed` (of {@link RouteDownloader.open}) is called with a route's id after
+ * every change of its availability or pictures.
+ */
+export interface RouteDownloads {
+  /** The source's routes of the downloader's kinds; finds those new to it on the device. */
+  setRoutes(routes: readonly RouteDownload[]): Promise<void>;
+  availability(id: string): RouteOffer['availability'];
+  pictures(id: string): RoutePictures;
+  /** Why a download of the route in the quality `option` cannot start now; none when it can. */
+  refusal(id: string, option?: string): string | undefined;
+  options(id: string): Promise<readonly RouteDownloadOption[]>;
+  /** Resolves once the download is done, failed or cancelled; its course is the availability. */
+  fetch(id: string, option?: string): Promise<void>;
+  cancel(id: string): void;
+  remove(id: string): Promise<void>;
+}
+
+/** A downloader of routes of some kinds of download (ADR 0105); a source opens one per downloader. */
+export interface RouteDownloader {
+  readonly kinds: readonly string[];
+  open(changed: (id: string) => void): RouteDownloads;
+}
+
+export const routeDownloaderCapability = defineCapability<
+  RouteDownloader,
+  'multiple',
+  'route.downloader'
+>('route.downloader', { cardinality: 'multiple' });

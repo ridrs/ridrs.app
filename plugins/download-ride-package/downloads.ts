@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { DataArchive, DataFetch, DataPicture, MediaFiles, RouteOffer } from '@ridrs/contracts';
+import type { DataArchive, DataFetch, DataPicture, MediaFiles, RouteOffer, RoutePictures } from '@ridrs/contracts';
 import {
   besideControl,
   entryNamed,
@@ -15,7 +15,7 @@ import {
 
 export type Availability = RouteOffer['availability'];
 
-/** A route of the catalog as far as its download is concerned. */
+/** A route's package as far as its download is concerned. */
 export interface Downloadable {
   /** The offer's id, `<pluginId>/<route>`: also its folder below `videos/` in the media storage. */
   readonly id: string;
@@ -32,12 +32,6 @@ export interface Downloadable {
    * folder when that has none, so that the rider need not download it again.
    */
   readonly former?: string;
-}
-
-/** A route's pictures on the device: its picture and its small one for a card, as URLs. */
-export interface RoutePictures {
-  readonly thumbnail?: string;
-  readonly tile?: string;
 }
 
 /** The hashes of the overlay files copied into a route's folder, by their paths: hidden, no entry. */
@@ -57,8 +51,8 @@ const folderOf = (id: string) => `videos/${id}`;
 const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
- * The downloads of a video source: which route is on the device, which is on its way and which
- * failed. A route needs its download first (docs/ideas/video-sources.md): `data.fetch` brings the
+ * The downloads of the packages of one source: which route is on the device, which is on its way
+ * and which failed. A route needs its download first (docs/ideas/video-sources.md): `data.fetch` brings the
  * package into the media storage, and it becomes the route's folder `videos/<offer id>/` (ADR
  * 0094): kept as `route.ride` where its video is stored, unpacked there otherwise. Nothing is
  * renamed. `changed` is called with the route's id after every change of its state (ADR 0068: one

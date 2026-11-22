@@ -11,7 +11,7 @@ Feature: A route's pictures: the catalog's overlay and a small tile picture
   storage are the real plugins on a media folder of the scenario.
 
   Background:
-    Given the ridrs plugins "video-source-scenic, video-source-local, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "video-source-scenic, download-ride-package, video-source-local, data-archive-node, storage-media-node" together with the simulated downloads
     And pictures are made smaller by the simulated picture provider
 
   Scenario: A route of the catalog shows the catalog's small picture on its card and its full one in its details

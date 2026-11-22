@@ -45,6 +45,7 @@ export const en = {
   routeNotReady: 'The route is not on this device yet',
   download: 'Download',
   downloadRoute: 'Download route',
+  chooseQuality: 'Choose a quality',
   /** The workout outlasts the route. */
   workoutLonger: (workout: string, route: string) =>
     `Workout ${workout}, route about ${route}: the picture then stands still and the workout goes on.`,

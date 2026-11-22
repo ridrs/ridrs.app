@@ -50,6 +50,7 @@
     ],
     "calls": [
       "ride.briefing-set",
+      "route.download-options",
       "route.fetch"
     ],
     "uses": [

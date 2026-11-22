@@ -231,6 +231,20 @@ Feature: The briefing before every ride
     Then the briefing says "The route is not on this device yet"
     And the start button of the briefing is disabled
 
+  Scenario: A route offered in several qualities asks which before its download
+    Given the host has started
+    And the main screen is 1400 px wide
+    And the ridrs UI is shown
+    When I press "Start ride"
+    And I move the focus to "Not here yet"
+    And I press Enter
+    And I press Enter
+    And I press "Download route"
+    Then the briefing offers the qualities "High, Low"
+    And the focus is on "High"
+    When I press "Low"
+    Then the route offer "fixture-briefing/not-here" is downloading 200000000 bytes
+
   Scenario: A workout in % FTP without an FTP is explained and not started
     Given the rider chose the athlete profile of "ridrs"
     Given intervals.icu plans "Sweet Spot 3x12" on "2026-11-04" with the steps:

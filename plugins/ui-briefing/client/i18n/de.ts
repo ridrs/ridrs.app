@@ -47,6 +47,7 @@ export const de: Messages = {
   routeNotReady: 'Die Route ist noch nicht auf diesem Gerät',
   download: 'Herunterladen',
   downloadRoute: 'Route herunterladen',
+  chooseQuality: 'Qualität wählen',
   workoutLonger: (workout: string, route: string) =>
     `Workout ${workout}, Route etwa ${route}: Das Bild bleibt dann stehen, und das Workout läuft weiter.`,
   routeLonger: (workout: string, route: string) =>

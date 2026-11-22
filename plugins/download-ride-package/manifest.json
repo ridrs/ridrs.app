@@ -1,0 +1,19 @@
+{
+  "id": "download-ride-package",
+  "name": "Downloads of route packages",
+  "version": "0.1.0",
+  "types": [
+    "transport"
+  ],
+  "provides": [
+    "route.downloader"
+  ],
+  "requires": [],
+  "optionalRequires": [
+    "storage.media",
+    "data.fetch",
+    "data.archive",
+    "data.picture"
+  ],
+  "entry": "index.ts"
+}

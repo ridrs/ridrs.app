@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { RouteOffer } from '@ridrs/contracts';
+import type { RouteDownload, RouteOffer } from '@ridrs/contracts';
 import type { CatalogRoute, RideCatalog } from './catalog.ts';
-import type { Availability, Downloadable } from './downloads.ts';
+
+type Availability = RouteOffer['availability'];
+
+/** The kind of download of a catalog's route that names none: a package with its video. */
+export const PACKAGE_KIND = 'ride-package';
+
+/** The kind of a route's download (ADR 0105): the downloader of that kind fetches it. */
+export const kindOf = (route: CatalogRoute) => route.download.kind ?? PACKAGE_KIND;
 
 export const PLUGIN = 'video-source-scenic';
 
@@ -37,16 +44,24 @@ function countryName(code: string | undefined): string | undefined {
   }
 }
 
-/** Every route of the catalog and what its download takes, its overlay and a former download included. */
-export function downloadables(catalog: RideCatalog): Downloadable[] {
+/**
+ * Every route of the catalog as its downloader sees it: its kind, its size, and the source's
+ * description, the package's URL and ETag and the overlay with sizes and hashes; and where a
+ * former source kept it.
+ */
+export function routeDownloads(catalog: RideCatalog): RouteDownload[] {
   return catalog.routes.map((route) => {
     const former = formerFolder(route);
+    const { url, etag } = route.download;
     return {
       id: offerId(route),
-      url: route.download.url,
+      kind: kindOf(route),
       size: route.download.size,
-      etag: route.download.etag,
-      overlay: route.overlay.map(({ path, size, sha256, url }) => ({ path, size, sha256, url })),
+      details: {
+        url,
+        ...(etag ? { etag } : {}),
+        overlay: route.overlay.map(({ path, size, sha256, url: at }) => ({ path, size, sha256, url: at })),
+      },
       ...(former ? { former } : {}),
     };
   });

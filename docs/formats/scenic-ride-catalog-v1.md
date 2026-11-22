@@ -45,4 +45,4 @@ Who made the content and under which license, by source id. Every route names it
 | `climbs` | object[] | Categorised climbs in their order (ADR 0070): `category` (`HC`, `1`–`4`), `start`, `end` (m along the route), `gain` (m), `grade` (%), `summit` (m), `name` (optional). |
 | `tile` | URL, optional | The route's small picture for a card, about 800 px wide. |
 | `overlay` | object[] | Files that improve the route's package (ADR 0094): `path` (as the package's entry it improves), `size` (bytes), `sha256` (hex), `url`. |
-| `download` | object | The package with its video at its source: `url`, `format` (`incyclist-gpx-import`), `size` (bytes), `etag` (optional, as the source's server sends it). |
+| `download` | object | The package with its video at its source: `url`, `format` (`incyclist-gpx-import`), `size` (bytes), `etag` (optional, as the source's server sends it), `kind` (optional: the kind of download, which picks the app's downloader, ADR 0105; `ride-package` where it is missing). |

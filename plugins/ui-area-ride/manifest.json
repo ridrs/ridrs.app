@@ -44,6 +44,7 @@
       "route.import"
     ],
     "calls": [
+      "route.download-options",
       "route.fetch",
       "route.cancel",
       "route.remove",

@@ -6,5 +6,10 @@
   "provides": [],
   "requires": [],
   "entry": "index.ts",
-  "state": { "owns": ["route.offer"] }
+  "state": {
+    "owns": ["route.offer"]
+  },
+  "services": {
+    "provides": ["route.download-options", "route.fetch"]
+  }
 }

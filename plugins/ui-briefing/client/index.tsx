@@ -14,9 +14,11 @@ import {
   mergeDeviceStatuses,
   type RideBriefing,
   type RideWorkout,
+  type RouteDownloadOption,
   type RouteOffer,
   rideBriefingSetService,
   rideBriefingState,
+  routeDownloadOptionsService,
   routeFetchService,
   routeOfferState,
   routeProfileCapability,
@@ -308,6 +310,11 @@ function Loaded({
   const [fixed, setFixed] = useState<Fixed>(fixedFirst);
   const [editing, setEditing] = useState<'route' | 'workout'>();
   const [problem, setProblem] = useState<'no-ftp' | 'no-power-zones'>();
+  // The qualities the route's download asks for, where its source offers several (ADR 0105).
+  const [qualities, setQualities] = useState<readonly RouteDownloadOption[]>();
+  const recommendedQuality = useRef<HTMLButtonElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new choice moves the focus to its recommended quality.
+  useEffect(() => recommendedQuality.current?.focus(), [qualities]);
 
   const offer = offerOf(answers.world, offers);
   const found: Found = useMemo(() => findWorkout(answers.workout, libraries, calendars), [answers.workout, libraries, calendars]);
@@ -357,6 +364,10 @@ function Loaded({
   };
   const back = useRef(() => {});
   back.current = () => {
+    if (qualities) {
+      setQualities(undefined);
+      return;
+    }
     if (editing) {
       focusNext.current = `change-${editing}`;
       setEditing(undefined);
@@ -405,6 +416,20 @@ function Loaded({
   const trainer = devices.find((device) => device.kind === 'trainer');
   const heartRate = devices.find((device) => device.kind === 'heart-rate');
   const downloadable = offer && (offer.availability.state === 'fetchable' || offer.availability.state === 'failed');
+  const recommended = qualities?.find((option) => option.recommended) ?? qualities?.[0];
+  const fetchRoute = (key: string, option?: string) =>
+    ctx
+      .call(routeFetchService, { key, ...(option ? { option } : {}) })
+      .catch((error: unknown) => ctx.logger.warn('The route could not be downloaded', error));
+  /** Downloads the route: in its one quality at once, or asks which where its source offers several. */
+  const download = (key: string) =>
+    ctx
+      .call(routeDownloadOptionsService, { key })
+      .then(({ options }) => {
+        if (options.length > 1) setQualities(options);
+        else return fetchRoute(key, options[0]?.id);
+      })
+      .catch((error: unknown) => ctx.logger.warn('The route could not be downloaded', error));
   const routeReady = !offer || offer.availability.state === 'ready';
 
   const pair = (link: typeof trainer, label: string, pairLabel: string, kind: string) => {
@@ -565,17 +590,25 @@ function Loaded({
               <strong>{text.route}</strong>
               <span>{routeReady ? text.routeReady : text.routeNotReady}</span>
             </span>
-            {downloadable ? (
-              <button
-                type="button"
-                className="br-button"
-                aria-label={text.downloadRoute}
-                onClick={() =>
-                  ctx
-                    .call(routeFetchService, { key: offer.id })
-                    .catch((error: unknown) => ctx.logger.warn('The route could not be downloaded', error))
-                }
-              >
+            {downloadable && qualities ? (
+              <div className="br-choices" role="group" aria-label={text.chooseQuality}>
+                {qualities.map((option) => (
+                  <button
+                    key={option.id}
+                    ref={option === recommended ? recommendedQuality : undefined}
+                    type="button"
+                    className="br-button"
+                    onClick={() => {
+                      setQualities(undefined);
+                      fetchRoute(offer.id, option.id);
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : downloadable ? (
+              <button type="button" className="br-button" aria-label={text.downloadRoute} onClick={() => download(offer.id)}>
                 {text.download}
               </button>
             ) : null}

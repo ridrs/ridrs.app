@@ -10,7 +10,7 @@ Feature: Video routes from ridrs Scenic
   tests/fixtures/scenic and the files of content/vangestel; the downloads are simulated too.
 
   Background:
-    Given the ridrs plugins "video-source-scenic, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "video-source-scenic, download-ride-package, data-archive-node, storage-media-node" together with the simulated downloads
 
   Scenario: The routes of ridrs Scenic are offered
     When the host has started

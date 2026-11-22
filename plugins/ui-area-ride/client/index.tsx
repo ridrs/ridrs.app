@@ -2,9 +2,11 @@
 
 import {
   activityStartRequestedEvent,
+  type RouteDownloadOption,
   type RouteImport,
   type RouteOffer,
   routeCancelService,
+  routeDownloadOptionsService,
   routeFetchService,
   routeImportService,
   routeImportState,
@@ -285,11 +287,22 @@ function DownloadBadge({ offer, text }: { readonly offer: RouteOffer; readonly t
   }
 }
 
+/** Downloads a route, asking for the quality where its source offers several (ADR 0105). */
+type Download = (offer: RouteOffer) => Promise<void>;
+
 /**
  * Download or Cancel on a card, beside its badge: a route that is not ready downloads from the list
  * as from its details. A refused call says why in the badge's place until the offer changes.
  */
-function DownloadTool({ ctx, offer }: { readonly ctx: UiContext; readonly offer: RouteOffer }) {
+function DownloadTool({
+  ctx,
+  offer,
+  onDownload,
+}: {
+  readonly ctx: UiContext;
+  readonly offer: RouteOffer;
+  readonly onDownload: Download;
+}) {
   const text = useMessages(ctx, messages);
   const { availability } = offer;
   const [refusal, setRefusal] = useState<string>();
@@ -310,7 +323,7 @@ function DownloadTool({ ctx, offer }: { readonly ctx: UiContext; readonly offer:
         className="pv-icon"
         aria-label={fetching ? text.cancelDownloadOf(offer.title) : text.downloadOf(offer.title)}
         onClick={() =>
-          call(() => ctx.call(fetching ? routeCancelService : routeFetchService, { key: offer.id }))
+          call(() => (fetching ? ctx.call(routeCancelService, { key: offer.id }) : onDownload(offer)))
         }
       >
         <span className="pv-glyph" aria-hidden="true" style={iconStyle(fetching ? CANCEL : DOWNLOAD)} />
@@ -324,10 +337,12 @@ function RouteCard({
   ctx,
   offer,
   onOpen,
+  onDownload,
 }: {
   readonly ctx: UiContext;
   readonly offer: RouteOffer;
   readonly onOpen: () => void;
+  readonly onDownload: Download;
 }) {
   const text = useMessages(ctx, messages);
   return (
@@ -342,7 +357,7 @@ function RouteCard({
       backdrop={<RouteProfileSlot ctx={ctx} offer={offer} variant="card" />}
       tools={
         <>
-          <DownloadTool ctx={ctx} offer={offer} />
+          <DownloadTool ctx={ctx} offer={offer} onDownload={onDownload} />
           <FavouriteToggle ctx={ctx} offer={offer} />
         </>
       }
@@ -416,18 +431,27 @@ function RouteDetails({
   ctx,
   offer,
   onClose,
+  onDownload,
+  qualities,
+  onChoose,
 }: {
   readonly ctx: UiContext;
   readonly offer: RouteOffer;
   readonly onClose: () => void;
+  readonly onDownload: Download;
+  /** The qualities the rider chooses from, while Download asks which. */
+  readonly qualities?: readonly RouteDownloadOption[];
+  readonly onChoose: (option: string) => Promise<unknown>;
 }) {
   const text = useMessages(ctx, messages);
   const go = useGo(ctx);
   const first = useRef<HTMLButtonElement>(null);
   const { availability, credits } = offer;
-  // The first action of the current state, also when a download changes it under the rider.
+  // The first action of the current state, also when a download changes it under the rider; while
+  // Download asks for the quality, the recommended one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the state decides which button is first.
-  useEffect(() => first.current?.focus(), [availability.state]);
+  useEffect(() => first.current?.focus(), [availability.state, qualities]);
+  const recommended = qualities?.find((option) => option.recommended) ?? qualities?.[0];
   const fetchable = availability.state === 'fetchable' || availability.state === 'failed';
   // Why the last Download, Cancel or Remove was refused, until the offer's state changes.
   const [refusal, setRefusal] = useState<string>();
@@ -462,6 +486,28 @@ function RouteDetails({
           {duration ? <Stat icon={DURATION} label={text.duration} value={duration} /> : null}
           {level ? <Stat icon={MOUNTAIN} label={text.level} value={text.levels[level] ?? level} /> : null}
         </dl>
+        {qualities ? (
+          <div className="pv-row" role="group" aria-label={text.chooseQuality} aria-describedby="ride-quality-note">
+            {qualities.map((option) => (
+              <button
+                key={option.id}
+                ref={option === recommended ? first : undefined}
+                type="button"
+                className={option === recommended ? 'pv-button pv-primary' : 'pv-button'}
+                onClick={() => call(() => onChoose(option.id))}
+              >
+                {option.label}
+                {option.size ? <span className="pv-muted"> · {formatSize(option.size, text)}</span> : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {qualities && recommended ? (
+          <p id="ride-quality-note" className="pv-muted">
+            {text.recommendedQuality(recommended.label)}
+          </p>
+        ) : null}
+        {qualities ? null : (
         <div className="pv-row">
           {availability.state === 'ready' ? (
             <button ref={first} type="button" className="pv-button pv-primary" onClick={() => go(offer)}>
@@ -474,7 +520,7 @@ function RouteDetails({
               ref={first}
               type="button"
               className="pv-button pv-primary"
-              onClick={() => call(() => ctx.call(routeFetchService, { key: offer.id }))}
+              onClick={() => call(() => onDownload(offer))}
             >
               <span className="pv-glyph" aria-hidden="true" style={iconStyle(DOWNLOAD)} />
               {text.download}
@@ -502,6 +548,7 @@ function RouteDetails({
             </button>
           ) : null}
         </div>
+        )}
       </div>
       {state ? (
         <p role="status" className="pv-muted">
@@ -548,11 +595,37 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
   const importers = useImporters(ctx);
   const [openId, setOpenId] = useState<string>();
   const open = offers.find((offer) => offer.id === openId);
+  // The qualities a route's download asks for, in its details (ADR 0105).
+  const [choice, setChoice] = useState<{ readonly id: string; readonly options: readonly RouteDownloadOption[] }>();
+  /** Back leaves the choice of a quality first, then the details. */
+  const close = () => {
+    if (choice) setChoice(undefined);
+    else setOpenId(undefined);
+  };
   useBack(ctx, () => {
     if (!open) return false;
-    setOpenId(undefined);
+    close();
     return true;
   });
+  /**
+   * Downloads a route: in its one quality at once, or, where its source offers several, in the one
+   * the rider chooses in its details.
+   */
+  const download: Download = async (offer) => {
+    const { options } = await ctx.call(routeDownloadOptionsService, { key: offer.id });
+    if (options.length > 1) {
+      setOpenId(offer.id);
+      setChoice({ id: offer.id, options });
+      return;
+    }
+    const [only] = options;
+    await ctx.call(routeFetchService, { key: offer.id, ...(only ? { option: only.id } : {}) });
+  };
+  const choose = async (option: string) => {
+    if (!choice) return;
+    await ctx.call(routeFetchService, { key: choice.id, option });
+    setChoice(undefined);
+  };
   const shown = filterRoutes(offers, state.filters, state.favourites);
   const toggleFilter = (filter: Filter, on: boolean) =>
     change((s) => ({ ...s, filters: on ? [...s.filters, filter] : s.filters.filter((f) => f !== filter) }));
@@ -573,7 +646,13 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
               <ImportCard key={provider} ctx={ctx} provider={provider} state={state} />
             ))}
             {routes.map((offer) => (
-              <RouteCard key={offer.id} ctx={ctx} offer={offer} onOpen={() => setOpenId(offer.id)} />
+              <RouteCard
+                key={offer.id}
+                ctx={ctx}
+                offer={offer}
+                onOpen={() => setOpenId(offer.id)}
+                onDownload={download}
+              />
             ))}
           </div>
         ) : null}
@@ -582,7 +661,16 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
   };
 
   if (open) {
-    return <RouteDetails ctx={ctx} offer={open} onClose={() => setOpenId(undefined)} />;
+    return (
+      <RouteDetails
+        ctx={ctx}
+        offer={open}
+        onClose={close}
+        onDownload={download}
+        qualities={choice?.id === open.id ? choice.options : undefined}
+        onChoose={choose}
+      />
+    );
   }
   return (
     <AreaPage title={text.title} intro={text.intro}>

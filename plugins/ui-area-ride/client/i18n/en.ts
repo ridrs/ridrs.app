@@ -35,6 +35,8 @@ export const en = {
   go: 'Go',
   download: 'Download',
   downloadOf: (title: string) => `Download ${title}`,
+  chooseQuality: 'Choose a quality',
+  recommendedQuality: (label: string) => `Recommended: ${label}`,
   cancelDownload: 'Cancel download',
   cancelDownloadOf: (title: string) => `Cancel download of ${title}`,
   remove: 'Remove from this device',

@@ -583,6 +583,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contracts
 
+  plugins/download-ride-package:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ridrs/ride':
+        specifier: workspace:*
+        version: link:../../packages/ride
+
   plugins/export-fit:
     dependencies:
       '@ridrs/contracts':
@@ -1708,9 +1717,6 @@ importers:
       '@ridrs/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@ridrs/ride':
-        specifier: workspace:*
-        version: link:../../packages/ride
 
   plugins/workout-player:
     dependencies:

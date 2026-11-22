@@ -5,7 +5,7 @@ Feature: A video download can be cancelled
   call). A cancelled route can be downloaded again; what was fetched so far stays for it.
 
   Background:
-    Given the ridrs plugins "video-source-scenic, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "video-source-scenic, download-ride-package, data-archive-node, storage-media-node" together with the simulated downloads
     And the host has started
     And the simulated downloads stop halfway
 

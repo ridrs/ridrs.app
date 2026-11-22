@@ -45,7 +45,14 @@ export interface CatalogRoute {
   }[];
   readonly tile?: string;
   readonly overlay: readonly { readonly path: string; readonly size: number; readonly sha256: string; readonly url: string }[];
-  readonly download: { readonly url: string; readonly format: string; readonly size: number; readonly etag?: string };
+  /** The route's download; `kind` picks its downloader (ADR 0105), a package where it names none. */
+  readonly download: {
+    readonly kind?: string;
+    readonly url: string;
+    readonly format: string;
+    readonly size: number;
+    readonly etag?: string;
+  };
 }
 
 /** The last catalog, kept in the app files, with the ETag Scenic sent for it. */

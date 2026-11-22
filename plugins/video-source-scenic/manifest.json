@@ -10,10 +10,7 @@
   "optionalRequires": [
     "net.http",
     "storage.app-files",
-    "storage.media",
-    "data.fetch",
-    "data.archive",
-    "data.picture"
+    "route.downloader"
   ],
   "entry": "index.ts",
   "state": {
@@ -23,6 +20,7 @@
   },
   "services": {
     "provides": [
+      "route.download-options",
       "route.fetch",
       "route.cancel",
       "route.remove"

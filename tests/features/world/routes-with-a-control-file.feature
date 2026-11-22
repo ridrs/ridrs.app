@@ -15,7 +15,7 @@ Feature: Routes on the device are folders with a control file
   start, as an older ridrs left them.
 
   Background:
-    Given the ridrs plugins "video-source-scenic, video-source-local, data-archive-node, storage-media-node" together with the simulated downloads
+    Given the ridrs plugins "video-source-scenic, download-ride-package, video-source-local, data-archive-node, storage-media-node" together with the simulated downloads
 
   Scenario: A downloaded route in the unified format gets a control file at start
     Given the media storage holds the Van Gestel route "col-de-pennes" in the unified format

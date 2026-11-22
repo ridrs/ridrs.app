@@ -73,6 +73,7 @@ ui-world-video (player) ── watches its route's key of route.offer, reads rou
 | Plugin | Type | Size | Job |
 |---|---|---|---|
 | `video-source-scenic` (was `video-source-vangestel`) | transport | tiny | Offers the ride catalog of ridrs Scenic (ADR 0103; until then the shipped catalog) as keys of `route.offer`. Decides per route whether a download is needed (always, for this source). `route.fetch` answers once the download started (or rejects with the reason it cannot start) and runs fetch → import; each change of an offer's availability is one key. `route.remove` answers once the route is gone. |
+| `download-ride-package` | transport | tiny | The downloader of packages (`route.downloader`, kind `ride-package`, ADR 0105): fetch → import for the routes a source hands it, in one quality. |
 | `data-fetch-tauri` | transport | small + Rust | Provides `data.fetch`: a URL into a media path, in Rust, with resume (`Range` + `If-Range` on the ETag), progress, cancel and a free-space check. Jobs survive a restart. Knows nothing about videos. Headless tests use `data-fetch-node`. |
 | `data-archive-tauri` | transport | small + Rust | Provides `data.archive`: extracts a ZIP (ZIP64, streamed) into a media folder. |
 | `video-import-incyclist` | transport | small | Provides `video.importer` for the format `incyclist-gpx-import`. Reads the control file by its BOM, checks the GPX with `plausibleTrack` and writes `route.json`. |
@@ -181,6 +182,7 @@ It sends requests one at a time with a pause and an identifying User-Agent. It d
 8. **Cancel (2026-11-07):** the service `route.cancel` stops a download on its way (`VideoDownloads.cancel` aborts `data.fetch`; the part stays for the next download; an import already running finishes). Headless scenarios: `tests/features/world/cancel-a-download.feature`. On the ride page: **Cancel download** in the route details while a download is on its way, and on every route card that is not ready a Download or Cancel button beside the badge with its size or progress (`ui-area-ride`; scenarios in `tests/features/ui/video-downloads.feature`). A refused call from a card says why in the badge's place.
 9. **V4, a second remote source:** only then extract `@ridrs/video-source` from what the two have in common.
 10. **Scenic (2026-11-21, [ADR 0103](../decisions/0103-video-routes-from-ridrs-scenic.md)):** the app ships no catalog; `video-source-scenic` reads the ride catalog of ridrs Scenic, keeps the last one for offline use and moves the downloads of `video-source-vangestel`. The catalog lives in `content/vangestel/`. Scenarios: `tests/features/world/scenic-routes.feature`.
+11. **Downloaders (2026-11-22, [ADR 0105](../decisions/0105-a-downloader-for-each-kind-of-download.md)):** a source hands each route to the downloader of its kind (`route.downloader`); `download-ride-package` fetches packages; Download asks `route.download-options` and lets the rider choose where a downloader offers several qualities. Scenarios: `tests/features/world/route-downloaders.feature`, `tests/features/ui/download-qualities.feature`.
 
 ## Open questions
 
