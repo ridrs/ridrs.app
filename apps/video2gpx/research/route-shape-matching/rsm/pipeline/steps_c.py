@@ -18,7 +18,7 @@ from rsm.hmm import grid
 from rsm.hmm_cal import dp
 from rsm.refine import anchors as A, curves, pathctx, post
 
-from . import align as AL, anchors as AN, config as C, cuts as K, local as L, odofail as OF, tracks as T
+from . import align as AL, anchors as AN, config as C, cuts as K, hints as HI, local as L, odofail as OF, tracks as T
 from .common import Worker, jdump, jload
 from .steps_b import frame_masks, load_map
 
@@ -365,6 +365,10 @@ def refine(d: Path, P: dict, W: Worker):
     g, E = load_map(d, "real")
     route = pickle.load(open(d / "route_search" / "route.pkl", "rb"))
     AN.activate((route.get("anchors") or {}).get("used"))     # the user anchors kept by route_search: masks of every decode below (anchors.py)
+    if P.get("hint"):                            # A28: the distance to the route hint costs in every decode below (local pass, islands, posterior)
+        HI.start_cost(P, g.crs)
+    else:
+        HI.activate_cost(None)
     if route.get("edge_set") == "full":          # the hint fallback decoded on the full search frame
         E = np.load(d / "map" / "edges_full.npy")
     elif route.get("edge_set") == "paths":       # the bike-path fallback decoded on the map with paths (steps_b.route_search)

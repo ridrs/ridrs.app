@@ -84,6 +84,14 @@ HINT_BUFFER_M = 300.0      # corridor half-width of a route hint; the app allows
 HINT_BUFFER_RANGE = (100.0, 2000.0)
 HINT_BRIDGE_MIN_M = 2000.0 # longest road connection added between separate corridor pieces: max(this, 5 buffers)
 HINT_FALLBACK_AUTO = "auto"
+# --- the distance to the route hint costs (docs/DECISIONS.md A28, maintainer 2026-11-22): every metre the route travels on a cell farther than HINT_COST_FREE_M
+# from the hint costs HINT_COST_NATS_PER_KM_PER_M nats/km per metre beyond it, at most HINT_COST_MAX_NATS_PER_KM. In every decode of route_search and refine
+# (scan, decode, local pass, islands, posterior), so the corridor / full-frame choice compares with it too. Lahntal: the B 3 and the B 62 100-250 m beside the
+# hint were free inside the corridor (Sterzhausen: 0.1 nats between the two streets); 100 m off now costs about 22 nats/km, while the video's own margins
+# where it clearly saw the road were 40-130 nats. PROVISIONAL.
+HINT_COST_FREE_M = 25.0
+HINT_COST_NATS_PER_KM_PER_M = 0.3
+HINT_COST_MAX_NATS_PER_KM = 60.0
 
 # --- adaptive calibration grid: if the best cell lies on the edge of the f_eff x kappa grid, extend that edge in log steps of the same ratio, up to the hard limits
 F_EXT = (150.0, 900.0)     # hard limits of f_eff

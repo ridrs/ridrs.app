@@ -10,6 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
+from . import config as C
+
 HINT_MAX_POINTS = 200000
 
 
@@ -229,3 +231,57 @@ def agreement(xy: np.ndarray, lines_xy, buffer_m: float) -> float:
     hint = shapely.multilinestrings([shapely.linestrings(l) for l in lines_xy if len(l) >= 2])
     d = shapely.distance(shapely.points(np.asarray(xy, float)), hint)
     return float(np.mean(d <= buffer_m))
+
+
+# ------------------------------------------------------------------ the distance cost (A28)
+_COST: dict = {}         # the active hint: crs, segments, STRtree, key
+
+
+def cost_per_m(d) -> np.ndarray:
+    """nats per metre travelled at distance d (m) from the hint: 0 up to C.HINT_COST_FREE_M, then C.HINT_COST_NATS_PER_KM_PER_M per km and metre, at most
+    C.HINT_COST_MAX_NATS_PER_KM"""
+    d = np.asarray(d, float)
+    return np.minimum(C.HINT_COST_MAX_NATS_PER_KM, C.HINT_COST_NATS_PER_KM_PER_M * np.maximum(0.0, d - C.HINT_COST_FREE_M)) / 1000.0
+
+
+def cell_cost(g, xy) -> np.ndarray | None:
+    """the grid hook (rsm.hmm.grid.CELL_COST_HOOK): the cost per metre of every cell centre xy of a grid on g; None for a graph in another CRS"""
+    import shapely
+    if not _COST or str(g.crs) != _COST["crs"]:
+        return None
+    pts = shapely.points(np.asarray(xy, float))
+    i = _COST["tree"].nearest(pts)
+    return cost_per_m(shapely.distance(pts, _COST["segs"][i]))
+
+
+def activate_cost(lines_xy, crs: str | None = None):
+    """put the distance cost of the hint polylines (in crs) in effect for every grid this process builds; None switches it off"""
+    import shapely
+    from rsm.hmm import grid
+    _COST.clear()
+    if lines_xy is None or crs is None:
+        grid.CELL_COST_HOOK = None
+        return
+    segs = _unique_segments(lines_xy)
+    if len(segs) == 0:
+        grid.CELL_COST_HOOK = None
+        return
+    key = hashlib.sha256(np.ascontiguousarray(shapely.get_coordinates(segs)).tobytes() + repr((crs, C.HINT_COST_FREE_M, C.HINT_COST_NATS_PER_KM_PER_M,
+                                                                                                 C.HINT_COST_MAX_NATS_PER_KM)).encode()).hexdigest()[:16]
+    _COST.update(crs=str(crs), segs=segs, tree=shapely.STRtree(segs), key=key)
+    grid.CELL_COST_HOOK = cell_cost
+
+
+def start_cost(P: dict, crs: str):
+    """route_search / refine: the distance cost of the run's hint in effect (off without a hint)"""
+    activate_cost(project_lines(read_hint(P["hint"]), crs) if P.get("hint") else None, crs)
+
+
+def cost_key() -> str:
+    """for cache keys of scores (steps_b._memo_key); "" when off"""
+    return _COST.get("key", "")
+
+
+def cost_hash_part(P: dict) -> list:
+    """the distance cost in the hashes of route_search onward ([] without a hint: old hashes unchanged)"""
+    return [["hint_cost1", C.HINT_COST_FREE_M, C.HINT_COST_NATS_PER_KM_PER_M, C.HINT_COST_MAX_NATS_PER_KM]] if P.get("hint") else []

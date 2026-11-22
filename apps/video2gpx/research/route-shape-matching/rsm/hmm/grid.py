@@ -20,6 +20,7 @@ from scipy.ndimage import gaussian_filter1d
 from rsm.network.graph import NetGraph
 
 PROF = 2.0  # m, heading profile grid inside an edge
+CELL_COST_HOOK = None  # callable(graph, cell xy) -> nats per metre per cell, or None (rsm.pipeline.hints.activate_cost: the route hint's distance cost); None: off
 
 
 def wrap(a):
@@ -128,7 +129,8 @@ def _group(k, src, dst, D, dp, w, n_cells) -> Group:
 
 def build(g: NetGraph, edges: np.ndarray | None = None, h: float = 30.0, sm: float = 10.0, K: int = 3, pen_uturn: float = 7.0, uturns: bool = True, zero: bool = True, dmax: float | None = None,
           edge_cost: np.ndarray | None = None) -> Grid:
-    """edge_cost (optional, one value per entry of `edges`): log cost in nats per metre of entering / moving along a cell of that edge (a road-class prior)"""
+    """edge_cost (optional, one value per entry of `edges`): log cost in nats per metre of entering / moving along a cell of that edge (a road-class prior).
+    CELL_COST_HOOK (when set): a cost per cell in nats per metre on top of it (the distance to the route hint)."""
     edges = np.arange(g.n_edges) if edges is None else np.asarray(edges, np.int64)
     Ee = len(edges)
     L = np.asarray(g.edge_len)[edges]
@@ -170,8 +172,12 @@ def build(g: NetGraph, edges: np.ndarray | None = None, h: float = 30.0, sm: flo
     D_l.append(0.5 * (ell[ss] + ell[dd])); dp_l.append(wrap(phi[dd] - phi[ss])); w_l.append(np.array(ww, float))
     e1 = (np.concatenate(s_l).astype(np.int32), np.concatenate(d_l).astype(np.int32), np.concatenate(D_l).astype(np.float32),
           np.concatenate(dp_l).astype(np.float32), np.concatenate(w_l).astype(np.float32))
-    if edge_cost is not None:
-        e1 = e1[:4] + ((e1[4] - np.asarray(edge_cost, np.float64)[cell_ei[e1[1]]] * e1[2]).astype(np.float32),)
+    cell_cost = CELL_COST_HOOK(g, xy) if CELL_COST_HOOK is not None else None
+    if edge_cost is not None or cell_cost is not None:
+        c = np.zeros(N) if edge_cost is None else np.asarray(edge_cost, np.float64)[cell_ei]
+        if cell_cost is not None:
+            c = c + np.asarray(cell_cost, np.float64)
+        e1 = e1[:4] + ((e1[4] - c[e1[1]] * e1[2]).astype(np.float32),)
     o = np.argsort(e1[0], kind="stable")  # CSR join needs level-1 entries sorted by src
     e1 = tuple(a[o] for a in e1)
     G = Grid(h, edges, edges[cell_ei], cell_ei, cell_i, ell, off, xy, phi, estart, [], g)

@@ -304,6 +304,7 @@ def _memo_key(pre, st, masks) -> str:
         h.update(Path(f).read_bytes())
     h.update(repr(C.F_REF).encode())
     h.update(AN.key().encode())
+    h.update(HI.cost_key().encode())
     return h.hexdigest()[:20]
 
 
@@ -650,6 +651,10 @@ def route_search(d: Path, P: dict, W: Worker):
     rot = jload(d / "rotation" / "summary.json")["features"]
     cons = _cons_of(P)
     AN.start(P)
+    if P.get("hint"):                            # A28: the distance to the route hint costs in every decode of this step
+        HI.start_cost(P, g.crs)
+    else:
+        HI.activate_cost(None)
     hint = P.get("hint")
     f_full = d / "map" / "edges_full.npy"
     have_full = bool(hint) and f_full.exists()

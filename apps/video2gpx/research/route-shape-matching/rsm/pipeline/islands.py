@@ -159,12 +159,10 @@ def refine_islands(d: Path, P: dict, W, g, E, route: dict, vehicle: str, st, tra
     srch_xy = np.column_stack(to_x.transform(sll_t[:, 0], sll_t[:, 1]))     # search route position per step
     allE = np.arange(gx.n_edges)
     hw_all = np.asarray(gx.edge_highway)
-    base = set(C.CLASSES_BIKE if vehicle == "bike" else C.CLASSES_MOTOR)
     loc_cls = set(L.classes_for(vehicle))
 
     def cost_of(Ex):
-        hw = hw_all[Ex]
-        return np.where(~np.isin(hw, list(base)), max(C.LOCAL_MINOR_NATS_PER_KM, 0.0) / 1000.0, 0.0) + np.where(~np.isin(hw, list(loc_cls)), C.LOCAL_EXT_NATS_PER_KM / 1000.0, 0.0)
+        return L.class_cost(gx, Ex, vehicle, ext=True)
     h = C.LOCAL_D0 * k
     par = dataclasses.replace(dp.Par(), a_ang=a_ang, kappa=k)
     R = C.LOCAL_ACCEPT_R_M

@@ -34,14 +34,26 @@ def search_path(g, E, route):
     return path.xy
 
 
+def class_cost(gl, Ec, vehicle: str, ext: bool) -> np.ndarray:
+    """nats per metre of the road-class prior per edge of Ec: C.LOCAL_MINOR_NATS_PER_KM on the roads the search map leaves out (residential etc. for a motor
+    vehicle: a through-route prefers the main road, so a parallel side street of the same direction, Menton: Avenue Cernuschi next to Cours René Coty, 7.5 nats
+    apart over 1 km, needs evidence of its own) and, with ext (the islands), C.LOCAL_EXT_NATS_PER_KM more on the classes the local pass does not read.
+    A bike pays nothing on the bike-path classes (C.BIKE_PATH_CLASSES, A28): the ways a bike may ride are as likely as its roads."""
+    hw = np.asarray(gl.edge_highway)[Ec]
+    base = set(C.CLASSES_BIKE if vehicle == "bike" else C.CLASSES_MOTOR)
+    c = np.where(~np.isin(hw, list(base)), max(C.LOCAL_MINOR_NATS_PER_KM, 0.0) / 1000.0, 0.0)
+    if ext:
+        c = c + np.where(~np.isin(hw, list(classes_for(vehicle))), C.LOCAL_EXT_NATS_PER_KM / 1000.0, 0.0)
+    if vehicle == "bike":
+        c = np.where(np.isin(hw, list(C.BIKE_PATH_CLASSES)), 0.0, c)
+    return c
+
+
 def minor_cost(gl, Ec, vehicle: str):
-    """nats per metre on the roads the search map leaves out (residential etc. for a motor vehicle): a through-route prefers the main road, so a parallel side
-    street of the same direction (Menton: Avenue Cernuschi next to Cours René Coty, 7.5 nats apart over 1 km) needs evidence of its own. None if off."""
+    """the road-class prior of the local pass (class_cost without the island term). None if off."""
     if C.LOCAL_MINOR_NATS_PER_KM <= 0:
         return None
-    base = set(C.CLASSES_BIKE if vehicle == "bike" else C.CLASSES_MOTOR)
-    minor = ~np.isin(np.asarray(gl.edge_highway)[Ec], list(base))
-    return np.where(minor, C.LOCAL_MINOR_NATS_PER_KM / 1000.0, 0.0)
+    return class_cost(gl, Ec, vehicle, ext=False)
 
 
 def classes_for(vehicle: str) -> tuple:
