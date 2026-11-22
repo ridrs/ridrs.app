@@ -32,7 +32,7 @@ import {
 } from '@ridrs/ui-preview';
 import type { UiCapabilityHandle, UiContext } from '@ridrs/ui-sdk';
 import { useMessages } from '@ridrs/ui-sdk/react';
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { openBriefing } from './briefing.ts';
 import { type Messages, messages } from './i18n/index.ts';
@@ -290,6 +290,122 @@ function DownloadBadge({ offer, text }: { readonly offer: RouteOffer; readonly t
 /** Downloads a route, asking for the quality where its source offers several (ADR 0105). */
 type Download = (offer: RouteOffer) => Promise<void>;
 
+/** The quality dialog of a route's download: reading the qualities, failed to, or asking which. */
+type Choice =
+  | { readonly id: string; readonly phase: 'reading' }
+  | { readonly id: string; readonly phase: 'failed'; readonly reason: string }
+  | { readonly id: string; readonly phase: 'choosing'; readonly options: readonly RouteDownloadOption[] };
+
+/** How long Download waits for the qualities before its dialog says it is reading them, in ms. */
+const READING_SHOWN_AFTER = 150;
+
+/** A quality as the dialog names it: resolution, frame rate and HDR or SDR where known. */
+function qualityName(option: RouteDownloadOption, text: Messages): string {
+  if (option.height === undefined) return option.label;
+  return [
+    `${option.height}p`,
+    ...(option.fps ? [text.fps(Math.round(option.fps))] : []),
+    ...(option.hdr === undefined ? [] : [option.hdr ? 'HDR' : 'SDR']),
+  ].join(' · ');
+}
+
+const DIALOG_BACKDROP: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 50,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgb(5 9 16 / .7)',
+};
+const DIALOG: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 16,
+  minWidth: 320,
+  maxWidth: 'min(560px, 90vw)',
+  padding: 24,
+  borderRadius: 'var(--ridrs-radius-lg)',
+  background: 'var(--ridrs-surface)',
+  boxShadow: 'var(--ridrs-edge)',
+};
+
+/**
+ * The quality dialog of a download (ADR 0105): it says that the qualities are being read, why they
+ * could not be (Try again reads them again), or lists them, the recommended one first in the focus
+ * and named with its resolution, frame rate and HDR. Cancel and Back leave it without a download.
+ */
+function QualityDialog({
+  ctx,
+  choice,
+  onChoose,
+  onRetry,
+  onCancel,
+}: {
+  readonly ctx: UiContext;
+  readonly choice: Choice;
+  readonly onChoose: (option: string) => Promise<unknown>;
+  readonly onRetry: () => void;
+  readonly onCancel: () => void;
+}) {
+  const text = useMessages(ctx, messages);
+  const first = useRef<HTMLButtonElement>(null);
+  const [refusal, setRefusal] = useState<string>();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each phase puts the focus on its first action.
+  useEffect(() => first.current?.focus(), [choice]);
+  const options = choice.phase === 'choosing' ? choice.options : [];
+  const recommended = options.find((option) => option.recommended) ?? options[0];
+  return (
+    <div style={DIALOG_BACKDROP}>
+      <div role="dialog" aria-modal="true" aria-label={text.chooseQuality} style={DIALOG}>
+        <h3 style={{ margin: 0 }}>{text.chooseQuality}</h3>
+        {choice.phase === 'reading' ? (
+          <p role="status" className="pv-muted">
+            {text.readingQualities}
+          </p>
+        ) : null}
+        {choice.phase === 'failed' ? <p role="alert">{text.qualitiesFailed(choice.reason)}</p> : null}
+        {choice.phase === 'choosing' ? (
+          <div className="pv-row" role="group" aria-label={text.qualities} aria-describedby="ride-quality-note" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+            {options.map((option) => (
+              <button
+                key={option.id}
+                ref={option === recommended ? first : undefined}
+                type="button"
+                className={option === recommended ? 'pv-button pv-primary' : 'pv-button'}
+                title={option.label}
+                onClick={() => {
+                  setRefusal(undefined);
+                  onChoose(option.id).catch((error: unknown) => setRefusal(reasonOf(error)));
+                }}
+              >
+                {qualityName(option, text)}
+                {option.size ? <span className="pv-muted"> · {formatSize(option.size, text)}</span> : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {recommended ? (
+          <p id="ride-quality-note" className="pv-muted">
+            {text.recommendedQuality(qualityName(recommended, text))}
+          </p>
+        ) : null}
+        {refusal ? <p role="alert">{refusal}</p> : null}
+        <div className="pv-row">
+          {choice.phase === 'failed' ? (
+            <button ref={first} type="button" className="pv-button pv-primary" onClick={onRetry}>
+              {text.tryAgain}
+            </button>
+          ) : null}
+          <button ref={choice.phase === 'reading' ? first : undefined} type="button" className="pv-button" onClick={onCancel}>
+            {text.cancel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Download or Cancel on a card, beside its badge: a route that is not ready downloads from the list
  * as from its details. A refused call says why in the badge's place until the offer changes.
@@ -432,26 +548,23 @@ function RouteDetails({
   offer,
   onClose,
   onDownload,
-  qualities,
-  onChoose,
+  choosing,
 }: {
   readonly ctx: UiContext;
   readonly offer: RouteOffer;
   readonly onClose: () => void;
   readonly onDownload: Download;
-  /** The qualities the rider chooses from, while Download asks which. */
-  readonly qualities?: readonly RouteDownloadOption[];
-  readonly onChoose: (option: string) => Promise<unknown>;
+  /** While Download asks for the quality: its dialog over the details. */
+  readonly choosing?: ReactNode;
 }) {
   const text = useMessages(ctx, messages);
   const go = useGo(ctx);
   const first = useRef<HTMLButtonElement>(null);
   const { availability, credits } = offer;
-  // The first action of the current state, also when a download changes it under the rider; while
-  // Download asks for the quality, the recommended one.
+  // The first action of the current state, also when a download changes it under the rider, and
+  // again once the quality dialog is gone.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the state decides which button is first.
-  useEffect(() => first.current?.focus(), [availability.state, qualities]);
-  const recommended = qualities?.find((option) => option.recommended) ?? qualities?.[0];
+  useEffect(() => first.current?.focus(), [availability.state, choosing === undefined]);
   const fetchable = availability.state === 'fetchable' || availability.state === 'failed';
   // Why the last Download, Cancel or Remove was refused, until the offer's state changes.
   const [refusal, setRefusal] = useState<string>();
@@ -486,28 +599,7 @@ function RouteDetails({
           {duration ? <Stat icon={DURATION} label={text.duration} value={duration} /> : null}
           {level ? <Stat icon={MOUNTAIN} label={text.level} value={text.levels[level] ?? level} /> : null}
         </dl>
-        {qualities ? (
-          <div className="pv-row" role="group" aria-label={text.chooseQuality} aria-describedby="ride-quality-note">
-            {qualities.map((option) => (
-              <button
-                key={option.id}
-                ref={option === recommended ? first : undefined}
-                type="button"
-                className={option === recommended ? 'pv-button pv-primary' : 'pv-button'}
-                onClick={() => call(() => onChoose(option.id))}
-              >
-                {option.label}
-                {option.size ? <span className="pv-muted"> · {formatSize(option.size, text)}</span> : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {qualities && recommended ? (
-          <p id="ride-quality-note" className="pv-muted">
-            {text.recommendedQuality(recommended.label)}
-          </p>
-        ) : null}
-        {qualities ? null : (
+        {choosing ? null : (
         <div className="pv-row">
           {availability.state === 'ready' ? (
             <button ref={first} type="button" className="pv-button pv-primary" onClick={() => go(offer)}>
@@ -584,6 +676,7 @@ function RouteDetails({
           {text.credits(credits.author, credits.source, credits.license, credits.url)}
         </p>
       ) : null}
+      {choosing}
     </DetailPage>
   );
 }
@@ -595,12 +688,16 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
   const importers = useImporters(ctx);
   const [openId, setOpenId] = useState<string>();
   const open = offers.find((offer) => offer.id === openId);
-  // The qualities a route's download asks for, in its details (ADR 0105).
-  const [choice, setChoice] = useState<{ readonly id: string; readonly options: readonly RouteDownloadOption[] }>();
+  // The quality dialog of a route's download, over its details (ADR 0105).
+  const [choice, setChoice] = useState<Choice>();
+  /** The download whose qualities are read now: an older one's answer comes too late. */
+  const reading = useRef(0);
   /** Back leaves the choice of a quality first, then the details. */
   const close = () => {
-    if (choice) setChoice(undefined);
-    else setOpenId(undefined);
+    if (choice) {
+      reading.current += 1;
+      setChoice(undefined);
+    } else setOpenId(undefined);
   };
   useBack(ctx, () => {
     if (!open) return false;
@@ -609,15 +706,32 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
   });
   /**
    * Downloads a route: in its one quality at once, or, where its source offers several, in the one
-   * the rider chooses in its details.
+   * the rider chooses in the dialog over its details. While the qualities take their time, the
+   * dialog says it reads them; when they cannot be read, it says why and offers Try again.
    */
   const download: Download = async (offer) => {
-    const { options } = await ctx.call(routeDownloadOptionsService, { key: offer.id });
-    if (options.length > 1) {
+    reading.current += 1;
+    const mine = reading.current;
+    const show = (next: Choice) => {
       setOpenId(offer.id);
-      setChoice({ id: offer.id, options });
+      setChoice(next);
+    };
+    const timer = setTimeout(() => show({ id: offer.id, phase: 'reading' }), READING_SHOWN_AFTER);
+    let options: readonly RouteDownloadOption[];
+    try {
+      ({ options } = await ctx.call(routeDownloadOptionsService, { key: offer.id }));
+    } catch (error) {
+      clearTimeout(timer);
+      if (mine === reading.current) show({ id: offer.id, phase: 'failed', reason: reasonOf(error) });
       return;
     }
+    clearTimeout(timer);
+    if (mine !== reading.current) return;
+    if (options.length > 1) {
+      show({ id: offer.id, phase: 'choosing', options });
+      return;
+    }
+    setChoice(undefined);
     const [only] = options;
     await ctx.call(routeFetchService, { key: offer.id, ...(only ? { option: only.id } : {}) });
   };
@@ -667,8 +781,19 @@ function RideAreaView({ ctx }: { readonly ctx: UiContext }) {
         offer={open}
         onClose={close}
         onDownload={download}
-        qualities={choice?.id === open.id ? choice.options : undefined}
-        onChoose={choose}
+        choosing={
+          choice?.id === open.id ? (
+            <QualityDialog
+              ctx={ctx}
+              choice={choice}
+              onChoose={choose}
+              onRetry={() => {
+                download(open).catch((error: unknown) => setChoice({ id: open.id, phase: 'failed', reason: reasonOf(error) }));
+              }}
+              onCancel={close}
+            />
+          ) : undefined
+        }
       />
     );
   }

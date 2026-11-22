@@ -1,9 +1,11 @@
 @ui
 Feature: Choosing the quality of a download
   A downloader may offer a route in several qualities (ADR 0105). Download asks the route's source
-  for them (`route.download-options`): with one, the download starts at once, as for the packages
-  of ridrs Scenic (features "Downloading a video route"); with several, the route's details ask
-  which, with the recommended one first in the focus, and `route.fetch` names the one chosen.
+  for them (`route.download-options`) in a dialog that says so while they are read and offers Try
+  again when they could not be: with one, the download starts at once, as for the packages of
+  ridrs Scenic (features "Downloading a video route"); with several, the dialog asks which, with
+  the recommended one first in the focus, each with its resolution, frame rate and whether it is
+  HDR where the downloader names them, and `route.fetch` names the one chosen.
   Choosing a route is on the ride path: arrows, Enter and Back alone (AGENTS.md rule 12).
 
   Here a test downloader takes the place of the package downloader and offers three qualities.
@@ -48,3 +50,23 @@ Feature: Choosing the quality of a download
     And I press "Download Col de Pennes - Climb it twice!"
     Then the route details offer the qualities "2160p, 1080p, 720p"
     And the focus is on "1080p"
+
+  Scenario: While the qualities are read, the dialog says so
+    Given the test downloader takes its time to read the qualities
+    When I press "Ride"
+    And I press "Col de Pennes - Climb it twice!"
+    And I press "Download"
+    Then the quality dialog reads "Reading the qualities…"
+    When the test downloader has read the qualities
+    Then the route details offer the qualities "2160p, 1080p, 720p"
+    And the focus is on "1080p"
+
+  Scenario: Qualities that could not be read are read again on Try again
+    Given the test downloader cannot read the qualities once: "yt-dlp is out of date"
+    When I press "Ride"
+    And I press "Col de Pennes - Climb it twice!"
+    And I press "Download"
+    Then the quality dialog reads "The qualities could not be read: yt-dlp is out of date"
+    And the focus is on "Try again"
+    When I press "Try again"
+    Then the route details offer the qualities "2160p, 1080p, 720p"

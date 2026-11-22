@@ -123,13 +123,19 @@ export const routeOfferState = defineState('route.offer', routeOfferSchema);
 
 const routeKeyRequest = z.object({ key: routeOfferSchema.shape.id }).strict();
 
-/** A quality a route can be downloaded in (ADR 0105): `size` in bytes where it is known. */
+/**
+ * A quality a route can be downloaded in (ADR 0105): `size` in bytes where it is known; a video's
+ * `height` in pixels, `fps` and whether it is `hdr` where the downloader names them.
+ */
 export const routeDownloadOptionSchema = z
   .object({
     id: z.string().min(1),
     label: z.string().min(1),
     size: z.number().int().positive().optional(),
     recommended: z.boolean().optional(),
+    height: z.number().int().positive().optional(),
+    fps: z.number().positive().optional(),
+    hdr: z.boolean().optional(),
   })
   .strict();
 

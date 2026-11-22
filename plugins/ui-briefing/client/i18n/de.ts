@@ -48,6 +48,9 @@ export const de: Messages = {
   download: 'Herunterladen',
   downloadRoute: 'Route herunterladen',
   chooseQuality: 'Qualität wählen',
+  readingQualities: 'Die Qualitäten werden gelesen …',
+  qualitiesFailed: (reason: string) => `Die Qualitäten konnten nicht gelesen werden: ${reason}`,
+  tryAgain: 'Erneut versuchen',
   workoutLonger: (workout: string, route: string) =>
     `Workout ${workout}, Route etwa ${route}: Das Bild bleibt dann stehen, und das Workout läuft weiter.`,
   routeLonger: (workout: string, route: string) =>

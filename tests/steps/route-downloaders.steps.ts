@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
-import { Given, Then } from '@cucumber/cucumber';
+import { Given, Then, When } from '@cucumber/cucumber';
 import type {
   RouteDownload,
   RouteDownloader,
@@ -16,6 +16,39 @@ type Availability = RouteOffer['availability'];
 
 /** What a test downloader was asked for: the route and the quality, in order. */
 const asked = new WeakMap<RidrsWorld, { id: string; option?: string }[]>();
+/** How the test downloader reads its qualities: held until released, or failing first. */
+const readings = new WeakMap<
+  RidrsWorld,
+  { failures: string[]; held?: Promise<void>; release?: () => void }
+>();
+const readingOf = (world: RidrsWorld) => {
+  let reading = readings.get(world);
+  if (!reading) {
+    reading = { failures: [] };
+    readings.set(world, reading);
+  }
+  return reading;
+};
+
+Given('the test downloader takes its time to read the qualities', function (this: RidrsWorld) {
+  const reading = readingOf(this);
+  reading.held = new Promise<void>((release) => {
+    reading.release = release;
+  });
+});
+
+When('the test downloader has read the qualities', async function (this: RidrsWorld) {
+  readingOf(this).release?.();
+  await this.settle();
+});
+
+Given(
+  'the test downloader cannot read the qualities once: {string}',
+  function (this: RidrsWorld, reason: string) {
+    readingOf(this).failures.push(reason);
+  },
+);
+
 /** The routes a source handed the test downloader last. */
 const handed = new WeakMap<RidrsWorld, readonly RouteDownload[]>();
 
@@ -30,7 +63,16 @@ function testDownloader(
 ): RouteDownloader {
   const options: RouteDownloadOption[] = qualities.map((quality) => {
     const label = quality.replace(/\s*\(recommended\)$/, '');
-    return { id: label, label, ...(label === quality ? {} : { recommended: true }) };
+    // `2160p60 HDR`: a resolution, a frame rate and HDR the dialog shows.
+    const facts = /^(\d+)p(\d+)( HDR)?$/.exec(label);
+    return {
+      id: label,
+      label,
+      ...(facts
+        ? { height: Number(facts[1]), fps: Number(facts[2]), hdr: facts[3] !== undefined }
+        : {}),
+      ...(label === quality ? {} : { recommended: true }),
+    };
   });
   const calls: { id: string; option?: string }[] = [];
   asked.set(world, calls);
@@ -51,7 +93,13 @@ function testDownloader(
           },
         pictures: () => ({}),
         refusal: () => undefined,
-        options: async () => options,
+        async options() {
+          const reading = readings.get(world);
+          const failure = reading?.failures.shift();
+          if (failure) throw new Error(failure);
+          if (reading?.held) await reading.held;
+          return options;
+        },
         async fetch(id, option) {
           calls.push({ id, ...(option ? { option } : {}) });
           states.set(id, {
@@ -125,7 +173,7 @@ function ui(world: RidrsWorld): HTMLElement {
 
 /** The names of the qualities a choice offers, in order. */
 function qualitiesIn(container: HTMLElement): string[] {
-  const group = within(container).getByRole('group', { name: (name) => /quality/i.test(name) });
+  const group = within(container).getByRole('group', { name: (name) => /qualit/i.test(name) });
   return within(group)
     .getAllByRole('button')
     .map((button) => button.textContent?.trim() ?? '');
@@ -160,3 +208,12 @@ Then(
     }, `"${key}" to be downloading ${size} bytes`);
   },
 );
+
+Then('the quality dialog reads {string}', async function (this: RidrsWorld, text: string) {
+  const view = this.uiViews[0];
+  assert.ok(view, 'Expected the ridrs UI to be shown');
+  await waitFor(() => {
+    const dialog = within(view.root).getByRole('dialog', { name: (name) => /quality/i.test(name) });
+    assert.ok(dialog.textContent?.includes(text), dialog.textContent ?? '');
+  });
+});

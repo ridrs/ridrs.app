@@ -63,6 +63,16 @@ const SETUP = 'setup';
 const GARAGE = 'garage';
 
 /** Every entry of an app state topic once it has delivered, and again when it changes; `undefined` before. */
+/** A quality as the briefing names it: resolution, frame rate and HDR or SDR where known. */
+function qualityName(option: RouteDownloadOption): string {
+  if (option.height === undefined) return option.label;
+  return [
+    `${option.height}p`,
+    ...(option.fps ? [`${Math.round(option.fps)} fps`] : []),
+    ...(option.hdr === undefined ? [] : [option.hdr ? 'HDR' : 'SDR']),
+  ].join(' · ');
+}
+
 function useWatched<T>(ctx: UiContext, topic: StateDefinition<T>): ReadonlyMap<string, T> | undefined {
   const [entries, setEntries] = useState<ReadonlyMap<string, T>>();
   useEffect(() => ctx.state.watch(topic, (view) => setEntries(view.entries)), [ctx, topic]);
@@ -311,10 +321,15 @@ function Loaded({
   const [editing, setEditing] = useState<'route' | 'workout'>();
   const [problem, setProblem] = useState<'no-ftp' | 'no-power-zones'>();
   // The qualities the route's download asks for, where its source offers several (ADR 0105).
-  const [qualities, setQualities] = useState<readonly RouteDownloadOption[]>();
+  const [quality, setQuality] = useState<
+    | { readonly phase: 'reading' }
+    | { readonly phase: 'failed'; readonly reason: string }
+    | { readonly phase: 'choosing'; readonly options: readonly RouteDownloadOption[] }
+  >();
+  const qualities = quality?.phase === 'choosing' ? quality.options : undefined;
   const recommendedQuality = useRef<HTMLButtonElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new choice moves the focus to its recommended quality.
-  useEffect(() => recommendedQuality.current?.focus(), [qualities]);
+  useEffect(() => recommendedQuality.current?.focus(), [quality]);
 
   const offer = offerOf(answers.world, offers);
   const found: Found = useMemo(() => findWorkout(answers.workout, libraries, calendars), [answers.workout, libraries, calendars]);
@@ -364,8 +379,8 @@ function Loaded({
   };
   const back = useRef(() => {});
   back.current = () => {
-    if (qualities) {
-      setQualities(undefined);
+    if (quality) {
+      setQuality(undefined);
       return;
     }
     if (editing) {
@@ -421,15 +436,26 @@ function Loaded({
     ctx
       .call(routeFetchService, { key, ...(option ? { option } : {}) })
       .catch((error: unknown) => ctx.logger.warn('The route could not be downloaded', error));
-  /** Downloads the route: in its one quality at once, or asks which where its source offers several. */
-  const download = (key: string) =>
+  /**
+   * Downloads the route: in its one quality at once, or asks which where its source offers several;
+   * while the qualities are read it says so, and why when they could not be, with Try again.
+   */
+  const download = (key: string) => {
+    setQuality({ phase: 'reading' });
     ctx
       .call(routeDownloadOptionsService, { key })
       .then(({ options }) => {
-        if (options.length > 1) setQualities(options);
-        else return fetchRoute(key, options[0]?.id);
+        if (options.length > 1) {
+          setQuality({ phase: 'choosing', options });
+          return undefined;
+        }
+        setQuality(undefined);
+        return fetchRoute(key, options[0]?.id);
       })
-      .catch((error: unknown) => ctx.logger.warn('The route could not be downloaded', error));
+      .catch((error: unknown) =>
+        setQuality({ phase: 'failed', reason: error instanceof Error ? error.message : String(error) }),
+      );
+  };
   const routeReady = !offer || offer.availability.state === 'ready';
 
   const pair = (link: typeof trainer, label: string, pairLabel: string, kind: string) => {
@@ -590,7 +616,16 @@ function Loaded({
               <strong>{text.route}</strong>
               <span>{routeReady ? text.routeReady : text.routeNotReady}</span>
             </span>
-            {downloadable && qualities ? (
+            {downloadable && quality?.phase === 'reading' ? (
+              <span role="status">{text.readingQualities}</span>
+            ) : downloadable && quality?.phase === 'failed' ? (
+              <span className="br-choices">
+                <span role="alert">{text.qualitiesFailed(quality.reason)}</span>
+                <button ref={recommendedQuality} type="button" className="br-button" onClick={() => download(offer.id)}>
+                  {text.tryAgain}
+                </button>
+              </span>
+            ) : downloadable && qualities ? (
               <div className="br-choices" role="group" aria-label={text.chooseQuality}>
                 {qualities.map((option) => (
                   <button
@@ -598,12 +633,13 @@ function Loaded({
                     ref={option === recommended ? recommendedQuality : undefined}
                     type="button"
                     className="br-button"
+                    title={option.label}
                     onClick={() => {
-                      setQualities(undefined);
+                      setQuality(undefined);
                       fetchRoute(offer.id, option.id);
                     }}
                   >
-                    {option.label}
+                    {qualityName(option)}
                   </button>
                 ))}
               </div>
