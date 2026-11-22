@@ -1,0 +1,9 @@
+{
+  "id": "process-run-tauri",
+  "name": "Programs of the Device (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["process.run"],
+  "requires": [],
+  "entry": "index.ts"
+}

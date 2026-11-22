@@ -53,7 +53,21 @@ export const en = {
     })[status],
   riding: 'A ride is under way: a new source applies from the next ride.',
   placeholder: 'Units, sounds and smoothing are not read yet; the ride keeps metric units.',
-  tabs: { general: 'General', controller: 'Controller' },
+  tabs: { general: 'General', controller: 'Controller', plugins: 'Plugins' },
+  plugins: {
+    intro: 'The plugins of ridrs and the ones you installed. Drag the ZIP of a plugin onto the window to install it.',
+    bundled: 'part of ridrs',
+    installed: 'installed',
+    locked: 'stays on',
+    startsNext: 'starts at the next start',
+    stopsNext: 'stops at the next start',
+    neededBy: (ids: string) => `needed by ${ids}`,
+    programs: (names: string) => `starts ${names}`,
+    pending: 'Takes effect at the next start',
+    reload: 'Reload',
+    remove: 'Remove',
+    removeOf: (name: string) => `Remove ${name}`,
+  },
   controller: {
     navigation: 'Zwift Ride: menus',
     intro:

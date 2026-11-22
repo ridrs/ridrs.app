@@ -403,6 +403,26 @@ export {
   type PluginState,
 } from './plugin.ts';
 export {
+  INSTALLED_PLUGINS,
+  NO_PLUGIN_CHOICES,
+  PLUGIN_CHOICES_PATH,
+  type PluginChoices,
+  type PluginEntry,
+  type PluginPreview,
+  type ProcessRequest,
+  type ProcessRun,
+  parsePluginChoices,
+  pluginChoicesSchema,
+  pluginEntrySchema,
+  pluginPreviewSchema,
+  pluginsInstallService,
+  pluginsPreviewService,
+  pluginsRemoveService,
+  pluginsSetEnabledService,
+  pluginsState,
+  processRunCapability,
+} from './plugins.ts';
+export {
   type ExportFit,
   exportFitSchema,
   exportFitState,

@@ -65,6 +65,7 @@ The recorder observes the bus ([recording-and-replay.md](recording-and-replay.md
 | `profile-local` | `athlete.profile` (`ridrs`, ADR 0075) | `athlete.profile.update` (`athlete.profile`) | `ui-settings`, `ui-area-me`, `ui-tile-ride-start` |
 | `ui-landscape-demo` | `route.offer` (`ui-landscape-demo/demo-course`) | — | `ui-area-ride` |
 | `video-source-scenic` | `route.offer` (`video-source-scenic/<Scenic's id>`, ADR 0103) | `route.download-options`, `route.fetch`, `route.cancel`, `route.remove` (`route.offer`; passed on to the downloader of the route's kind, ADR 0105) | `ui-area-ride`, `ui-briefing`, `ui-world-video` |
+| `plugins-manager` | `plugins.list` (one key per plugin, ADR 0106) | `plugins.set-enabled`, `plugins.remove` (`plugins.list`), `plugins.preview`, `plugins.install` | `ui-settings`, `file-drop` |
 | `planner-intervals-icu` | `training.account`, `training.plan` (`intervals.icu`), `training.upload` (session id); watches `recording.ride` | `training.connect`, `training.disconnect`, `training.refresh`, `training.library.load`, `training.upload` (`training.account`) | `ui-training-plan`, `ui-debriefing` |
 | `recording-session` | `recording.ride`, `recording.recoverable` (session) | `recording.finish` (`recording.recoverable`), `recording.delete` (`recording.ride`) | `ui-debriefing`, `ui-tile-ride-start`, `ui-ride-recovery`, `export-fit`, `planner-intervals-icu` |
 | native composition root | — | `recording.continue` (`provideService`) | `ui-ride-recovery` |

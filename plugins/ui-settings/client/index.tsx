@@ -12,6 +12,7 @@ import {
   type StateDefinition,
   trainingCalendarState,
   trainingLibraryState,
+  pluginsState,
 } from '@ridrs/contracts';
 import { ActionButton, AreaPage, reactComponent, Toggle, useBack, userDocument } from '@ridrs/ui-preview';
 import type { UiContext } from '@ridrs/ui-sdk';
@@ -20,6 +21,7 @@ import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { appVersion } from './about.generated.ts';
 import { ControllerTab } from './controller-tab.tsx';
+import { PluginsTab } from './plugins-tab.tsx';
 import { messages } from './i18n/index.ts';
 import { type Chosen, LicensesPage } from './licenses-page.tsx';
 
@@ -212,23 +214,25 @@ function LibraryRow({ ctx, name }: { readonly ctx: UiContext; readonly name: str
 }
 
 /** The tabs of the settings, in this order. */
-const TABS = ['general', 'controller'] as const;
+const TABS = ['general', 'controller', 'plugins'] as const;
 
 type Tab = (typeof TABS)[number];
 
 /** The row of tabs: one button each, the shown one selected. */
 function Tabs({
   tab,
+  tabs,
   names,
   onChoose,
 }: {
   readonly tab: Tab;
+  readonly tabs: readonly Tab[];
   readonly names: Record<Tab, string>;
   readonly onChoose: (tab: Tab) => void;
 }) {
   return (
     <div className="pv-row" role="tablist" aria-label={names.general}>
-      {TABS.map((each) => (
+      {tabs.map((each) => (
         <button
           key={each}
           type="button"
@@ -257,6 +261,9 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   const [chosen, setChosen] = useState<Chosen>();
   const riding = useRiding(ctx);
   const [tab, setTab] = useState<Tab>('general');
+  // The plugins page where the plugin manager lists plugins (ADR 0106).
+  const plugins = useStateEntries(ctx, pluginsState).size > 0;
+  const tabs = TABS.filter((each) => each !== 'plugins' || plugins);
   const tabBack = useRef<() => boolean>(undefined);
   useBack(ctx, () => {
     if (tabBack.current?.()) {
@@ -286,7 +293,7 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
   }
   return (
     <AreaPage title={text.title} intro={text.intro}>
-      <Tabs tab={tab} names={text.tabs} onChoose={setTab} />
+      <Tabs tab={tab} tabs={tabs} names={text.tabs} onChoose={setTab} />
       <div role="tabpanel" id={`settings-panel-${tab}`} aria-labelledby={`settings-tab-${tab}`} className="pv-section" style={{ gap: 28 }}>
         {tab === 'general' ? (
           <>
@@ -370,6 +377,7 @@ function SettingsView({ ctx }: { readonly ctx: UiContext }) {
           </>
         ) : null}
         {tab === 'controller' ? <ControllerTab ctx={ctx} backRef={tabBack} /> : null}
+        {tab === 'plugins' ? <PluginsTab ctx={ctx} /> : null}
       </div>
       {/* About stays at the end of the settings, below every tab. */}
       <section className="pv-section">

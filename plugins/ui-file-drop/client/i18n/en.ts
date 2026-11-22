@@ -19,6 +19,11 @@ export const en = {
   added: (n: number) => `Added ${workouts(n)} to your workouts`,
   importingRoutes: (n: number) => `Importing ${routes(n)}: see Ride › Scenic`,
   failed: (n: number) => `${n} could not be added`,
+  letGoInstall: (names: readonly string[]) => `Let go to install the plugin ${names.join(' and ')}`,
+  installed: (n: number) => `Installed ${n === 1 ? 'a plugin' : `${n} plugins`}: it starts at the next start (Settings › Plugins)`,
+  plugin: 'Plugin',
+  uses: (capabilities: string) => `Uses ${capabilities}`,
+  starts: (programs: string) => `Starts the programs ${programs}`,
   more: (n: number) => `+ ${n} more`,
   video: 'Video',
 };

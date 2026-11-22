@@ -36,7 +36,7 @@ async function shownLayer(world: RidrsWorld): Promise<HTMLElement> {
   });
 }
 
-function drop(world: RidrsWorld): SimulatedDrop {
+export function drop(world: RidrsWorld): SimulatedDrop {
   const simulation = drops.get(world);
   assert.ok(simulation, 'Expected the simulated drop');
   return simulation;
@@ -147,9 +147,7 @@ async function letGo(world: RidrsWorld, move: boolean): Promise<void> {
     const drag = world.ensureHost().getState('file.drop').get('window') as
       | { files: { verdict: { kind: string } }[] }
       | undefined;
-    if (
-      !drag?.files.some((file) => file.verdict.kind === 'workouts' || file.verdict.kind === 'route')
-    ) {
+    if (!drag?.files.some((file) => ['workouts', 'route', 'plugin'].includes(file.verdict.kind))) {
       await world.settle();
       return;
     }

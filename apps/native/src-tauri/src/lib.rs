@@ -6,6 +6,7 @@ mod debug_snapshot;
 mod keep_awake;
 mod media_drop;
 mod media_pick;
+mod process_run;
 mod ride_screenshot;
 #[cfg(target_os = "macos")]
 mod web_snapshot;
@@ -81,6 +82,7 @@ pub fn run() {
         .manage(media::MediaState::default())
         .manage(media_pick::PickState::default())
         .manage(media_drop::DropState::default())
+        .manage(process_run::Processes::default())
         .invoke_handler(tauri::generate_handler![
             ble::ble_check_permissions,
             ble::ble_adapter_state,
@@ -127,6 +129,8 @@ pub fn run() {
             media_drop::media_drop_peek,
             media_drop::media_drop_read,
             media_drop::media_drop_remove,
+            process_run::process_run,
+            process_run::process_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

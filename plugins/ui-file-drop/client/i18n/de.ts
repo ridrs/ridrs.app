@@ -21,6 +21,11 @@ export const de: Messages = {
   added: (n) => `${workouts(n)} zu deinen Workouts hinzugefügt`,
   importingRoutes: (n) => `${routes(n)} ${n === 1 ? 'wird' : 'werden'} importiert: siehe Fahren › Scenic`,
   failed: (n) => `${n} konnte${n === 1 ? '' : 'n'} nicht hinzugefügt werden`,
+  letGoInstall: (names) => `Loslassen, um das Plugin ${names.join(' und ')} zu installieren`,
+  installed: (n) => `${n === 1 ? 'Ein Plugin' : `${n} Plugins`} installiert: startet beim nächsten Start (Einstellungen › Plugins)`,
+  plugin: 'Plugin',
+  uses: (capabilities) => `Nutzt ${capabilities}`,
+  starts: (programs) => `Startet die Programme ${programs}`,
   more: (n) => `+ ${n} weitere`,
   video: 'Video',
 };

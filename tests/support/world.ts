@@ -72,6 +72,7 @@ import {
   fileDropImportService,
   fileDropState,
   filesSaveService,
+  INSTALLED_PLUGINS,
   measurementCadenceEvent,
   measurementHeartRateEvent,
   measurementPowerEvent,
@@ -87,7 +88,9 @@ import {
   netWebSocketCapability,
   nextRideSetService,
   nextRideState,
+  PLUGIN_CHOICES_PATH,
   type PluginContext,
+  parsePluginChoices,
   physicsBicycleCapability,
   physicsEnvironmentCapability,
   physicsMotionCapability,
@@ -98,6 +101,12 @@ import {
   physicsStateEvent,
   physicsTotalResistanceCapability,
   physicsTrainerLoadCapability,
+  pluginsInstallService,
+  pluginsPreviewService,
+  pluginsRemoveService,
+  pluginsSetEnabledService,
+  pluginsState,
+  processRunCapability,
   type ResistanceBreakdown,
   recordingContinueService,
   recordingDeleteService,
@@ -283,6 +292,7 @@ const TEST_STATES: readonly StateDefinition[] = [
   dataSourceState,
   athleteProfileState,
   routeOfferState,
+  pluginsState,
   fileDropState,
   routeImportState,
   bridgeLinkState,
@@ -314,6 +324,10 @@ const TEST_SERVICES: readonly ServiceDefinition[] = [
   athleteProfileUpdateService,
   routeFetchService,
   routeDownloadOptionsService,
+  pluginsPreviewService,
+  pluginsInstallService,
+  pluginsSetEnabledService,
+  pluginsRemoveService,
   routeCancelService,
   bridgePairService,
   bridgeConnectService,
@@ -587,6 +601,7 @@ export class RidrsWorld extends World {
       dataArchiveCapability,
       dataPictureCapability,
       routeDownloaderCapability,
+      processRunCapability,
       dataDropCapability,
       dataPickCapability,
     ]) {
@@ -737,19 +752,37 @@ export class RidrsWorld extends World {
     }
   }
 
+  /**
+   * Where the plugins the rider installed lie (ADR 0106): the folder `plugins` of the scenario's
+   * media storage, once a scenario runs the plugin manager.
+   */
+  installedPluginsDir(): string | undefined {
+    const media = process.env.RIDRS_MEDIA_DIR;
+    return this.realPluginIds.includes('plugins-manager') && media
+      ? join(media, INSTALLED_PLUGINS)
+      : undefined;
+  }
+
   /** What every host of the scenario is composed with. */
   hostOptions(): PluginHostOptions {
+    const installed = this.installedPluginsDir();
     const dirs = [
       ...(this.realPluginIds.length > 0
         ? [this.tempPluginDir, REAL_PLUGINS_DIR]
         : [this.tempPluginDir]),
       ...this.extraPluginDirs,
+      ...(installed ? [installed] : []),
     ];
+    // The rider's choices of plugins, as the app reads them before it starts.
+    const choices = parsePluginChoices(this.memoryFiles?.files.get(PLUGIN_CHOICES_PATH));
     return {
       sources: this.bundled
         ? [createBundledPluginSource(this.bundled satisfies BundledPluginSet)]
         : dirs.map(createFileSystemPluginSource),
-      disabledPlugins: this.realPluginIds.length > 0 ? this.unusedRealPlugins() : [],
+      disabledPlugins: [
+        ...(this.realPluginIds.length > 0 ? this.unusedRealPlugins() : []),
+        ...choices.disabled,
+      ],
       timeSource: this.clock,
       capabilities: [...this.capabilityContracts.values()],
       events: [...this.eventDefinitions.values()],

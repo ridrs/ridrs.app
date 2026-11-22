@@ -58,12 +58,15 @@
       "athlete.profile",
       "data.source",
       "training.calendar",
-      "training.library"
+      "training.library",
+      "plugins.list"
     ],
     "calls": [
       "app.set-language",
       "data.select",
-      "controller.set-bindings"
+      "controller.set-bindings",
+      "plugins.set-enabled",
+      "plugins.remove"
     ]
   }
 }

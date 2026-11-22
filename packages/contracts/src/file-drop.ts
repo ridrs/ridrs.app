@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { defineState } from './app-state.ts';
+import { pluginPreviewSchema } from './plugins.ts';
 import { routeImportPreviewSchema } from './route.ts';
 import { defineService } from './services.ts';
 import { workoutSchema } from './workout.ts';
@@ -37,6 +38,8 @@ export const droppedFileSchema = z
           preview: routeImportPreviewSchema.options[0].shape.preview,
         })
         .strict(),
+      /** A plugin to install (ADR 0106), with what it asks for. */
+      z.object({ kind: z.literal('plugin'), plugin: pluginPreviewSchema }).strict(),
       /** Nothing ridrs can import, and why. */
       z.object({ kind: z.literal('refused'), reason: z.string().min(1) }).strict(),
     ]),
@@ -61,6 +64,8 @@ export const fileDropSchema = z.discriminatedUnion('phase', [
       saved: z.number().int().nonnegative(),
       skipped: z.number().int().nonnegative(),
       routes: z.number().int().nonnegative(),
+      /** Plugins installed; they start at the next start of the app (ADR 0106). */
+      plugins: z.number().int().nonnegative().optional(),
       failed: z.number().int().nonnegative(),
       /** The files were moved: each leaves where it lay once what it holds is in ridrs. */
       moved: z.boolean(),

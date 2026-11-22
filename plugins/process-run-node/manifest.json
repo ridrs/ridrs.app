@@ -1,0 +1,10 @@
+{
+  "id": "process-run-node",
+  "name": "Programs of the Device (Node)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["process.run"],
+  "requires": [],
+  "optionalRequires": ["storage.app-files"],
+  "entry": "index.ts"
+}

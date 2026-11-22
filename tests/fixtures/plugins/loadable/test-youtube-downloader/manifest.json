@@ -1,0 +1,11 @@
+{
+  "id": "test-youtube-downloader",
+  "name": "Test YouTube downloader",
+  "version": "1.0.0",
+  "types": ["transport"],
+  "provides": ["route.downloader"],
+  "requires": [],
+  "optionalRequires": ["process.run"],
+  "programs": ["node"],
+  "entry": "index.js"
+}

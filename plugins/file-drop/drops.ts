@@ -5,6 +5,7 @@ import type {
   DroppedFile,
   DroppedFileVerdict,
   FileDrop,
+  PluginPreview,
   RouteImportPreview,
   Workout,
 } from '@ridrs/contracts';
@@ -34,6 +35,10 @@ export interface DropServices {
   importRoute(provider: string, file: string, move: boolean): Promise<void>;
   /** Saves a workout with its original; `false` when the library refused it. */
   saveWorkout(workout: Workout, original: { readonly fileName: string; readonly data: string }): Promise<boolean>;
+  /** What a ZIP with a plugin's manifest would install (ADR 0106); none without a plugin manager. */
+  previewPlugin?(file: string): Promise<{ ok: true; plugin: PluginPreview } | { ok: false; reason: string }>;
+  /** Installs the plugin of a dragged ZIP; with `move`, the file leaves where it lay. */
+  installPlugin?(file: string, move: boolean): Promise<void>;
   /** When the file is read, as an ISO time: the workouts' `importedAt`. */
   now(): string;
   /** Why an import of a dragged file failed. */
@@ -161,10 +166,20 @@ export class FileDrops {
     let saved = 0;
     let skipped = 0;
     let routes = 0;
+    let plugins = 0;
     let failed = 0;
     for (const entry of this.files) {
       const { verdict } = entry;
-      if (verdict.kind === 'route') {
+      if (verdict.kind === 'plugin') {
+        try {
+          if (!this.services.installPlugin) throw new Error('This app cannot install plugins');
+          await this.services.installPlugin(entry.file.id, move);
+          plugins += 1;
+        } catch (error) {
+          this.services.warn?.(`${entry.file.name}: ${String(error)}`);
+          failed += 1;
+        }
+      } else if (verdict.kind === 'route') {
         try {
           await this.services.importRoute(verdict.provider, entry.file.id, move);
           routes += 1;
@@ -203,7 +218,16 @@ export class FileDrops {
     }
     if (drag !== this.drag) return;
     this.importing = false;
-    this.outcome = { phase: 'done', files: this.snapshot(), saved, skipped, routes, failed, moved: move };
+    this.outcome = {
+      phase: 'done',
+      files: this.snapshot(),
+      saved,
+      skipped,
+      routes,
+      ...(plugins > 0 ? { plugins } : {}),
+      failed,
+      moved: move,
+    };
     this.show();
   }
 
@@ -233,6 +257,11 @@ export class FileDrops {
   private async recognise(file: DroppedFile): Promise<{ verdict: DroppedFileVerdict['verdict']; found: Found[] }> {
     const peek = await file.peek();
     const cannot = `ridrs cannot import ${file.name}`;
+    // A ZIP with a manifest at its top is a plugin (ADR 0106), or nothing ridrs can add.
+    if (peek.entries?.some((entry) => entry.name === 'manifest.json') && this.services.previewPlugin) {
+      const answer = await this.services.previewPlugin(file.id);
+      return { verdict: answer.ok ? { kind: 'plugin', plugin: answer.plugin } : refused(answer.reason), found: [] };
+    }
     if (peek.entries) {
       let reason: string | undefined;
       for (const provider of this.services.routeProviders()) {

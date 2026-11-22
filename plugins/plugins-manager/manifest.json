@@ -1,0 +1,17 @@
+{
+  "id": "plugins-manager",
+  "name": "Plugins",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": [],
+  "requires": [],
+  "optionalRequires": ["storage.app-files", "storage.media", "data.drop"],
+  "permissions": ["observe-host"],
+  "entry": "index.ts",
+  "state": {
+    "owns": ["plugins.list"]
+  },
+  "services": {
+    "provides": ["plugins.preview", "plugins.install", "plugins.set-enabled", "plugins.remove"]
+  }
+}

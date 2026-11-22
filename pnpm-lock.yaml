@@ -199,6 +199,9 @@ importers:
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
+      '@tauri-apps/plugin-fs':
+        specifier: 2.7.1
+        version: 2.7.1
     devDependencies:
       '@tauri-apps/cli':
         specifier: 2.12.4
@@ -789,6 +792,27 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  plugins/plugins-manager:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
+  plugins/process-run-node:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+
+  plugins/process-run-tauri:
+    dependencies:
+      '@ridrs/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
 
   plugins/profile-local:
     dependencies:

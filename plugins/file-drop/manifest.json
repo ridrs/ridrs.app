@@ -2,17 +2,35 @@
   "id": "file-drop",
   "name": "Files Dragged onto the Window",
   "version": "0.1.0",
-  "types": ["storage"],
+  "types": [
+    "storage"
+  ],
   "provides": [],
   "requires": [],
-  "optionalRequires": ["data.drop"],
+  "optionalRequires": [
+    "data.drop"
+  ],
   "entry": "index.ts",
   "state": {
-    "owns": ["file.drop"],
-    "watches": ["training.library", "route.import"]
+    "owns": [
+      "file.drop"
+    ],
+    "watches": [
+      "training.library",
+      "route.import"
+    ]
   },
   "services": {
-    "provides": ["file.drop.import", "file.drop.cancel"],
-    "calls": ["route.import-preview", "route.import", "training.library.save"]
+    "provides": [
+      "file.drop.import",
+      "file.drop.cancel"
+    ],
+    "calls": [
+      "route.import-preview",
+      "route.import",
+      "training.library.save",
+      "plugins.preview",
+      "plugins.install"
+    ]
   }
 }

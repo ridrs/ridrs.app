@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  type PluginPreview,
   athleteProfileState,
   DEFAULT_PROVIDER,
   dataSourceState,
@@ -23,6 +24,7 @@ import { type Messages, messages } from './i18n/index.ts';
 
 /** From Lucide (ISC, see the folder's LICENSE), painted as masks in the text colour, as the library's cards. */
 const VIDEO = new URL('./assets/icons/video.svg', import.meta.url).href;
+const PLUGIN = new URL('./assets/icons/download.svg', import.meta.url).href;
 const DISTANCE = new URL('./assets/icons/route.svg', import.meta.url).href;
 const ASCENT = new URL('./assets/icons/trending-up.svg', import.meta.url).href;
 const STAR = new URL('./assets/icons/star.svg', import.meta.url).href;
@@ -37,7 +39,8 @@ type DroppedFile = FileDrop['files'][number];
 /** One tile: a workout of a file, or a video route. A file ridrs cannot import has none. */
 type Tile =
   | { readonly kind: 'workout'; readonly key: string; readonly workout: Workout; readonly duplicate: boolean }
-  | { readonly kind: 'route'; readonly key: string; readonly file: DroppedFile };
+  | { readonly kind: 'route'; readonly key: string; readonly file: DroppedFile }
+  | { readonly kind: 'plugin'; readonly key: string; readonly plugin: PluginPreview };
 
 function tilesOf(files: readonly DroppedFile[]): Tile[] {
   return files.flatMap((file): Tile[] => {
@@ -51,6 +54,7 @@ function tilesOf(files: readonly DroppedFile[]): Tile[] {
       }));
     }
     if (verdict.kind === 'route') return [{ kind: 'route', key: file.id, file }];
+    if (verdict.kind === 'plugin') return [{ kind: 'plugin', key: file.id, plugin: verdict.plugin }];
     return [];
   });
 }
@@ -60,8 +64,10 @@ function addable(files: readonly DroppedFile[]) {
   let workouts = 0;
   let duplicates = 0;
   let routes = 0;
+  const plugins: string[] = [];
   for (const { verdict } of files) {
     if (verdict.kind === 'route') routes += 1;
+    if (verdict.kind === 'plugin') plugins.push(verdict.plugin.name);
     if (verdict.kind === 'workouts') {
       for (const found of verdict.workouts) {
         if (found.state === 'duplicate') duplicates += 1;
@@ -69,7 +75,7 @@ function addable(files: readonly DroppedFile[]) {
       }
     }
   }
-  return { workouts, duplicates, routes };
+  return { workouts, duplicates, routes, plugins };
 }
 
 /** The sentence of the layer: what letting go does, or did. */
@@ -81,11 +87,14 @@ function sayWhat(drop: FileDrop, text: Messages, moving: boolean): string {
     const said = [
       drop.saved > 0 ? (drop.moved ? text.moved(drop.saved) : text.added(drop.saved)) : '',
       drop.routes > 0 ? text.importingRoutes(drop.routes) : '',
+      (drop.plugins ?? 0) > 0 ? text.installed(drop.plugins ?? 0) : '',
       drop.failed > 0 ? text.failed(drop.failed) : '',
     ].filter(Boolean);
     return said.length > 0 ? said.join('. ') : text.alreadyThere;
   }
-  const { workouts, duplicates, routes } = addable(drop.files);
+  const { workouts, duplicates, routes, plugins } = addable(drop.files);
+  // A plugin is installed, not added: it is said on its own.
+  if (plugins.length > 0 && workouts + routes === 0) return text.letGoInstall(plugins);
   const parts = [workouts > 0 ? text.letGoWorkouts(workouts) : '', routes > 0 ? text.letGoRoutes(routes) : ''].filter(
     Boolean,
   );
@@ -247,6 +256,34 @@ function RouteTile({
   );
 }
 
+/** A plugin to install (ADR 0106): its name and version, and what it asks for. */
+function PluginTile({
+  tile,
+  text,
+  width,
+}: {
+  readonly tile: Extract<Tile, { kind: 'plugin' }>;
+  readonly text: Messages;
+  readonly width: number;
+}) {
+  const { plugin } = tile;
+  return (
+    <div className="fd-tile fd-inert" style={{ width }}>
+      <Card
+        label={plugin.name}
+        classifier={text.plugin}
+        icon={PLUGIN}
+        title={plugin.name}
+        details={[
+          plugin.version,
+          ...(plugin.capabilities.length > 0 ? [text.uses(plugin.capabilities.join(', '))] : []),
+          ...(plugin.programs.length > 0 ? [text.starts(plugin.programs.join(', '))] : []),
+        ]}
+      />
+    </div>
+  );
+}
+
 /** The library's grids: cards of at least 230 px, routes of at least 300 px (`.pv-cards`). */
 const CARD_MIN = 230;
 const ROUTE_MIN = 300;
@@ -341,7 +378,7 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
   const shown = drop !== undefined && hidden !== drop;
   // Files ridrs cannot import are ignored: no layer for them, and no tile beside others. While
   // nothing is known yet the layer waits, so a file that turns out to be one does not flash it.
-  const known = drop?.files.some((file) => file.verdict.kind === 'workouts' || file.verdict.kind === 'route') ?? false;
+  const known = drop?.files.some((file) => ['workouts', 'route', 'plugin'].includes(file.verdict.kind)) ?? false;
   const visible = shown && !(drop.phase === 'over' && !known);
   const widths = useCardWidths(place, visible);
 
@@ -360,10 +397,10 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
 
   if (!visible || !drop) return <div ref={place} hidden />;
 
-  const { workouts, routes } = addable(drop.files);
+  const { workouts, routes, plugins } = addable(drop.files);
   // Let go while a file is still read, it is added once it is read, if it can be.
   const reading = drop.files.some((file) => file.verdict.kind === 'reading');
-  const takes = drop.phase === 'over' && (reading || workouts + routes > 0);
+  const takes = drop.phase === 'over' && (reading || workouts + routes + plugins.length > 0);
   const tiles = tilesOf(drop.files);
   const shownTiles = tiles.slice(0, MAX_TILES);
   return (
@@ -408,6 +445,8 @@ function Layer({ ctx }: { readonly ctx: UiContext }) {
           {shownTiles.map((tile) =>
             tile.kind === 'workout' ? (
               <WorkoutTile key={tile.key} ctx={ctx} tile={tile} text={text} athlete={athlete} width={widths.card} />
+            ) : tile.kind === 'plugin' ? (
+              <PluginTile key={tile.key} tile={tile} text={text} width={widths.card} />
             ) : (
               <RouteTile key={tile.key} ctx={ctx} tile={tile} text={text} width={widths.route} />
             ),

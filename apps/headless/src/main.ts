@@ -73,6 +73,12 @@ import {
   physicsStateEvent,
   physicsTotalResistanceCapability,
   physicsTrainerLoadCapability,
+  pluginsInstallService,
+  pluginsPreviewService,
+  pluginsRemoveService,
+  pluginsSetEnabledService,
+  pluginsState,
+  processRunCapability,
   type RecoverableRide,
   recordingContinueService,
   recordingDeleteService,
@@ -157,6 +163,8 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   'storage-media-tauri',
   'data-fetch-tauri',
   'data-archive-tauri',
+  // Programs of the device through the app's Rust commands (ADR 0106); headless has the Node provider.
+  'process-run-tauri',
   // The system's open dialog for own video packages; the headless app has none.
   'data-pick-tauri',
   // Files dragged onto the window (ADR 0093); the headless app has no window.
@@ -193,6 +201,7 @@ const CAPABILITIES: readonly CapabilityContract[] = [
   dataArchiveCapability,
   dataPictureCapability,
   routeDownloaderCapability,
+  processRunCapability,
   dataDropCapability,
   dataPickCapability,
 ];
@@ -204,6 +213,7 @@ const STATES: readonly StateDefinition[] = [
   dataSourceState,
   athleteProfileState,
   routeOfferState,
+  pluginsState,
   fileDropState,
   routeImportState,
   deviceStatusState,
@@ -230,6 +240,10 @@ const SERVICES: readonly ServiceDefinition[] = [
   athleteProfileUpdateService,
   routeFetchService,
   routeDownloadOptionsService,
+  pluginsPreviewService,
+  pluginsInstallService,
+  pluginsSetEnabledService,
+  pluginsRemoveService,
   routeCancelService,
   deviceConnectService,
   deviceForgetService,

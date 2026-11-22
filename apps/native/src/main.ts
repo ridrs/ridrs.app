@@ -5,6 +5,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { suppressBrowserChrome } from './browser-chrome.ts';
 import { bundledPlugins } from './bundled-plugins.ts';
 import { startRidrsApp } from './compose.ts';
+import { createInstalledPluginSource, readPluginChoices } from './installed-plugins.ts';
 import { androidBackButton, createKeepAwake, ensureBluetoothPermission } from './platform.ts';
 import { enableOverlayTitleBar, hasOverlayTitleBar } from './title-bar.ts';
 
@@ -57,11 +58,16 @@ async function main(): Promise<void> {
   }
 
   const appVersion = await getVersion().catch(() => '0.0.0');
+  // The plugins the rider switched off and the ones installed (ADR 0106), for this start.
+  const choices = await readPluginChoices();
   const app = await startRidrsApp({
-    sources: [createBundledPluginSource(bundledPlugins)],
+    sources: [createBundledPluginSource(bundledPlugins), createInstalledPluginSource()],
     root,
     logger,
-    disabledPlugins: hasOverlayTitleBar() ? DISABLED_IN_APP : [...DISABLED_IN_APP, ...SCREENSHOTS],
+    disabledPlugins: [
+      ...(hasOverlayTitleBar() ? DISABLED_IN_APP : [...DISABLED_IN_APP, ...SCREENSHOTS]),
+      ...choices.disabled,
+    ],
     platform: {
       ridrsVersion: __RIDRS_VERSION__,
       runtime: 'tauri',

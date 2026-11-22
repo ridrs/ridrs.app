@@ -7,6 +7,8 @@ import {
   fileDropCancelService,
   fileDropImportService,
   fileDropState,
+  pluginsInstallService,
+  pluginsPreviewService,
   routeImportPreviewService,
   routeImportService,
   routeImportState,
@@ -44,6 +46,10 @@ export default definePlugin({
           const answer = await ctx.services.call(trainingLibrarySaveService, { key: LIBRARY, workout, original });
           if (!answer.ok) ctx.logger.warn({ workout: workout.id, reason: answer.reason }, 'file-drop: the library refused a workout');
           return answer.ok;
+        },
+        previewPlugin: (file) => ctx.services.call(pluginsPreviewService, { file }),
+        installPlugin: async (file, move) => {
+          await ctx.services.call(pluginsInstallService, { file, ...(move ? { move } : {}) });
         },
         warn: (message) => ctx.logger.warn({ message }, 'file-drop: a dragged file could not be added'),
         now: () => importTime(ctx.clock.now()),

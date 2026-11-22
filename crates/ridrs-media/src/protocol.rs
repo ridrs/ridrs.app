@@ -49,6 +49,8 @@ fn content_type(path: &str) -> &'static str {
         Some("gpx") => "application/gpx+xml",
         Some("jpg" | "jpeg") => "image/jpeg",
         Some("png") => "image/png",
+        // The entry of a plugin the rider installed (ADR 0106), loaded as an ES module.
+        Some("js" | "mjs") => "text/javascript",
         _ => "application/octet-stream",
     }
 }
@@ -295,5 +297,6 @@ mod tests {
         assert_eq!(content_type("videos/a/Col.mkv"), "video/x-matroska");
         assert_eq!(content_type("videos/a/Col.WebM"), "video/webm");
         assert_eq!(content_type("videos/a/Col.xml"), "application/octet-stream");
+        assert_eq!(content_type("plugins/a/index.js"), "text/javascript");
     }
 }

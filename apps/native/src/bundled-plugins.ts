@@ -3,7 +3,7 @@
 import type { BundledPluginSet } from '@ridrs/core';
 
 // The plugin set is fixed at build time. Patterns must be literals; plugins that cannot run in a
-// WebView (Node BLE, Node files, media and downloads) are excluded here (build layer) - the runtime layer is
+// WebView (Node BLE, Node files, media, downloads and programs) are excluded here (build layer) - the runtime layer is
 // `disabledPlugins` in main.ts. scripts/check-native-bundle.mjs checks the result.
 const manifests = import.meta.glob<string>(
   [
@@ -13,6 +13,7 @@ const manifests = import.meta.glob<string>(
     '!../../../plugins/storage-media-node/**',
     '!../../../plugins/data-fetch-node/**',
     '!../../../plugins/data-archive-node/**',
+    '!../../../plugins/process-run-node/**',
   ],
   { query: '?raw', import: 'default', eager: true },
 );
@@ -26,6 +27,7 @@ const modules = import.meta.glob([
   '!../../../plugins/storage-media-node/**',
   '!../../../plugins/data-fetch-node/**',
   '!../../../plugins/data-archive-node/**',
+  '!../../../plugins/process-run-node/**',
 ]);
 
 export const bundledPlugins: BundledPluginSet = { manifests, modules };

@@ -15,6 +15,7 @@ const FORBIDDEN = [
   ['storage-media-node', /storage-media-node|RIDRS_MEDIA_DIR/],
   ['data-fetch-node', /data-fetch-node|\.part\.json/],
   ['data-archive-node', /data-archive-node|FileRangeReader/],
+  ['process-run-node', /process-run-node|node:child_process/],
 ];
 
 function files(dir) {

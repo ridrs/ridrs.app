@@ -87,6 +87,11 @@ export const manifestSchema = z
     ui: uiManifestSectionSchema.optional(),
     permissions: z.array(hostPermissionSchema).optional(),
     persistence: z.array(persistenceScopeSchema).optional(),
+    /**
+     * Programs of the device the plugin starts through `process.run` (ADR 0106): a program's name,
+     * no path. The rider grants them when installing the plugin.
+     */
+    programs: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)).optional(),
     /** App state beside the bus (ADR 0068); input-side types only. */
     state: manifestStateSchema.optional(),
     /** Services beside the bus (ADR 0068); input-side types only. */

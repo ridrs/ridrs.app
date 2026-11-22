@@ -54,7 +54,21 @@ export const de: Messages = {
   riding: 'Eine Fahrt läuft: Eine neue Quelle gilt ab der nächsten Fahrt.',
   placeholder:
     'Einheiten, Töne und Glättung werden noch nicht ausgewertet; die Fahrt bleibt bei metrischen Einheiten.',
-  tabs: { general: 'Allgemein', controller: 'Controller' },
+  tabs: { general: 'Allgemein', controller: 'Controller', plugins: 'Plugins' },
+  plugins: {
+    intro: 'Die Plugins von ridrs und die, die du installiert hast. Zieh das ZIP eines Plugins auf das Fenster, um es zu installieren.',
+    bundled: 'Teil von ridrs',
+    installed: 'installiert',
+    locked: 'bleibt an',
+    startsNext: 'startet beim nächsten Start',
+    stopsNext: 'stoppt beim nächsten Start',
+    neededBy: (ids: string) => `gebraucht von ${ids}`,
+    programs: (names: string) => `startet ${names}`,
+    pending: 'Wirkt beim nächsten Start',
+    reload: 'Neu laden',
+    remove: 'Entfernen',
+    removeOf: (name: string) => `${name} entfernen`,
+  },
   controller: {
     navigation: 'Zwift Ride: Menüs',
     intro:
