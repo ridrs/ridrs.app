@@ -167,7 +167,7 @@ class Run:
         still = [["still1", C.STILL_WIN_S, C.STILL_GATE_REL, C.STILL_GATE_FAR, C.STILL_BASE_S, C.STILL_NPAIR, C.STILL_THR_PX, C.STILL_GRID, C.STILL_CELL_SHARE, C.STILL_ALL,
                    C.STILL_UP, C.STILL_MIN_S, C.STILL_EDGE_S, C.STILL_SAMPLE_S]] if C.STILL_ON else []   # sure standstill (standstill.py): detected in rotation, held in refine
         parts = dict(motion=[file_sig(P["video"]), C.VMS, C.F360, "motion2", "pick_rel1", M_ALT.ALT_TRIGGER_REL, "alt_thr_rel1", M_ALT.ALT_NOISE_REF, M_ALT.ALT_THR_SLOPE,
-                             ["hz_run1", M_ALT.HZ_EVERY, M_ALT.HZ_WINDOW, M_ALT.HZ_SPAN, M_ALT.HZ_MIN_FOES, M_ALT.HZ_MAX_DEV],
+                             ["hz_run1", M_ALT.HZ_EVERY, M_ALT.HZ_WINDOW, M_ALT.HZ_SPAN, M_ALT.HZ_MIN_FOES, M_ALT.HZ_MAX_DEV], ["hz_gate1", M_ALT.HZ_GATE_SPAN],
                              *([["extract1", EX_ALT.VERSION, EX_ALT.params(), VI_ALT.params()]] if C.MOTION_FROM_EXTRACT else []),
                              *([["hz_fixed1"], ["hz_spread1", C.HZ_SPREAD_IQR]] if P.get("horizon", "running") != "running" else [])],
                      rotation=[C.FAR, C.F_FAR, C.F_REF, "rotation2", C.ROT_BAND_OFF_VMS,

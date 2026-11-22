@@ -171,24 +171,18 @@ def calibrate_noise(P: Points, horizon: float, top: int, bottom: int, road_width
 
 
 def horizon_track(P: Points, horizon: float) -> dict:
-    """`vmsx.motion.horizon_track` of the whole extraction: the focus-of-expansion row every HZ_EVERY s (HZ_WINDOW s each), in the extraction's seconds"""
+    """`vmsx.motion.horizon_track` of the whole extraction: the focus-of-expansion row every HZ_EVERY s (HZ_WINDOW s each), in the extraction's seconds;
+    gated by vmsx.motion.gate_track (A29), not by the calibrated `horizon`"""
     H = P.height
     whole = P.rect(round(0.1 * H), H - round(vm.ABOVE_BOTTOM * H))
-    dev = vm.HZ_MAX_DEV * H / 360
-    t, row = [], []
+    starts, foes = [], []
     k = 0
     while k * vm.HZ_EVERY + vm.HZ_WINDOW <= P.duration + 1e-9:
         s = k * vm.HZ_EVERY
         k += 1
-        f = _foes(P, P.stretch(s, vm.HZ_WINDOW), whole)
-        if len(f) < vm.HZ_MIN_FOES:
-            continue
-        m = float(np.median(f))
-        if abs(m - horizon) > dev:
-            continue
-        t.append(float(s + vm.HZ_WINDOW / 2))
-        row.append(m)
-    return dict(t=t, row=row)
+        starts.append(s)
+        foes.append(_foes(P, P.stretch(s, vm.HZ_WINDOW), whole))
+    return vm.track_of(starts, foes, H)
 
 
 def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 0, road_width=vm.ROAD_WIDTH, on_progress=None, running: bool = True,

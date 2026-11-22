@@ -99,13 +99,15 @@ ALT_TOL = 0.3
 #: distance uphill too long and downhill too short (map / nominal ≈ 1 − 2.3..3.3 × grade on the "4K HDR" passes). So the focus of expansion is
 #: sampled every HZ_EVERY s along the whole video (HZ_WINDOW s, every 3rd pair as in the calibration), and each pair is fitted with the mean of
 #: the stretch medians within ±HZ_SPAN / 2 s of it. A stretch with fewer than HZ_MIN_FOES foci or a median more than HZ_MAX_DEV rows (at 360)
-#: off the calibrated row says nothing; no stretch within reach: the calibrated row. Known cost: the bike videos (Pontaix 30:00-34:00, slow climb)
+#: off the median of the stretch medians within ±HZ_GATE_SPAN / 2 s says nothing (A29, 2026-11-22: until then off the calibrated row, which dropped a
+#: camera that tilts during the ride: Lahntal 180 rows at the start, 265 after 20 min, calibrated 249); no stretch within reach: the calibrated row. Known cost: the bike videos (Pontaix 30:00-34:00, slow climb)
 #: show a FOE shift there that is not visible in the frames; the maintainer accepted that regression and checks it by hand.
 HZ_EVERY = 5.0
 HZ_WINDOW = 1.0
 HZ_SPAN = 60.0
 HZ_MIN_FOES = 5
 HZ_MAX_DEV = 60.0
+HZ_GATE_SPAN = 300.0
 
 #: Focal length in px at 360 rows for the second-order rotation terms of the flow model (config.F360).
 F_ROT = 449.0
@@ -367,7 +369,8 @@ def _foe_sample(args) -> list:
 
 def horizon_track(path: str, height: int, horizon: float, t0: float = 0.0, t1: float | None = None, hwaccel: bool = True, pool=None) -> dict:
     """the focus-of-expansion row along the video (HZ_*): dict(t, row), one entry per usable stretch, t its middle. The stretches start on one grid
-    from time 0 (k × HZ_EVERY), so a clip [t0, t1] gets the stretches of the whole video within HZ_SPAN / 2 of it (with `pool`: same result)."""
+    from time 0 (k × HZ_EVERY), so a clip [t0, t1] gets the stretches of the whole video within HZ_SPAN / 2 of it (with `pool`: same result).
+    `horizon` (the calibrated row) no longer gates the stretches (A29: gate_track); the signature stays for the callers."""
     info = probe(path)
     lo = max(0.0, t0 - HZ_SPAN / 2)
     hi = min(info.duration, (info.duration if t1 is None else t1) + HZ_SPAN / 2)
@@ -375,17 +378,25 @@ def horizon_track(path: str, height: int, horizon: float, t0: float = 0.0, t1: f
               if k * HZ_EVERY + HZ_WINDOW <= info.duration + 1e-9]
     jobs = [(path, height, float(s), HZ_WINDOW, hwaccel) for s in starts]
     parts = pool.map(_foe_sample, jobs, chunksize=1) if pool is not None else [_foe_sample(j) for j in jobs]
+    return track_of(starts, parts, height)
+
+
+def track_of(starts, foes, height: int) -> dict:
+    """dict(t, row) of the stretches (start s, foci f) with at least HZ_MIN_FOES foci that pass gate_track; t the stretch middle, row its median"""
+    ok = [(float(s), float(np.median(f))) for s, f in zip(starts, foes) if len(f) >= HZ_MIN_FOES]
+    if not ok:
+        return dict(t=[], row=[])
+    s, m = np.array(ok).T
+    keep = gate_track(s, m, height)
+    return dict(t=[float(x + HZ_WINDOW / 2) for x in s[keep]], row=[float(x) for x in m[keep]])
+
+
+def gate_track(t, med, height: int) -> np.ndarray:
+    """bool per stretch: its median lies within HZ_MAX_DEV rows (at 360) of the median of the stretch medians within ±HZ_GATE_SPAN / 2 s (itself included)"""
+    t, med = np.asarray(t, float), np.asarray(med, float)
     dev = HZ_MAX_DEV * height / 360
-    t, row = [], []
-    for s, f in zip(starts, parts):
-        if len(f) < HZ_MIN_FOES:
-            continue
-        m = float(np.median(f))
-        if abs(m - horizon) > dev:
-            continue
-        t.append(float(s + HZ_WINDOW / 2))
-        row.append(m)
-    return dict(t=t, row=row)
+    ref = np.array([np.median(med[np.abs(t - x) <= HZ_GATE_SPAN / 2 + 1e-9]) for x in t])
+    return np.abs(med - ref) <= dev
 
 
 def running_horizon(track: dict | None, t, fallback: float) -> np.ndarray:
