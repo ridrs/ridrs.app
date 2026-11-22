@@ -4,7 +4,17 @@ import type { MetricReading } from '@ridrs/contracts';
 import { describeMetricReading, formatDecimal } from '@ridrs/ui-sdk';
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createHdrLayer, HDR_MARGIN, type HdrLayer } from './hdr-layer.ts';
-import { angleOf, bandNear, dimmed, drawsOnHdrCanvas, lit, type Scale, ticksOf } from './model.ts';
+import {
+  angleOf,
+  bandNear,
+  dimmed,
+  drawsOnHdrCanvas,
+  type GaugeTarget,
+  lit,
+  type Scale,
+  targetWindow,
+  ticksOf,
+} from './model.ts';
 
 /** The dial is drawn on 200 × 200 units, its centre at (C, C). */
 const C = 100;
@@ -47,6 +57,13 @@ const GREY_DARK = 'rgb(148 163 184)';
 const WARN = '#ffb62e';
 /** The outline that keeps a mark apart from the scale under it. */
 const OUTLINE = '#0b1220';
+/** The workout target on the scale (Spotlight 3): an outer arc with a center triangle and a radial spotlight. */
+const TARGET_ORANGE = '#ff5a1f';
+const TARGET_OUTER = 96.8;
+const TARGET_SPOTLIGHT_INNER = 72;
+const TARGET_RAY_INNER = 74;
+const TARGET_TICK_MARGIN = 1.8;
+const TARGET_POINTER = `${C - 4.5},${(C - TARGET_OUTER + 0.15).toFixed(2)} ${C + 4.5},${(C - TARGET_OUTER + 0.15).toFixed(2)} ${C},7.4`;
 
 function point(radius: number, degrees: number): [number, number] {
   const rad = (degrees * Math.PI) / 180;
@@ -59,6 +76,16 @@ function arc(radius: number, from: number, to: number): string {
   const [x1, y1] = point(radius, to);
   const large = to - from > 180 ? 1 : 0;
   return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${radius} ${radius} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+
+/** A clockwise sector between `rOuter` and `rInner` from `from`° to `to`°. */
+function sector(rOuter: number, rInner: number, from: number, to: number): string {
+  const [ox0, oy0] = point(rOuter, from);
+  const [ox1, oy1] = point(rOuter, to);
+  const [ix1, iy1] = point(rInner, to);
+  const [ix0, iy0] = point(rInner, from);
+  const large = to - from > 180 ? 1 : 0;
+  return `M ${ox0.toFixed(2)} ${oy0.toFixed(2)} A ${rOuter} ${rOuter} 0 ${large} 1 ${ox1.toFixed(2)} ${oy1.toFixed(2)} L ${ix1.toFixed(2)} ${iy1.toFixed(2)} A ${rInner} ${rInner} 0 ${large} 0 ${ix0.toFixed(2)} ${iy0.toFixed(2)} Z`;
 }
 
 /** Turns what is drawn pointing up from the centre to `angle`° on the scale. */
@@ -79,6 +106,8 @@ export interface GaugeProps {
   readonly average?: { readonly label: string; readonly value: number | undefined };
   /** The FTP, marked on the scale; absent: no mark. */
   readonly ftp?: number | undefined;
+  /** The workout target on the scale; while present, the FTP and average marks on the scale hide. */
+  readonly target?: GaugeTarget | undefined;
   /**
    * The virtual gear, shown at the bottom in place of an average and focusable: Up and Down on it
    * shift. Absent: no gear.
@@ -112,6 +141,7 @@ export function Gauge({
   capturing = false,
   average,
   ftp,
+  target,
   gear,
   zoneName,
 }: GaugeProps) {
@@ -132,6 +162,14 @@ export function Gauge({
   const averageValue = average?.value === undefined ? undefined : Math.round(average.value);
   const averageText = averageValue === undefined ? '–' : formatDecimal(averageValue, 0);
   const lights = live && angle - start > 0.5;
+  const targetSpan = target ? targetWindow(scale, target) : undefined;
+  const targetAngles = targetSpan
+    ? {
+        low: angleOf(scale, targetSpan.low),
+        high: angleOf(scale, targetSpan.high),
+        center: angleOf(scale, targetSpan.center),
+      }
+    : undefined;
   const spoken = [
     `${label} ${display.text} ${unit}`,
     band ? `${zoneName(band.zone)}${band.name ? ` ${band.name}` : ''}` : undefined,
@@ -221,6 +259,63 @@ export function Gauge({
         // A block: inline, it would sit on a text line and add the line's descent below it.
         style={{ display: 'block', overflow: 'visible', opacity: onHdr ? 0 : 1 }}
       >
+        {targetAngles && target && targetSpan ? (
+          <>
+            <defs>
+              <radialGradient
+                id={`target-glow-${kind}`}
+                cx={C}
+                cy={C}
+                r={TARGET_OUTER}
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop offset="74.5%" stopColor="#111a2d" />
+                <stop offset="80%" stopColor="#351c1a" />
+                <stop offset="86%" stopColor="#7a2c12" />
+                <stop offset="93%" stopColor="#c2410c" />
+                <stop offset="100%" stopColor="#ea580c" />
+              </radialGradient>
+              <radialGradient
+                id={`target-edge-${kind}`}
+                cx={C}
+                cy={C}
+                r={TARGET_OUTER}
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop offset="75%" stopColor="#111a2d" />
+                <stop offset="83%" stopColor="#9a3412" />
+                <stop offset="100%" stopColor={TARGET_ORANGE} />
+              </radialGradient>
+            </defs>
+            <g
+              data-testid="target-spotlight"
+              data-low={String(Math.round(target.low))}
+              data-high={String(Math.round(target.high))}
+              data-center={String(Math.round(targetSpan.center))}
+            >
+              <path
+                d={sector(TARGET_OUTER, TARGET_SPOTLIGHT_INNER, targetAngles.low, targetAngles.high)}
+                fill={`url(#target-glow-${kind})`}
+              />
+              {([targetAngles.low, targetAngles.high] as const).map((rayAngle) => {
+                const [x0, y0] = point(TARGET_OUTER, rayAngle);
+                const [x1, y1] = point(TARGET_RAY_INNER, rayAngle);
+                return (
+                  <line
+                    key={rayAngle}
+                    x1={x0}
+                    y1={y0}
+                    x2={x1}
+                    y2={y1}
+                    stroke={`url(#target-edge-${kind})`}
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+            </g>
+          </>
+        ) : null}
 
         {/* The zones, dimmed; the scale lights up from its start to the value. */}
         {scale.bands.length === 0 ? (
@@ -260,23 +355,32 @@ export function Gauge({
         ) : null}
 
         {/* The ticks inside the scale and their numbers. */}
-        {ticksOf(scale).map((tick) => {
-          const at = angleOf(scale, tick.value);
-          const [x0, y0] = point(TICK_OUTER, at);
-          const [x1, y1] = point(tick.major ? TICK_INNER_MAJOR : TICK_INNER_MINOR, at);
-          return (
-            <line
-              key={tick.value}
-              x1={x0}
-              y1={y0}
-              x2={x1}
-              y2={y1}
-              stroke={tick.major ? WHITE : GREY_DARK}
-              strokeWidth={tick.major ? 1.47 : 0.87}
-              strokeLinecap="round"
-            />
-          );
-        })}
+        {ticksOf(scale)
+          .filter((tick) => {
+            if (!targetAngles) return true;
+            const at = angleOf(scale, tick.value);
+            return (
+              at < targetAngles.low - TARGET_TICK_MARGIN ||
+              at > targetAngles.high + TARGET_TICK_MARGIN
+            );
+          })
+          .map((tick) => {
+            const at = angleOf(scale, tick.value);
+            const [x0, y0] = point(TICK_OUTER, at);
+            const [x1, y1] = point(tick.major ? TICK_INNER_MAJOR : TICK_INNER_MINOR, at);
+            return (
+              <line
+                key={tick.value}
+                x1={x0}
+                y1={y0}
+                x2={x1}
+                y2={y1}
+                stroke={tick.major ? WHITE : GREY_DARK}
+                strokeWidth={tick.major ? 1.47 : 0.87}
+                strokeLinecap="round"
+              />
+            );
+          })}
         {ticksOf(scale)
           .filter((tick) => tick.major)
           .map((tick) => {
@@ -297,8 +401,52 @@ export function Gauge({
             );
           })}
 
+        {/* The workout target (Spotlight 3): an outer arc and a center triangle; the other triangles hide. */}
+        {targetAngles && target && targetSpan ? (
+          <g
+            data-testid="target-marker"
+            data-low={String(Math.round(target.low))}
+            data-high={String(Math.round(target.high))}
+            data-center={String(Math.round(targetSpan.center))}
+          >
+            <path
+              d={arc(TARGET_OUTER, targetAngles.low, targetAngles.high)}
+              fill="none"
+              stroke={OUTLINE}
+              strokeWidth={3.8}
+              strokeLinecap="round"
+            />
+            <g transform={towards(targetAngles.center)}>
+              <polygon
+                points={TARGET_POINTER}
+                fill={OUTLINE}
+                stroke={OUTLINE}
+                strokeWidth={1.4}
+                strokeLinejoin="round"
+              />
+            </g>
+            <path
+              data-testid="target-line"
+              d={arc(TARGET_OUTER, targetAngles.low, targetAngles.high)}
+              fill="none"
+              stroke={TARGET_ORANGE}
+              strokeWidth={2.3}
+              strokeLinecap="round"
+            />
+            <g data-testid="target-pointer" transform={towards(targetAngles.center)}>
+              <polygon
+                points={TARGET_POINTER}
+                fill={TARGET_ORANGE}
+                stroke={TARGET_ORANGE}
+                strokeWidth={0.4}
+                strokeLinejoin="round"
+              />
+            </g>
+          </g>
+        ) : null}
+
         {/* The FTP: a red line across the scale and a red triangle inside it. */}
-        {ftp !== undefined ? (
+        {ftp !== undefined && !target ? (
           <g data-testid="ftp-marker" data-value={String(Math.round(ftp))} transform={towards(angleOf(scale, ftp))}>
             <line x1={C} y1={5.7} x2={C} y2={13} stroke={OUTLINE} strokeWidth={3.5} strokeLinecap="round" />
             <line
@@ -321,7 +469,7 @@ export function Gauge({
         ) : null}
 
         {/* The average: a white triangle on the rim, pointing into the scale. */}
-        {averageValue !== undefined ? (
+        {averageValue !== undefined && !target ? (
           <g data-testid="average-marker" data-value={String(averageValue)} transform={towards(angleOf(scale, averageValue))}>
             <polygon
               points={`${C - 5.5},0.8 ${C + 5.5},0.8 ${C},${AVERAGE_TIP}`}

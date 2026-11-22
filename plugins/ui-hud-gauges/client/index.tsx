@@ -19,15 +19,26 @@ import {
   rideScreenshotCaptureState,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  workoutFinishedEvent,
+  workoutIntensityChangedEvent,
+  workoutStepChangedEvent,
 } from '@ridrs/contracts';
 import { formatDecimal, localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Gauge } from './gauge.tsx';
 import { messages } from './i18n/index.ts';
 import { RouteBoxView } from './route-box.tsx';
-import { cadenceScale, formatDuration, heartRateScale, powerScale, RideAverage } from './model.ts';
+import {
+  cadenceScale,
+  formatDuration,
+  type GaugeTarget,
+  heartRateScale,
+  powerScale,
+  RideAverage,
+  WorkoutTargetTracker,
+} from './model.ts';
 
 /** The latest reading of a metric and, with `averaged`, its average over the ride. */
 function useRideMetric<R extends MetricReading>(
@@ -151,6 +162,74 @@ function gearText(gear: DrivetrainGearChangedPayload): string {
 }
 
 /**
+ * The power and cadence targets of the ride's active workout step, gliding from the previous
+ * step's target to the new one over `TARGET_TRANSITION_MS` when the step changes.
+ */
+function useWorkoutTargets(
+  ctx: UiContext,
+  ftp: number | undefined,
+): { readonly power: GaugeTarget | undefined; readonly cadence: GaugeTarget | undefined } {
+  const tracker = useRef(new WorkoutTargetTracker());
+  const clock = useRef(0);
+  const [state, setState] = useState<{
+    readonly power: GaugeTarget | undefined;
+    readonly cadence: GaugeTarget | undefined;
+    readonly animating: boolean;
+  }>({ power: undefined, cadence: undefined, animating: false });
+
+  tracker.current.setFtp(ftp);
+
+  useLayoutEffect(() => {
+    const sync = (at: number) => {
+      clock.current = Math.max(clock.current, at);
+      setState(tracker.current.at(clock.current));
+    };
+    const stopState = ctx.events.subscribe(activityStateChangedEvent, ({ payload, timestamp }) => {
+      tracker.current.activity(payload);
+      if (payload.state !== 'idle' && payload.state !== 'finished') {
+        clock.current = payload.startedAt;
+      }
+      sync(timestamp);
+    });
+    const stopStep = ctx.events.subscribe(workoutStepChangedEvent, ({ payload }) => {
+      tracker.current.stepChanged(payload);
+      sync(payload.startedAt);
+    });
+    const stopFinished = ctx.events.subscribe(workoutFinishedEvent, ({ payload }) => {
+      tracker.current.finished(payload);
+      sync(payload.at);
+    });
+    const stopIntensity = ctx.events.subscribe(
+      workoutIntensityChangedEvent,
+      ({ payload, timestamp }) => {
+        tracker.current.intensityChanged(payload, timestamp);
+        sync(timestamp);
+      },
+    );
+    return () => {
+      stopState();
+      stopStep();
+      stopFinished();
+      stopIntensity();
+    };
+  }, [ctx]);
+
+  useEffect(() => {
+    setState(tracker.current.at(clock.current, ftp));
+  }, [ftp]);
+
+  useEffect(() => {
+    if (!state.animating) return undefined;
+    return ctx.frames.onFrame(({ time }) => {
+      clock.current = time;
+      setState(tracker.current.at(time));
+    });
+  }, [ctx, state.animating]);
+
+  return state;
+}
+
+/**
  * The telemetry, a HUD element of its own: three round dials side by side at the bottom centre.
  * Only the gauges take pointer events.
  */
@@ -166,6 +245,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
   const capturing = useStateEntries(ctx, rideScreenshotCaptureState).size > 0;
 
   const { ftp, powerZones, heartRateZones, lthr, maxHeartRate } = athlete;
+  const workoutTargets = useWorkoutTargets(ctx, ftp);
   const scales = useMemo(
     () => ({
       power: powerScale(ftp, powerZones),
@@ -200,6 +280,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         language={language}
         average={{ label: text.average, value: power.average }}
         ftp={ftp}
+        target={workoutTargets.power}
         zoneName={text.zone}
       />
       <Gauge
@@ -221,6 +302,7 @@ function TelemetryView({ ctx }: { readonly ctx: UiContext }) {
         scale={scales.cadence}
         capturing={capturing}
         language={language}
+        target={workoutTargets.cadence}
         {...(trainer.gear !== undefined && trainer.target === undefined
           ? {
               gear: {

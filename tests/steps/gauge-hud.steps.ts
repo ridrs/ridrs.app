@@ -419,3 +419,77 @@ Then(
     }
   },
 );
+
+When('{int} millisecond(s) go(es) by', async function (this: RidrsWorld, ms: number) {
+  this.fixedTime += ms;
+  await this.settle();
+});
+
+Then(
+  'the {word} gauge marks the target at {int} on its scale',
+  async function (this: RidrsWorld, kind: string, value: number) {
+    const element = await gauge(this, kind);
+    await eventually(this, () => {
+      const marker = within(element).getByTestId('target-marker');
+      const spotlight = within(element).getByTestId('target-spotlight');
+      assert.equal(marker.dataset.low, String(value));
+      assert.equal(marker.dataset.high, String(value));
+      assert.equal(marker.dataset.center, String(value));
+      assert.equal(spotlight.dataset.center, String(value));
+      assert.ok(within(marker).getByTestId('target-line'));
+      assert.ok(within(marker).getByTestId('target-pointer'));
+    });
+  },
+);
+
+Then(
+  'the {word} gauge marks the target from {int} to {int} on its scale',
+  async function (this: RidrsWorld, kind: string, low: number, high: number) {
+    const element = await gauge(this, kind);
+    const center = String(Math.round((low + high) / 2));
+    await eventually(this, () => {
+      const marker = within(element).getByTestId('target-marker');
+      const spotlight = within(element).getByTestId('target-spotlight');
+      assert.equal(marker.dataset.low, String(low));
+      assert.equal(marker.dataset.high, String(high));
+      assert.equal(marker.dataset.center, center);
+      assert.equal(spotlight.dataset.center, center);
+      assert.ok(within(marker).getByTestId('target-line'));
+      assert.ok(within(marker).getByTestId('target-pointer'));
+    });
+  },
+);
+
+Then(
+  'the {word} gauge target is moving between {int} and {int} on its scale',
+  async function (this: RidrsWorld, kind: string, from: number, to: number) {
+    const element = await gauge(this, kind);
+    const low = Math.min(from, to);
+    const high = Math.max(from, to);
+    await eventually(this, () => {
+      const marker = within(element).getByTestId('target-marker');
+      const center = Number(marker.dataset.center);
+      assert.ok(
+        center > low && center < high,
+        `Expected the ${kind} target centre to be moving between ${low} and ${high}, got ${center}`,
+      );
+    });
+  },
+);
+
+Then(
+  'the {word} gauge marks no target on its scale',
+  async function (this: RidrsWorld, kind: string) {
+    const element = await gauge(this, kind);
+    await eventually(this, () => {
+      assert.ok(
+        within(element).queryByTestId('target-marker') === null,
+        'Expected no target marker',
+      );
+      assert.ok(
+        within(element).queryByTestId('target-spotlight') === null,
+        'Expected no target spotlight',
+      );
+    });
+  },
+);

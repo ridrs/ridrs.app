@@ -1,7 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { ActivityState, HeartRateZones, PowerZones } from '@ridrs/contracts';
-import { defaultHeartRateZones, defaultPowerZones, type TrainingZones } from '@ridrs/workout';
+import {
+  type ActivityState,
+  type HeartRateZones,
+  type PowerZones,
+  WORKOUT_INTENSITY,
+  type WorkoutFinishedPayload,
+  type WorkoutIntensityChangedPayload,
+  type WorkoutStepChangedPayload,
+  type WorkoutTarget,
+} from '@ridrs/contracts';
+import {
+  defaultHeartRateZones,
+  defaultPowerZones,
+  type TimelineSegment,
+  type TrainingZones,
+  workoutTimeline,
+} from '@ridrs/workout';
 
 /** One zone on a gauge's scale, in the gauge's unit. */
 export interface Band {
@@ -332,4 +347,260 @@ export function formatDuration(seconds: number): string {
  */
 export function drawsOnHdrCanvas(hasHdrLayer: boolean, capturing: boolean): boolean {
   return hasHdrLayer && !capturing;
+}
+
+/** A workout target on a gauge's scale, in the gauge's unit (`low === high` for an exact value). */
+export interface GaugeTarget {
+  readonly low: number;
+  readonly high: number;
+}
+
+/** The span of the spotlight and outer arc drawn on the scale, and the centre the triangle marks. */
+export interface TargetWindow {
+  readonly low: number;
+  readonly high: number;
+  readonly center: number;
+}
+
+/**
+ * The least share of the scale a workout target's spotlight and outer arc span (±6 % around its
+ * centre: 30° of the 250° sweep), so an exact target or a narrow range still frames its pointer.
+ */
+export const MIN_TARGET_SPAN = 0.12;
+
+/**
+ * The visual window `[low, high]` and `center` of `target` on `scale`, held within the scale with
+ * at least `MIN_TARGET_SPAN` of the scale around `center`.
+ */
+export function targetWindow(scale: Scale, target: GaugeTarget): TargetWindow {
+  const span = scale.max - scale.min;
+  const minHalf = (span * MIN_TARGET_SPAN) / 2;
+  const center = Math.min(scale.max, Math.max(scale.min, (target.low + target.high) / 2));
+  const half = Math.max((target.high - target.low) / 2, minHalf);
+  const low = Math.max(scale.min, Math.min(center - half, scale.max - minHalf));
+  const high = Math.min(scale.max, Math.max(center + half, scale.min + minHalf));
+  return { low, high, center };
+}
+
+/** Where a steady or ramped target stands at `share` (0 to 1) of its step. */
+function rangeAt(target: WorkoutTarget, share: number): GaugeTarget {
+  if (!target.end) {
+    return { low: target.start.low, high: target.start.high };
+  }
+  const clamped = Math.min(1, Math.max(0, share));
+  const at = (from: number, to: number) => from + (to - from) * clamped;
+  return { low: at(target.start.low, target.end.low), high: at(target.start.high, target.end.high) };
+}
+
+/**
+ * The power target (in watts, scaled by `intensityPercent`) and cadence target (in rpm) of
+ * `segment` at `elapsedMs` into the step.
+ */
+export function stepTargets(
+  segment: Pick<TimelineSegment, 'effort' | 'duration' | 'durationSeconds'> | undefined,
+  ftp: number | undefined,
+  intensityPercent = 100,
+  elapsedMs = 0,
+): { readonly power: GaugeTarget | undefined; readonly cadence: GaugeTarget | undefined } {
+  if (!segment) {
+    return { power: undefined, cadence: undefined };
+  }
+  const { effort, duration, durationSeconds } = segment;
+  const share =
+    duration.kind === 'time' && durationSeconds > 0
+      ? Math.min(1, Math.max(0, elapsedMs / (durationSeconds * 1000)))
+      : 0;
+  let power: GaugeTarget | undefined;
+  if (effort.kind === 'target') {
+    const { primary } = effort;
+    if (primary.unit === 'watts') {
+      const raw = rangeAt(primary, share);
+      const factor = intensityPercent / 100;
+      power = { low: raw.low * factor, high: raw.high * factor };
+    } else if (primary.unit === 'percent-ftp' && ftp !== undefined) {
+      const raw = rangeAt(primary, share);
+      const factor = (ftp * intensityPercent) / 10000;
+      power = { low: raw.low * factor, high: raw.high * factor };
+    }
+  }
+  const targets =
+    effort.kind === 'max-effort'
+      ? []
+      : effort.kind === 'target'
+        ? [effort.primary, ...(effort.secondary ?? [])]
+        : (effort.secondary ?? []);
+  const rpm = targets.find((item) => item.unit === 'rpm');
+  const cadence = rpm ? rangeAt(rpm, share) : undefined;
+  return { power, cadence };
+}
+
+/** How long, in ms, the target indicator takes to glide from one workout step's target to the next. */
+export const TARGET_TRANSITION_MS = 400;
+
+/**
+ * Glides a gauge's target from `from` (the previous step's target) to `to` (the current step's
+ * target) over `TARGET_TRANSITION_MS` with a cubic ease-out, so a step change moves smoothly
+ * along the scale instead of jumping. Without a previous target, `to` shows at once.
+ */
+export function interpolateTarget(
+  from: GaugeTarget | undefined,
+  to: GaugeTarget | undefined,
+  elapsedStepMs: number,
+): GaugeTarget | undefined {
+  if (!to) {
+    return undefined;
+  }
+  if (!from || elapsedStepMs >= TARGET_TRANSITION_MS) {
+    return to;
+  }
+  if (elapsedStepMs <= 0) {
+    return from;
+  }
+  const progress = elapsedStepMs / TARGET_TRANSITION_MS;
+  const ease = 1 - (1 - progress) ** 3;
+  return {
+    low: from.low + (to.low - from.low) * ease,
+    high: from.high + (to.high - from.high) * ease,
+  };
+}
+
+interface ActiveStep {
+  readonly index: number;
+  readonly startedAt: number;
+  readonly fromPower: GaugeTarget | undefined;
+  readonly fromCadence: GaugeTarget | undefined;
+}
+
+function segmentHasRamp(segment: TimelineSegment): boolean {
+  if (segment.effort.kind === 'max-effort') return false;
+  const targets =
+    segment.effort.kind === 'target'
+      ? [segment.effort.primary, ...(segment.effort.secondary ?? [])]
+      : (segment.effort.secondary ?? []);
+  return targets.some((item) => item.end !== undefined);
+}
+
+function sameTarget(a: GaugeTarget | undefined, b: GaugeTarget | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return Math.round(a.low) === Math.round(b.low) && Math.round(a.high) === Math.round(b.high);
+}
+
+/**
+ * Follows the ride's active workout and its steps, returning the power and cadence targets to draw
+ * on the gauges at `now` and whether a step transition or ramp is still moving.
+ */
+export class WorkoutTargetTracker {
+  private sessionId: string | undefined;
+  private startedAt = 0;
+  private segments: readonly TimelineSegment[] = [];
+  private step: ActiveStep | undefined;
+  private pausedAt: number | undefined;
+  private pausedMs = 0;
+  private finishedAt: number | undefined;
+  private intensity: { readonly at: number; readonly percent: number } | undefined;
+  private ftp: number | undefined;
+
+  setFtp(ftp: number | undefined): void {
+    this.ftp = ftp;
+  }
+
+  activity(state: ActivityState): void {
+    if (state.state === 'idle' || state.state === 'finished') {
+      this.sessionId = undefined;
+      this.segments = [];
+      this.step = undefined;
+      this.pausedAt = undefined;
+      this.pausedMs = 0;
+      this.finishedAt = undefined;
+      return;
+    }
+    if (state.sessionId !== this.sessionId) {
+      this.sessionId = state.sessionId;
+      this.startedAt = state.startedAt;
+      this.segments = state.workout?.workout ? workoutTimeline(state.workout.workout).segments : [];
+      this.step = undefined;
+      this.pausedAt = undefined;
+      this.pausedMs = 0;
+      this.finishedAt = undefined;
+    } else if (!state.workout?.workout) {
+      this.segments = [];
+    } else if (this.segments.length === 0) {
+      this.segments = workoutTimeline(state.workout.workout).segments;
+    }
+    if (state.state === 'paused') {
+      this.pausedAt ??= state.pausedAt;
+    } else if (this.pausedAt !== undefined && state.resumedAt !== undefined) {
+      this.pausedMs += Math.max(0, state.resumedAt - this.pausedAt);
+      this.pausedAt = undefined;
+    }
+  }
+
+  stepChanged(payload: WorkoutStepChangedPayload): void {
+    const previous = this.at(payload.startedAt);
+    this.step = {
+      index: payload.index,
+      startedAt: payload.startedAt,
+      fromPower: previous.power,
+      fromCadence: previous.cadence,
+    };
+    this.pausedMs = 0;
+  }
+
+  finished(payload: WorkoutFinishedPayload): void {
+    this.finishedAt = payload.at;
+  }
+
+  intensityChanged(payload: WorkoutIntensityChangedPayload, timestamp: number): void {
+    this.intensity = { at: timestamp, percent: payload.percent };
+  }
+
+  at(
+    now: number,
+    ftp = this.ftp,
+  ): {
+    readonly power: GaugeTarget | undefined;
+    readonly cadence: GaugeTarget | undefined;
+    readonly animating: boolean;
+  } {
+    this.ftp = ftp;
+    if (
+      !this.sessionId ||
+      this.segments.length === 0 ||
+      !this.step ||
+      this.step.startedAt < this.startedAt ||
+      (this.finishedAt !== undefined && this.finishedAt >= this.startedAt)
+    ) {
+      return { power: undefined, cadence: undefined, animating: false };
+    }
+    const segment = this.segments[this.step.index];
+    if (!segment) {
+      return { power: undefined, cadence: undefined, animating: false };
+    }
+    const clock = this.pausedAt ?? now;
+    const elapsedMs = Math.max(0, clock - this.step.startedAt - this.pausedMs);
+    const percent =
+      this.intensity && this.intensity.at >= this.startedAt
+        ? this.intensity.percent
+        : WORKOUT_INTENSITY.default;
+    const raw = stepTargets(segment, ftp, percent, elapsedMs);
+    const power = interpolateTarget(this.step.fromPower, raw.power, elapsedMs);
+    const cadence = interpolateTarget(this.step.fromCadence, raw.cadence, elapsedMs);
+    const powerMoving =
+      elapsedMs < TARGET_TRANSITION_MS &&
+      this.step.fromPower !== undefined &&
+      raw.power !== undefined &&
+      !sameTarget(this.step.fromPower, raw.power);
+    const cadenceMoving =
+      elapsedMs < TARGET_TRANSITION_MS &&
+      this.step.fromCadence !== undefined &&
+      raw.cadence !== undefined &&
+      !sameTarget(this.step.fromCadence, raw.cadence);
+    const rampMoving =
+      this.pausedAt === undefined &&
+      segmentHasRamp(segment) &&
+      segment.duration.kind === 'time' &&
+      elapsedMs < segment.durationSeconds * 1000;
+    return { power, cadence, animating: powerMoving || cadenceMoving || rampMoving };
+  }
 }

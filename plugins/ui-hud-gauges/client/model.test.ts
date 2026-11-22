@@ -9,17 +9,22 @@ import {
   CADENCE_COLOURS,
   dimmed,
   drawsOnHdrCanvas,
-  LIT_LIGHTNESS,
-  lit,
-  TRACK_LIGHTNESS,
   formatDuration,
   heartRateScale,
+  interpolateTarget,
+  LIT_LIGHTNESS,
+  lit,
   powerScale,
   RideAverage,
   START_ANGLE,
-  vivid,
   SWEEP,
+  stepTargets,
+  TARGET_TRANSITION_MS,
+  TRACK_LIGHTNESS,
+  targetWindow,
   ticksOf,
+  vivid,
+  WorkoutTargetTracker,
 } from './model.ts';
 
 describe('powerScale', () => {
@@ -203,5 +208,136 @@ describe('drawsOnHdrCanvas', () => {
     expect(drawsOnHdrCanvas(true, true)).toBe(false);
     expect(drawsOnHdrCanvas(false, false)).toBe(false);
     expect(drawsOnHdrCanvas(false, true)).toBe(false);
+  });
+});
+
+describe('workout targets on the gauges', () => {
+  it('widens an exact target to a minimum span around its centre and keeps wide ranges as they are', () => {
+    const cadence = cadenceScale();
+    expect(targetWindow(cadence, { low: 85, high: 85 })).toEqual({ low: 76, high: 94, center: 85 });
+    expect(targetWindow(cadence, { low: 70, high: 90 })).toEqual({ low: 70, high: 90, center: 80 });
+  });
+
+  it('reads power (scaled by intensity or FTP) and cadence from a workout step, including ramps', () => {
+    const steady = stepTargets(
+      {
+        durationSeconds: 240,
+        duration: { kind: 'time', seconds: 240 },
+        effort: {
+          kind: 'target',
+          primary: { unit: 'percent-ftp', start: { low: 100, high: 100 } },
+          secondary: [{ unit: 'rpm', start: { low: 90, high: 100 } }],
+        },
+      },
+      250,
+      110,
+      0,
+    );
+    expect(steady).toEqual({
+      power: { low: 275, high: 275 },
+      cadence: { low: 90, high: 100 },
+    });
+
+    const ramp = stepTargets(
+      {
+        durationSeconds: 100,
+        duration: { kind: 'time', seconds: 100 },
+        effort: {
+          kind: 'target',
+          primary: { unit: 'watts', start: { low: 100, high: 100 }, end: { low: 200, high: 200 } },
+        },
+      },
+      250,
+      100,
+      50_000,
+    );
+    expect(ramp).toEqual({
+      power: { low: 150, high: 150 },
+      cadence: undefined,
+    });
+  });
+
+  it('glides from one step target to the next over the transition instead of jumping', () => {
+    const from = { low: 288, high: 288 };
+    const to = { low: 125, high: 125 };
+    expect(interpolateTarget(undefined, to, 0)).toEqual(to);
+    expect(interpolateTarget(from, to, 0)).toEqual(from);
+    const mid = interpolateTarget(from, to, TARGET_TRANSITION_MS / 2);
+    expect(mid?.low).toBeLessThan(288);
+    expect(mid?.low).toBeGreaterThan(125);
+    expect(interpolateTarget(from, to, TARGET_TRANSITION_MS)).toEqual(to);
+    expect(interpolateTarget(from, undefined, 100)).toBeUndefined();
+  });
+
+  it('tracks a workout ride across steps, glides between targets, and clears when finished', () => {
+    const tracker = new WorkoutTargetTracker();
+    tracker.setFtp(250);
+    tracker.activity({
+      state: 'running',
+      sessionId: 'ride-1',
+      startedAt: 1000,
+      workout: {
+        workout: {
+          format: 'ridrs-workout',
+          version: 1,
+          id: 'w1',
+          name: 'Test',
+          sport: 'virtual-ride',
+          source: { kind: 'builtin' },
+          steps: [
+            {
+              kind: 'interval',
+              id: 's1',
+              duration: { kind: 'time', seconds: 60 },
+              effort: {
+                kind: 'target',
+                primary: { unit: 'watts', start: { low: 288, high: 288 } },
+                secondary: [{ unit: 'rpm', start: { low: 95, high: 105 } }],
+              },
+            },
+            {
+              kind: 'interval',
+              id: 's2',
+              duration: { kind: 'time', seconds: 60 },
+              effort: {
+                kind: 'target',
+                primary: { unit: 'watts', start: { low: 125, high: 125 } },
+              },
+            },
+          ],
+        },
+      },
+    });
+    tracker.stepChanged({ stepId: 's1', index: 0, startedAt: 1000 });
+    expect(tracker.at(1000)).toEqual({
+      power: { low: 288, high: 288 },
+      cadence: { low: 95, high: 105 },
+      animating: false,
+    });
+
+    tracker.stepChanged({ stepId: 's2', index: 1, startedAt: 2000 });
+    expect(tracker.at(2000)).toEqual({
+      power: { low: 288, high: 288 },
+      cadence: undefined,
+      animating: true,
+    });
+
+    const moving = tracker.at(2100);
+    expect(moving.animating).toBe(true);
+    expect(moving.power?.low).toBeLessThan(288);
+    expect(moving.power?.low).toBeGreaterThan(125);
+
+    expect(tracker.at(2000 + TARGET_TRANSITION_MS)).toEqual({
+      power: { low: 125, high: 125 },
+      cadence: undefined,
+      animating: false,
+    });
+
+    tracker.finished({ at: 3000 });
+    expect(tracker.at(3000)).toEqual({
+      power: undefined,
+      cadence: undefined,
+      animating: false,
+    });
   });
 });

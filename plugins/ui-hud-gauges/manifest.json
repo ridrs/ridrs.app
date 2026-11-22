@@ -49,7 +49,10 @@
         "physics.state",
         "world.position",
         "drivetrain.gear-changed",
-        "trainer.target-power"
+        "trainer.target-power",
+        "workout.step-changed",
+        "workout.finished",
+        "workout.intensity-changed"
       ],
       "publish": [
         "drivetrain.shift-requested",
