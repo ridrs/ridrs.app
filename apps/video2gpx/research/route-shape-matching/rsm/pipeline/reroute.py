@@ -29,8 +29,21 @@ from rsm.refine.pathctx import Path as RoutePath
 from . import align as AL, config as C, cuts as K, odofail as OF, osm, steps_c as SC, steps_d as SD, tracks as T
 from .common import Worker, data_dir, file_sig, jdump, jload, sha
 
-# All drivable streets plus paths, cycleways and tracks so the user can drag onto any street or path
-CLASSES_REROUTE = tuple(sorted(set(C.CLASSES_MOTOR) | set(C.CLASSES_BIKE) | set(C.LOCAL_EXTRA) | set(C.BIKE_PATH_CLASSES)))
+# All drivable streets plus paths, cycleways, tracks, footways and steps so the user can drag onto any street, bridge or path
+CLASSES_REROUTE = tuple(sorted(set(C.CLASSES_MOTOR) | set(C.CLASSES_BIKE) | set(C.LOCAL_EXTRA) | set(C.BIKE_PATH_CLASSES) | {"steps"}))
+REROUTE_GRAPH_VERSION = "reroute_graph2"
+_PERM_YES = ("yes", "designated", "permissive")
+
+
+def reroute_way_ok(t) -> bool:
+    """Permissive way filter for manual drag-and-drop rerouting: keeps bridges with bicycle=dismount (e.g. foot/cycle bridges),
+    footways, pedestrian ways, steps, and parking aisles; drops only ways closed with access=private/no (unless bicycle/foot permitted)."""
+    g = lambda k: str(t.get(k, "")).strip().lower()
+    if g("access") in ("private", "no"):
+        if g("bicycle") in _PERM_YES or g("foot") in _PERM_YES:
+            return True
+        return False
+    return True
 
 
 # ------------------------------------------------------------------ graph loading & caching
@@ -51,7 +64,7 @@ def _box_covers(outer: dict, inner: dict) -> bool:
     return outer["south"] <= inner["south"] and outer["west"] <= inner["west"] and outer["north"] >= inner["north"] and outer["east"] >= inner["east"]
 
 
-def load_reroute_graph(d: Path, P: dict, ll_pts: np.ndarray) -> NetGraph:
+def load_reroute_graph(d: Path, P: dict, ll_pts: np.ndarray, *, bike: bool = True) -> NetGraph:
     """Load or extract+cache a NetGraph with all road+path classes covering ll_pts (lon, lat)."""
     need = _route_box(ll_pts, margin_m=600.0)
     cache = data_dir(d)
@@ -62,23 +75,28 @@ def load_reroute_graph(d: Path, P: dict, ll_pts: np.ndarray) -> NetGraph:
         meta_f = cache / "graph_reroute_index.json"
         idx = jload(meta_f) if meta_f.exists() else []
         for entry in idx:
-            if entry.get("pbf") == psig and entry.get("rules") == C.BIKE_PATH_RULES and _box_covers(entry["box"], need):
+            if (
+                entry.get("pbf") == psig
+                and entry.get("version") == REROUTE_GRAPH_VERSION
+                and entry.get("bike") == bike
+                and _box_covers(entry["box"], need)
+            ):
                 f = cache / entry["file"]
                 if f.exists():
                     return NetGraph.load(f)
         # Extract with a generous 1.2 km margin so subsequent drags nearby hit the cache immediately
         box = _route_box(ll_pts, margin_m=1200.0)
-        key = sha(psig, box, list(CLASSES_REROUTE), "reroute_graph1", *osm.rules_token(CLASSES_REROUTE))
+        key = sha(psig, box, list(CLASSES_REROUTE), REROUTE_GRAPH_VERSION, bike)
         fname = f"graph_reroute_{key}.npz"
         f = cache / fname
         if f.exists():
             gl = NetGraph.load(f)
         else:
-            ex = osm.extract(pbf, CLASSES_REROUTE, {"reroute": box}, lambda _f: None)
-            gl = osm.build_graph(*ex["reroute"])
+            ex = osm.extract(pbf, CLASSES_REROUTE, {"reroute": box}, lambda _f: None, way_filter=reroute_way_ok)
+            gl = osm.build_graph(*ex["reroute"], allow_contraflow_bike=bike)
             gl.save(f)
         idx = [e for e in idx if e.get("file") != fname][-15:]
-        idx.append(dict(pbf=psig, rules=C.BIKE_PATH_RULES, box=box, file=fname))
+        idx.append(dict(pbf=psig, version=REROUTE_GRAPH_VERSION, bike=bike, box=box, file=fname))
         jdump(meta_f, idx)
         return gl
     # Fallback when PBF is not on disk (e.g. unit tests or moved PBF): use the run's map graph
@@ -163,12 +181,16 @@ def _snap_candidates(g: NetGraph, tree: cKDTree, sample_eid: np.ndarray, p: np.n
 
 
 def _base_edge_weights(g: NetGraph, orig_xy: np.ndarray) -> np.ndarray:
-    """Per-edge cost multiplier: 0.35 for edges aligned with orig_xy in position & direction, 1.0 otherwise."""
+    """Per-edge cost multiplier: 0.35 for edges aligned with orig_xy in position & direction, 1.0 for normal roads/paths/bridges,
+    mild soft preference against footways/pedestrian (1.3) and steps (2.5) so short connections/bridges are used cleanly while roads/cycleways win ties."""
+    scale = np.ones(g.n_edges, float)
+    hw = np.asarray(g.edge_highway).astype(str)
+    scale[np.isin(hw, ("footway", "pedestrian"))] = 1.3
+    scale[hw == "steps"] = 2.5
     if len(orig_xy) < 2:
-        return np.ones(g.n_edges, float)
+        return scale
     dense, _, tang = _densify(orig_xy, 5.0)
     otree = cKDTree(dense)
-    scale = np.ones(g.n_edges, float)
     for e in range(g.n_edges):
         poly = g.geom(e)
         p0, p1 = poly[0], poly[-1]
@@ -785,7 +807,9 @@ def reroute(d: Path, spec_raw: str | dict) -> dict:
             extra_ll.append([x["lon"], x["lat"]])
     all_ll = np.vstack([orig_ll, np.array(extra_ll, float)]) if extra_ll else orig_ll
 
-    g = load_reroute_graph(d, P, all_ll)
+    vf = d / "route_search" / "vehicle_final.json"
+    veh = (jload(vf).get("vehicle") if vf.exists() else None) or P.get("vehicle") or "bike"
+    g = load_reroute_graph(d, P, all_ll, bike=(veh in ("bike", "auto")))
     tr_to_g = Transformer.from_crs("EPSG:4326", g.crs, always_xy=True)
     gx, gy = tr_to_g.transform(orig_ll[:, 0], orig_ll[:, 1])
     orig_xy = np.column_stack([gx, gy])

@@ -18,7 +18,7 @@ from rsm.network.graph import NetGraph
 from . import config as C
 from .common import jload, sha, file_sig
 
-TAGS = ("highway", "name", "ref", "oneway", "junction", "tunnel", "bridge", "access", "area",
+TAGS = ("highway", "name", "ref", "oneway", "oneway:bicycle", "junction", "tunnel", "bridge", "access", "area",
         # cross-section for the lane model (graph2, rsm.pipeline.lane)
         "width", "est_width", "lanes", "lanes:forward", "lanes:backward", "lane_markings", "cycleway", "cycleway:right", "cycleway:left", "cycleway:both",
         # bike-path tier (bike_tier)
@@ -153,10 +153,11 @@ def edge_tiers(g, ways) -> np.ndarray:
     return np.array([tm[int(w)] for w in np.asarray(g.edge_way)], np.int8)
 
 
-def _ways(pbf, classes, progress=None):
+def _ways(pbf, classes, progress=None, way_filter=None):
     """yield (way_id, tags dict, [(ref, lat, lon)]) of the road ways of the given classes"""
     import osmium
     cls = set(classes)
+    ok_fn = way_ok if way_filter is None else way_filter
     prog = _FdProgress(pbf)
     fp = osmium.FileProcessor(str(pbf), osmium.osm.NODE | osmium.osm.WAY).with_locations().with_filter(osmium.filter.KeyFilter("highway"))
     n = 0
@@ -169,7 +170,7 @@ def _ways(pbf, classes, progress=None):
             if f is not None:
                 progress(f)
         t = w.tags
-        if t.get("highway") not in cls or t.get("area") == "yes" or not way_ok(t):
+        if t.get("highway") not in cls or t.get("area") == "yes" or not ok_fn(t):
             continue
         try:
             pts = [(nd.ref, nd.lat, nd.lon) for nd in w.nodes]
@@ -260,10 +261,10 @@ def foreign_boxes(D: dict, bbox: dict, info_box: dict | None, n: int = C.N_FOREI
     return out
 
 
-def extract(pbf, classes, boxes: dict[str, dict], progress=None) -> dict:
+def extract(pbf, classes, boxes: dict[str, dict], progress=None, way_filter=None) -> dict:
     """one pass; ways touching a box (any node inside), full geometry. -> {name: (ways, nodes)}"""
     res = {k: ([], {}) for k in boxes}
-    for wid, tags, pts in _ways(pbf, classes, progress):
+    for wid, tags, pts in _ways(pbf, classes, progress, way_filter=way_filter):
         for k, b in boxes.items():
             if any(b["south"] <= la <= b["north"] and b["west"] <= lo <= b["east"] for _, la, lo in pts):
                 ws, nd = res[k]
@@ -281,10 +282,16 @@ def subset(ways, nodes, classes):
     return ws, {r: ll for r, ll in nodes.items() if r in refs}
 
 
-def _oneway(tags) -> tuple[bool, bool]:
+def _oneway(tags, allow_contraflow_bike: bool = False) -> tuple[bool, bool]:
     ow = str(tags.get("oneway", "")).lower()
     fwd = ow in ("yes", "true", "1") or tags.get("junction") == "roundabout"
     rev = ow in ("-1", "reverse")
+    if allow_contraflow_bike and (fwd or rev) and tags.get("junction") != "roundabout":
+        if str(tags.get("oneway:bicycle", "")).strip().lower() == "no":
+            return False, False
+        for k in ("cycleway", "cycleway:left", "cycleway:right", "cycleway:both"):
+            if str(tags.get(k, "")).strip().lower().startswith("opposite"):
+                return False, False
     return fwd or rev, rev
 
 
@@ -318,7 +325,7 @@ def _cycle(tags, direction: int) -> int:
     return 1 if v in ("lane", "shared_lane", "shoulder") else 2 if v in ("track", "separate") else 0
 
 
-def build_graph(ways, nodes) -> NetGraph:
+def build_graph(ways, nodes, *, allow_contraflow_bike: bool = False) -> NetGraph:
     from pyproj import Transformer
     ids = np.array(list(nodes.keys()), np.int64)
     ll = np.array([nodes[i] for i in ids])
@@ -341,7 +348,7 @@ def build_graph(ways, nodes) -> NetGraph:
 
     for wid, tags, refs in ways:
         split = [i for i, r in enumerate(refs) if i == 0 or i == len(refs) - 1 or use[r] > 1]
-        one, rev = _oneway(tags)
+        one, rev = _oneway(tags, allow_contraflow_bike=allow_contraflow_bike)
         w_, n_, lf_, lb_ = _width(tags), _int_tag(tags, "lanes"), _int_tag(tags, "lanes:forward"), _int_tag(tags, "lanes:backward")
         lm = str(tags.get("lane_markings", "")).lower()
         mk_ = 0 if lm == "no" else 1 if lm == "yes" else -1

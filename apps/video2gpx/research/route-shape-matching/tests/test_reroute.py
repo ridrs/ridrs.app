@@ -11,7 +11,7 @@ import pytest
 from pyproj import Transformer
 
 from rsm.network.graph import NetGraph
-from rsm.pipeline import cli, reroute as RR
+from rsm.pipeline import cli, osm, reroute as RR
 from rsm.pipeline.common import jdump, jload
 
 
@@ -228,3 +228,33 @@ def test_cli_reroute_and_reset(tmp_path, capsys):
     lines2 = [json.loads(ln) for ln in capsys.readouterr().out.splitlines() if ln.strip()]
     res2 = [x for x in lines2 if x.get("type") == "result"][-1]
     assert 1.19 <= res2["path_km"] <= 1.21
+
+
+def test_reroute_way_ok_keeps_dismount_bridge_footways_and_steps():
+    # Exact OSM tags of Drehbrücke (way 79315837) and nearby paths/steps in Marburg
+    assert RR.reroute_way_ok({"highway": "path", "bridge": "movable", "bicycle": "dismount", "foot": "designated"}) is True
+    assert RR.reroute_way_ok({"highway": "footway", "surface": "asphalt"}) is True
+    assert RR.reroute_way_ok({"highway": "steps", "step_count": "17"}) is True
+    assert RR.reroute_way_ok({"highway": "service", "service": "parking_aisle"}) is True
+    # Truly closed ways without bicycle/foot permission are still excluded
+    assert RR.reroute_way_ok({"highway": "service", "access": "private"}) is False
+    assert RR.reroute_way_ok({"highway": "path", "access": "no"}) is False
+    assert RR.reroute_way_ok({"highway": "path", "access": "no", "bicycle": "yes"}) is True
+    assert "steps" in RR.CLASSES_REROUTE
+
+
+def test_contraflow_bike_oneway_allowed_in_reroute_graph():
+    nodes = {1: (50.814, 8.776), 2: (50.815, 8.776)}
+    ways = [
+        (22756869, {"highway": "residential", "name": "Biegenstraße", "oneway": "yes", "oneway:bicycle": "no"}, [1, 2]),
+        (169723496, {"highway": "residential", "name": "Uferstraße", "oneway": "yes", "oneway:bicycle": "yes"}, [1, 2]),
+    ]
+    g_car = osm.build_graph(ways, nodes, allow_contraflow_bike=False)
+    g_bike = osm.build_graph(ways, nodes, allow_contraflow_bike=True)
+    # Without contraflow: both are strictly one-way (2 directed edges total)
+    assert g_car.n_edges == 2
+    # With contraflow: Biegenstraße (oneway:bicycle=no) gets 2 directed edges, Uferstraße (oneway:bicycle=yes) stays 1
+    assert g_bike.n_edges == 3
+    assert int((g_bike.edge_way == 22756869).sum()) == 2
+    assert int((g_bike.edge_way == 169723496).sum()) == 1
+
