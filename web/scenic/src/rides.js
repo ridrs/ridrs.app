@@ -65,8 +65,47 @@ export async function packageZip(env, row, root) {
 
 /** Points of a sparkline: evenly spaced elevations from start to end. */
 const SPARKLINE = 100;
-/** The bitrate a YouTube video's size is estimated with where Scenic has none: about 1080p. */
-const DEFAULT_KBPS = 8000;
+/**
+ * The bitrate a YouTube video's size is estimated with: YouTube's video stream at 1080p, more at a
+ * high frame rate. Scenic's own bitrate is the best format's (4K HDR up to 180 Mbit/s): it counts
+ * only where it is lower.
+ */
+const kbps1080 = (fps) => (fps > 30 ? 12000 : 8000);
+/** Ups and downs smaller than this, in m, are noise of the elevation, not climbs. */
+const HYSTERESIS = 3;
+
+const RADIUS = 6371008.8;
+const rad = (deg) => (deg * Math.PI) / 180;
+/** m between two points [lon, lat]. */
+function haversine([lon1, lat1], [lon2, lat2]) {
+  const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
+  return 2 * RADIUS * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
+ * What a synced track (`{t, c, e}`, one point per video second) says of a ride: its distance in m,
+ * the m climbed (ups of at least 3 m), its profile [[km, ele], …] and the s it runs; none without
+ * elevations.
+ */
+export function trackFacts(track) {
+  const { t, c, e } = track ?? {};
+  if (!Array.isArray(t) || !Array.isArray(c) || !Array.isArray(e) || t.length < 2 || c.length !== t.length || e.length !== t.length) {
+    return null;
+  }
+  let distance = 0;
+  let ascent = 0;
+  let low = e[0];
+  const profile = [[0, e[0]]];
+  for (let i = 1; i < t.length; i += 1) {
+    distance += haversine(c[i - 1], c[i]);
+    profile.push([distance / 1000, e[i]]);
+    if (e[i] - low >= HYSTERESIS) {
+      ascent += e[i] - low;
+      low = e[i];
+    } else if (e[i] < low) low = e[i];
+  }
+  return { distance: Math.round(distance), ascent: Math.round(ascent), profile, duration: t.at(-1) - t[0] };
+}
 
 /** `n` elevations evenly spaced along a profile [[km, ele], …], linearly between its points. */
 export function sparklineOf(profile, n = SPARKLINE) {
@@ -87,18 +126,22 @@ const sourceOf = (r) => ({ name: r.source_name, ...(r.author ? { author: r.autho
 
 /**
  * A YouTube video the app can ride with the YouTube downloader (ridrs_app ADR 0105): the package without its video
- * (concept 4.7) and the video's id and frame rate; its size is an estimate, the video at Scenic's bitrate over its
- * duration. Its channel is its author.
+ * (concept 4.7) and the video's id and frame rate; its size is an estimate, the video at 1080p over the ride's
+ * duration. Its channel is its author. `r.track` are the facts of its synced track ({@link trackFacts}), if it has one.
  */
 function youtubeRoute(r, site) {
   const route = { id: r.video_id, source: r.source, title: r.title || r.place || r.video_id,
     page: `https://www.youtube.com/watch?v=${r.video_id}` };
   if (r.channel) route.author = r.channel;
   if (r.country) route.country = r.country;
-  Object.assign(route, { distance: Math.round(r.distance_km * 1000), ascent: r.ascent_m ?? 0, duration: r.duration_s,
-    sparkline: sparklineOf(parse(r.profile)), climbs: [], overlay: [] });
+  // The synced track knows the ride best; the route's profile where there is none.
+  const facts = r.track ?? { distance: Math.round(r.distance_km * 1000), ascent: r.ascent_m ?? 0, profile: parse(r.profile),
+    duration: r.duration_s };
+  Object.assign(route, { distance: facts.distance, ascent: facts.ascent, duration: facts.duration,
+    sparkline: sparklineOf(facts.profile), climbs: [], overlay: [] });
+  const rate = Math.min(r.bitrate_kbps ?? Number.POSITIVE_INFINITY, kbps1080(r.fps ?? 30));
   route.download = { kind: 'youtube', url: `${site}/api/videos/${r.video_id}/incyclist.zip`, format: 'incyclist-gpx-import',
-    size: Math.round(((r.bitrate_kbps ?? DEFAULT_KBPS) * 1000 / 8) * r.duration_s), video: r.video_id };
+    size: Math.round(((rate * 1000) / 8) * facts.duration), video: r.video_id };
   if (r.fps) route.download.fps = r.fps;
   return route;
 }

@@ -19,7 +19,7 @@
 import { adminIdentity, sameOriginWrite } from './auth.js';
 import { basePath, routePath, VIDEO_ID } from './base.js';
 import { FTS_INSERT } from './search-index.js';
-import { packageZip, rideCatalog, ridePicture, slugOf } from './rides.js';
+import { packageZip, rideCatalog, ridePicture, slugOf, trackFacts } from './rides.js';
 import { handleAdmin, HttpError, ajson, routeLine, loadTrack, loadJob } from './admin.js';
 import { buildIncyclistZip, MIN_LEVEL } from './incyclist.js';
 import { buildTrack } from '../site/lib/route-sync.js';
@@ -273,16 +273,23 @@ async function rideCatalogResponse(env, request, site) {
   const { results } = await env.DB.prepare(`SELECT v.video_id, v.title, v.country, v.duration_s, v.source, p.*, s.name AS source_name, s.author,
       s.url AS source_url, s.license_id, s.license_name, s.license_url
     FROM ride_package p JOIN video v ON v.video_id = p.video_id LEFT JOIN source s ON s.source_id = v.source WHERE ${VISIBLE} ORDER BY v.video_id`).all();
-  // YouTube videos with an Incyclist package (from level MIN_LEVEL) and an elevation profile: the YouTube downloader of
-  // the app fetches the package and the video (ridrs_app ADR 0105).
-  const { results: videos } = await env.DB.prepare(`SELECT v.video_id, v.title, v.place, v.country, v.duration_s, v.source,
-      c.name AS channel, t.fps, t.bitrate_kbps, r.distance_km, r.ascent_m, r.profile, s.name AS source_name, s.author,
-      s.url AS source_url, s.license_id, s.license_name, s.license_url
-    FROM video v JOIN localization l ON l.video_id = v.video_id JOIN route r ON r.video_id = v.video_id
-    LEFT JOIN channel c ON c.channel_id = v.channel_id LEFT JOIN video_tech t ON t.video_id = v.video_id
-    LEFT JOIN source s ON s.source_id = v.source
-    WHERE ${VISIBLE} AND v.source = 'youtube' AND l.loc_level <= ?1 AND r.profile IS NOT NULL AND r.distance_km > 0
-      AND v.duration_s > 0 ORDER BY v.video_id`).bind(MIN_LEVEL).all();
+  // YouTube videos with an Incyclist package (from level MIN_LEVEL) and elevations, from their synced track or their
+  // route's profile: the YouTube downloader of the app fetches the package and the video (ridrs_app ADR 0105).
+  const { results: candidates } = await env.DB.prepare(`SELECT v.video_id, v.title, v.place, v.country, v.duration_s, v.source,
+      c.name AS channel, t.fps, t.bitrate_kbps, r.distance_km, r.ascent_m, r.profile, rs.method AS sync_method,
+      rs.path AS sync_path, s.name AS source_name, s.author, s.url AS source_url, s.license_id, s.license_name, s.license_url
+    FROM video v JOIN localization l ON l.video_id = v.video_id LEFT JOIN route r ON r.video_id = v.video_id
+    LEFT JOIN route_sync rs ON rs.video_id = v.video_id LEFT JOIN channel c ON c.channel_id = v.channel_id
+    LEFT JOIN video_tech t ON t.video_id = v.video_id LEFT JOIN source s ON s.source_id = v.source
+    WHERE ${VISIBLE} AND v.source = 'youtube' AND l.loc_level <= ?1 AND v.duration_s > 0
+      AND (rs.video_id IS NOT NULL OR (r.profile IS NOT NULL AND r.distance_km > 0)) ORDER BY v.video_id`).bind(MIN_LEVEL).all();
+  const videos = [];
+  for (const row of candidates) {
+    const sync = row.sync_method ? { method: row.sync_method, path: row.sync_path } : null;
+    const track = trackFacts(await loadTrack(env, row.video_id, sync, site).catch(() => null));
+    if (track) videos.push({ ...row, track });
+    else if (row.profile && row.distance_km > 0) videos.push(row);
+  }
   const body = JSON.stringify(rideCatalog(results, site, videos));
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-1', new TextEncoder().encode(body)));
   const etag = `"${[...digest].map((b) => b.toString(16).padStart(2, '0')).join('')}"`;

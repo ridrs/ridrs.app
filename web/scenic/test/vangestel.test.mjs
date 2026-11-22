@@ -214,6 +214,39 @@ test('ride catalog: a published YouTube video at level 3 or better, with a route
   });
 });
 
+test('ride catalog: a YouTube video without a route profile takes distance, climb, profile and duration from its track', async () => {
+  const RIDE = 'YTYTYTYTY04';
+  // A climb of 1 km in 101 s from video second 60: 0.01 km and 2 m up per second, 202 m in all.
+  const track = { v: 1, t: [], c: [], e: [] };
+  for (let i = 0; i <= 100; i += 1) {
+    track.t.push(60 + i);
+    track.c.push([7, 45 + (i * 0.01) / 111.195]);
+    track.e.push(500 + 2 * i);
+  }
+  const video = { ...yt(RIDE), localization: { level: 1, key: 'video2gpx', rules_version: 0 },
+    tech: { max_height: 2160, max_width: 3840, fps: 60, hdr: 1, codecs: ['vp9'], bitrate_kbps: 57608, aspect: 1.78, source: 'ytdlp', checked_at: '2026-11-21' },
+    route: null };
+  const snapshot = new Map([[RIDE, { title: 'Sa Calobra', duration_s: 300, channel_id: 'UCcccccccccccccccccccccc', channel_title: 'Test Channel' }]]);
+  const DB = makeD1();
+  DB.raw.exec(buildImportSql({ videos: [video], yt: snapshot, sync: new Map(), rides: [], today: '2026-11-21', at: 'x' }).sql.join('\n'));
+  DB.raw.prepare("INSERT INTO route_sync (video_id, method, t_start_s, t_end_s, path, hash, built_at) VALUES (?1, 'anchors', 60, 160, ?2, 'h', 'x')").run(RIDE, `api/sync/${RIDE}.json`);
+  DB.raw.prepare('INSERT INTO sync_track (video_id, json) VALUES (?1, ?2)').run(RIDE, JSON.stringify(track));
+  DB.raw.exec('UPDATE video SET site_published = 1');
+  const env = { DB, ASSETS, BASE_PATH: '/scenic' };
+  const catalog = await (await worker.fetch(new Request(`${BASE}/api/ride/v1/catalog.json`), env, null)).json();
+  const [route] = catalog.routes;
+  assert.equal(route?.id, RIDE);
+  assert.equal(route.distance, 1000);
+  assert.equal(route.ascent, 200);
+  assert.equal(route.duration, 100);
+  assert.equal(route.sparkline.length, 100);
+  assert.equal(route.sparkline[0], 500);
+  assert.equal(route.sparkline.at(-1), 700);
+  // The size is estimated for 1080p at 60 fps (12000 kbit/s), not for Scenic's 4K bitrate: 12000 kbit/s over 100 s.
+  assert.equal(route.download.size, 150_000_000);
+  assert.equal(route.download.fps, 60);
+});
+
 test('filter "rideable in ridrs" (ride=1): only entries with a ride package, in the URL and as a facet', () => {
   const videos = [{ id: 'a', ride: 1, topics: [], search: '' }, { id: 'b', ride: 0, topics: [], search: '' }];
   const s = { ...defaults(), ride: true };
