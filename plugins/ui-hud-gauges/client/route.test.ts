@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { fitPlaces, gradeColour, headingAt, nearestIndex, profileOf, thin } from './route.ts';
+import { fitPlaces, gradeColour, headingAt, indexAtDistance, measureTrack, profileOf, thin } from './route.ts';
 
 const NORTH_THEN_EAST = [
   { latitude: 46.0, longitude: 7.0 },
@@ -19,9 +19,29 @@ describe('fitPlaces', () => {
   });
 });
 
-describe('nearestIndex', () => {
-  it('finds the point of the track nearest to the rider', () => {
-    expect(nearestIndex(NORTH_THEN_EAST, { latitude: 46.0041, longitude: 7.0001 })).toBe(1);
+describe('measureTrack and indexAtDistance', () => {
+  it('finds the point of the track at or before the ridden distance', () => {
+    const measured = measureTrack(NORTH_THEN_EAST);
+    expect(measured[0]?.distance).toBe(0);
+    expect(measured[1]?.distance).toBeCloseTo(445, 0);
+    expect(indexAtDistance(measured, 0)).toBe(0);
+    expect(indexAtDistance(measured, 450)).toBe(1);
+    expect(indexAtDistance(measured, 5000)).toBe(2);
+  });
+
+  it('stays on the outbound leg of an out-and-back track instead of jumping to the return leg', () => {
+    const outAndBack = measureTrack([
+      { latitude: 46.0, longitude: 7.0 },
+      { latitude: 46.002, longitude: 7.0 },
+      { latitude: 46.004, longitude: 7.0 },
+      { latitude: 46.002, longitude: 7.0 },
+      { latitude: 46.0, longitude: 7.0 },
+    ]);
+    // Same geographic spot appears at ~222 m (outbound, index 1) and ~667 m (return, index 3).
+    expect(indexAtDistance(outAndBack, 223)).toBe(1);
+    expect(headingAt(outAndBack, 1)).toBeCloseTo(0, 0);
+    expect(indexAtDistance(outAndBack, 668)).toBe(3);
+    expect(headingAt(outAndBack, 3)).toBeCloseTo(180, 0);
   });
 });
 
@@ -83,5 +103,24 @@ describe('headingAt', () => {
       { latitude: 46, longitude: 7.01 },
     ];
     expect(headingAt(east, 1)).toBeCloseTo(90, 0);
+  });
+
+  it('keeps facing the road ahead when looking ahead folds back onto the start at a U-turn', () => {
+    // 25 m east, then 25 m straight back west to the same spot (~0.00032° lon at 46°).
+    const uTurn = [
+      { latitude: 46, longitude: 7 },
+      { latitude: 46, longitude: 7.00032 },
+      { latitude: 46, longitude: 7 },
+    ];
+    expect(headingAt(uTurn, 0, 50)).toBeCloseTo(90, 0);
+  });
+
+  it('keeps the arrival direction when the track ends with stationary points', () => {
+    const stationaryEnd = [
+      { latitude: 46, longitude: 7 },
+      { latitude: 46, longitude: 7.01 },
+      { latitude: 46, longitude: 7.01 },
+    ];
+    expect(headingAt(stationaryEnd, 2)).toBeCloseTo(90, 0);
   });
 });

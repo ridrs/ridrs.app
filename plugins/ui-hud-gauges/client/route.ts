@@ -6,6 +6,11 @@ export interface Place {
   readonly longitude: number;
 }
 
+/** A place on a track together with its cumulative distance (m) from the start. */
+export interface MeasuredPlace extends Place {
+  readonly distance: number;
+}
+
 /** A point in a drawing, in its own units, y downwards. */
 export interface Point {
   readonly x: number;
@@ -21,21 +26,39 @@ export function thin<T>(items: readonly T[], max: number): T[] {
   return Array.from({ length: max }, (_, i) => items[Math.round(i * step)] as T);
 }
 
-/** The index of the place of `track` nearest to `place`: where the rider is on it. */
-export function nearestIndex(track: readonly Place[], place: Place): number {
-  const east = Math.cos((place.latitude * Math.PI) / 180);
-  let best = 0;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  track.forEach((point, index) => {
-    const dx = (point.longitude - place.longitude) * east;
-    const dy = point.latitude - place.latitude;
-    const distance = dx * dx + dy * dy;
-    if (distance < bestDistance) {
-      best = index;
-      bestDistance = distance;
-    }
+/**
+ * Each place of `track` paired with its cumulative distance (m) from the start along the full
+ * track. Measure before thinning so shortcuts across hairpins do not shrink distances.
+ */
+export function measureTrack<T extends Place>(track: readonly T[]): (T & { readonly distance: number })[] {
+  let distance = 0;
+  return track.map((point, index) => {
+    if (index > 0) distance += metresBetween(track[index - 1] as Place, point);
+    return { ...point, distance };
   });
-  return best;
+}
+
+/**
+ * The index of the last place of `track` at or before `distance` (m): where the rider is along
+ * the route. Locating by distance rather than coordinates stays on the right leg of an
+ * out-and-back, self-crossing or switchback track.
+ */
+export function indexAtDistance(
+  track: readonly { readonly distance: number }[],
+  distance: number,
+): number {
+  if (track.length <= 1) return 0;
+  let low = 0;
+  let high = track.length - 1;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if ((track[middle]?.distance ?? 0) <= distance) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return low;
 }
 
 /**
@@ -149,6 +172,13 @@ function metresBetween(a: Place, b: Place): number {
   return Math.hypot(dx, dy);
 }
 
+/** Degrees clockwise from north, from `from` toward `to`. */
+function bearingBetween(from: Place, to: Place): number {
+  const east = Math.cos((from.latitude * Math.PI) / 180);
+  const degrees = (Math.atan2((to.longitude - from.longitude) * east, to.latitude - from.latitude) * 180) / Math.PI;
+  return (degrees + 360) % 360;
+}
+
 /**
  * The direction of travel at the point `index` of `track`, in degrees clockwise from north: toward
  * the point about `ahead` m further on. Short enough that a hairpin does not turn the map across
@@ -164,12 +194,18 @@ export function headingAt(track: readonly Place[], index: number, ahead = 50): n
     travelled += metresBetween(to, next);
     to = next;
   }
-  if (to === from) {
-    // At the end: keep the direction the track came from.
-    const before = track[index - 1];
-    return before ? headingAt([before, from], 0, ahead) : 0;
+  if (metresBetween(from, to) >= 1) {
+    return bearingBetween(from, to);
   }
-  const east = Math.cos((from.latitude * Math.PI) / 180);
-  const degrees = (Math.atan2((to.longitude - from.longitude) * east, to.latitude - from.latitude) * 180) / Math.PI;
-  return (degrees + 360) % 360;
+  // Looking `ahead` folded back onto `from` (e.g. approaching a U-turn): face the road right ahead.
+  for (let i = index + 1; i < track.length; i += 1) {
+    const next = track[i] as Place;
+    if (metresBetween(from, next) >= 1) return bearingBetween(from, next);
+  }
+  // At the end (or only stationary points remain): keep the direction the track came from.
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const before = track[i] as Place;
+    if (metresBetween(before, from) >= 1) return bearingBetween(before, from);
+  }
+  return 0;
 }

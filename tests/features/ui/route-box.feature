@@ -32,6 +32,13 @@ Feature: A box at the top right shows the route being ridden
     Then the route map marks the rider
     And the route map shows 3 points of the track as ridden
 
+  Scenario: On an out-and-back route the ridden part follows the distance ridden, not the return leg
+    Given "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "out-and-back"
+    When the world reports the rider at 46.00201, 7.0000 after 223 m
+    Then the route map shows 2 points of the track as ridden
+    When the world reports the rider at 46.00201, 7.0000 after 667 m
+    Then the route map shows 4 points of the track as ridden
+
   Scenario: The profile marks the rider along the route
     Given "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "hill"
     When the physics reports a road gradient of 4.5 % after 300 m

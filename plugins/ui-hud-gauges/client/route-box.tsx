@@ -15,7 +15,7 @@ import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useMemo, useState } from 'react';
 import { messages } from './i18n/index.ts';
 import { canDrawMap, LiveMap, MAP_ATTRIBUTION } from './live-map.tsx';
-import { fitPlaces, gradeColour, nearestIndex, polyline, profileOf, thin } from './route.ts';
+import { fitPlaces, gradeColour, indexAtDistance, measureTrack, polyline, profileOf, thin } from './route.ts';
 
 const EN_DASH = '–';
 const WIDTH = 300;
@@ -80,10 +80,10 @@ function useTrack(offer: RouteOffer | undefined): TrackPosition[] | undefined {
  * plane leaning back. Where no map can be drawn (no WebGL, offline).
  */
 function TrackMap({ track, position }: { readonly track: TrackPosition[]; readonly position?: WorldPosition }) {
-  const shown = useMemo(() => thin(track, MAX_POINTS), [track]);
+  const shown = useMemo(() => thin(measureTrack(track), MAX_POINTS), [track]);
   const project = useMemo(() => fitPlaces(shown, MAP.width, MAP.height, MAP.pad), [shown]);
   const points = useMemo(() => shown.map(project), [shown, project]);
-  const here = position ? nearestIndex(shown, position) : undefined;
+  const here = position ? indexAtDistance(shown, position.distance) : undefined;
   const rider = position ? project(position) : undefined;
 
   return (

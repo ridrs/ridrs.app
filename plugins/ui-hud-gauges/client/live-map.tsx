@@ -4,7 +4,7 @@ import type { WorldPosition } from '@ridrs/contracts';
 import type { TrackPosition } from '@ridrs/ride';
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import { useEffect, useRef } from 'react';
-import { headingAt, nearestIndex, thin } from './route.ts';
+import { headingAt, indexAtDistance, type MeasuredPlace, measureTrack, type Place, thin } from './route.ts';
 
 /**
  * OpenFreeMap's dark blue style (ADR 0097), in the colours of the ride cards: free, no key, from
@@ -55,13 +55,13 @@ interface Spot {
   readonly geometry: { readonly type: 'Point'; readonly coordinates: number[] };
 }
 
-const line = (places: readonly TrackPosition[]): Line => ({
+const line = (places: readonly Place[]): Line => ({
   type: 'Feature',
   properties: {},
   geometry: { type: 'LineString', coordinates: places.map((p) => [p.longitude, p.latitude]) },
 });
 
-const spot = (place: { readonly latitude: number; readonly longitude: number }): Spot => ({
+const spot = (place: Place): Spot => ({
   type: 'Feature',
   properties: {},
   geometry: { type: 'Point', coordinates: [place.longitude, place.latitude] },
@@ -74,7 +74,7 @@ const spot = (place: { readonly latitude: number; readonly longitude: number }):
  */
 function follow(
   target: MapLibreMap,
-  places: readonly TrackPosition[],
+  places: readonly MeasuredPlace[],
   at: WorldPosition | undefined,
   height: number,
   lastCamera: { current: number },
@@ -84,8 +84,9 @@ function follow(
   const start = places[0];
   const known = at ?? (start ? { distance: 0, latitude: start.latitude, longitude: start.longitude } : undefined);
   if (!known) return;
-  const here = nearestIndex(places, known);
-  (target.getSource('ridden') as GeoJSONSource | undefined)?.setData(line(places.slice(0, here + 1)));
+  const here = indexAtDistance(places, known.distance);
+  const ridden = at ? [...places.slice(0, here + 1), at] : places.slice(0, here + 1);
+  (target.getSource('ridden') as GeoJSONSource | undefined)?.setData(line(ridden));
   if (at) (target.getSource('rider') as GeoJSONSource | undefined)?.setData(spot(at));
   const time = performance.now();
   if (!now && time - lastCamera.current < CAMERA_EVERY) return;
@@ -122,7 +123,7 @@ export function LiveMap({
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap>(undefined);
   const ready = useRef(false);
-  const shown = useRef<TrackPosition[]>([]);
+  const shown = useRef<MeasuredPlace[]>([]);
   const lastCamera = useRef(0);
   const latest = useRef(position);
   latest.current = position;
@@ -134,7 +135,7 @@ export function LiveMap({
     const element = container.current;
     if (!element) return undefined;
     let cancelled = false;
-    shown.current = thin(track, MAX_POINTS);
+    shown.current = thin(measureTrack(track), MAX_POINTS);
     // MapLibre finds its worker beside its own file only on an http page; the native app is not
     // one. The bundler builds the worker and names its URL (ADR 0097).
     Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url')])
