@@ -18,6 +18,6 @@ Status: accepted on 2026-11-22, on the maintainer's request that every kind of v
 
 ## Consequences
 
-- A YouTube downloader (plan step D) is a plugin of the kind `youtube` and needs no change of the source; Scenic's catalog names the kind of each route.
+- A YouTube downloader (plan step D) is a plugin of the kind `youtube` and needs no change of the source. Since 2026-11-22 (plan step B) ridrs Scenic lists its published YouTube videos at Lokalisierungsstufe 3 or better with a route and an elevation profile in the ride catalog, `download.kind: "youtube"` with the video's id, its frame rate and Scenic's package without the video; the source hands the downloader the catalog's whole `download` as `details`, and credits a route to its own `author` (the channel) where its source has none. Without a YouTube downloader they are not offered.
 - A host without `download-ride-package` offers no route of ridrs Scenic; every composition that wants them lists both plugins.
 - The quality choice is in the ride page and the briefing; no current downloader uses it, the scenarios test it with a test downloader.

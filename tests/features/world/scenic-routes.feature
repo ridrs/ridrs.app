@@ -53,3 +53,17 @@ Feature: Video routes from ridrs Scenic
     When the host has started
     Then the route offer "video-source-scenic/vg-col-de-pennes" is "ready"
     And the media storage holds no route "video-source-vangestel/col-de-pennes"
+
+  Scenario: A YouTube video of ridrs Scenic goes to the downloader of YouTube videos
+    Given ridrs Scenic also lists the YouTube video "YTYTYTYTY02"
+    And a test downloader offers the qualities "1080p (recommended), 720p" for YouTube videos
+    When the host has started
+    Then the video source "video-source-scenic" offers 24 routes
+    And the route offer "video-source-scenic/YTYTYTYTY02" is titled "Passo di Test"
+    And the test downloader was handed the route "video-source-scenic/YTYTYTYTY02" with the details '{"url":"https://ridrs.app/scenic/api/videos/YTYTYTYTY02/incyclist.zip","format":"incyclist-gpx-import","video":"YTYTYTYTY02","fps":30,"overlay":[]}'
+
+  Scenario: Without a downloader of YouTube videos a YouTube video is not offered
+    Given ridrs Scenic also lists the YouTube video "YTYTYTYTY02"
+    When the host has started
+    Then the video source "video-source-scenic" offers 23 routes
+    And there is no route offer "video-source-scenic/YTYTYTYTY02"

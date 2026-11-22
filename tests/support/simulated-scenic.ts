@@ -12,6 +12,8 @@ export const RIDE_CATALOG = `${SCENIC}api/ride/v1/catalog.json`;
 
 /** The ride catalog the simulated Scenic serves: taken from ridrs.app/scenic (README beside it). */
 const CATALOG_FILE = resolve(import.meta.dirname, '../fixtures/scenic/ride-catalog.json');
+/** A YouTube video as Scenic lists it in its catalog, with the source YouTube (ADR 0105). */
+const YOUTUBE_FILE = resolve(import.meta.dirname, '../fixtures/scenic/youtube-ride.json');
 /** The files of the Van Gestel rides that Scenic serves under `vg/<slug>/`. */
 const CONTENT = resolve(import.meta.dirname, '../../content/vangestel');
 
@@ -28,11 +30,14 @@ export function scenicFile(url: string): Uint8Array | undefined {
 
 /**
  * ridrs Scenic for the scenarios, through `net.http`: its ride catalog with an ETag, `304` when asked
- * with the current one. It can be out of reach, and routes can leave its catalog.
+ * with the current one. It can be out of reach, routes can leave its catalog, and YouTube videos
+ * can join it.
  */
 export class SimulatedScenic {
   offline = false;
   readonly withdrawn = new Set<string>();
+  /** YouTube videos the catalog lists besides the rides of the fixture, by their ids. */
+  readonly youtube = new Set<string>();
   readonly requests: {
     readonly url: string;
     readonly headers: Readonly<Record<string, string>>;
@@ -48,9 +53,29 @@ export class SimulatedScenic {
         return { status: 404, headers: {}, body: '{"error":"not found"}' };
       }
       const catalog = JSON.parse(readFileSync(CATALOG_FILE, 'utf8')) as {
-        routes: { id: string }[];
+        sources: Record<string, unknown>;
+        routes: { id: string; [field: string]: unknown }[];
       };
       catalog.routes = catalog.routes.filter((route) => !this.withdrawn.has(route.id));
+      if (this.youtube.size > 0) {
+        const { source, route } = JSON.parse(readFileSync(YOUTUBE_FILE, 'utf8')) as {
+          source: unknown;
+          route: { id: string; page: string; download: Record<string, unknown> };
+        };
+        catalog.sources.youtube = source;
+        for (const id of this.youtube) {
+          catalog.routes.push({
+            ...route,
+            id,
+            page: `https://www.youtube.com/watch?v=${id}`,
+            download: {
+              ...route.download,
+              url: `${SCENIC}api/videos/${id}/incyclist.zip`,
+              video: id,
+            },
+          });
+        }
+      }
       const body = JSON.stringify(catalog);
       const etag = `"${createHash('sha1').update(body).digest('hex')}"`;
       const asked = Object.entries(request.headers ?? {}).find(

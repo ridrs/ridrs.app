@@ -183,6 +183,37 @@ test('ride catalog for the app: exactly the test vector, with ETag and 304', asy
   assert.deepEqual((await after.json()).routes, []);
 });
 
+test('ride catalog: a published YouTube video at level 3 or better, with a route and its elevation, for the YouTube downloader', async () => {
+  const RIDE = 'YTYTYTYTY02';
+  const climb = { ...yt(RIDE), localization: { level: 3, key: 'route', rules_version: 0 },
+    tech: { max_height: 1080, max_width: 1920, fps: 30, hdr: 0, codecs: ['vp9'], bitrate_kbps: 8000, aspect: 1.78, source: 'ytdlp', checked_at: '2026-11-21' },
+    route: { ...yt(RIDE).route, distance_km: 1.2, elevation: { ascent_m: 120, descent_m: 0, min_ele_m: 500, max_ele_m: 620, max_gradient: 10,
+      profile: [[0, 500], [0.6, 560], [1.2, 620]], source: 'copernicus_glo30' } } };
+  const snapshot = new Map([[RIDE, { title: 'Passo di Test', duration_s: 600, channel_id: 'UCcccccccccccccccccccccc', channel_title: 'Test Channel' }]]);
+  const DB = makeD1();
+  // The first YouTube video has no elevation and the third is at level 4: neither is a ride.
+  const far = { ...yt('YTYTYTYTY03'), localization: { level: 4, key: 'region', rules_version: 0 } };
+  DB.raw.exec(buildImportSql({ videos: [yt(YT), climb, far], yt: snapshot, sync: new Map(), rides: loadVanGestel(VG), today: '2026-11-21', at: 'x' }).sql.join('\n'));
+  DB.raw.exec("UPDATE video SET site_published = 1");
+  const env = { DB, ASSETS, BASE_PATH: '/scenic' };
+  const catalog = await (await worker.fetch(new Request(`${BASE}/api/ride/v1/catalog.json`), env, null)).json();
+  assert.deepEqual(catalog.routes.map((r) => r.id), [RIDE, ID]);
+  assert.deepEqual(catalog.sources.youtube, { name: 'YouTube', url: 'https://www.youtube.com/',
+    license: { id: null, name: 'Standard YouTube License', url: 'https://www.youtube.com/t/terms' } });
+  const [route] = catalog.routes;
+  assert.equal(route.sparkline.length, 100);
+  assert.equal(route.sparkline[0], 500);
+  assert.equal(route.sparkline.at(-1), 620);
+  delete route.sparkline;
+  assert.deepEqual(route, {
+    id: RIDE, source: 'youtube', title: 'Passo di Test', page: `https://www.youtube.com/watch?v=${RIDE}`, author: 'Test Channel',
+    country: 'IT', distance: 1200, ascent: 120, duration: 600, climbs: [], overlay: [],
+    // The size is an estimate: the video at Scenic's bitrate over its duration (8000 kbit/s for 600 s).
+    download: { kind: 'youtube', url: `${BASE}/api/videos/${RIDE}/incyclist.zip`, format: 'incyclist-gpx-import', size: 600_000_000,
+      video: RIDE, fps: 30 },
+  });
+});
+
 test('filter "rideable in ridrs" (ride=1): only entries with a ride package, in the URL and as a facet', () => {
   const videos = [{ id: 'a', ride: 1, topics: [], search: '' }, { id: 'b', ride: 0, topics: [], search: '' }];
   const s = { ...defaults(), ride: true };

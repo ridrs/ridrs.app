@@ -53,6 +53,13 @@ Given(
   },
 );
 
+Given(
+  'ridrs Scenic also lists the YouTube video {string}',
+  function (this: RidrsWorld, id: string) {
+    scenic(this).youtube.add(id);
+  },
+);
+
 Then('ridrs Scenic was asked for its ride catalog', async function (this: RidrsWorld) {
   await this.waitForIo(() => catalogRequests(this).length > 0, 'a request for the ride catalog');
 });

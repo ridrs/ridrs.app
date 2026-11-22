@@ -63,12 +63,55 @@ export async function packageZip(env, row, root) {
   return zipSync(files, { level: 6 });
 }
 
-/** The ride catalog (format ridrs-scenic-ride-catalog, version 1) of the rows; `site` = origin + base path. */
-export function rideCatalog(rows, site) {
+/** Points of a sparkline: evenly spaced elevations from start to end. */
+const SPARKLINE = 100;
+/** The bitrate a YouTube video's size is estimated with where Scenic has none: about 1080p. */
+const DEFAULT_KBPS = 8000;
+
+/** `n` elevations evenly spaced along a profile [[km, ele], …], linearly between its points. */
+export function sparklineOf(profile, n = SPARKLINE) {
+  const end = profile.at(-1)[0];
+  let i = 0;
+  return Array.from({ length: n }, (_, k) => {
+    const km = (end * k) / (n - 1);
+    while (i < profile.length - 2 && profile[i + 1][0] < km) i += 1;
+    const [a, b] = [profile[i], profile[i + 1] ?? profile[i]];
+    const share = b[0] > a[0] ? (km - a[0]) / (b[0] - a[0]) : 0;
+    return Math.round(a[1] + (b[1] - a[1]) * Math.min(1, Math.max(0, share)));
+  });
+}
+
+/** A source of the catalog from a row with its columns; no author for one whose entries name their own. */
+const sourceOf = (r) => ({ name: r.source_name, ...(r.author ? { author: r.author } : {}), url: r.source_url,
+  license: { id: r.license_id, name: r.license_name, url: r.license_url } });
+
+/**
+ * A YouTube video the app can ride with the YouTube downloader (ridrs_app ADR 0105): the package without its video
+ * (concept 4.7) and the video's id and frame rate; its size is an estimate, the video at Scenic's bitrate over its
+ * duration. Its channel is its author.
+ */
+function youtubeRoute(r, site) {
+  const route = { id: r.video_id, source: r.source, title: r.title || r.place || r.video_id,
+    page: `https://www.youtube.com/watch?v=${r.video_id}` };
+  if (r.channel) route.author = r.channel;
+  if (r.country) route.country = r.country;
+  Object.assign(route, { distance: Math.round(r.distance_km * 1000), ascent: r.ascent_m ?? 0, duration: r.duration_s,
+    sparkline: sparklineOf(parse(r.profile)), climbs: [], overlay: [] });
+  route.download = { kind: 'youtube', url: `${site}/api/videos/${r.video_id}/incyclist.zip`, format: 'incyclist-gpx-import',
+    size: Math.round(((r.bitrate_kbps ?? DEFAULT_KBPS) * 1000 / 8) * r.duration_s), video: r.video_id };
+  if (r.fps) route.download.fps = r.fps;
+  return route;
+}
+
+/**
+ * The ride catalog (format ridrs-scenic-ride-catalog, version 1) of the rows with ride packages and of the YouTube
+ * videos the app can ride; `site` = origin + base path. Routes in the order of their ids.
+ */
+export function rideCatalog(rows, site, videos = []) {
   const sources = {};
+  for (const r of videos) sources[r.source] ??= sourceOf(r);
   const routes = rows.map((r) => {
-    sources[r.source] ??= { name: r.source_name, author: r.author, url: r.source_url,
-      license: { id: r.license_id, name: r.license_name, url: r.license_url } };
+    sources[r.source] ??= sourceOf(r);
     const root = `${site}/vg/${slugOf(r.video_id)}`, thumb = parse(r.thumbnail);
     const route = { id: r.video_id, source: r.source, title: r.title, page: r.page_url };
     if (r.country) route.country = r.country;
@@ -81,5 +124,6 @@ export function rideCatalog(rows, site) {
     if (r.download_etag) route.download.etag = r.download_etag;
     return route;
   });
-  return { format: 'ridrs-scenic-ride-catalog', version: 1, sources, routes };
+  const all = [...routes, ...videos.map((r) => youtubeRoute(r, site))].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return { format: 'ridrs-scenic-ride-catalog', version: 1, sources, routes: all };
 }

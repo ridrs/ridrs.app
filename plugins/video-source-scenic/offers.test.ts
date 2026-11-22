@@ -70,4 +70,67 @@ describe('routeDownloads', () => {
     const named = { ...catalog, routes: [{ ...first, download: { ...first?.download, kind: 'other' } }] } as RideCatalog;
     expect(routeDownloads(named)[0]?.kind).toBe('other');
   });
+
+  it("hands a YouTube video's download to the downloader with its video, frame rate and package", () => {
+    const catalog = catalogOf(vector);
+    const youtube = { ...catalog, routes: [YOUTUBE] } as RideCatalog;
+    expect(routeDownloads(youtube)).toEqual([
+      {
+        id: 'video-source-scenic/YTYTYTYTY02',
+        kind: 'youtube',
+        size: 600_000_000,
+        details: {
+          url: 'https://ridrs.example.org/scenic/api/videos/YTYTYTYTY02/incyclist.zip',
+          format: 'incyclist-gpx-import',
+          video: 'YTYTYTYTY02',
+          fps: 30,
+          overlay: [],
+        },
+      },
+    ]);
+  });
+});
+
+/** A YouTube video of the catalog, as ridrs Scenic lists it (docs/formats/scenic-ride-catalog-v1.md). */
+const YOUTUBE = {
+  id: 'YTYTYTYTY02',
+  source: 'youtube',
+  title: 'Passo di Test',
+  page: 'https://www.youtube.com/watch?v=YTYTYTYTY02',
+  author: 'Test Channel',
+  country: 'IT',
+  distance: 1200,
+  ascent: 120,
+  duration: 600,
+  sparkline: [500, 560, 620],
+  climbs: [],
+  overlay: [],
+  download: {
+    kind: 'youtube',
+    url: 'https://ridrs.example.org/scenic/api/videos/YTYTYTYTY02/incyclist.zip',
+    format: 'incyclist-gpx-import',
+    size: 600_000_000,
+    video: 'YTYTYTYTY02',
+    fps: 30,
+  },
+};
+
+const YOUTUBE_SOURCE = {
+  name: 'YouTube',
+  url: 'https://www.youtube.com/',
+  license: { id: null, name: 'Standard YouTube License', url: 'https://www.youtube.com/t/terms' },
+};
+
+describe('a YouTube video', () => {
+  it("is credited to its channel under YouTube's license", () => {
+    const catalog = { ...catalogOf(vector), sources: { youtube: YOUTUBE_SOURCE }, routes: [YOUTUBE] } as unknown as RideCatalog;
+    const [offer] = catalogOffers(catalog);
+    expect(routeOfferSchema.safeParse(offer).error).toBeUndefined();
+    expect(offer?.credits).toEqual({
+      author: 'Test Channel',
+      source: 'YouTube',
+      url: 'https://www.youtube.com/watch?v=YTYTYTYTY02',
+      license: 'Standard YouTube License',
+    });
+  });
 });

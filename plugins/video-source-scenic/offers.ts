@@ -45,22 +45,21 @@ function countryName(code: string | undefined): string | undefined {
 }
 
 /**
- * Every route of the catalog as its downloader sees it: its kind, its size, and the source's
- * description, the package's URL and ETag and the overlay with sizes and hashes; and where a
- * former source kept it.
+ * Every route of the catalog as its downloader sees it: its kind, its size, and the catalog's
+ * description of its download (a package's URL and ETag, a YouTube video's id and frame rate) with
+ * the overlay's sizes and hashes; and where a former source kept it.
  */
 export function routeDownloads(catalog: RideCatalog): RouteDownload[] {
   return catalog.routes.map((route) => {
     const former = formerFolder(route);
-    const { url, etag } = route.download;
+    const { kind: _kind, size, ...download } = route.download;
     return {
       id: offerId(route),
       kind: kindOf(route),
-      size: route.download.size,
+      size,
       details: {
-        url,
-        ...(etag ? { etag } : {}),
-        overlay: route.overlay.map(({ path, size, sha256, url: at }) => ({ path, size, sha256, url: at })),
+        ...download,
+        overlay: route.overlay.map(({ path, size: bytes, sha256, url }) => ({ path, size: bytes, sha256, url })),
       },
       ...(former ? { former } : {}),
     };
@@ -79,6 +78,7 @@ export function catalogOffers(
   return catalog.routes.map((route) => {
     const id = offerId(route);
     const source = catalog.sources[route.source];
+    const author = route.author ?? source?.author;
     const thumbnail = pictureOf(route);
     return {
       id,
@@ -92,8 +92,8 @@ export function catalogOffers(
       ...(route.tile ? { tile: route.tile } : {}),
       climbs: route.climbs.map((climb) => ({ ...climb, category: climb.category as Category })),
       tags: { country: countryName(route.country), level: route.level, tour: route.tour },
-      ...(source
-        ? { credits: { author: source.author, source: source.name, url: route.page, license: source.license.name } }
+      ...(source && author
+        ? { credits: { author, source: source.name, url: route.page, license: source.license.name } }
         : {}),
       availability: availability(id) ?? { state: 'fetchable', size: route.download.size },
       world: { landscape: 'ui-world-video/landscape', route: id },

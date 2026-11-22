@@ -16,12 +16,18 @@ type Availability = RouteOffer['availability'];
 
 /** What a test downloader was asked for: the route and the quality, in order. */
 const asked = new WeakMap<RidrsWorld, { id: string; option?: string }[]>();
+/** The routes a source handed the test downloader last. */
+const handed = new WeakMap<RidrsWorld, readonly RouteDownload[]>();
 
 /**
- * A downloader of ride packages that offers `qualities` (`1080p (recommended)` marks the
+ * A downloader of the downloads of `kind` that offers `qualities` (`1080p (recommended)` marks the
  * recommended one) and starts every download without ever finishing it.
  */
-function testDownloader(world: RidrsWorld, qualities: readonly string[]): RouteDownloader {
+function testDownloader(
+  world: RidrsWorld,
+  qualities: readonly string[],
+  kind: string,
+): RouteDownloader {
   const options: RouteDownloadOption[] = qualities.map((quality) => {
     const label = quality.replace(/\s*\(recommended\)$/, '');
     return { id: label, label, ...(label === quality ? {} : { recommended: true }) };
@@ -29,13 +35,14 @@ function testDownloader(world: RidrsWorld, qualities: readonly string[]): RouteD
   const calls: { id: string; option?: string }[] = [];
   asked.set(world, calls);
   return {
-    kinds: ['ride-package'],
+    kinds: [kind],
     open(changed) {
       let routes: readonly RouteDownload[] = [];
       const states = new Map<string, Availability>();
       return {
         async setRoutes(next) {
           routes = next;
+          handed.set(world, next);
         },
         availability: (id) =>
           states.get(id) ?? {
@@ -61,19 +68,36 @@ function testDownloader(world: RidrsWorld, qualities: readonly string[]): RouteD
   };
 }
 
-Given(
-  'a test downloader offers the qualities {string} for ride packages',
-  async function (this: RidrsWorld, qualities: string) {
-    this.getBehavior('test-downloader').providedImplementations.set(
-      'route.downloader',
-      testDownloader(this, splitCsv(qualities)),
+for (const [kinds, kind] of [
+  ['ride packages', 'ride-package'],
+  ['YouTube videos', 'youtube'],
+] as const) {
+  Given(
+    `a test downloader offers the qualities {string} for ${kinds}`,
+    async function (this: RidrsWorld, qualities: string) {
+      this.getBehavior('test-downloader').providedImplementations.set(
+        'route.downloader',
+        testDownloader(this, splitCsv(qualities), kind),
+      );
+      await this.writeProbePluginFolder({
+        folder: 'test-downloader',
+        id: 'test-downloader',
+        types: ['test'],
+        provides: ['route.downloader'],
+      });
+    },
+  );
+}
+
+Then(
+  'the test downloader was handed the route {string} with the details {string}',
+  async function (this: RidrsWorld, id: string, json: string) {
+    await this.waitForIo(
+      () => (handed.get(this) ?? []).some((route) => route.id === id),
+      `the test downloader to be handed "${id}"`,
     );
-    await this.writeProbePluginFolder({
-      folder: 'test-downloader',
-      id: 'test-downloader',
-      types: ['test'],
-      provides: ['route.downloader'],
-    });
+    const route = handed.get(this)?.find((each) => each.id === id);
+    assert.deepEqual(route?.details, JSON.parse(json));
   },
 );
 

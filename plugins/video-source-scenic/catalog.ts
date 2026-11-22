@@ -15,9 +15,10 @@ export interface RideCatalog {
 
 export interface CatalogSource {
   readonly name: string;
-  readonly author: string;
+  /** The source's one author; none where its routes name their own (YouTube: the channel). */
+  readonly author?: string;
   readonly url: string;
-  readonly license: { readonly id: string; readonly name: string; readonly url: string };
+  readonly license: { readonly id: string | null; readonly name: string; readonly url: string };
 }
 
 export interface CatalogRoute {
@@ -26,6 +27,8 @@ export interface CatalogRoute {
   readonly source: string;
   readonly title: string;
   readonly page: string;
+  /** Who made the route, where its source has no one author: a YouTube video's channel. */
+  readonly author?: string;
   /** ISO 3166-1 alpha-2. */
   readonly country?: string;
   readonly level?: string;
@@ -45,13 +48,17 @@ export interface CatalogRoute {
   }[];
   readonly tile?: string;
   readonly overlay: readonly { readonly path: string; readonly size: number; readonly sha256: string; readonly url: string }[];
-  /** The route's download; `kind` picks its downloader (ADR 0105), a package where it names none. */
+  /**
+   * The route's download; `kind` picks its downloader (ADR 0105), a package where it names none.
+   * The other fields are the downloader's: a package's `etag`, a YouTube video's `video` and `fps`.
+   */
   readonly download: {
     readonly kind?: string;
     readonly url: string;
     readonly format: string;
     readonly size: number;
     readonly etag?: string;
+    readonly [field: string]: unknown;
   };
 }
 

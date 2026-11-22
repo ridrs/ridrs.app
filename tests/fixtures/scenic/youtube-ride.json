@@ -1,0 +1,33 @@
+{
+  "source": {
+    "name": "YouTube",
+    "url": "https://www.youtube.com/",
+    "license": {
+      "id": null,
+      "name": "Standard YouTube License",
+      "url": "https://www.youtube.com/t/terms"
+    }
+  },
+  "route": {
+    "id": "YTYTYTYTY02",
+    "source": "youtube",
+    "title": "Passo di Test",
+    "page": "https://www.youtube.com/watch?v=YTYTYTYTY02",
+    "author": "Test Channel",
+    "country": "IT",
+    "distance": 1200,
+    "ascent": 120,
+    "duration": 600,
+    "sparkline": [500, 530, 560, 590, 620],
+    "climbs": [],
+    "overlay": [],
+    "download": {
+      "kind": "youtube",
+      "url": "https://ridrs.app/scenic/api/videos/YTYTYTYTY02/incyclist.zip",
+      "format": "incyclist-gpx-import",
+      "size": 600000000,
+      "video": "YTYTYTYTY02",
+      "fps": 30
+    }
+  }
+}
