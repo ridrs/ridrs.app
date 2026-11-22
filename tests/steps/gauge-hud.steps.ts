@@ -493,3 +493,21 @@ Then(
     });
   },
 );
+
+Then(
+  'the target spotlight of the {word} gauge fades to transparent',
+  async function (this: RidrsWorld, kind: string) {
+    const element = await gauge(this, kind);
+    await eventually(this, () => {
+      const stops = [...element.querySelectorAll(`#target-glow-${kind} stop`)];
+      assert.ok(stops.length >= 2, 'Expected radial gradient stops for the target spotlight');
+      assert.equal(stops[0]?.getAttribute('stop-opacity'), '0');
+      const colors = new Set(stops.map((stop) => stop.getAttribute('stop-color')));
+      assert.equal(
+        colors.size,
+        1,
+        `Expected the spotlight to fade one colour to transparent, got ${[...colors].join(', ')}`,
+      );
+    });
+  },
+);

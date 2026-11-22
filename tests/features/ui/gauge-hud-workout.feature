@@ -29,6 +29,8 @@ Feature: During a workout the power and cadence gauges mark their targets on the
     And the power gauge marks no average on its scale
     And the power gauge shows the average "200"
     And the heart-rate gauge marks its average at 150 on its scale
+    And the target spotlight of the power gauge fades to transparent
+    And the target spotlight of the cadence gauge fades to transparent
     And everything the power gauge draws is fully opaque
     And everything the cadence gauge draws is fully opaque
 

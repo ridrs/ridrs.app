@@ -60,6 +60,8 @@ const OUTLINE = '#0b1220';
 /** The workout target on the scale (Spotlight 3): an outer arc with a center triangle and a radial spotlight. */
 const TARGET_ORANGE = '#ff5a1f';
 const TARGET_OUTER = 96.8;
+const TARGET_LINE_WIDTH = 2.3;
+const TARGET_CAP_ANGLE = ((TARGET_LINE_WIDTH / 2 / TARGET_OUTER) * 180) / Math.PI;
 const TARGET_SPOTLIGHT_INNER = 72;
 const TARGET_RAY_INNER = 74;
 const TARGET_TICK_MARGIN = 1.8;
@@ -269,11 +271,11 @@ export function Gauge({
                 r={TARGET_OUTER}
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="74.5%" stopColor="#111a2d" />
-                <stop offset="80%" stopColor="#351c1a" />
-                <stop offset="86%" stopColor="#7a2c12" />
-                <stop offset="93%" stopColor="#c2410c" />
-                <stop offset="100%" stopColor="#ea580c" />
+                <stop offset="74.5%" stopColor={TARGET_ORANGE} stopOpacity={0} />
+                <stop offset="80%" stopColor={TARGET_ORANGE} stopOpacity={0.12} />
+                <stop offset="86%" stopColor={TARGET_ORANGE} stopOpacity={0.28} />
+                <stop offset="93%" stopColor={TARGET_ORANGE} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.75} />
               </radialGradient>
               <radialGradient
                 id={`target-edge-${kind}`}
@@ -282,9 +284,9 @@ export function Gauge({
                 r={TARGET_OUTER}
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="75%" stopColor="#111a2d" />
-                <stop offset="83%" stopColor="#9a3412" />
-                <stop offset="100%" stopColor={TARGET_ORANGE} />
+                <stop offset="75%" stopColor={TARGET_ORANGE} stopOpacity={0} />
+                <stop offset="85%" stopColor={TARGET_ORANGE} stopOpacity={0.45} />
+                <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.9} />
               </radialGradient>
             </defs>
             <g
@@ -410,7 +412,14 @@ export function Gauge({
             data-center={String(Math.round(targetSpan.center))}
           >
             <path
-              d={arc(TARGET_OUTER, targetAngles.low, targetAngles.high)}
+              d={arc(
+                TARGET_OUTER,
+                targetAngles.low + TARGET_CAP_ANGLE,
+                Math.max(
+                  targetAngles.high - TARGET_CAP_ANGLE,
+                  targetAngles.low + TARGET_CAP_ANGLE + 0.01,
+                ),
+              )}
               fill="none"
               stroke={OUTLINE}
               strokeWidth={3.8}
@@ -427,10 +436,17 @@ export function Gauge({
             </g>
             <path
               data-testid="target-line"
-              d={arc(TARGET_OUTER, targetAngles.low, targetAngles.high)}
+              d={arc(
+                TARGET_OUTER,
+                targetAngles.low + TARGET_CAP_ANGLE,
+                Math.max(
+                  targetAngles.high - TARGET_CAP_ANGLE,
+                  targetAngles.low + TARGET_CAP_ANGLE + 0.01,
+                ),
+              )}
               fill="none"
               stroke={TARGET_ORANGE}
-              strokeWidth={2.3}
+              strokeWidth={TARGET_LINE_WIDTH}
               strokeLinecap="round"
             />
             <g data-testid="target-pointer" transform={towards(targetAngles.center)}>
