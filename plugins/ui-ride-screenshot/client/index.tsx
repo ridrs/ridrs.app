@@ -25,7 +25,6 @@ function ScreenshotButtonView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const startedAt = useRef<number>(undefined);
   const busy = useRef(false);
-  const [focused, setFocused] = useState(false);
   const [status, setStatus] = useState<Status>();
 
   // At commit, not after paint: the button may be pressed before passive effects ran.
@@ -67,8 +66,6 @@ function ScreenshotButtonView({ ctx }: { readonly ctx: UiContext }) {
         title={text.screenshot}
         data-testid="ride-screenshot"
         onClick={() => void onPress()}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
         style={{
           width: 56,
           height: 56,
@@ -81,9 +78,6 @@ function ScreenshotButtonView({ ctx }: { readonly ctx: UiContext }) {
           boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
           color: 'var(--ridrs-text)',
           cursor: 'pointer',
-          // The focus is always clearly visible.
-          outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
-          outlineOffset: 3,
         }}
       >
         <span

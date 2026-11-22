@@ -21,8 +21,10 @@ const CSS = `
 .wi-button:disabled { opacity: .45; cursor: default; }
 .wi-primary { border-color: transparent; background: var(--ridrs-accent); color: var(--ridrs-accent-text); }
 .wi-file { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); opacity: 0; }
-.wi-button:focus-within, .wi-button:focus-visible, .wi-text:focus-visible, .wi-name:focus-visible {
-  outline: var(--ridrs-focus-ring); outline-offset: 2px; }
+:root[data-input-mode="keyboard"] .wi-button:has(.wi-file:focus),
+:root[data-input-mode="pointer"]:not([data-cursor-hidden]) label.wi-button:hover {
+  outline: var(--ridrs-highlight-ring, var(--ridrs-focus-ring));
+  outline-offset: var(--ridrs-highlight-offset, 2px); }
 .wi-paste { display: flex; flex-direction: column; gap: 8px; }
 .wi-text, .wi-name { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 0; box-shadow: var(--ridrs-edge);
   border-radius: var(--ridrs-radius-sm); background: var(--ridrs-card-quiet); color: inherit; font: inherit; }

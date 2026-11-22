@@ -36,7 +36,6 @@ function Teeth({
   readonly value: number;
   readonly onShift: (change: 'up' | 'down') => void;
 }) {
-  const [focused, setFocused] = useState(false);
   return (
     <span
       role="spinbutton"
@@ -50,14 +49,9 @@ function Teeth({
         event.preventDefault();
         onShift(event.key === 'ArrowUp' ? 'up' : 'down');
       }}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
       style={{
         padding: '0 4px',
         borderRadius: 'var(--ridrs-radius-sm)',
-        // The focus is always clearly visible.
-        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
-        outlineOffset: 2,
       }}
     >
       {value}
@@ -189,9 +183,6 @@ function VirtualGearWidgetView({ ctx }: { readonly ctx: UiContext }) {
         boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
         color: 'var(--ridrs-text)',
         fontFamily: 'var(--ridrs-font-text)',
-        // The focus is always clearly visible.
-        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
-        outlineOffset: 2,
       }}
     >
       <div style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>{text.gear}</div>

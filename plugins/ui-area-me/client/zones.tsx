@@ -19,7 +19,6 @@ export const ZONES_CSS = `
 .me-zone-field { min-height: 40px; min-width: 0; padding: 6px 10px; border: 0; box-shadow: var(--ridrs-edge);
   border-radius: var(--ridrs-radius); background: var(--ridrs-card-quiet); color: var(--ridrs-text);
   font: 16px var(--ridrs-font-text); font-variant-numeric: tabular-nums; }
-.me-zone-field:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .me-zone-field[aria-invalid="true"] { border-color: var(--ridrs-warn); }
 .me-zone-open { color: var(--ridrs-text-muted); padding: 0 10px; white-space: nowrap; }
 .me-zone-absolute { font-variant-numeric: tabular-nums; color: var(--ridrs-text-muted); white-space: nowrap; }

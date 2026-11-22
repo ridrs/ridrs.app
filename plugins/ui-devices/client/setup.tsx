@@ -1113,11 +1113,11 @@ export function DeviceSetupView({
         ?.focus();
     }
   }, [details]);
-  // Opened, the setup puts the focus on its first row, so the rider sees at once where they are.
+  // Opened, the setup puts the focus on its first row, so keyboard/controller navigation starts there.
   useEffect(() => {
-    // `focusVisible`: the ring shows however the rider opened the setup (a pointer click too).
-    if (!opened.current)
-      list.current?.querySelector<HTMLButtonElement>('button')?.focus({ focusVisible: true } as FocusOptions);
+    if (!opened.current) {
+      list.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    }
   }, []);
   // Back closes the details, or leaves the setup.
   const leave = useRef(close);

@@ -10,7 +10,6 @@ const STYLE = `
 .lic-entry .lic-purpose { flex-basis: 100%; opacity: 0.75; font-size: 0.9em; }
 .lic-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .lic-block { margin: 0 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: 0.85em; }
-.lic-block:focus { outline: 2px solid currentColor; outline-offset: 2px; }
 `;
 
 /** The license data, loaded when the page opens: it is large and only this page needs it. */

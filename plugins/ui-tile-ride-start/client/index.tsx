@@ -33,8 +33,6 @@ const CSS = `
   padding: 16px 36px; border: 0; border-radius: var(--ridrs-radius); cursor: pointer;
   background: var(--ridrs-accent); color: var(--ridrs-accent-text);
   font: 500 22px var(--ridrs-font-text); }
-.rs-start:hover { filter: brightness(1.08); }
-.rs-start:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
 .rs-play { width: 22px; height: 22px; background: currentColor;
   mask: url("${PLAY}") center / contain no-repeat; -webkit-mask: url("${PLAY}") center / contain no-repeat; }
 .rs-tile [data-testid="ride-saved"], .rs-tile [data-testid="ride-not-saved"] { padding-top: 16px;

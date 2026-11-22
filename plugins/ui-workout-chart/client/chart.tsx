@@ -434,6 +434,7 @@ function FullChart({
               key={shape.segmentIndex}
               data-shape
               data-step
+              data-highlight="delegate"
               data-testid="workout-chart-step"
               data-step-id={shape.stepId}
               data-zone={shape.zone}

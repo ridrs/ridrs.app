@@ -6,7 +6,12 @@ import { suppressBrowserChrome } from './browser-chrome.ts';
 import { bundledPlugins } from './bundled-plugins.ts';
 import { startRidrsApp } from './compose.ts';
 import { createInstalledPluginSource, readPluginChoices } from './installed-plugins.ts';
-import { androidBackButton, createKeepAwake, ensureBluetoothPermission } from './platform.ts';
+import {
+  androidBackButton,
+  createKeepAwake,
+  createNativeFullscreen,
+  ensureBluetoothPermission,
+} from './platform.ts';
 import { enableOverlayTitleBar, hasOverlayTitleBar } from './title-bar.ts';
 
 /**
@@ -76,6 +81,7 @@ async function main(): Promise<void> {
     },
     keepAwake: createKeepAwake(),
     backButton: androidBackButton,
+    fullscreen: createNativeFullscreen(),
   });
   window.addEventListener('pagehide', () => {
     void app.close();

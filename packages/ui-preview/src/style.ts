@@ -54,9 +54,8 @@ export const PREVIEW_CSS = `
 .pv-button, .pv-chip, .pv-icon { display: inline-flex; align-items: center; justify-content: center;
   gap: 8px; min-height: 40px; padding: 8px 14px; border: 0; border-radius: var(--ridrs-radius);
   background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); color: var(--ridrs-text);
-  font: 500 14px var(--ridrs-font-text); cursor: pointer; transition: filter var(--ridrs-ease); }
-.pv-button:hover, .pv-chip:hover, .pv-icon:hover { filter: brightness(1.2); }
-.pv-button:disabled { opacity: .45; cursor: default; filter: none; }
+  font: 500 14px var(--ridrs-font-text); cursor: pointer; }
+.pv-button:disabled { opacity: .45; cursor: default; }
 .pv-primary { background: var(--ridrs-accent); box-shadow: none; color: var(--ridrs-accent-text); }
 .pv-chip { border-radius: var(--ridrs-radius-pill); }
 .pv-chip[aria-pressed="true"] { background: var(--ridrs-text); box-shadow: none; color: var(--ridrs-accent-text); }
@@ -64,8 +63,6 @@ export const PREVIEW_CSS = `
 .pv-icon[aria-pressed="true"] { color: var(--ridrs-warn); }
 .pv-favourite[aria-pressed="true"] { background: var(--ridrs-surface-raised);
   color: var(--ridrs-text); }
-.pv-button:focus-visible, .pv-chip:focus-visible, .pv-icon:focus-visible, .pv-open:focus-visible {
-  outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .pv-glyph { flex: none; width: 18px; height: 18px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 .pv-icon[aria-pressed="true"] .pv-glyph { background: currentColor; }
@@ -89,7 +86,9 @@ export const PREVIEW_CSS = `
     linear-gradient(to bottom, rgb(6 10 20 / .45), rgb(6 10 20 / 0) 30%); }
 .pv-teaser-image { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%;
   object-fit: cover; transition: transform .4s ease; }
-.pv-teaser:has(.pv-teaser-open:hover) .pv-teaser-image { transform: scale(1.04); }
+:root[data-input-mode="keyboard"] .pv-teaser:has(.pv-teaser-open:focus) .pv-teaser-image,
+:root[data-input-mode="pointer"]:not([data-cursor-hidden]) .pv-teaser:has(.pv-teaser-open:hover) .pv-teaser-image {
+  transform: scale(1.04); }
 .pv-teaser-backdrop { position: absolute; inset: auto 0 0; z-index: -1; height: 42%;
   pointer-events: none; }
 .pv-teaser-backdrop > * { display: block; width: 100%; height: 100%; }
@@ -102,9 +101,10 @@ export const PREVIEW_CSS = `
   padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
 .pv-teaser-open { cursor: pointer; }
 .pv-teaser-open::after { content: ""; position: absolute; inset: 0; }
-.pv-teaser-open:focus-visible { outline: none; }
-.pv-teaser:has(.pv-teaser-open:focus-visible) { outline: var(--ridrs-focus-ring);
-  outline-offset: 2px; }
+:root[data-input-mode="keyboard"] .pv-teaser:has(.pv-teaser-open:focus),
+:root[data-input-mode="pointer"]:not([data-cursor-hidden]) .pv-teaser:has(.pv-teaser-open:hover) {
+  outline: var(--ridrs-highlight-ring, var(--ridrs-focus-ring));
+  outline-offset: var(--ridrs-highlight-offset, 2px); }
 .pv-teaser-title { display: -webkit-box; overflow: hidden; font: 500 21px/1.2 var(--ridrs-font-text);
   -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
 .pv-teaser-details { display: flex; align-items: center; overflow: hidden; color: var(--ridrs-text-muted); font-size: 14px;

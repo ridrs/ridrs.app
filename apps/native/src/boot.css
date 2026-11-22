@@ -41,7 +41,3 @@ summary,
 #ridrs > [data-screen] {
   height: 100%;
 }
-button:focus-visible {
-  outline: 3px solid #5aa9e6;
-  outline-offset: 2px;
-}

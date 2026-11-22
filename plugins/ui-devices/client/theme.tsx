@@ -8,10 +8,6 @@ import type { RowKind } from './devices.ts';
  * Animations and pseudo elements need a style sheet; class names carry the plugin's prefix.
  */
 const CSS = `
-.rd-row:hover, .rd-back:hover, .rd-continue:hover { filter: brightness(1.18); }
-.rd-line:hover { background: var(--ridrs-surface-raised) !important; }
-.rd-row:focus-visible, .rd-back:focus-visible,
-.rd-continue:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .rd-spin { display: inline-block; flex: none; vertical-align: middle;
   width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgb(255 255 255 / .2);
   border-top-color: var(--ridrs-info); animation: rd-spin 1s linear infinite; }

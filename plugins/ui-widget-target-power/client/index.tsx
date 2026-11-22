@@ -39,7 +39,6 @@ function useTarget(ctx: UiContext): number | null {
 function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const erg = useTarget(ctx) !== null;
-  const [focused, setFocused] = useState(false);
   return (
     <button
       type="button"
@@ -49,8 +48,6 @@ function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
       data-testid="widget-erg"
       data-status={erg ? 'available' : 'unavailable'}
       onClick={() => ctx.events.publish(trainerErgRequestedEvent, { change: erg ? 'leave' : 'enter' })}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
       style={{
         width: 56,
         height: 56,
@@ -67,9 +64,6 @@ function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
         fontFamily: 'var(--ridrs-font-text)',
         lineHeight: 1,
         cursor: 'pointer',
-        // The focus is always clearly visible.
-        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
-        outlineOffset: 2,
       }}
     >
       <span style={{ fontSize: 13, fontWeight: 500, letterSpacing: '.06em' }}>{text.erg}</span>
@@ -155,9 +149,6 @@ function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
         boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
         color: 'var(--ridrs-text)',
         fontFamily: 'var(--ridrs-font-text)',
-        // The focus is always clearly visible.
-        outline: focused ? 'var(--ridrs-focus-ring)' : 'none',
-        outlineOffset: 2,
       }}
     >
       <div style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>{text.target}</div>

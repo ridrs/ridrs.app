@@ -24,7 +24,6 @@ const CSS = `
 .ga-field { min-height: 44px; max-width: 320px; padding: 8px 14px; border: 0; box-shadow: var(--ridrs-edge);
   border-radius: var(--ridrs-radius); background: var(--ridrs-card-quiet); color: var(--ridrs-text);
   font: 16px var(--ridrs-font-text); }
-.ga-field:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .ga-value { min-width: 90px; font-size: 20px; font-weight: 500; text-align: center; }
 .ga-teeth { margin: 0; font-variant-numeric: tabular-nums; }
 .ga-notice { padding: 10px 14px; border-radius: var(--ridrs-radius); background: var(--ridrs-surface-raised);

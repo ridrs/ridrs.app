@@ -78,8 +78,6 @@ const CSS = `
 :root ${LABEL} { font-family: var(--ridrs-font-mono) !important; color: var(--ridrs-info) !important;
   font-size: var(--ridrs-size-label); font-style: normal; font-weight: 500; letter-spacing: .12em;
   text-transform: uppercase; }
-/* One focus ring for everything a rider can reach: 3 px cyan, 2 px off the shape. */
-:root :focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 /* Figures never jitter. */
 :root :is([data-testid="value"], [data-numeric], .tnum) { font-variant-numeric: tabular-nums; }
 `;

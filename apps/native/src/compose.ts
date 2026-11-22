@@ -334,6 +334,8 @@ export interface RidrsAppOptions {
   readonly frameSource?: FrameSource;
   /** The platform's back button (Android's); it goes back like Escape. */
   readonly backButton?: ShellOptions['backButton'];
+  /** Host fullscreen & native cursor bridge (desktop Tauri window). */
+  readonly fullscreen?: ShellOptions['fullscreen'];
   /** Who runs the host; recordings name it. */
   readonly platform?: HostPlatform;
 }
@@ -422,6 +424,7 @@ export async function startRidrsApp(options: RidrsAppOptions): Promise<RidrsApp>
       logger: options.uiLogger ?? console,
       frameSource: options.frameSource,
       backButton: options.backButton,
+      fullscreen: options.fullscreen,
     });
   };
 

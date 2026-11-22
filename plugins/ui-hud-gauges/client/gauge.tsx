@@ -147,7 +147,6 @@ export function Gauge({
   gear,
   zoneName,
 }: GaugeProps) {
-  const [gearFocused, setGearFocused] = useState(false);
   const shownZone = useRef<number | undefined>(undefined);
   const svg = useRef<SVGSVGElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -591,8 +590,6 @@ export function Gauge({
             event.preventDefault();
             gear.onShift(event.key === 'ArrowUp' ? 'up' : 'down');
           }}
-          onFocus={() => setGearFocused(true)}
-          onBlur={() => setGearFocused(false)}
           style={{
             position: 'absolute',
             left: '30%',
@@ -600,9 +597,6 @@ export function Gauge({
             width: '40%',
             height: '21%',
             borderRadius: 'var(--ridrs-radius-sm)',
-            // The focus is always clearly visible.
-            outline: gearFocused ? 'var(--ridrs-focus-ring)' : 'none',
-            outlineOffset: 2,
           }}
         />
       ) : null}

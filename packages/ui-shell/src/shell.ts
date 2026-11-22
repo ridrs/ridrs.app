@@ -26,6 +26,9 @@ import type {
   Unsubscribe,
 } from '@ridrs/ui-sdk';
 import { controllerKeys } from './controller-keys.ts';
+import { type FullscreenPort, fullscreenCursor } from './fullscreen-cursor.ts';
+import { inputModality } from './input-modality.ts';
+import { mountInteractionStyle } from './interaction-style.ts';
 import { keyboardNavigation } from './keyboard.ts';
 
 export interface ShellOptions {
@@ -36,6 +39,10 @@ export interface ShellOptions {
   readonly frameSource?: FrameSource;
   /** The platform's back button (Android's), if it has one: calls `press` on every press. */
   readonly backButton?: (press: () => void) => Unsubscribe;
+  /** Host fullscreen & native cursor bridge (e.g. Tauri desktop). */
+  readonly fullscreen?: FullscreenPort;
+  /** Inactivity timeout before hiding the pointer cursor in fullscreen. */
+  readonly cursorHideTimeoutMs?: number;
 }
 
 /** Frames at the display's refresh rate; the WebView pauses them while it is hidden. */
@@ -796,6 +803,14 @@ export function mountShell(
   };
 
   const stopListening = bridge.onRegistryChanged(onRegistry);
+  const stopInteractionStyle = mountInteractionStyle(document);
+  const modality = inputModality(document);
+  const stopFullscreenCursor = fullscreenCursor(document, modality, {
+    ...(options.fullscreen ? { port: options.fullscreen } : {}),
+    ...(options.cursorHideTimeoutMs !== undefined
+      ? { timeoutMs: options.cursorHideTimeoutMs }
+      : {}),
+  });
   const stopKeyboard = keyboardNavigation(root, { back });
   const stopBackButton = options.backButton?.(back);
   const stopController = controllerKeys(document, bridge);
@@ -807,6 +822,9 @@ export function mountShell(
     stopKeyboard();
     stopBackButton?.();
     stopController();
+    stopFullscreenCursor();
+    modality.stop();
+    stopInteractionStyle();
     show(undefined);
   };
 }

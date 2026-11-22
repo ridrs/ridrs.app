@@ -76,10 +76,8 @@ const CSS = `
 .ms-actions [data-action] { position: relative; display: grid; place-items: center; width: 44px;
   height: 44px; padding: 0; border: 0; border-radius: 50%;
   background: var(--ridrs-card-quiet); box-shadow: var(--ridrs-edge); color: var(--ridrs-text); cursor: pointer; }
-.ms-actions [data-action]:hover { background: var(--ridrs-surface-raised); }
 .ms-actions [data-action][aria-current="page"] { background: var(--ridrs-surface-raised);
   color: var(--ridrs-accent); }
-.ms-actions [data-action]:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .ms-actions [data-action-icon] { width: 20px; height: 20px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 .ms-actions [data-action-tone] { position: absolute; top: 2px; right: 2px; width: 11px; height: 11px;
@@ -105,8 +103,6 @@ const CSS = `
 .ms-dialog-close { position: absolute; top: 16px; right: 16px; z-index: 1; width: 40px; height: 40px;
   padding: 0; border: 0; box-shadow: var(--ridrs-edge); border-radius: 50%; background: var(--ridrs-card-quiet);
   color: var(--ridrs-text); cursor: pointer; }
-.ms-dialog-close:hover { background: var(--ridrs-surface-raised); }
-.ms-dialog-close:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .ms-dialog-close::before, .ms-dialog-close::after { content: ""; position: absolute; top: 50%; left: 50%;
   width: 16px; height: 2px; border-radius: 1px; background: currentColor; }
 .ms-dialog-close::before { transform: translate(-50%, -50%) rotate(45deg); }

@@ -301,9 +301,7 @@ const SKIP_INTRO_CSS = `
 .vw-skip-intro { position: absolute; left: 16px; bottom: 16px; height: 56px; padding: 0 24px;
   border: 0; border-radius: 28px; background: var(--ridrs-card-quiet);
   box-shadow: var(--ridrs-edge), var(--ridrs-shadow); color: var(--ridrs-text);
-  font: 600 16px var(--ridrs-font-text); cursor: pointer; transition: filter var(--ridrs-ease); }
-.vw-skip-intro:hover { filter: brightness(1.25); }
-.vw-skip-intro:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
+  font: 600 16px var(--ridrs-font-text); cursor: pointer; }
 `;
 
 function VideoWorld({

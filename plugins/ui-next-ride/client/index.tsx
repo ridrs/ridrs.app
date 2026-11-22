@@ -40,10 +40,8 @@ const PLAY = new URL('./assets/icons/play.svg', import.meta.url).href;
  */
 const CSS = `
 .nr { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: var(--ridrs-radius-lg); cursor: pointer;
-  color: var(--ridrs-text); font: var(--ridrs-size-small) var(--ridrs-font-text); outline: none;
+  color: var(--ridrs-text); font: var(--ridrs-size-small) var(--ridrs-font-text);
   transition: background var(--ridrs-ease); }
-.nr:hover:not([aria-disabled="true"]) { background: var(--ridrs-surface-raised); }
-.nr:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .nr[aria-disabled="true"] { cursor: default; }
 .nr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px; }
 .nr-title { margin: 0; color: var(--ridrs-text-muted); font: 500 var(--ridrs-size-label) var(--ridrs-font-mono);

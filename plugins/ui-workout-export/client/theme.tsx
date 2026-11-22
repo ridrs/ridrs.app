@@ -19,7 +19,10 @@ const CSS = `
 .we-format span { display: block; padding: 8px 16px; border: 1.5px solid var(--ridrs-line);
   border-radius: var(--ridrs-radius-pill); background: var(--ridrs-surface); }
 .we-format input:checked + span { border-color: var(--ridrs-accent); color: var(--ridrs-accent); }
-.we-format input:focus-visible + span { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
+:root[data-input-mode="keyboard"] .we-format input:focus + span,
+:root[data-input-mode="pointer"]:not([data-cursor-hidden]) .we-format:hover input + span {
+  outline: var(--ridrs-highlight-ring, var(--ridrs-focus-ring));
+  outline-offset: var(--ridrs-highlight-offset, 2px); }
 .we-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .we-warning { padding: 8px 12px; border-left: 3px solid var(--ridrs-warn); border-radius: var(--ridrs-radius-sm);
   background: var(--ridrs-surface); }
@@ -30,7 +33,6 @@ const CSS = `
 .we-save { align-self: flex-start; padding: 10px 24px; border: 0; border-radius: var(--ridrs-radius-pill);
   background: var(--ridrs-accent); color: var(--ridrs-on-accent); font: inherit; font-weight: 500; cursor: pointer; }
 .we-save:disabled { opacity: .4; cursor: not-allowed; }
-.we-back:focus-visible, .we-save:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 `;
 
 export function ExportStyles() {

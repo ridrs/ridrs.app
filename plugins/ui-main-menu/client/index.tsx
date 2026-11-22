@@ -46,11 +46,9 @@ const CSS = `
   transition: background var(--ridrs-ease), color var(--ridrs-ease); }
 .mm-nav [data-menu-label] { font-family: var(--ridrs-font-display) !important; font-style: italic;
   text-transform: uppercase; letter-spacing: .08em; }
-.mm-nav [data-menu-item]:hover { background: var(--ridrs-surface-raised); color: var(--ridrs-text); }
 .mm-nav [data-menu-item][aria-current="page"] { background: var(--ridrs-card-quiet); box-shadow: var(--ridrs-edge);
   color: var(--mm-volt); }
 .mm-nav [data-menu-item][aria-current="page"] [data-menu-icon] { color: inherit; }
-.mm-nav [data-menu-item]:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .mm-nav [data-menu-icon] { flex: none; width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat;
   transition: color .15s; }

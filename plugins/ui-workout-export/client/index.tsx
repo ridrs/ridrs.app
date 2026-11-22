@@ -103,6 +103,7 @@ function ExportView({
                 <input
                   type="radio"
                   name="workout-export-format"
+                  data-highlight="delegate"
                   value={option}
                   checked={format === option}
                   onChange={() => choose(option)}

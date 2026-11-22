@@ -49,7 +49,6 @@ const CSS = `
 .br-status[data-ok="true"]::before, .br-status[data-ok="false"]::before { content: ''; width: 10px; height: 10px;
   border-radius: 50%; background: var(--ridrs-ok); }
 .br-status[data-ok="false"]::before { background: var(--ridrs-warn); }
-.br-button:focus-visible, .br-option:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 `;
 
 export function BriefingStyles() {

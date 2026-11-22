@@ -60,9 +60,7 @@ const HUD_INSET_BOTTOM_RIGHT = BUTTON_BOTTOM + BUTTON_SIZE + BUTTON_GAP;
 const CONTROLS_CSS = `
 .as-control { display: grid; place-items: center; padding: 0; border: 0;
   background: var(--ridrs-card-quiet); box-shadow: var(--ridrs-edge), var(--ridrs-shadow);
-  color: var(--ridrs-text); cursor: pointer; transition: filter var(--ridrs-ease); }
-.as-control:hover { filter: brightness(1.25); }
-.as-control:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
+  color: var(--ridrs-text); cursor: pointer; }
 .as-control-icon { width: 24px; height: 24px; background: currentColor;
   mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
 /* A screen in a dialog over the ride (ADR 0098), drawn like the dialogs of the main screen. */
@@ -77,8 +75,6 @@ const CONTROLS_CSS = `
 .as-dialog-close { position: absolute; top: 16px; right: 16px; z-index: 1; width: 40px; height: 40px;
   padding: 0; border: 0; box-shadow: var(--ridrs-edge); border-radius: 50%; background: var(--ridrs-card-quiet);
   color: var(--ridrs-text); cursor: pointer; }
-.as-dialog-close:hover { background: var(--ridrs-surface-raised); }
-.as-dialog-close:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .as-dialog-close::before, .as-dialog-close::after { content: ""; position: absolute; top: 50%; left: 50%;
   width: 16px; height: 2px; border-radius: 1px; background: currentColor; }
 .as-dialog-close::before { transform: translate(-50%, -50%) rotate(45deg); }

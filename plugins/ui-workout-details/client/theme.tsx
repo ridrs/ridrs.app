@@ -36,7 +36,6 @@ const CSS = `
 .wd-step [data-field="target"] { color: var(--ridrs-accent); }
 .wd-mark { padding: 2px 8px; border: 1px solid var(--ridrs-warn); border-radius: var(--ridrs-radius-pill);
   color: var(--ridrs-warn); font-size: 12px; }
-.wd-back:focus-visible, .wd-step:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 @media (max-width: 560px) {
   .wd-step { grid-template-columns: 1fr auto; }
 }

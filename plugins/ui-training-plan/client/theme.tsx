@@ -38,10 +38,6 @@ const CSS = `
 .rt-profile { grid-column: 1 / -1; margin-top: 6px; }
 .tr-chart { pointer-events: none; }
 .tr-chart:empty { display: none; }
-.rt-button:hover { filter: brightness(1.2); }
-.rt-card:hover .rt-name { color: var(--ridrs-accent); }
-.rt-button:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
-.rt-card:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 8px; border-radius: var(--ridrs-radius); }
 .rt-spin { display: inline-block; width: 14px; height: 14px; border-radius: 50%;
   border: 2px solid rgb(255 255 255 / .2); border-top-color: ${COLORS.cyan}; animation: rt-spin 1s linear infinite; }
 @keyframes rt-spin { to { transform: rotate(360deg); } }

@@ -276,6 +276,7 @@ function ImportView({ ctx }: { readonly ctx: UiContext }) {
             type="file"
             multiple
             className="wi-file"
+            data-highlight="delegate"
             onChange={(event) => {
               const input = event.currentTarget;
               void addFiles([...(input.files ?? [])]);

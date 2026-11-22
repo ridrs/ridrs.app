@@ -334,6 +334,7 @@ export function Card({
         <button
           type="button"
           className="pv-teaser-open"
+          data-highlight="delegate"
           aria-label={label ?? title}
           onClick={onOpen}
         >

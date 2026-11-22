@@ -24,8 +24,6 @@ const CSS = `
 .rr-button { padding: 10px 20px; border: 0; border-radius: var(--ridrs-radius); box-shadow: var(--ridrs-edge);
   background: var(--ridrs-surface-raised); color: var(--ridrs-text); font: 500 var(--ridrs-size-body) var(--ridrs-font-text); cursor: pointer; }
 .rr-button.rr-primary { background: var(--ridrs-accent); box-shadow: none; color: var(--ridrs-accent-text); }
-.rr-button:hover { filter: brightness(1.15); }
-.rr-button:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 `;
 
 function facts(ride: RecoverableRide, text: Messages, language: Language): string {

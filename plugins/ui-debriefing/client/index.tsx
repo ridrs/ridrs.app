@@ -58,11 +58,9 @@ const CSS = `
 .db-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .db-button { padding: 12px 26px; border: 0; border-radius: var(--ridrs-radius);
   background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); color: var(--ridrs-text);
-  font: 500 var(--ridrs-size-body) var(--ridrs-font-text); cursor: pointer; transition: filter var(--ridrs-ease); }
+  font: 500 var(--ridrs-size-body) var(--ridrs-font-text); cursor: pointer; }
 .db-primary { background: ${COLORS.lime}; box-shadow: none; color: var(--ridrs-accent-text); }
 .db-delete { color: ${COLORS.red}; }
-.db-button:hover { filter: brightness(1.2); }
-.db-button:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 3px; }
 .db-button:disabled { opacity: .5; cursor: default; }
 .db-more { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid ${COLORS.line}; }
 .db-quiet { padding: 8px 18px; background: transparent; box-shadow: var(--ridrs-edge); color: ${COLORS.muted};

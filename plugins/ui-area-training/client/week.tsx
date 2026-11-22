@@ -408,8 +408,6 @@ export const WEEK_CSS = `
 .tw-nav { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
   padding: 0; border: 0; border-radius: var(--ridrs-radius);
   background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); color: var(--ridrs-text); cursor: pointer; }
-.tw-nav:hover { filter: brightness(1.2); }
-.tw-nav:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .tw-grid { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   overflow: hidden; border-radius: var(--ridrs-radius-lg); box-shadow: var(--ridrs-edge);
   background: var(--ridrs-card-quiet); }
@@ -432,14 +430,13 @@ export const WEEK_CSS = `
   padding: 8px 10px 8px 14px; overflow: hidden; border-radius: var(--ridrs-radius-sm);
   background: var(--ridrs-surface-raised); box-shadow: var(--ridrs-edge); }
 .tw-entry-name { overflow-wrap: anywhere; font-size: 14px; line-height: 1.15; }
-.tw-entry-open { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.tw-entry-open:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 4px; border-radius: 2px; }
+.tw-entry-open { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 2px; }
 .tw-entry-label { font-size: var(--ridrs-size-label); letter-spacing: .06em; color: var(--ridrs-text-muted); }
 /* Every entry is a small card of the same shape; its kind is the bar at its left edge: planned cyan,
    done volt, outdoor green, rest and note grey. A done entry also shows a check in volt. */
 .tw-entry::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--ridrs-info); }
 .tw-entry[draggable="true"] { cursor: grab; }
-.tw-entry[data-state="planned"][draggable="true"]:hover { background: var(--ridrs-card-quiet); }
+:root[data-input-mode="pointer"]:not([data-cursor-hidden]) .tw-entry[data-state="planned"][draggable="true"]:hover { background: var(--ridrs-card-quiet); }
 .tw-entry[data-kind="rest"]::before, .tw-entry[data-kind="note"]::before { background: var(--ridrs-text-muted); }
 .tw-entry[data-kind="outdoor"]::before { background: var(--ridrs-ok); }
 .tw-entry[data-state="done"]::before { background: var(--ridrs-accent); }
@@ -457,8 +454,6 @@ export const WEEK_CSS = `
 .tw-current { margin-left: 10px; padding: 2px 4px; border: 0; border-radius: var(--ridrs-radius-sm); background: none;
   color: var(--ridrs-info); font: inherit; font-size: var(--ridrs-size-label); letter-spacing: .02em; text-transform: inherit;
   text-decoration: underline; text-underline-offset: 3px; cursor: pointer; vertical-align: middle; }
-.tw-current:hover { color: var(--ridrs-text); }
-.tw-current:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; border-radius: var(--ridrs-radius-sm); }
 /* The box of the rider's workouts' tiles: where a planned workout is dropped to become one of the workouts. */
 .tr-workouts-drop { position: relative; min-height: 96px; border-radius: var(--ridrs-radius-lg); transition: box-shadow var(--ridrs-ease); }
 .tr-workouts-drop[data-dragging] { box-shadow: 0 0 0 2px rgb(204 255 0 / .5); }

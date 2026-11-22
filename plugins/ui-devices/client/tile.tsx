@@ -25,8 +25,6 @@ const CSS = `
   border: 0; border-radius: var(--ridrs-radius); background: transparent; color: inherit; text-align: left;
   font: 500 15px var(--ridrs-font-text); cursor: pointer; }
 .dt-row::after { content: '›'; margin-left: auto; color: var(--ridrs-text-muted); font-size: 22px; }
-.dt-row:hover, .dt-open:hover { background: var(--ridrs-surface-raised); }
-.dt-row:focus-visible, .dt-open:focus-visible { outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 .dt-text { display: grid; gap: 2px; min-width: 0; }
 .dt-name { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .dt-status { color: var(--ridrs-text-muted); font-size: 14px; }

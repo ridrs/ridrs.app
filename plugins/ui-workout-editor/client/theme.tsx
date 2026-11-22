@@ -45,8 +45,6 @@ const CSS = `
 .we-drop[data-over] { outline: 2px dashed var(--ridrs-accent); min-height: 22px; }
 .we-foot { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--ridrs-line); }
 .we-notice { margin: 0; color: var(--ridrs-text-muted); font-size: 13px; }
-.we-page button:focus-visible, .we-page input:focus-visible, .we-page select:focus-visible, .we-page textarea:focus-visible {
-  outline: var(--ridrs-focus-ring); outline-offset: 2px; }
 `;
 
 export function EditorStyles() {
