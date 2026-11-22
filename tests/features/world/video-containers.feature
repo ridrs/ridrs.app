@@ -14,11 +14,12 @@ Feature: A video route plays whatever container its video comes in
     And the video world showed the frame at 1.2 s
 
     Examples:
-      | container | file              | codec |
-      | MP4       | test-pattern.mp4  | avc1  |
-      | QuickTime | test-pattern.mov  | avc1  |
-      | Matroska  | test-pattern.mkv  | avc1  |
-      | WebM      | test-pattern.webm | vp09  |
+      | container      | file                         | codec |
+      | MP4            | test-pattern.mp4             | avc1  |
+      | fragmented MP4 | test-pattern-fragmented.mp4  | avc1  |
+      | QuickTime      | test-pattern.mov             | avc1  |
+      | Matroska       | test-pattern.mkv             | avc1  |
+      | WebM           | test-pattern.webm            | vp09  |
 
   Scenario: A Matroska video is not read in full before the ride
     Given the 20 s test pattern as long-test-pattern.webm

@@ -56,6 +56,18 @@ describe('readVideoIndex', () => {
     await readVideoIndex(read);
     expect(Math.max(...reads.map(([, length]) => length))).toBeLessThan(2000);
   });
+
+  it('stops scanning top-level boxes at moov so fragmented MP4s do not scan every moof/mdat', async () => {
+    const fragmented = readFileSync(new URL('./fixtures/test-pattern-fragmented.mp4', import.meta.url));
+    const reads: [number, number][] = [];
+    const index = await readVideoIndex(async (offset, length) => {
+      reads.push([offset, length]);
+      return new Uint8Array(fragmented.subarray(offset, Math.min(fragmented.length, offset + length)));
+    });
+    expect(index.offsets).toHaveLength(0);
+    // 2 box headers (ftyp, moov) + 2 box bodies (ftyp, moov).
+    expect(reads).toHaveLength(4);
+  });
 });
 
 describe('httpRangeReader', () => {

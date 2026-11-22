@@ -123,6 +123,11 @@ async function topLevelBoxes(read: RangeReader): Promise<{ type: string; offset:
       throw new Error(`Broken box "${type}" at ${offset}`);
     }
     boxes.push({ type, offset, size });
+    if (type === 'moov') {
+      // ftyp precedes moov in ISO BMFF; nothing after moov is needed to read its sample table
+      // (a fragmented MP4 can have hundreds of moof/mdat boxes after moov).
+      return boxes;
+    }
     offset += size;
   }
 }

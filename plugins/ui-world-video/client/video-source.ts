@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { type EncodedPacket, EncodedPacketSink, Input, MATROSKA, StreamSource, WEBM } from 'mediabunny';
+import {
+  type EncodedPacket,
+  EncodedPacketSink,
+  Input,
+  type InputFormat,
+  MATROSKA,
+  MP4,
+  QTFF,
+  StreamSource,
+  WEBM,
+} from 'mediabunny';
 import { type RangeReader, readVideoIndex, type VideoColour, type VideoIndex } from './video-index.ts';
 
 /** An encoded sample as the decoder takes it: s from the first shown frame. */
@@ -56,7 +66,7 @@ const TOLERANCE = 1e-4;
 export async function openVideo(read: RangeReader, size: () => number): Promise<VideoSource> {
   const head = await read(0, 12);
   if (EBML_MAGIC.every((byte, i) => head[i] === byte)) {
-    return openMatroska(read, size);
+    return openWithMediabunny(read, size, [MATROSKA, WEBM]);
   }
   // ISO BMFF (MP4, M4V, QuickTime) starts with a box: a size and a type of four printable letters.
   const type = String.fromCharCode(...head.subarray(4, 8));
@@ -64,6 +74,10 @@ export async function openVideo(read: RangeReader, size: () => number): Promise<
     throw new Error('The video is neither MP4 nor Matroska (or WebM)');
   }
   const index = await readVideoIndex(read);
+  if (index.offsets.length === 0) {
+    // Fragmented MP4 (e.g. DASH): moov has no sample table, samples live in moof/mdat fragments.
+    return openWithMediabunny(read, size, [MP4, QTFF]);
+  }
   return indexSource(index, read);
 }
 
@@ -188,16 +202,20 @@ function bytesOf(source: AllowSharedBufferSource | undefined): Uint8Array | unde
 }
 
 /**
- * A Matroska or WebM video: it has no sample table, so keyframes are looked up in its cues and
- * the samples read cluster by cluster as the player goes (ADR 0101). Nothing reads the file in
- * full: a 9 GB WebM costs two reads per keyframe lookup.
+ * A video without a complete sample table in `moov` (Matroska, WebM, or fragmented MP4 / DASH):
+ * keyframes are looked up by cues or fragments and samples read on demand as the player goes
+ * (ADR 0101). Nothing reads the file in full.
  */
-async function openMatroska(read: RangeReader, size: () => number): Promise<VideoSource> {
+async function openWithMediabunny(
+  read: RangeReader,
+  size: () => number,
+  formats: InputFormat[],
+): Promise<VideoSource> {
   const source = new StreamSource({
     getSize: size,
     read: (start, end) => read(start, end - start),
   });
-  const input = new Input({ source, formats: [MATROSKA, WEBM] });
+  const input = new Input({ source, formats });
   const track = await input.getPrimaryVideoTrack();
   if (!track) {
     throw new Error('The video has no video track');

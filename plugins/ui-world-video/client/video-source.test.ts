@@ -74,6 +74,22 @@ describe('openVideo', () => {
     expect((await open('test-pattern.webm')).video.colour).toBeUndefined();
   });
 
+  it('opens a fragmented MP4 (DASH) whose samples lie in moof boxes', async () => {
+    const { video } = await open('test-pattern-fragmented.mp4');
+    expect(video.codec).toMatch(/^avc1\./);
+    expect([video.width, video.height]).toEqual([64, 48]);
+    expect(video.description?.[0]).toBe(1); // avcC configurationVersion
+    expect(await video.keyframeAt(1.2)).toBeCloseTo(1, 5);
+    const samples = await all(video.samplesFrom(1));
+    expect(samples).toHaveLength(30);
+    expect(samples[0]).toMatchObject({ time: 1, key: true });
+    expect(samples.filter((sample) => sample.key).map((sample) => sample.time)).toEqual([1, 1.5]);
+    // B-frames: presentation times are not in decode order, but cover every frame once.
+    const times = samples.map((sample) => Math.round(sample.time * 30));
+    expect(times).not.toEqual([...times].sort((a, b) => a - b));
+    expect([...times].sort((a, b) => a - b)).toEqual(Array.from({ length: 30 }, (_, i) => 30 + i));
+  });
+
   it('refuses a file in no known container', async () => {
     const { read, size } = reader(Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]));
     await expect(openVideo(read, size)).rejects.toThrow(/neither MP4 nor Matroska/);
