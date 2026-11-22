@@ -224,9 +224,12 @@ export async function createHdrLayer(canvas: HTMLCanvasElement): Promise<HdrLaye
         canvas.width = width;
         canvas.height = height;
       }
+      // A decoded SVG image in WebKit already carries premultiplied alpha; asking
+      // `copyExternalImageToTexture` to premultiply again multiplies RGB by alpha a second time
+      // and darkens translucent gradients towards black when the shader divides by alpha once.
       device.queue.copyExternalImageToTexture(
         { source: image },
-        { texture, colorSpace: 'display-p3', premultipliedAlpha: true },
+        { texture, colorSpace: 'display-p3', premultipliedAlpha: false },
         [width, height],
       );
       const encoder = device.createCommandEncoder();

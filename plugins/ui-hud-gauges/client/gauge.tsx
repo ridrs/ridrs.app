@@ -61,7 +61,7 @@ const OUTLINE = '#0b1220';
 const TARGET_ORANGE = '#ff5a1f';
 const TARGET_OUTER = 96.8;
 const TARGET_LINE_WIDTH = 2.3;
-const TARGET_CAP_ANGLE = ((TARGET_LINE_WIDTH / 2 / TARGET_OUTER) * 180) / Math.PI;
+const TARGET_SPOTLIGHT_OUTER = TARGET_OUTER - TARGET_LINE_WIDTH / 2;
 const TARGET_SPOTLIGHT_INNER = 72;
 const TARGET_RAY_INNER = 74;
 const TARGET_TICK_MARGIN = 1.8;
@@ -268,25 +268,25 @@ export function Gauge({
                 id={`target-glow-${kind}`}
                 cx={C}
                 cy={C}
-                r={TARGET_OUTER}
+                r={TARGET_SPOTLIGHT_OUTER}
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="74.5%" stopColor={TARGET_ORANGE} stopOpacity={0} />
-                <stop offset="80%" stopColor={TARGET_ORANGE} stopOpacity={0.12} />
-                <stop offset="86%" stopColor={TARGET_ORANGE} stopOpacity={0.28} />
-                <stop offset="93%" stopColor={TARGET_ORANGE} stopOpacity={0.5} />
-                <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.75} />
+                <stop offset="75%" stopColor={TARGET_ORANGE} stopOpacity={0} />
+                <stop offset="81%" stopColor={TARGET_ORANGE} stopOpacity={0.12} />
+                <stop offset="87%" stopColor={TARGET_ORANGE} stopOpacity={0.28} />
+                <stop offset="94%" stopColor={TARGET_ORANGE} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.72} />
               </radialGradient>
               <radialGradient
                 id={`target-edge-${kind}`}
                 cx={C}
                 cy={C}
-                r={TARGET_OUTER}
+                r={TARGET_SPOTLIGHT_OUTER}
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="75%" stopColor={TARGET_ORANGE} stopOpacity={0} />
-                <stop offset="85%" stopColor={TARGET_ORANGE} stopOpacity={0.45} />
-                <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.9} />
+                <stop offset="77%" stopColor={TARGET_ORANGE} stopOpacity={0} />
+                <stop offset="86%" stopColor={TARGET_ORANGE} stopOpacity={0.45} />
+                <stop offset="100%" stopColor={TARGET_ORANGE} stopOpacity={0.85} />
               </radialGradient>
             </defs>
             <g
@@ -296,11 +296,16 @@ export function Gauge({
               data-center={String(Math.round(targetSpan.center))}
             >
               <path
-                d={sector(TARGET_OUTER, TARGET_SPOTLIGHT_INNER, targetAngles.low, targetAngles.high)}
+                d={sector(
+                  TARGET_SPOTLIGHT_OUTER,
+                  TARGET_SPOTLIGHT_INNER,
+                  targetAngles.low,
+                  targetAngles.high,
+                )}
                 fill={`url(#target-glow-${kind})`}
               />
               {([targetAngles.low, targetAngles.high] as const).map((rayAngle) => {
-                const [x0, y0] = point(TARGET_OUTER, rayAngle);
+                const [x0, y0] = point(TARGET_SPOTLIGHT_OUTER, rayAngle);
                 const [x1, y1] = point(TARGET_RAY_INNER, rayAngle);
                 return (
                   <line
@@ -310,8 +315,7 @@ export function Gauge({
                     x2={x1}
                     y2={y1}
                     stroke={`url(#target-edge-${kind})`}
-                    strokeWidth={1.5}
-                    strokeLinecap="round"
+                    strokeWidth={1.3}
                   />
                 );
               })}
@@ -412,14 +416,7 @@ export function Gauge({
             data-center={String(Math.round(targetSpan.center))}
           >
             <path
-              d={arc(
-                TARGET_OUTER,
-                targetAngles.low + TARGET_CAP_ANGLE,
-                Math.max(
-                  targetAngles.high - TARGET_CAP_ANGLE,
-                  targetAngles.low + TARGET_CAP_ANGLE + 0.01,
-                ),
-              )}
+              d={arc(TARGET_OUTER, targetAngles.low, targetAngles.high)}
               fill="none"
               stroke={OUTLINE}
               strokeWidth={3.8}
@@ -436,14 +433,7 @@ export function Gauge({
             </g>
             <path
               data-testid="target-line"
-              d={arc(
-                TARGET_OUTER,
-                targetAngles.low + TARGET_CAP_ANGLE,
-                Math.max(
-                  targetAngles.high - TARGET_CAP_ANGLE,
-                  targetAngles.low + TARGET_CAP_ANGLE + 0.01,
-                ),
-              )}
+              d={arc(TARGET_OUTER, targetAngles.low, targetAngles.high)}
               fill="none"
               stroke={TARGET_ORANGE}
               strokeWidth={TARGET_LINE_WIDTH}
