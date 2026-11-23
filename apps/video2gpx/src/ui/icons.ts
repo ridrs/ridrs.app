@@ -25,6 +25,13 @@ const P = {
   expand: '<path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/>',
   image: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="5.8" cy="6.3" r="1.1"/><path d="M2.5 11.5l3.5-3 2.5 2 2-1.5 3 2.5"/>',
   edit: '<path d="M3 13l.6-2.8 7-7 2.2 2.2-7 7z"/>',
+  mountain: '<path d="M1.8 13l4.6-8 2.8 4.4 1.8-2.4 3.2 6z"/>',
+  activity: '<path d="M1.8 8.5h2.7l1.8-4.5 2.7 8 1.9-4.5h3.3"/>',
+  sliders: '<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/><circle cx="5.5" cy="4.5" r="1.4" fill="currentColor"/><circle cx="10.5" cy="8" r="1.4" fill="currentColor"/><circle cx="6.5" cy="11.5" r="1.4" fill="currentColor"/>',
+  search: '<circle cx="7.2" cy="7.2" r="4.5"/><path d="M10.6 10.6l3.2 3.2"/>',
+  pin: '<path d="M8 14s4.5-4 4.5-7.6a4.5 4.5 0 1 0-9 0C3.5 10 8 14 8 14z"/><circle cx="8" cy="6.4" r="1.5"/>',
+  upload: '<path d="M8 10.5v-8M4.5 5.8L8 2.3l3.5 3.5M3 13.5h10"/>',
+  arrowLeft: '<path d="M10 3.5L5.5 8 10 12.5"/>',
 } as const;
 export type IconName = keyof typeof P;
 

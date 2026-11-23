@@ -1,6 +1,6 @@
-// The frame of the app: global bar, stage bar of a project, the views, toasts, the live region. Routes pick what is shown.
+// The frame of the app: global bar, streamlined 4-step workflow bar + optional inspectors (Höhe, Analyse), views, toasts, live region.
 import { analyseBusy, analyseReady } from "../analyse";
-import { elevationBusy, profileCurrent } from "../elevation";
+import { E, anythingMissing, elevationBusy, profileCurrent } from "../elevation";
 import { imp, importPct } from "../features/import";
 import { active, activeName, toolsReady } from "../features/run";
 import { S, bus, finishedSteps, overallPct, runningSteps, type RunState } from "../state";
@@ -14,6 +14,8 @@ import { STAGES, currentRoute, go, routePath, type Route, type Stage } from "./r
 const waitsForVideo = (r: RunState) => r.input?.state === "growing" && !runningSteps(r).length && finishedSteps(r) === 0;
 
 export const STAGE_LABEL: Record<Stage, string> = { einrichten: "Einrichten", berechnung: "Berechnung", ergebnis: "Ergebnis", analyse: "Analyse", hoehe: "Höhe", export: "Export" };
+const PRIMARY_STAGES: readonly Stage[] = ["einrichten", "berechnung", "ergebnis", "export"];
+const INSPECT_STAGES: readonly Stage[] = ["hoehe", "analyse"];
 const VIEW_TITLE = { start: "Start", tools: "Werkzeuge", maps: "Kartendaten", settings: "Einstellungen", selfcheck: "Selbsttest" } as const;
 type PlainView = keyof typeof VIEW_TITLE;
 
@@ -36,7 +38,7 @@ export function buildShell(): Regions {
   R = {
     views, ws: el("div", { class: "view ws", hidden: true }),
     head: reg("div", "ws-head"), map: reg("section", "ws-map panel", "Karte"), video: reg("section", "ws-video panel", "Video"), side: reg("aside", "ws-side panel", "Einrichten"),
-    main: reg("div", "ws-main"), info: reg("aside", "ws-info", "Angaben zur Berechnung"), timeline: reg("section", "ws-timeline panel", "Zeitleiste"),
+    main: reg("div", "ws-main"), info: reg("aside", "ws-info panel", "Angaben zur Berechnung"), timeline: reg("section", "ws-timeline", "Zeitleiste und Anpassung"),
   };
   R.ws.append(stageH1, R.head, R.map, R.video, R.side, R.main, R.info, R.timeline);
 
@@ -50,13 +52,24 @@ export function buildShell(): Regions {
     el("nav", { class: "bar-nav", "aria-label": "Bereiche" },
       el("a", { href: routePath.maps, class: "bar-link" }, icon("map"), el("span", {}, "Kartendaten")), toolsLink,
       el("a", { href: routePath.settings, class: "bar-link" }, icon("settings"), el("span", {}, "Einstellungen"))));
-  const ol = el("ol", {});
-  STAGES.forEach((s, i) => {
+
+  // Primary 4-step workflow bar
+  const ol = el("ol", { class: "stage-steps" });
+  PRIMARY_STAGES.forEach((s, i) => {
     stageLinks[s] = el("a", { class: "stage-link" }, el("span", { class: "stage-n" }, String(i + 1)), el("span", { class: "stage-l" }, STAGE_LABEL[s]), el("span", { class: "stage-x" }));
     stageLinks[s].addEventListener("click", (e) => { if (stageLinks[s].getAttribute("aria-disabled") === "true") e.preventDefault(); });
     ol.append(el("li", {}, stageLinks[s]));
   });
-  stageNav = el("nav", { class: "stagebar", "aria-label": "Arbeitsschritte", hidden: true }, ol);
+  // Optional inspection tools (Höhe, Analyse)
+  const tools = el("div", { class: "stage-tools", role: "group", "aria-label": "Prüfen & Details" }, el("span", { class: "stage-tools-lbl", "aria-hidden": "true" }, "Details"));
+  INSPECT_STAGES.forEach((s) => {
+    const ic = s === "hoehe" ? "mountain" : "activity";
+    stageLinks[s] = el("a", { class: "stage-link tool-link" }, icon(ic), el("span", { class: "stage-l" }, STAGE_LABEL[s]), el("span", { class: "stage-x" }));
+    stageLinks[s].addEventListener("click", (e) => { if (stageLinks[s].getAttribute("aria-disabled") === "true") e.preventDefault(); });
+    tools.append(stageLinks[s]);
+  });
+
+  stageNav = el("nav", { class: "stagebar", "aria-label": "Arbeitsschritte", hidden: true }, ol, tools);
   mainEl = el("main", { id: "main", tabIndex: -1 }, ...Object.values(views), R.ws);
   $("#app").append(el("a", { class: "skip", href: "#main", onclick: (e: Event) => { e.preventDefault(); mainEl.focus(); } }, "Zum Inhalt"), bar, stageNav, mainEl, el("div", { id: "toasts" }), liveRegion());
 
@@ -95,7 +108,7 @@ export async function onRoute(r: Route) {
     R.ws.hidden = false; R.ws.dataset.stage = stage;
     visited.add(`${r.id}/${stage}`);
     stageH1.textContent = `${STAGE_LABEL[stage]}: ${projectTitle(S.cur!.app)}`;
-    stageH1.hidden = stage === "ergebnis"; // the verdict is the heading of Ergebnis
+    stageH1.hidden = stage === "ergebnis" || stage === "hoehe";
     document.title = `${STAGE_LABEL[stage]}: ${projectTitle(S.cur!.app)} – video2gpx`;
     updateBar();
     bus.emit("stage", stage);
@@ -109,9 +122,8 @@ export async function onRoute(r: Route) {
     shown[r.view]?.();
   }
   window.scrollTo(0, 0);
-  // the focus goes to the view (the start page focuses its field itself); the first heading is what a screen reader hears next
   if (!(r.view === "start")) { if (!first || r.view !== "project") mainEl.focus({ preventScroll: true }); }
-  if (r.view === "project" && r.stage === "ergebnis" && !first) R.head.querySelector<HTMLElement>("h1")?.focus();
+  if (r.view === "project" && (r.stage === "ergebnis" || r.stage === "hoehe") && !first) R.head.querySelector<HTMLElement>("h1")?.focus();
   first = false;
 }
 
@@ -135,32 +147,30 @@ function updateBar() {
       if (s === stage) a.setAttribute("aria-current", "step"); else a.removeAttribute("aria-current");
       const x = a.querySelector<HTMLElement>(".stage-x")!;
       const state = stageState(s, cur!.app.id);
-      if (x.dataset.state !== state) { x.dataset.state = state; x.replaceChildren(...(state === "run" ? [icon("spinner", "spin")] : state === "done" ? [icon("check")] : [])); }
+      if (x.dataset.state !== state) {
+        x.dataset.state = state;
+        x.replaceChildren(...(state === "run" ? [icon("spinner", "spin")] : state === "done" ? [icon("check")] : state === "warn" ? [icon("warning")] : []));
+      }
       const pct = s === "berechnung" && state === "run" && !waitsForVideo(S.run) ? ` ${Math.round(overallPct(S.run))} %` : "";
       const t = x.querySelector(".pct") ?? x.appendChild(el("span", { class: "pct" }));
       if (t.textContent !== pct) t.textContent = pct;
     }
   }
-  // a narrow window: the stage bar scrolls, so the current stage is brought into view
-  if (inProject) {
-    const cur2 = stageLinks[R.ws.dataset.stage as Stage], ol = cur2.closest("ol");
-    if (ol && ol.scrollWidth > ol.clientWidth) ol.scrollLeft = Math.max(0, cur2.offsetLeft - (ol.clientWidth - cur2.offsetWidth) / 2);
-  }
-  // activity: a run or an import that goes on, wherever the user is
   const rs = active.state;
   runChip.hidden = !active.project || (route.view === "project" && route.id === active.project && route.stage === "berechnung");
   if (active.project) { runChip.href = routePath.project(active.project, "berechnung"); setChip(runChip, rs && waitsForVideo(rs) ? "Berechnung wartet auf das Video" : `Berechnung ${rs ? Math.round(overallPct(rs)) + " %" : "läuft"}`, `Berechnung läuft: ${activeName()}`); }
   impChip.hidden = !imp.running || !imp.project || (route.view === "project" && route.id === imp.project && route.stage === "einrichten");
   if (imp.running && imp.project) { const p = importPct(); impChip.href = routePath.project(imp.project, "einrichten"); setChip(impChip, `Video lädt${p !== null ? ` ${Math.round(p)} %` : ""}`, "Zum Import"); }
 }
-/** the mark in the stage bar: a spinner while the stage works, a check when it is done */
-function stageState(s: Stage, project: string): "run" | "done" | "" {
+
+/** the mark in the stage bar: a spinner while working, a check when done, warn when elevation data is missing */
+function stageState(s: Stage, project: string): "run" | "done" | "warn" | "" {
   switch (s) {
     case "einrichten": return S.run.started || !!S.result ? "done" : "";
     case "berechnung": return S.run.running ? "run" : S.result ? "done" : "";
     case "ergebnis": return S.result && (visited.has(`${project}/ergebnis`) || profileCurrent()) ? "done" : "";
     case "analyse": return analyseBusy() ? "run" : analyseReady() && visited.has(`${project}/analyse`) ? "done" : "";
-    case "hoehe": return elevationBusy() ? "run" : profileCurrent() ? "done" : "";
+    case "hoehe": return elevationBusy() ? "run" : E.state === "missing" || (E.dem && anythingMissing()) ? "warn" : profileCurrent() ? "done" : "";
     default: return "";
   }
 }

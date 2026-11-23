@@ -64,8 +64,10 @@ export function mountRouteEditor(container: HTMLElement) {
   chipsEl = el("div", { class: "row wrap re-chips" });
   resetBtn = btn("Route zurücksetzen", () => void resetEdit(), { size: "sm" });
   resetBtn.hidden = true;
-  barEl = el("div", { class: "re-bar row wrap between" }, el("div", { class: "row wrap re-left" }, statusEl, chipsEl), resetBtn);
-  container.append(barEl);
+  barEl = el("div", { class: "re-bar adjust-sec row wrap between" },
+    el("div", { class: "row wrap re-left" }, el("span", { class: "label" }, "Strecke auf Karte"), statusEl, chipsEl),
+    resetBtn);
+  container.prepend(barEl);
 
   bus.on("stage", (s: string | null) => {
     stage = s;

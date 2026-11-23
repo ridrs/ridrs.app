@@ -1,5 +1,4 @@
-// Berechnung: overall progress, the vertical step list (several steps may run at once), the download row of a run that waits
-// for its import, end states with a specific action, the log; beside the map: the run's inputs and the status signals.
+// Berechnung: clear overall progress, parallel step list, download row when waiting for import, smart error recovery, signals card.
 import { api } from "../api";
 import { go, routePath } from "../app/router";
 import { LEVEL_DE, LEVEL_TONE, VEHICLE_DE, gloss } from "../features/gloss";
@@ -7,14 +6,14 @@ import { active, canResume, cancel, start } from "../features/run";
 import { STEPS, S, bus, effectivePbf, finishedSteps, overallPct, runningSteps } from "../state";
 import type { StepId } from "../types";
 import { announce, btn, copyBtn, progressBar, setToneIcon, statusRow, stepList, toneIcon, type Tone } from "../ui/components";
+import { icon } from "../ui/icons";
 import { el, fmtBytes, fmtDur, fmtEta, fmtSize } from "../util";
 import { openMapData } from "./maps";
 
-/** which steps a step waits for (numbers as shown); the pipeline runs 1–3 side by side */
 const DEPS: Partial<Record<StepId, number[]>> = { route_search: [1, 2, 3], plausibility: [4], refine: [4], gpx: [6] };
 
 let root: HTMLElement, info: HTMLElement;
-let head: HTMLElement, eta: HTMLElement, overall: ReturnType<typeof progressBar>, cancelBtn: HTMLButtonElement;
+let head: HTMLElement, pctPill: HTMLElement, eta: HTMLElement, overall: ReturnType<typeof progressBar>, cancelBtn: HTMLButtonElement;
 let inputRow: HTMLElement, inputIcon: HTMLElement, inputText: HTMLElement, inputBar: ReturnType<typeof progressBar>;
 let steps: ReturnType<typeof stepList>, endBox: HTMLElement, logDisc: HTMLDetailsElement, logSum: HTMLElement, logPre: HTMLElement;
 let params: HTMLElement, signals: HTMLElement;
@@ -23,6 +22,7 @@ let lastAnnounce = "";
 export function mountRun(mainEl: HTMLElement, infoEl: HTMLElement) {
   root = el("div", { class: "run-view panel" }); info = infoEl;
   head = el("h2", { class: "run-h" });
+  pctPill = el("span", { class: "chip accent tnum", hidden: true });
   eta = el("span", { class: "small muted tnum" });
   overall = progressBar("Gesamtfortschritt der Berechnung", "lg");
   cancelBtn = btn("Abbrechen", () => void cancel(), { kind: "danger" });
@@ -34,15 +34,17 @@ export function mountRun(mainEl: HTMLElement, infoEl: HTMLElement) {
   endBox = el("div", { class: "stack" });
   logSum = el("span", {});
   logPre = el("pre", { class: "logbox mono", tabIndex: 0, "aria-label": "Protokoll der Berechnung" });
-  logDisc = el("details", { class: "disc" }, el("summary", {}, logSum),
+  logDisc = el("details", { class: "disc" }, el("summary", {}, icon("chevron"), logSum),
     el("div", { class: "disc-body stack" }, logPre, el("div", { class: "row wrap" }, copyBtn(() => logText(), "Protokoll kopieren"), btn("Projektordner zeigen", () => void api.reveal(S.cur?.dir ?? ""), { size: "sm", icon: "folder" }))));
   root.append(
-    el("div", { class: "run-top" }, el("div", { class: "row between" }, head, el("div", { class: "row" }, eta, cancelBtn)), overall.el),
+    el("div", { class: "run-top" },
+      el("div", { class: "row between wrap" }, el("div", { class: "row wrap" }, head, pctPill), el("div", { class: "row" }, eta, cancelBtn)),
+      overall.el),
     el("div", { class: "steps-wrap" }, inputRow, steps.el), endBox, logDisc);
   mainEl.append(root);
   params = el("dl", { class: "facts small" });
   signals = el("div", { class: "signals" });
-  info.append(params, el("h2", { class: "label" }, "Signale"), signals);
+  info.append(el("h2", { class: "label" }, "Laufparameter"), params, el("h2", { class: "label" }, "Signale"), signals);
   for (const ev of ["run", "runtick", "result", "project", "import"]) bus.on(ev, schedule);
   bus.on("stage", (s: string | null) => { root.hidden = s !== "berechnung"; if (s === "berechnung") update(); });
 }
@@ -79,13 +81,15 @@ function update() {
     : r.exit?.code === 0 || S.result ? "Berechnung fertig" : cancelled ? `Abgebrochen nach ${done} von 7 Schritten` : failed ? "Berechnung fehlgeschlagen" : r.started ? "Berechnung" : "Noch keine Berechnung";
   if (head.textContent !== title) head.textContent = title;
   const pct = r.exit?.code === 0 ? 100 : overallPct(r);
+  pctPill.hidden = waitingForVideo || !r.started;
+  pctPill.textContent = `${Math.round(pct)} %`;
   overall.set(waitingForVideo ? null : pct, `${Math.round(pct)} Prozent`);
   const etas = runningSteps(r).map((id) => r.steps[id].eta).filter((x): x is number => x !== undefined);
   eta.textContent = runningHere ? (r.progress?.eta !== undefined ? fmtEta(r.progress.eta) : etas.length ? fmtEta(Math.max(...etas)) : "") : "";
-  // focus inside the controls that are replaced at the end of a run moves to the first new action (F5)
+
   const focusHere = document.activeElement === cancelBtn || endBox.contains(document.activeElement);
   cancelBtn.hidden = !runningHere;
-  // the download of a run that waits for its import
+
   const inp = r.input;
   inputRow.hidden = !inp;
   if (inp) {
@@ -97,32 +101,39 @@ function update() {
     inputBar.set(inp.pct, inp.pct != null ? `Video laden, ${Math.round(inp.pct)} Prozent` : undefined);
   }
   STEPS.forEach((_, i) => steps.set(i, stepRow(i)));
-  // end states: rebuilt only when what they show changes, so a focused action keeps its focus
+
   const endKey = JSON.stringify([waitingForVideo, runningHere, failed, cancelled, r.error ?? null, r.exit?.code ?? null, r.started, canResume(), !!S.result]);
   if (endBox.dataset.key !== endKey) {
-  endBox.dataset.key = endKey;
-  endBox.replaceChildren();
-  if (waitingForVideo) endBox.append(el("p", { class: "banner info" }, toneIcon("info"), el("span", {}, "Die Berechnung startet, sobald das Video geladen ist.")));
-  if (!runningHere && (failed || cancelled || (r.error && r.exit?.code !== 0 && r.started))) {
-    const code = r.exit?.code ?? null;
-    const actions: HTMLElement[] = [];
-    if (canResume()) actions.push(btn("Fortsetzen", () => void start(true), { kind: "primary" }));
-    if (code === 3) actions.push(btn("Suchrahmen verkleinern", () => go(routePath.project(cur.app.id, "einrichten")), { kind: canResume() ? undefined : "primary" }));
-    else if (code === 4) actions.push(btn("Kartendaten prüfen", () => openMapData(false)));
-    else if (code === 2) actions.push(btn("Video und Karte prüfen", () => go(routePath.project(cur.app.id, "einrichten"))));
-    actions.push(btn("Zurück zu Einrichten", () => go(routePath.project(cur.app.id, "einrichten"))));
-    endBox.append(el("div", { class: `banner ${cancelled ? "info" : "bad"}`, role: cancelled ? "status" : "alert" }, toneIcon(cancelled ? "info" : "bad"),
-      el("div", { class: "banner-body" }, el("div", {}, r.error ?? (cancelled ? "Abgebrochen." : "Die Berechnung ist fehlgeschlagen.")), el("div", { class: "row wrap" }, ...actions))));
-    if (failed && !logDisc.dataset.auto) { logDisc.open = true; logDisc.dataset.auto = "1"; }
-  } else delete logDisc.dataset.auto;
-  if (!runningHere && S.result) endBox.append(el("div", { class: "row" }, btn("Zum Ergebnis", () => go(routePath.project(cur.app.id, "ergebnis")), { kind: "primary" })));
-  if (focusHere || document.activeElement === document.body) endBox.querySelector<HTMLButtonElement>("button")?.focus();
+    endBox.dataset.key = endKey;
+    endBox.replaceChildren();
+    if (waitingForVideo) endBox.append(el("p", { class: "banner info" }, toneIcon("info"), el("span", {}, "Die Berechnung startet, sobald das Video geladen ist.")));
+    if (!runningHere && (failed || cancelled || (r.error && r.exit?.code !== 0 && r.started))) {
+      const code = r.exit?.code ?? null;
+      const actions: HTMLElement[] = [];
+      // Put the most helpful fix first: on OOM (3) shrink frame, on bad map (4) check maps, on cancel (130) resume
+      if (code === 3) {
+        actions.push(btn("Suchrahmen verkleinern", () => go(routePath.project(cur.app.id, "einrichten")), { kind: "primary" }));
+        if (canResume()) actions.push(btn("Fortsetzen", () => void start(true)));
+      } else if (code === 4) {
+        actions.push(btn("Kartendaten prüfen", () => openMapData(false), { kind: "primary" }));
+        if (canResume()) actions.push(btn("Fortsetzen", () => void start(true)));
+      } else {
+        if (canResume()) actions.push(btn("Fortsetzen", () => void start(true), { kind: "primary" }));
+        if (code === 2) actions.push(btn("Video und Karte prüfen", () => go(routePath.project(cur.app.id, "einrichten")), { kind: canResume() ? undefined : "primary" }));
+      }
+      actions.push(btn("Zurück zu Einrichten", () => go(routePath.project(cur.app.id, "einrichten"))));
+      endBox.append(el("div", { class: `banner ${cancelled ? "info" : "bad"}`, role: cancelled ? "status" : "alert" }, toneIcon(cancelled ? "info" : "bad"),
+        el("div", { class: "banner-body" }, el("div", {}, r.error ?? (cancelled ? "Abgebrochen." : "Die Berechnung ist fehlgeschlagen.")), el("div", { class: "row wrap" }, ...actions))));
+      if (failed && !logDisc.dataset.auto) { logDisc.open = true; logDisc.dataset.auto = "1"; }
+    } else delete logDisc.dataset.auto;
+    if (!runningHere && S.result) endBox.append(el("div", { class: "row" }, btn("Zum Ergebnis", () => go(routePath.project(cur.app.id, "ergebnis")), { kind: "primary", icon: "chevron" })));
+    if (focusHere || document.activeElement === document.body) endBox.querySelector<HTMLButtonElement>("button")?.focus();
   }
-  // log
+
   logSum.textContent = `Protokoll (${r.logs.length})`;
   const t = r.logs.slice(-300).map((l) => (l.level === "info" ? "" : `[${l.level}] `) + l.message).join("\n") || "(noch keine Meldungen)";
   if (logPre.textContent !== t) { const end = logPre.scrollTop + logPre.clientHeight >= logPre.scrollHeight - 4; logPre.textContent = t; if (end) logPre.scrollTop = logPre.scrollHeight; }
-  // live region: step changes and the end only
+
   const runIds = runningSteps(r);
   const msg = runningHere ? (runIds.length ? `Schritt ${STEPS.findIndex((s) => s.id === runIds[runIds.length - 1]) + 1} von 7: ${runIds.map((id) => STEPS.find((s) => s.id === id)!.label).join(", ")}` : waitingForVideo ? "Wartet auf das Video" : "") : title;
   if (msg && msg !== lastAnnounce) { lastAnnounce = msg; announce(msg); }

@@ -1,23 +1,25 @@
-// Höhe (stage 4): the sources of the elevation data and their download, the profile over the whole route (zoom, pan, layers, hover, click)
-// and what it is made of. Inspection only: heights are not edited here (docs/FEATURE_elevation_stage.md).
+// Höhe: header + status + KPI summary + 1-click download CTA AT THE TOP (ws-head), synced video & map,
+// interactive elevation profile chart right below, then 2-column Auffällige Stellen + Quellen & Lizenzen.
 import { go, routePath } from "../app/router";
 import { E, anythingMissing, cancelDownload, loadDem, loadDiag, loadElevation, missingBytes, startDownload } from "../elevation";
 import { ElevationChart, GRADE_TOKENS, DEFAULT_LAYERS, srcColour, type Layers } from "../elevationChart";
 import { GRADE_LABEL, de, maxGrade, steepStretches, topDifferences, viewFor, type Stretch } from "../elevationStats";
 import { mapMarks } from "../mapPanel";
 import { S, bus } from "../state";
-import { banner, btn, chip, iconBtn, progressBar, toneIcon, type Tone } from "../ui/components";
+import { banner, btn, chip, disclosure, iconBtn, progressBar, toneIcon } from "../ui/components";
 import { icon } from "../ui/icons";
 import { el, fmtBytes, pointAt, pointAtArc } from "../util";
 import { getPlayer } from "../videoPanel";
 import { token } from "../app/theme";
 
 const LAYER_KEY = "v2g.elevLayers";
-let root: HTMLElement;
-let statusEl: HTMLElement, nextBtn: HTMLButtonElement, notes: HTMLElement, srcBox: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement, figBox: HTMLElement, stretchBox: HTMLElement, attrBox: HTMLElement;
+let root: HTMLElement, topBox: HTMLElement;
+let statusEl: HTMLElement, kpiStrip: HTMLElement, topDlWrap: HTMLElement, nextBtn: HTMLButtonElement;
+let notes: HTMLElement, srcBox: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement, figBox: HTMLElement, stretchBox: HTMLElement, attrBox: HTMLElement;
 let zoomIn: HTMLButtonElement, zoomOut: HTMLButtonElement, zoomAll: HTMLButtonElement, rangeEl: HTMLElement, emptyEl: HTMLElement;
 let chart: ElevationChart;
 let layers: Layers = { ...DEFAULT_LAYERS, src: {} };
+let topDlBar: ReturnType<typeof progressBar>, topDlText: HTMLElement, topDlProg: HTMLElement;
 let dlBar: ReturnType<typeof progressBar>, dlText: HTMLElement;
 let sig = "";
 
@@ -26,11 +28,25 @@ function loadLayers() {
 }
 function saveLayers() { try { localStorage.setItem(LAYER_KEY, JSON.stringify(layers)); } catch { /* private mode */ } }
 
-export function mountElevation(mainEl: HTMLElement) {
+export function mountElevation(mainEl: HTMLElement, headEl: HTMLElement) {
   loadLayers();
   root = el("div", { class: "elev-view", hidden: true });
   statusEl = el("span", { class: "row small" });
+  kpiStrip = el("div", { class: "row wrap elev-kpi-strip" });
+  topDlWrap = el("div", { class: "row wrap" });
   nextBtn = btn("Weiter: Export", () => S.cur && go(routePath.project(S.cur.app.id, "export")), { kind: "primary", icon: "chevron", attrs: { "data-primary": "" } });
+
+  // Header & key summary right at the TOP of the workspace!
+  topDlBar = progressBar("Höhendaten werden geladen", "thin");
+  topDlText = el("span", { class: "small muted tnum", "aria-live": "polite" });
+  topDlProg = el("div", { class: "stack-xs", hidden: true }, topDlBar.el, topDlText);
+  topBox = el("div", { class: "panel elev-top stack-s", hidden: true },
+    el("div", { class: "row wrap between" },
+      el("div", { class: "row wrap" }, el("h1", { class: "elev-h1", tabIndex: -1 }, "Höhe"), statusEl, kpiStrip),
+      el("div", { class: "row wrap" }, topDlWrap, nextBtn)),
+    topDlProg);
+  headEl.append(topBox);
+
   notes = el("div", { class: "stack-s" });
   srcBox = el("section", { class: "panel stack", "aria-labelledby": "elev-src-h" });
   legendEl = el("div", { class: "elev-legend", role: "group", "aria-label": "Ebenen des Diagramms" });
@@ -45,22 +61,24 @@ export function mountElevation(mainEl: HTMLElement) {
   });
   emptyEl = el("div", { class: "elev-empty", hidden: true });
   chartBox = el("section", { class: "panel stack", "aria-labelledby": "elev-chart-h" },
-    el("div", { class: "row wrap between" }, el("h3", { id: "elev-chart-h" }, "Höhenprofil der Strecke"),
+    el("div", { class: "row wrap between" }, el("h2", { id: "elev-chart-h" }, "Höhenprofil der Strecke"),
       el("div", { class: "row" }, rangeEl, zoomOut, zoomIn, zoomAll)),
     el("div", { class: "elev-chartwrap" }, chart.el, emptyEl), legendEl,
-    el("p", { class: "small muted" }, "Mausrad, Zwei-Finger-Geste oder die Knöpfe zoomen (bis etwa 200 m Breite), Ziehen verschiebt. Ein Klick springt im Video an die Stelle. Die Deckkraft eines Messpunkts ist das Gewicht, das ihm die Schätzung gegeben hat: kräftige Punkte trägt das Profil, blasse hat es verworfen."));
+    el("div", { class: "row wrap between" },
+      el("span", { class: "small muted" }, "Klick springt im Video · Mausrad zoomt · Ziehen verschiebt"),
+      disclosure("Hilfe zum Diagramm",
+        el("p", { class: "small muted" }, "Mausrad, Zwei-Finger-Geste oder +/− zoomen bis ca. 200 m Breite. Die Deckkraft eines Messpunkts zeigt das Gewicht der Schätzung: kräftige Punkte tragen das Profil, blasse wurden verworfen."))));
   figBox = el("section", { class: "panel stack", "aria-labelledby": "elev-fig-h" });
   stretchBox = el("section", { class: "panel stack", "aria-labelledby": "elev-str-h" });
   attrBox = el("section", { class: "panel stack-s", "aria-labelledby": "elev-attr-h" });
-  root.append(
-    el("div", { class: "row wrap between elev-head" }, el("div", { class: "row wrap" }, el("h2", {}, "Höhe"), statusEl), nextBtn),
-    notes, srcBox, chartBox,
-    el("div", { class: "elev-bottom" }, figBox, stretchBox), attrBox);
+
+  // Chart FIRST right under video+map, then conspicuous stretches + figures, then sources table!
+  root.append(notes, chartBox, el("div", { class: "elev-bottom" }, stretchBox, figBox), srcBox, attrBox);
   mainEl.append(root);
 
   bus.on("stage", (s: string | null) => {
     const on = s === "hoehe";
-    root.hidden = !on;
+    root.hidden = !on; topBox.hidden = !on;
     if (on) void enter(); else { mapMarks.hover(null); mapMarks.stretch(null); }
   });
   bus.on("elevation", () => { if (!root.hidden) update(); });
@@ -74,7 +92,6 @@ export function mountElevation(mainEl: HTMLElement) {
   window.addEventListener("offline", () => { if (!root.hidden) update(); });
 }
 
-/** the stage was opened: the sources (online sizes), the profile (a stale one is computed again) and its diagnostics */
 async function enter() {
   if (!S.cur || !S.result) return;
   update();
@@ -97,7 +114,6 @@ function syncZoom() {
   rangeEl.textContent = E.profile ? `km ${de(v0 / 1000, 2)} bis ${de(v1 / 1000, 2)}` : "";
 }
 
-// ------------------------------------------------------------------ rendering
 function update() {
   if (!S.cur || !S.result) return;
   const d = E.dl;
@@ -106,12 +122,33 @@ function update() {
   renderProgress();
 }
 
-const TONE: Record<string, Tone> = { current: "ok", stale: "warn", missing: "warn", computing: "run", error: "bad" };
 function renderStatus() {
   const st = E.dl.running ? "run" : E.state === "computing" || E.state === "loading" ? "computing" : E.state === "missing" ? "missing" : E.state === "error" ? "error" : E.profile && E.stale ? "stale" : E.profile ? "current" : "computing";
-  const text = { run: "Höhendaten werden geladen …", computing: "Profil wird berechnet …", missing: "Kein Profil: Copernicus-Kacheln fehlen", error: "Profil nicht verfügbar", stale: "Profil veraltet", current: "Profil aktuell" }[st];
-  statusEl.replaceChildren(toneIcon(st === "run" ? "run" : TONE[st] ?? "info"), el("span", {}, text));
-  nextBtn.className = "btn primary";
+  const text = { run: "Höhendaten werden geladen …", computing: "Profil wird berechnet …", missing: "Copernicus-Kacheln fehlen", error: "Profil nicht verfügbar", stale: "Profil veraltet", current: "Profil aktuell" }[st];
+  statusEl.replaceChildren(chip(text, st === "current" ? "ok" : st === "run" || st === "computing" ? "accent" : st === "error" ? "bad" : "warn"));
+
+  // Inline compact KPI chips right in the top bar
+  const p = E.profile, diag = E.diag;
+  kpiStrip.replaceChildren();
+  if (p) {
+    const maxG = diag ? diag.max_grade_pct : maxGrade(p.z, p.ds);
+    kpiStrip.append(
+      chip(`↑ ${de(p.ascent_m, 0)} m`, ""),
+      chip(`↓ ${de(p.descent_m, 0)} m`, ""),
+      chip(`${de(p.min_m, 0)}–${de(p.max_m, 0)} m`, ""),
+      chip(`max. ${de(maxG, 1)} %`, ""));
+  }
+
+  // Prominent top download button whenever data is missing
+  const missing = anythingMissing(), offline = !navigator.onLine, d = E.dl;
+  topDlWrap.replaceChildren();
+  if (missing && !d.running) {
+    const size = ` (${E.dem?.exact && !(E.dem?.extras?.missing_blocks) ? "" : "ca. "}${fmtBytes(missingBytes())})`;
+    topDlWrap.append(btn(`Höhendaten laden${size}`, () => void startDownload(), { kind: !offline && E.state === "missing" ? "primary" : undefined, icon: "download", disabled: offline }));
+  } else if (d.running) {
+    topDlWrap.append(btn("Download abbrechen", () => void cancelDownload(), { kind: "danger", size: "sm" }));
+  }
+  nextBtn.className = `btn${missing && !offline && E.state === "missing" ? "" : " primary"}`;
 }
 
 function renderAll() {
@@ -127,12 +164,11 @@ function renderAll() {
 function renderNotes() {
   notes.replaceChildren();
   if (E.state === "error") notes.append(banner("bad", `Das Höhenprofil konnte nicht berechnet werden: ${E.error ?? "unbekannter Fehler"}`));
-  if (E.profile && E.stale && E.state === "ready") notes.append(banner("info", "Das Profil stammt von einer älteren Version der Berechnung oder aus anderen Höhendaten und wird neu berechnet."));
-  if (E.profile && !E.profile.diag && !E.dl.running) notes.append(banner("info", "Zu diesem Profil gibt es keine Diagnosedaten (es wurde mit einer älteren Pipeline erstellt). Quellen, Vergleich mit P13 und Gewichte erscheinen nach der nächsten Berechnung."));
+  if (E.profile && E.stale && E.state === "ready") notes.append(banner("info", "Das Profil stammt von einer älteren Version oder anderen Höhendaten und wird neu berechnet."));
+  if (E.profile && !E.profile.diag && !E.dl.running) notes.append(banner("info", "Zu diesem Profil gibt es noch keine Diagnosedaten (ältere Pipeline). Quellen, P13-Vergleich und Gewichte erscheinen nach der nächsten Berechnung."));
   if (E.diagError && E.profile) notes.append(banner("warn", `Diagnosedaten nicht gelesen: ${E.diagError}`));
 }
 
-// ---- sources and download
 interface Row { name: string; title: string; region: string; licence: string; have: number; total: number; bytes: number; exact: boolean; used: boolean; note: string }
 function rows(): Row[] {
   const dem = E.dem;
@@ -167,7 +203,6 @@ function renderSources() {
     });
     srcBox.append(el("div", { class: "table-wrap" }, el("table", { class: "src-table" }, el("thead", {}, el("tr", {}, ...head)), el("tbody", {}, ...body))));
   }
-  // download
   dlBar = progressBar("Höhendaten werden geladen"); dlBar.el.hidden = true;
   dlText = el("span", { class: "small muted tnum", "aria-live": "polite" });
   const d = E.dl, missing = anythingMissing(), offline = !navigator.onLine;
@@ -175,34 +210,40 @@ function renderSources() {
   const go1 = btn(`Höhendaten laden${size}`, () => void startDownload(), { kind: missing && !offline ? "primary" : undefined, icon: "download", disabled: !missing || d.running || offline });
   const cancel = btn("Abbrechen", () => void cancelDownload(), { kind: "danger", size: "sm" });
   cancel.hidden = !d.running;
-  const line = el("div", { class: "row wrap" }, go1, cancel, dlText);
-  srcBox.append(line, dlBar.el);
+  srcBox.append(el("div", { class: "row wrap" }, go1, cancel, dlText), dlBar.el);
   if (d.error) srcBox.append(el("div", { class: "err small", role: "alert" }, `Fehler beim Laden: ${d.error}`));
   else if (d.cancelled) srcBox.append(el("div", { class: "small muted" }, "Abgebrochen. Das Profil wird aus den vorhandenen Daten berechnet."));
   else if (d.note) srcBox.append(el("div", { class: "small muted" }, d.note));
   if (dem && !missing) srcBox.append(el("p", { class: "small muted" }, "Alle Höhendaten für diese Strecke sind vorhanden."));
-  else if (dem && offline) srcBox.append(el("p", { class: "small muted" }, "Keine Verbindung: Das Profil wird aus den vorhandenen Daten berechnet. Es fehlen noch Daten dieser Quellen. Zum Laden brauchst du das Netz."));
-  else if (dem) srcBox.append(el("p", { class: "small muted" }, "Auch ohne Download wird das Profil aus den vorhandenen Daten berechnet; fehlende Quellen machen es an manchen Stellen ungenauer. Nach dem Laden wird es neu berechnet."));
+  else if (dem && offline) srcBox.append(el("p", { class: "small muted" }, "Keine Verbindung: Zum Laden fehlender Quellen wird das Netz benötigt."));
+  else if (dem) srcBox.append(el("p", { class: "small muted" }, "Nach dem Laden wird das Profil automatisch neu berechnet."));
 }
 
 function renderProgress() {
   if (!dlBar) return;
   const d = E.dl;
-  dlBar.el.hidden = !d.running && E.state !== "computing";
+  const active = d.running || E.state === "computing";
+  dlBar.el.hidden = !active;
+  topDlProg.hidden = !active;
   if (d.running) {
-    dlBar.set(d.total ? (100 * (d.index + d.bytes / d.total)) / Math.max(1, d.of) : d.of ? (100 * d.index) / d.of : null);
-    dlText.textContent = !d.of && !d.bytes ? "Verbinde …" : d.extra ? `Genauere Höhendaten: ${fmtBytes(d.bytes)} (Block ${d.index} von ${d.of})` : `${fmtBytes(d.bytes)}${d.total ? ` von ${fmtBytes(d.total)}` : ""} (Kachel ${d.index + 1} von ${d.of})`;
-  } else if (E.state === "computing") { dlBar.set(null); dlText.textContent = "Profil wird berechnet …"; }
-  else dlText.textContent = "";
+    const pct = d.total ? (100 * (d.index + d.bytes / d.total)) / Math.max(1, d.of) : d.of ? (100 * d.index) / d.of : null;
+    const msg = !d.of && !d.bytes ? "Verbinde …" : d.extra ? `Genauere Höhendaten: ${fmtBytes(d.bytes)} (Block ${d.index} von ${d.of})` : `${fmtBytes(d.bytes)}${d.total ? ` von ${fmtBytes(d.total)}` : ""} (Kachel ${d.index + 1} von ${d.of})`;
+    dlBar.set(pct); dlText.textContent = msg;
+    topDlBar.set(pct); topDlText.textContent = msg;
+  } else if (E.state === "computing") {
+    dlBar.set(null); dlText.textContent = "Profil wird berechnet …";
+    topDlBar.set(null); topDlText.textContent = "Profil wird berechnet …";
+  } else {
+    dlText.textContent = ""; topDlText.textContent = "";
+  }
 }
 
-// ---- chart
 function renderChart() {
   const p = E.profile;
   emptyEl.hidden = !!p;
   chart.el.hidden = !p;
   if (!p) {
-    emptyEl.replaceChildren(E.state === "missing" ? el("div", {}, "Für diese Strecke fehlen die Copernicus-Kacheln. Lade die Höhendaten oben, dann erscheint das Profil.")
+    emptyEl.replaceChildren(E.state === "missing" ? el("div", {}, "Für diese Strecke fehlen die Copernicus-Kacheln. Klicke oben auf „Höhendaten laden“, dann erscheint das Profil.")
       : E.state === "error" ? el("div", {}, "Das Profil ist nicht verfügbar.") : el("div", { class: "row center" }, icon("spinner", "spin"), "Profil wird berechnet …"));
   }
   chart.setData(p, E.diag);
@@ -226,37 +267,35 @@ function renderLegend() {
     const c = el("input", { type: "checkbox", checked: layers.src[s.name] !== false, onchange: () => { layers.src[s.name] = c.checked; saveLayers(); chart.setLayers(layers); } });
     legendEl.append(el("label", { class: "check small elev-lg" }, c, sw("dot", `--c:${srcColour(s.colour)}`), el("span", {}, `Messpunkte ${s.title.replace(/ \(.*\)$/, "")}`)));
   }
-  legendEl.append(item("tunnel", "Tunnel und Brücken (interpoliert)", sw("band hint")), item("filled", "Copernicus aufgefüllt", sw("band warn")), item("rug", "Geländeunruhe", sw("rug")),
+  legendEl.append(item("tunnel", "Tunnel & Brücken", sw("band hint")), item("filled", "Copernicus aufgefüllt", sw("band warn")), item("rug", "Geländeunruhe", sw("rug")),
     item("grade", `Steigung (${GRADE_LABEL.map((l, i) => `${["grün", "gelb", "orange", "rot"][i]} ${l}`).join(", ")})`, el("span", { class: "elev-grade" }, ...GRADE_TOKENS.map((t) => el("i", { class: "elev-sw g", style: `--c:${token(t, "#888")}` })))));
 }
 
-// ---- key figures
 function renderFigures() {
-  figBox.replaceChildren(el("h3", { id: "elev-fig-h" }, "Kennzahlen"));
+  figBox.replaceChildren(el("h3", { id: "elev-fig-h" }, "Kennzahlen & Verfahren"));
   const p = E.profile, d = E.diag;
   if (!p) { figBox.append(el("p", { class: "muted small" }, "Noch kein Profil.")); return; }
   const maxG = d ? d.max_grade_pct : maxGrade(p.z, p.ds);
   const fig = (v: string, l: string) => el("div", { class: "ride-box" }, el("div", { class: "ride-v mono tnum" }, v), el("div", { class: "ride-l" }, l));
   figBox.append(el("div", { class: "elev-figs" },
-    fig(`${de(p.ascent_m, 0)} m`, "Anstieg"), fig(`${de(p.descent_m, 0)} m`, "Abstieg"), fig(`${de(p.min_m, 0)} m`, "tiefster Punkt"), fig(`${de(p.max_m, 0)} m`, "höchster Punkt"), fig(`${de(maxG, 1)} %`, "größte Steigung (50 m)")));
+    fig(`${de(p.ascent_m, 0)} m`, "Anstieg"), fig(`${de(p.descent_m, 0)} m`, "Abstieg"), fig(`${de(p.min_m, 0)} m`, "tiefster Punkt"), fig(`${de(p.max_m, 0)} m`, "höchster Punkt"), fig(`${de(maxG, 1)} %`, "max. Steigung (50 m)")));
   if (!d) return;
   const dl = el("dl", { class: "elev-dl small" });
   const add = (k: string, v: string) => dl.append(el("dt", {}, k), el("dd", {}, v));
-  add("Verfahren", `robust mit mehreren Quellen auf ${de(d.strategy_share.robust * 100, 0)} % der Strecke, nur Copernicus (P13) auf ${de(d.strategy_share.p13 * 100, 0)} %`);
+  add("Verfahren", `robust mit mehreren Quellen auf ${de(d.strategy_share.robust * 100, 0)} %, nur Copernicus (P13) auf ${de(d.strategy_share.p13 * 100, 0)} %`);
   const src = d.sources.map((s) => `${s.title.replace(/ \(.*\)$/, "")} ${de((d.source_share[s.name] ?? 0) * 100, 0)} %`).join(", ");
   add("Anteil der Quellen", src);
   const diff = p.ascent_m - d.ascent_p13_m;
-  add("Vergleich mit P13", d.strategy_share.robust < 0.005 ? "gleich (keine weiteren Quellen im Profil)" : `Anstieg ${diff >= 0 ? "+" : "−"}${de(Math.abs(diff), 0)} m gegenüber nur Copernicus (P13: ${de(d.ascent_p13_m, 0)} m)`);
+  add("Vergleich mit P13", d.strategy_share.robust < 0.005 ? "gleich (keine weiteren Quellen)" : `Anstieg ${diff >= 0 ? "+" : "−"}${de(Math.abs(diff), 0)} m gegenüber P13 (${de(d.ascent_p13_m, 0)} m)`);
   figBox.append(dl);
 }
 
-// ---- conspicuous stretches
 function renderStretches() {
   stretchBox.replaceChildren(el("h3", { id: "elev-str-h" }, "Auffällige Stellen"));
   const p = E.profile, d = E.diag;
   if (!p) { stretchBox.append(el("p", { class: "muted small" }, "Noch kein Profil.")); return; }
   const list: Stretch[] = [...(d ? topDifferences(p.z, d.z_p13, p.ds, p.s0, 5) : []), ...steepStretches(p.z, p.ds, p.s0, 12)].sort((a, b) => a.a - b.a);
-  if (!list.length) { stretchBox.append(el("p", { class: "small muted" }, d ? "Keine auffälligen Stellen: Das Profil weicht nirgends deutlich von P13 ab, und nirgends ist es steiler als 12 %." : "Keine Stelle ist steiler als 12 %.")); return; }
+  if (!list.length) { stretchBox.append(el("p", { class: "small muted" }, d ? "Keine auffälligen Stellen (> 12 % oder deutliche Abweichung von P13)." : "Keine Stelle ist steiler als 12 %.")); return; }
   const ul = el("ul", { class: "elev-str" });
   for (const s of list) {
     const km = `km ${de(s.a / 1000, 2)}${s.b - s.a > 30 ? `–${de(s.b / 1000, 2)}` : ""}`;
@@ -276,4 +315,3 @@ function renderAttribution() {
   attrBox.append(el("p", { class: "small" }, used.length ? `Im Profil verwendet: ${used.map((s) => `${s.title} (${s.licence})`).join("; ")}.` : p.source),
     el("p", { class: "small muted wrap-any" }, p.attribution));
 }
-

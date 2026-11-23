@@ -24,7 +24,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--c-accent); 
 .nowrap { white-space: nowrap; }
 .wrap-any { overflow-wrap: anywhere; } .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ok-text { color: var(--c-ok); } .warn-text { color: var(--c-warn); } .bad-text { color: var(--c-bad); }
-.stack { display: flex; flex-direction: column; gap: var(--sp-3); } .stack-s { display: flex; flex-direction: column; gap: var(--sp-2); }
+.stack { display: flex; flex-direction: column; gap: var(--sp-3); } .stack-s { display: flex; flex-direction: column; gap: var(--sp-2); } .stack-xs { display: flex; flex-direction: column; gap: var(--sp-1); }
 .row { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .row.wrap { flex-wrap: wrap; } .row.center { justify-content: center; } .row.end { justify-content: flex-end; } .row.between { justify-content: space-between; }
 .row.end-align { align-items: flex-end; } .row.top-align { align-items: flex-start; } .row.gap-l { gap: var(--sp-5); }

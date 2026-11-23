@@ -1,7 +1,4 @@
-// "Ortsangaben" in the result view: at the current video time the user drags a frame on the map ("the camera was inside it then").
-// The anchors are stored in the project (app.anchors), drawn on the map, listed with their time (click: seek), and a rerun takes them
-// into account (pipeline --anchors; only route_search and later steps are computed again). "Ab Schritt … neu berechnen" forces a
-// rerun from a chosen step and reuses the steps before it. Off the ride path: pointer for drawing, standard controls otherwise.
+// "Ortsangaben" inside the collapsible "Route anpassen & korrigieren" panel of Ergebnis.
 import L from "leaflet";
 import { addAnchor, anchorReport, anchorReportDe, fmtT, normalizeAnchors, removeAnchor, rerunChoices, sameAnchors, type Anchor } from "./anchors";
 import { go, routePath } from "./app/router";
@@ -10,12 +7,12 @@ import { normBox } from "./frames";
 import { getMap } from "./mapPanel";
 import { STEPS, S, bus, saveCur, toast } from "./state";
 import type { Bbox, StepId } from "./types";
-import { banner, btn, iconBtn } from "./ui/components";
-import { el } from "./util";
+import { banner, btn, disclosure, iconBtn } from "./ui/components";
+import { el, fmtSize } from "./util";
 import { getPlayer } from "./videoPanel";
 
 const COLOR = "#ea580c";
-const MIN_DEG = 0.0002; // about 20 m: smaller drags are a click, not a frame
+const MIN_DEG = 0.0002;
 let root: HTMLElement, list: HTMLElement, report: HTMLElement, drawBtn: HTMLButtonElement, rerunBtn: HTMLButtonElement, stepSel: HTMLSelectElement, stepBtn: HTMLButtonElement, hint: HTMLElement;
 let layer: L.LayerGroup | null = null;
 let curT = 0;
@@ -37,18 +34,19 @@ async function setAnchors(a: Anchor[]) {
 }
 
 export function mountAnchors(container: HTMLElement) {
-  drawBtn = btn("Ort festlegen", () => toggleDraw(), { size: "sm", attrs: { "aria-pressed": "false" } });
-  hint = el("p", { class: "small muted" }, "Video an die Stelle spulen, „Ort festlegen“ wählen und auf der Karte einen Rahmen ziehen: Dort war die Kamera zu dieser Videozeit.");
+  drawBtn = btn("Ort festlegen", () => toggleDraw(), { size: "sm", icon: "pin", attrs: { "aria-pressed": "false" } });
+  hint = el("p", { class: "small muted" }, "Video an eine bekannte Stelle spulen, „Ort festlegen“ klicken und einen Rahmen auf der Karte ziehen.");
   list = el("ul", { class: "anchor-list stack-s", "aria-label": "Ortsangaben" });
   report = el("div", {});
   rerunBtn = btn("Mit Ortsangaben neu berechnen", () => void rerun(null), { kind: "primary", size: "sm" });
   stepSel = el("select", { "aria-label": "Ab welchem Schritt neu berechnen" }) as HTMLSelectElement;
   stepBtn = btn("Neu berechnen", () => void rerun((stepSel.value || null) as StepId | null), { size: "sm" });
-  root = el("section", { class: "anchors stack-s", "aria-label": "Ortsangaben" },
+  const advStep = disclosure("Erweitert: ab bestimmtem Schritt neu berechnen",
+    el("div", { class: "row wrap small" }, el("label", {}, "Ab Schritt ", stepSel), stepBtn),
+    el("p", { class: "help" }, "Schritte davor werden aus dem letzten Lauf übernommen und nicht neu gerechnet."));
+  root = el("section", { class: "anchors adjust-sec stack-s", "aria-label": "Ortsangaben" },
     el("div", { class: "row wrap between" }, el("h2", { class: "label" }, "Ortsangaben"), el("div", { class: "row wrap" }, drawBtn, rerunBtn)),
-    hint, list, report,
-    el("div", { class: "row wrap small" }, el("label", {}, "Ab Schritt ", stepSel), stepBtn,
-      el("span", { class: "muted" }, "Die Schritte davor werden aus dem letzten Lauf übernommen, nicht neu berechnet.")));
+    hint, list, report, advStep);
   container.append(root);
   bus.on("time", (t: number) => { curT = t; if (drawing) setDrawLabel(); });
   for (const ev of ["project", "result", "run", "runtick"]) bus.on(ev, () => { render(); if (ev !== "runtick") drawOnMap(); });
@@ -61,7 +59,6 @@ function initMap() {
   if (!map) { setTimeout(initMap, 200); return; }
   layer = L.layerGroup().addTo(map);
   const c = map.getContainer();
-  // a drag that drew an anchor must not also act as a click on the route (that would move the video)
   c.addEventListener("click", (e) => { if (suppressClick) { suppressClick = false; e.stopPropagation(); } }, true);
   map.on("mousedown", (e: L.LeafletMouseEvent) => {
     if (!drawing) return;
@@ -86,7 +83,7 @@ function initMap() {
   drawOnMap();
 }
 
-function setDrawLabel() { drawBtn.querySelector("span")!.textContent = drawing ? `Rahmen für ${fmtT(curT)} ziehen … (Esc bricht ab)` : "Ort festlegen"; }
+function setDrawLabel() { drawBtn.querySelector("span")!.textContent = drawing ? `Rahmen für ${fmtT(curT)} ziehen … (Esc)` : "Ort festlegen"; }
 
 function toggleDraw() { if (drawing) stopDraw(); else startDraw(); }
 function startDraw() {
@@ -119,7 +116,6 @@ function drawOnMap() {
   }
 }
 
-/** finished steps of the last run (for the choice of the rerun step) */
 function finished(): Partial<Record<StepId, boolean>> {
   const o: Partial<Record<StepId, boolean>> = {};
   for (const s of STEPS) o[s.id] = ["done", "skipped"].includes(S.run.steps[s.id].state) || (!!S.result && !S.run.started);
@@ -133,19 +129,21 @@ function render() {
   if (!app) return;
   if (lk && drawing) stopDraw();
   drawBtn.disabled = lk;
-  list.replaceChildren(...a.map((x, i) => el("li", { class: "row" },
-    btn(`${fmtT(x.t)}`, () => { seekTo(x.t); getMap()?.fitBounds([[x.bbox[0], x.bbox[1]], [x.bbox[2], x.bbox[3]]], { maxZoom: 17, padding: [60, 60] }); }, { size: "sm", attrs: { title: "Video zu dieser Zeit spulen und den Rahmen zeigen", "aria-label": `Ortsangabe ${fmtT(x.t)}: Video hierhin spulen` } }),
-    el("span", { class: "small muted tnum" }, `${x.bbox[0].toFixed(4)}, ${x.bbox[1].toFixed(4)} – ${x.bbox[2].toFixed(4)}, ${x.bbox[3].toFixed(4)}`),
-    iconBtn("trash", `Ortsangabe ${fmtT(x.t)} löschen`, () => { if (!locked()) void setAnchors(removeAnchor(anchors(), i)); }, { disabled: lk }))));
-  if (!a.length) list.append(el("li", { class: "small muted" }, "Noch keine Ortsangaben."));
+  list.replaceChildren(...a.map((x, i) => {
+    const coords = `${x.bbox[0].toFixed(4)}, ${x.bbox[1].toFixed(4)} – ${x.bbox[2].toFixed(4)}, ${x.bbox[3].toFixed(4)}`;
+    return el("li", { class: "row" },
+      btn(`${fmtT(x.t)}`, () => { seekTo(x.t); getMap()?.fitBounds([[x.bbox[0], x.bbox[1]], [x.bbox[2], x.bbox[3]]], { maxZoom: 17, padding: [60, 60] }); }, { size: "sm", attrs: { title: "Video zu dieser Zeit spulen und Rahmen zeigen", "aria-label": `Ortsangabe ${fmtT(x.t)}: Video hierhin spulen` } }),
+      el("span", { class: "small muted tnum", title: coords }, `Rahmen ${fmtSize(x.bbox)}`),
+      iconBtn("trash", `Ortsangabe ${fmtT(x.t)} löschen`, () => { if (!locked()) void setAnchors(removeAnchor(anchors(), i)); }, { disabled: lk }));
+  }));
+  list.hidden = !a.length;
   const changed = !sameAnchors(a, app.last_run?.anchors);
-  rerunBtn.disabled = lk || !app.last_run || (!a.length && !app.last_run?.anchors?.length) || !changed;
-  rerunBtn.title = !changed ? "Die Ortsangaben sind seit dem letzten Lauf unverändert." : "Nur die Routensuche und die folgenden Schritte werden neu berechnet.";
-  // what the last run did with the anchors
+  rerunBtn.hidden = !changed;
+  rerunBtn.disabled = lk || !app.last_run || !changed;
   const rep = anchorReport(S.result?.project?.steps?.route_search?.summary?.anchors ?? S.result?.project?.anchors);
   report.replaceChildren();
-  if (rep) report.append(rep.dropped.length ? banner("warn", anchorReportDe(rep), ". Ein nicht erfüllbarer Rahmen passt zu keiner Route dieses Videos zusammen mit den anderen; bitte Zeit und Rahmen prüfen.") : el("p", { class: "small" }, anchorReportDe(rep) + "."));
-  // rerun from a step
+  if (rep) report.append(rep.dropped.length ? banner("warn", anchorReportDe(rep), ". Ein nicht erfüllbarer Rahmen passt zu keiner Route zusammen mit den anderen; bitte Zeit und Rahmen prüfen.") : el("p", { class: "small" }, anchorReportDe(rep) + "."));
+
   const ch = rerunChoices(finished());
   const key = ch.join(",");
   if (stepSel.dataset.key !== key) {

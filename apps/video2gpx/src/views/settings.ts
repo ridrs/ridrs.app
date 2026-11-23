@@ -1,4 +1,4 @@
-// Einstellungen: Import-Vorlagen, Werkzeuge, Darstellung, Ortssuche, Entwickler, Über.
+// Einstellungen: everyday preferences upfront (Darstellung, Ortssuche, Werkzeuge), then Import-Vorlagen, Entwickler & Über.
 import { api } from "../api";
 import { routePath } from "../app/router";
 import { getTheme, setTheme, type Theme } from "../app/theme";
@@ -31,16 +31,21 @@ export function mountSettings(r: HTMLElement) {
   aboutEl = el("div", { class: "stack" });
   devEl = el("div", {});
   const theme = segmented<Theme>("Darstellung", [["system", "System"], ["light", "Hell"], ["dark", "Dunkel"]], getTheme(), (t) => setTheme(t));
+  theme.el.classList.add("fill");
   const suggest = el("input", { type: "checkbox", id: uid("sg"), onchange: (e: Event) => void save({ suggest_online: (e.target as HTMLInputElement).checked }) });
   r.append(el("div", { class: "page narrow" },
     el("h1", {}, "Einstellungen"),
+    el("div", { class: "settings-grid" },
+      section("Darstellung",
+        el("div", { class: "field" }, el("div", { class: "label-text", id: "theme-l" }, "Farbschema"), theme.el),
+        el("p", { class: "help" }, "„System“ folgt den Systemeinstellungen.")),
+      section("Ortssuche & Werkzeuge",
+        el("label", { class: "check" }, suggest, " Suchrahmen aus dem Videotitel vorschlagen"),
+        el("p", { class: "help" }, "Fragt Nominatim (online) nach dem Ort im Videotitel, wenn noch kein Suchrahmen existiert."),
+        el("div", {}, el("a", { href: routePath.tools, class: "small" }, "Werkzeuge prüfen & Pfade konfigurieren →")))),
     section("Import-Vorlagen",
-      el("p", {}, "Eine Vorlage ist ein Befehl mit Platzhaltern. video2gpx setzt die Adresse oder den Pfad für ", ph("{input}"), " und den Import-Ordner des Projekts für ", ph("{out}"), " ein und führt den Befehl erst aus, wenn du auf „Importieren“ klickst."),
-      el("p", { class: "help" }, RESPONSIBILITY),
+      el("p", { class: "small muted" }, "Befehle mit den Platzhaltern ", ph("{input}"), " (Adresse/Pfad) und ", ph("{out}"), " (Import-Ordner). ", RESPONSIBILITY),
       defaultsEl, tplList, el("div", {}, btn("Neue Vorlage …", () => openEditor(null), { icon: "edit" })), editorHost, historyEl),
-    section("Werkzeuge", el("p", {}, "ffmpeg und ffprobe sind nötig, yt-dlp nur für Vorlagen, die es aufrufen. Prüfen, installieren und eigene Pfade: ", el("a", { href: routePath.tools }, "Werkzeuge öffnen"), ".")),
-    section("Darstellung", el("div", { class: "field" }, el("div", { class: "label-text", id: "theme-l" }, "Farben"), theme.el), el("p", { class: "help" }, "„System“ folgt der Einstellung von macOS.")),
-    section("Ortssuche", el("label", { class: "check" }, suggest, " Suchrahmen automatisch aus dem Videotitel vorschlagen"), el("p", { class: "help" }, "Schickt den Titel des Videos an Nominatim (OpenStreetMap, online), wenn ein Projekt noch keinen Suchrahmen hat.")),
     section("Entwickler", devEl),
     section("Über", aboutEl)));
   theme.el.setAttribute("aria-labelledby", "theme-l");
@@ -57,10 +62,9 @@ export function showSettings() {
   bus.emit("settings");
 }
 
-const section = (title: string, ...body: (Node | string)[]) => el("section", { class: "panel stack", "aria-labelledby": `set-${title}` }, el("h2", { id: `set-${title}` }, title), ...body);
+const section = (title: string, ...body: (Node | string)[]) => el("section", { class: "panel stack", "aria-labelledby": `set-${title.replace(/\W+/g, "-")}` }, el("h2", { id: `set-${title.replace(/\W+/g, "-")}` }, title), ...body);
 const ph = (t: string) => el("span", { class: "ph mono" }, t);
 
-// ---------------------------------------------------------------- templates
 function renderTemplates() {
   if (!root || !S.settings) return;
   const st = settingsOf();
@@ -71,13 +75,13 @@ function renderTemplates() {
       el("option", { value: "", selected: !opts.some((t) => t.id === cur) }, opts.length ? "keine" : "keine passende Vorlage"), ...opts.map((t) => el("option", { value: t.id, selected: t.id === cur }, t.name)));
     return field(label, s).el;
   };
-  defaultsEl.replaceChildren(sel("url", "Für Adressen (URLs)"), sel("path", "Für Dateien zum Kopieren"));
+  defaultsEl.replaceChildren(sel("url", "Standard für Adressen (URLs)"), sel("path", "Standard zum Kopieren"));
   tplList.replaceChildren(...templates.map(tplRow));
   if (!templates.length) tplList.append(el("li", { class: "muted" }, "Keine Vorlagen."));
   const hist = settings().import_history ?? [];
   historyEl.replaceChildren();
   if (hist.length) historyEl.append(disclosure(`Frühere Befehle (${hist.length})`,
-    el("p", { class: "help" }, "Befehle aus dem früheren Import-Dialog. Übernimm einen als Vorlage und ersetze darin die Adresse oder den Pfad durch {input} und den Zielordner durch {out}."),
+    el("p", { class: "help" }, "Befehle aus früheren Imports — übernimm einen als Vorlage und ersetze Zieladresse und Ordner durch {input} und {out}."),
     el("ul", { class: "rows" }, ...hist.map((c) => el("li", { class: "data-row" }, el("code", { class: "mono grow wrap-any" }, c), btn("Als Vorlage übernehmen", () => openEditor({ id: "", name: "", template: c, builtin: false, accepts: "any", tool: null }), { size: "sm" }))))));
 }
 
@@ -101,7 +105,6 @@ async function removeTpl(t: ImportTemplate) {
 
 const toolFor = (cmd: string): ToolId | null => { const p = cmd.trim().split(/\s+/)[0]?.split("/").pop() ?? ""; return p === "yt-dlp" || p === "ffmpeg" || p === "ffprobe" ? p : null; };
 
-/** the editor: name, command with placeholder buttons, input kind, live preview from the backend (importPreview) */
 function openEditor(t: ImportTemplate | null) {
   const editing = t && t.id ? t : null;
   const name = el("input", { type: "text", value: t?.name ?? "", autocomplete: "off" });
@@ -121,7 +124,6 @@ function openEditor(t: ImportTemplate | null) {
     const r = await api.importPreview(cmd.value, sample.value).catch((e) => ({ display: "", errors: [String(e)], warnings: [], tool: null }));
     out.set(r.display);
     const dup = templates.some((x) => x.name.trim().toLowerCase() === name.value.trim().toLowerCase() && x.id !== editing?.id);
-    // a missing program or a sample that does not fit do not make the template wrong: notes, not errors
     const soft = (e: string) => /Programm nicht gefunden|Adresse|Dateipfad|eingeben/.test(e);
     problems = [...(name.value.trim() ? [] : ["Bitte einen Namen eingeben."]), ...(dup ? ["Der Name ist schon vergeben."] : []), ...r.errors.filter((e) => !soft(e))];
     const notes = [...r.errors.filter(soft), ...(r.warnings ?? [])];
@@ -153,7 +155,6 @@ function openEditor(t: ImportTemplate | null) {
   preview();
 }
 
-// ---------------------------------------------------------------- developer, about
 function renderDev() {
   const s = { ...settings() };
   const f = (label: string, key: "python" | "rsm_dir" | "sidecar", help: string) => {
@@ -162,10 +163,10 @@ function renderDev() {
   };
   const fields = el("div", { class: "stack", hidden: !s.dev_mode },
     f("Python-Interpreter", "python", "Muss „rsm.pipeline“ importieren können. Standard: .venv des Forschungspakets."),
-    f("Pipeline-Ordner (rsm)", "rsm_dir", "Ordner mit dem Paket „rsm“ (Arbeitsverzeichnis und PYTHONPATH)."),
+    f("Pipeline-Ordner (rsm)", "rsm_dir", "Ordner mit dem Paket „rsm“."),
     f("Anderes Sidecar (optional)", "sidecar", "Ausführbare Datei eines PyInstaller-Sidecars. Leer = Python."));
   const cb = el("input", { type: "checkbox", checked: s.dev_mode, onchange: async () => { fields.hidden = !cb.checked; await save({ dev_mode: cb.checked }); await recheck(); } });
-  const d = disclosure("Entwicklermodus", el("label", { class: "check" }, cb, " Externes Python statt der eingebauten Pipeline (nur zum Entwickeln der Pipeline)"), fields);
+  const d = disclosure("Entwicklermodus", el("label", { class: "check" }, cb, " Externes Python statt der eingebauten Pipeline (nur zum Entwickeln)"), fields);
   d.open = s.dev_mode;
   devEl.replaceChildren(d);
 }
@@ -176,10 +177,10 @@ function renderAbout() {
   const e = S.env, p = e?.pipeline;
   aboutEl.replaceChildren(
     el("dl", { class: "facts" },
-      el("dt", {}, "Berechnung"), el("dd", {}, p ? `${p.mode === "sidecar" ? "eingebaut" : "externes Python (Entwicklermodus)"} · Version ${p.version ?? "unbekannt"}` : "wird geprüft …"),
+      el("dt", {}, "Berechnung"), el("dd", {}, p ? `${p.mode === "sidecar" ? "eingebaut" : "externes Python"} · Version ${p.version ?? "unbekannt"}` : "wird geprüft …"),
       el("dt", {}, "Code-Hash"), el("dd", { class: "mono" }, p?.code_hash ?? "–"),
       el("dt", {}, "Datenordner"), el("dd", { class: "mono wrap-any" }, e?.data_dir ?? "–")),
     el("div", { class: "row wrap" }, btn(isMac ? "Datenordner im Finder zeigen" : "Datenordner im Dateimanager zeigen", () => void api.reveal(e?.data_dir ?? ""), { size: "sm", icon: "folder", disabled: !e })),
-    !e || (e.python.ok && e.rsm.ok) ? el("p", { class: "help" }, "Kartendaten © OpenStreetMap-Mitwirkende (ODbL). Höhendaten: Copernicus DEM GLO-30, wo geladen zusätzlich nationale und regionale Geländemodelle (IGN, INGV, Südtirol, swisstopo, BEV, Bayern, Hessen, NRW, NASADEM; Liste unter Kartendaten › Höhendaten). Lizenzen der mitgelieferten Bibliotheken: THIRD-PARTY-NOTICES im Programmpaket.")
+    !e || (e.python.ok && e.rsm.ok) ? el("p", { class: "help" }, "Kartendaten © OpenStreetMap-Mitwirkende (ODbL). Höhendaten: Copernicus DEM GLO-30 sowie nationale/regionale Geländemodelle. Lizenzen: THIRD-PARTY-NOTICES im Programmpaket.")
       : banner("bad", "Die Berechnung ist nicht verfügbar. Einzelheiten unter Werkzeuge."));
 }

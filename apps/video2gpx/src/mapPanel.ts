@@ -106,7 +106,9 @@ export function initMapPanel(root: HTMLElement) {
   document.addEventListener("click", (e) => { if (!(e.target as HTMLElement).closest(".search")) resultsEl.hidden = true; });
 
   bus.on("project", (app: ProjectApp | null) => void onProject(app));
-  bus.on("result", drawRoute);
+  bus.on("result", () => { drawRoute(); renderLegend(); });
+  bus.on("stage", (s: string | null) => { curStage = s; renderLegend(); });
+  bus.on("bbox", renderLegend);
   bus.on("time", (t: number) => { lastT = t; const pts = S.result?.points; if (pts && routeVisible()) { const p = pointAt(pts, t); placeMarker(p); followMarker(p); } });
   bus.on("run", drawFrames);
   // after a window resize or a change of stage Leaflet must learn the new size (the frames are not tied to the view)
@@ -204,6 +206,7 @@ let follow = true;
 try { follow = localStorage.getItem(FOLLOW_KEY) !== "0"; } catch { /* private mode */ }
 let followBox: HTMLElement | null = null;
 let lastT = 0;
+let curStage: string | null = null;
 function followToggle(): HTMLElement {
   if (followBox) return followBox;
   const cb = el("input", { type: "checkbox", checked: follow, onchange: () => {
@@ -219,9 +222,17 @@ function followToggle(): HTMLElement {
 function renderLegend() {
   legendEl.replaceChildren();
   const sw = (cls: string, color: string, label: string) => el("span", { class: "lg" }, el("i", { class: `sw ${cls}`, style: `--c:${color}` }), label);
-  legendEl.append(
-    sw("box", FRAME_STYLE.search.color, "Suchrahmen"), sw("box", FRAME_STYLE.start.color, "Start"), sw("box", FRAME_STYLE.end.color, "Ende"),
-    sw("dash", HINT_COLOR, "Vermutete Strecke (Hinweis)"), sw("line", CONF_COLORS.high, "Route des Ergebnisses"), followToggle());
+  const playback = curStage === "ergebnis" || curStage === "analyse" || curStage === "hoehe";
+  if (playback) {
+    legendEl.append(sw("line", CONF_COLORS.high, "Route"), sw("line", CONF_COLORS.mid, "mittel"), sw("line", CONF_COLORS.low, "gering"));
+    if (S.hint) legendEl.append(sw("dash", HINT_COLOR, "Hinweis"));
+    legendEl.append(followToggle());
+  } else {
+    legendEl.append(sw("box", FRAME_STYLE.search.color, "Suchrahmen"));
+    if (S.startFrame) legendEl.append(sw("box", FRAME_STYLE.start.color, "Start"));
+    if (S.endFrame) legendEl.append(sw("box", FRAME_STYLE.end.color, "Ende"));
+    if (S.hint) legendEl.append(sw("dash", HINT_COLOR, "Streckenhinweis"));
+  }
 }
 
 // ---------- route hint ----------

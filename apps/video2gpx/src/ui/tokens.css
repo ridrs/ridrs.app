@@ -1,12 +1,12 @@
-/* Design tokens (plan-ui 5.1–5.3). Only custom properties. Contrast of text tokens >= 4.5:1 on bg, surface and surface-2. */
+/* Design tokens. Only custom properties. Contrast of text tokens >= 4.5:1 on bg, surface and surface-2. */
 :root {
   color-scheme: light;
-  --c-bg: #f5f5f2; --c-surface: #ffffff; --c-surface-2: #eeeeea;
-  --c-text: #1b1b19; --c-text-2: #5f5f59; --c-border: #d9d8d1; --c-border-strong: #8a8a83;
+  --c-bg: #f4f5f7; --c-surface: #ffffff; --c-surface-2: #eceef2;
+  --c-text: #16181d; --c-text-2: #525866; --c-border: #dcdfe6; --c-border-strong: #858c9b;
   --c-accent: #1d5fd6; --c-on-accent: #ffffff;
-  --c-ok: #17703d; --c-warn: #8a5a00; --c-bad: #b93a0b; --c-danger: #b42318; --c-on-danger: #ffffff; --c-hint: #6d3fd0;
+  --c-ok: #156e3b; --c-warn: #8a5600; --c-bad: #b8380a; --c-danger: #b42318; --c-on-danger: #ffffff; --c-hint: #6638cc;
   /* tints as explicit tokens (no color-mix: the build target is Safari 15) */
-  --c-ok-bg: #e5f1ea; --c-warn-bg: #f6eedf; --c-bad-bg: #f8e9e3; --c-accent-bg: #e4ecfa; --c-hint-bg: #ede7f9; --c-danger-bg: #f7e5e3;
+  --c-ok-bg: #e3f3ea; --c-warn-bg: #f8efdc; --c-bad-bg: #fae8e1; --c-accent-bg: #e5eefc; --c-hint-bg: #eee7fa; --c-danger-bg: #f9e4e2;
   /* map palette: the same in both themes (it lies on the tiles); mirrors frames.ts FRAME_STYLE and util.ts CONF_COLORS */
   --map-search: #2563eb; --map-start: #1f8a4c; --map-end: #d9363e; --map-hint: #7c3aed;
   --map-conf-high: #2563eb; --map-conf-mid: #e0a100; --map-conf-low: #8d8d87; --map-conf-none: #bdbdb6;
@@ -14,35 +14,36 @@
   --c-src-0: #b45309; --c-src-1: #6d28d9; --c-src-2: #0f766e; --c-src-3: #be185d; --c-src-4: #4d7c0f; --c-src-5: #0369a1;
   --c-grade-1: #2f9e5e; --c-grade-2: #d4a50a; --c-grade-3: #e8741c; --c-grade-4: #d12f2f;
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
-  --r-1: 6px; --r-2: 10px; --r-3: 14px; --r-pill: 999px;
-  --h-control: 32px; --h-control-lg: 40px; --h-control-sm: 28px;
-  --shadow-1: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.05); --shadow-2: 0 8px 28px rgba(0,0,0,.16), 0 2px 6px rgba(0,0,0,.08);
-  --bar-h: 40px; --stage-h: 44px; --side-w: 380px;
+  --r-1: 7px; --r-2: 11px; --r-3: 15px; --r-pill: 999px;
+  --h-control: 34px; --h-control-lg: 42px; --h-control-sm: 28px;
+  --shadow-1: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.04);
+  --shadow-2: 0 10px 28px rgba(16,24,40,.14), 0 2px 6px rgba(16,24,40,.06);
+  --bar-h: 44px; --stage-h: 46px; --side-w: 376px;
   --font: -apple-system, "SF Pro Text", system-ui, sans-serif; --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
-  --t-display: 650 28px/34px var(--font); --t-title: 600 20px/26px var(--font); --t-heading: 600 15px/20px var(--font);
-  --t-body: 400 14px/20px var(--font); --t-small: 400 12.5px/18px var(--font); --t-label: 600 12px/16px var(--font); --t-mono: 400 12.5px/18px var(--font-mono);
+  --t-display: 680 28px/34px var(--font); --t-title: 640 20px/26px var(--font); --t-heading: 620 15px/20px var(--font);
+  --t-body: 400 14px/20px var(--font); --t-small: 400 12.5px/18px var(--font); --t-label: 650 11.5px/16px var(--font); --t-mono: 400 12.5px/18px var(--font-mono);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --c-bg: #141413; --c-surface: #1d1d1b; --c-surface-2: #282825;
-    --c-text: #ededea; --c-text-2: #a6a69e; --c-border: #353530; --c-border-strong: #77776f;
-    --c-accent: #6b9cf5; --c-on-accent: #0b1220;
+    --c-bg: #121316; --c-surface: #1a1c21; --c-surface-2: #24272f;
+    --c-text: #eef0f4; --c-text-2: #a0a6b4; --c-border: #2e323d; --c-border-strong: #6f7687;
+    --c-accent: #6b9cf5; --c-on-accent: #09111f;
     --c-ok: #4cc380; --c-warn: #e3b341; --c-bad: #f08a5d; --c-danger: #f2706b; --c-on-danger: #1b0b09; --c-hint: #a78bfa;
-    --c-ok-bg: #1d2e24; --c-warn-bg: #322a19; --c-bad-bg: #35231b; --c-accent-bg: #1f2a40; --c-hint-bg: #2a2440; --c-danger-bg: #36201f;
-    --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 10px 30px rgba(0,0,0,.55);
+    --c-ok-bg: #1a2d23; --c-warn-bg: #322918; --c-bad-bg: #36221a; --c-accent-bg: #1c2942; --c-hint-bg: #292341; --c-danger-bg: #371f1e;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.42); --shadow-2: 0 12px 32px rgba(0,0,0,.58);
     --c-src-0: #fbbf24; --c-src-1: #a78bfa; --c-src-2: #2dd4bf; --c-src-3: #f472b6; --c-src-4: #a3e635; --c-src-5: #38bdf8;
     --c-grade-1: #4cc380; --c-grade-2: #e3b341; --c-grade-3: #f59a4d; --c-grade-4: #f2706b;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --c-bg: #141413; --c-surface: #1d1d1b; --c-surface-2: #282825;
-  --c-text: #ededea; --c-text-2: #a6a69e; --c-border: #353530; --c-border-strong: #77776f;
-  --c-accent: #6b9cf5; --c-on-accent: #0b1220;
+  --c-bg: #121316; --c-surface: #1a1c21; --c-surface-2: #24272f;
+  --c-text: #eef0f4; --c-text-2: #a0a6b4; --c-border: #2e323d; --c-border-strong: #6f7687;
+  --c-accent: #6b9cf5; --c-on-accent: #09111f;
   --c-ok: #4cc380; --c-warn: #e3b341; --c-bad: #f08a5d; --c-danger: #f2706b; --c-on-danger: #1b0b09; --c-hint: #a78bfa;
-  --c-ok-bg: #1d2e24; --c-warn-bg: #322a19; --c-bad-bg: #35231b; --c-accent-bg: #1f2a40; --c-hint-bg: #2a2440; --c-danger-bg: #36201f;
-  --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 10px 30px rgba(0,0,0,.55);
+  --c-ok-bg: #1a2d23; --c-warn-bg: #322918; --c-bad-bg: #36221a; --c-accent-bg: #1c2942; --c-hint-bg: #292341; --c-danger-bg: #371f1e;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.42); --shadow-2: 0 12px 32px rgba(0,0,0,.58);
   --c-src-0: #fbbf24; --c-src-1: #a78bfa; --c-src-2: #2dd4bf; --c-src-3: #f472b6; --c-src-4: #a3e635; --c-src-5: #38bdf8;
   --c-grade-1: #4cc380; --c-grade-2: #e3b341; --c-grade-3: #f59a4d; --c-grade-4: #f2706b;
 }

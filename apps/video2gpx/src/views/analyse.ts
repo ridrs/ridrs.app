@@ -1,6 +1,5 @@
-// Analyse (stage 4): what the pipeline saw on the weak stretches and why. The video carries an overlay of what was tracked at the current time ("Bewegung",
-// "Rotation"), the charts below put curvature of the video against the map's, rotation, speed and quality on one time axis, and the list names the weak
-// stretches with the causes measured on them. Inspection only (docs/FEATURE_analysis_insight.md, Part A).
+// Analyse: focused diagnostic inspector — compact single-row overlay toolbar (explanation collapsed by default),
+// synced video + map, 5-lane timeline charts with concise hint + collapsible guide, weak stretches & figures.
 import { A, loadSeries, overlayOn, requestFrame, setSwitch } from "../analyse";
 import { AnalyseChart, DEFAULT_LAYERS, type ChartLayers } from "../analyseChart";
 import { Overlay, COL, GAIN, shownBand } from "../analyseOverlay";
@@ -9,14 +8,13 @@ import { go, routePath } from "../app/router";
 import { mapMarks } from "../mapPanel";
 import { S, bus } from "../state";
 import type { AnalyseStretch, InspectFrame } from "../types";
-import { banner, btn, chip, iconBtn } from "../ui/components";
+import { banner, btn, chip, disclosure, iconBtn } from "../ui/components";
 import { icon } from "../ui/icons";
 import { el, fmtKm, pointAt } from "../util";
 import { getPlayer } from "../videoPanel";
 
 const LAYER_KEY = "v2g.analyseLayers";
-const OV_OPEN_KEY = "v2g.analyseOverlayOpen";
-const TICK_MS = 2500;       // while the video plays the overlay is asked for this often
+const TICK_MS = 2500;
 let root: HTMLElement, busyEl: HTMLElement, nextBtn: HTMLButtonElement, notes: HTMLElement, ovBox: HTMLElement, frameInfo: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement;
 let listBox: HTMLElement, figBox: HTMLElement, emptyEl: HTMLElement, rangeEl: HTMLElement;
 let zoomIn: HTMLButtonElement, zoomOut: HTMLButtonElement, zoomAll: HTMLButtonElement;
@@ -33,10 +31,9 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
   loadLayers();
   overlay = new Overlay(videoHost);
   root = el("div", { class: "an-view", hidden: true });
-  nextBtn = btn("Weiter: Höhe", () => S.cur && go(routePath.project(S.cur.app.id, "hoehe")), { kind: "primary", icon: "chevron", attrs: { "data-primary": "" } });
+  nextBtn = btn("Weiter: Export", () => S.cur && go(routePath.project(S.cur.app.id, "export")), { kind: "primary", icon: "chevron", attrs: { "data-primary": "" } });
   notes = el("div", { class: "stack-s" });
-  frameInfo = el("div", { class: "an-frameinfo small", "aria-live": "polite" });
-  // the busy note keeps its place in the title line (shown or not), so the panel does not change height while the points are tracked
+  frameInfo = el("div", { class: "an-frameinfo small", "aria-live": "polite", hidden: true });
   busyEl = el("span", { class: "muted row small an-busy" }, icon("spinner", "spin"), "aktualisiert …");
   const sw = (k: "motion" | "rotation", text: string, sample: HTMLElement) => {
     const c = el("input", { type: "checkbox", checked: A[k], onchange: () => { setSwitch(k, c.checked); onSwitch(); } });
@@ -44,22 +41,24 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
     return el("label", { class: "check an-sw" }, c, sample, el("span", {}, text));
   };
   const dotSw = (...cols: string[]) => el("span", { class: "an-swatch", "aria-hidden": "true" }, ...cols.map((col) => el("i", { style: `background:${col}` })));
-  // the overlay panel sits above video and map (in the head row of the workspace); collapsed it keeps only its title line with the switches
-  let ovOpen = true;
-  try { ovOpen = localStorage.getItem(OV_OPEN_KEY) !== "0"; } catch { /* private mode */ }
-  const ovBody = el("div", { id: "an-ov-body", class: "stack" });
-  const ovToggle = iconBtn("chevron", "Overlay-Erklärung ein- oder ausklappen", () => setOvOpen(!ovOpen), { "aria-controls": "an-ov-body", class: "icon-btn an-ov-toggle" });
-  const setOvOpen = (o: boolean) => {
-    ovOpen = o; ovBody.hidden = !o; ovToggle.setAttribute("aria-expanded", String(o)); ovBox.classList.toggle("collapsed", !o);
-    try { localStorage.setItem(OV_OPEN_KEY, o ? "1" : "0"); } catch { /* private mode */ }
-  };
-  ovBox = el("section", { class: "panel stack an-ov", "aria-labelledby": "an-ov-h", hidden: true },
-    el("div", { class: "row wrap between" }, el("div", { class: "row" }, ovToggle, el("h3", { id: "an-ov-h" }, "Overlay auf dem Video"), busyEl),
-      el("div", { class: "row wrap" }, sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic, COL.ignored)), sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)), nextBtn)),
-    ovBody);
-  ovBody.append(el("p", { class: "small muted" }, `Die Punkte werden für das Bild unter dem Zeiger neu verfolgt (mit den Parametern der Berechnung, ohne ein Ergebnis zu ändern); das dauert etwa eine Sekunde. Bewegung: Straßenpunkte der Bildbewegung, grün = zählt für Tempo und Gierrate (Inlier), rot = verworfen, magenta gestrichelt und durchgekreuzt = vorbeifahrender Verkehr, vom Tempo ignoriert, Pfeil = Verschiebung zum nächsten Bild (${GAIN.motion}-fach), gestrichelt das Straßenfeld, gelb der Horizont. Rotation: Fernmerkmale über dem Horizont, cyan = Inlier, orange = verworfen, Pfeil = Verschiebung im Fenster (${GAIN.rotation}-fach), gepunktet die Bänder, oben die Gierrate. Beim Abspielen wird alle ${TICK_MS / 1000} s aktualisiert.`),
-    frameInfo);
-  setOvOpen(ovOpen);
+
+  // Compact top bar: overlay switches + collapsible legend explanation (collapsed by default so video & map start high!)
+  const ovHelp = disclosure("Overlay-Legende",
+    el("p", { class: "small muted" }, `Neuverfolgung für das aktuelle Bild (ca. 1 s, ändert kein Ergebnis). Bewegung: grün = Inlier, rot = verworfen, magenta = ignorierter Verkehr, Pfeil = Verschiebung (${GAIN.motion}-fach), gelb = Horizont. Rotation: Fernmerkmale über Horizont, cyan = Inlier, orange = verworfen, Pfeil = ${GAIN.rotation}-fach. Beim Abspielen alle ${TICK_MS / 1000} s aktualisiert.`));
+
+  ovBox = el("section", { class: "panel stack-s an-ov", "aria-labelledby": "an-ov-h", hidden: true },
+    el("div", { class: "row wrap between" },
+      el("div", { class: "row wrap" },
+        el("h2", { id: "an-ov-h", class: "an-ov-h" }, "Analyse"),
+        sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic, COL.ignored)),
+        sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)),
+        busyEl),
+      el("div", { class: "row wrap" },
+        btn("Höhe", () => S.cur && go(routePath.project(S.cur.app.id, "hoehe")), { size: "sm", icon: "mountain" }),
+        nextBtn)),
+    frameInfo,
+    ovHelp);
+
   legendEl = el("div", { class: "elev-legend", role: "group", "aria-label": "Spuren der Diagramme" });
   rangeEl = el("span", { class: "small muted tnum" });
   zoomIn = iconBtn("plus", "Hineinzoomen", () => chart.zoomBy(0.5));
@@ -74,11 +73,13 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
   chartBox = el("section", { class: "panel stack", "aria-labelledby": "an-chart-h" },
     el("div", { class: "row wrap between elev-head" }, el("h3", { id: "an-chart-h" }, "Verlauf im Video"), el("div", { class: "row" }, rangeEl, zoomOut, zoomIn, zoomAll)),
     el("div", { class: "elev-chartwrap" }, chart.el, emptyEl), legendEl,
-    el("p", { class: "small muted" }, "Mausrad, Zwei-Finger-Geste oder die Knöpfe zoomen (bis 10 s Breite), Ziehen mit der Maus zoomt in den markierten Zeitraum, Umschalt und Ziehen (oder ein Finger) verschiebt, ein Doppelklick zoomt hinein, ein Klick springt im Video an die Stelle. Rot hinterlegt sind die schwachen Abschnitte. Die Kurvenrate ist die Richtungsänderung je Kilometer über ein Fenster von etwa 30 m, links positiv: aus der Gierrate und dem Tempo des Videos, und aus der Linie der Karte an der gefundenen Stelle. Passen beide nicht zusammen, stimmt entweder die Messung nicht, oder die Position ist falsch."));
+    el("div", { class: "row wrap between" },
+      el("span", { class: "small muted" }, "Klick springt im Video · Ziehen zoomt · Umschalt+Ziehen verschiebt · Rot = schwache Abschnitte"),
+      disclosure("Hilfe zum Diagramm",
+        el("p", { class: "small muted" }, "Mausrad, Zwei-Finger-Geste oder +/− zoomen (bis 10 s Breite), Doppelklick zoomt hinein. Die Kurvenrate zeigt die Richtungsänderung je Kilometer (links positiv) aus dem Video gegen die OSM-Karte: passen beide nicht zusammen, stimmt entweder die Messung nicht oder die Position ist falsch."))));
   listBox = el("section", { class: "panel stack", "aria-labelledby": "an-list-h" });
   figBox = el("section", { class: "panel stack", "aria-labelledby": "an-fig-h" });
-  root.append(
-    notes, chartBox, el("div", { class: "elev-bottom an-bottom" }, listBox, figBox));
+  root.append(notes, chartBox, el("div", { class: "elev-bottom an-bottom" }, listBox, figBox));
   mainEl.append(root);
   headEl.append(ovBox);
 
@@ -123,13 +124,12 @@ function leave() {
   overlay.set(null, false, false);
 }
 
-/** a frame for time t: wait a moment (a scrub makes many), then ask; the backend ends an older request, an older answer is dropped */
 function ask(t: number, delay: number) {
   clearTimeout(deb);
   deb = window.setTimeout(() => { void requestFrame(t); }, delay);
 }
 function onTime(t: number) {
-  if (playing) return;                                     // while playing the timer asks
+  if (playing) return;
   if (Math.abs(t - A.frameFor) > 0.04 && Math.abs(t - lastAsked) > 0.04) { lastAsked = t; ask(t, 160); }
   else drawOverlay();
 }
@@ -154,7 +154,6 @@ function syncZoom() {
   rangeEl.textContent = A.series ? `${fmtClock(v0)} bis ${fmtClock(v1)}` : "";
 }
 
-// ------------------------------------------------------------------ rendering
 function update() {
   if (!S.cur || !S.result) return;
   const sg = JSON.stringify([A.state, A.series?.n, A.series?.result_mtime, A.error, A.frameBusy, A.frameError, A.motion, A.rotation, A.frame?.t, A.frame?.seconds, navigator.onLine]);
@@ -170,30 +169,20 @@ function update() {
 function renderNotes() {
   notes.replaceChildren();
   if (A.state === "error") notes.append(banner("bad", `Die Analyse konnte nicht gelesen werden: ${A.error ?? "unbekannter Fehler"}`));
-  if (A.state === "ready" && A.series && !A.series.scale_from_route) notes.append(banner("info", "Zur Routensuche liegt keine Datei vor (route.pkl): Kurvenrate und Tempo sind mit der Standard-Brennweite und ohne den Streckenfaktor gerechnet."));
+  if (A.state === "ready" && A.series && !A.series.scale_from_route) notes.append(banner("info", "Zur Routensuche liegt keine Datei vor (route.pkl): Kurvenrate und Tempo sind mit Standard-Brennweite gerechnet."));
   if (A.frameError && overlayOn()) notes.append(banner("warn", `Das Overlay konnte nicht berechnet werden: ${A.frameError}`));
   if (!S.cur?.app.video && overlayOn()) notes.append(banner("info", "Ohne Video gibt es kein Overlay."));
 }
 
 function frameLine(label: string, text: string, ok?: boolean, why?: string): HTMLElement {
-  return el("div", { class: "an-fl" }, el("b", {}, label), el("span", {}, text), ok === undefined ? "" : ok ? chip("stimmt mit der Berechnung überein", "ok", "Dieselben Zahlen wie in der gespeicherten Zeile der Berechnung") : chip("weicht von der Berechnung ab", "warn", why ?? ""));
-}
-/** the frame lines grow the panel but never shrink it while the width stays (no jumping while the video plays); a new width, project or switch starts over */
-let infoW = 0, infoH = 0, infoProject = "";
-function holdHeight() {
-  const w = frameInfo.clientWidth, pr = `${S.cur?.app.id ?? ""}|${A.motion}|${A.rotation}`;
-  if (w !== infoW || pr !== infoProject) { infoW = w; infoProject = pr; infoH = 0; frameInfo.style.minHeight = ""; }
-  infoH = Math.max(infoH, frameInfo.scrollHeight);
-  if (infoH) frameInfo.style.minHeight = `${infoH}px`;
+  return el("div", { class: "an-fl" }, el("b", {}, label), el("span", {}, text), ok === undefined ? "" : ok ? chip("stimmt überein", "ok", "Dieselben Zahlen wie in der Berechnung") : chip("weicht ab", "warn", why ?? ""));
 }
 function renderFrameInfo() {
-  busyEl.style.visibility = overlayOn() && A.frameBusy && A.frame ? "visible" : "hidden";
+  const on = overlayOn();
+  busyEl.style.visibility = on && A.frameBusy && A.frame ? "visible" : "hidden";
+  frameInfo.hidden = !on;
   frameInfo.replaceChildren();
-  renderFrameLines();
-  holdHeight();
-}
-function renderFrameLines() {
-  if (!overlayOn()) { frameInfo.append(el("div", { class: "muted" }, "Schalte „Bewegung“ oder „Rotation“ ein, um zu sehen, was die Berechnung im Bild verfolgt hat.")); return; }
+  if (!on) return;
   const f = A.frame;
   if (!f) { frameInfo.append(el("div", { class: "muted row" }, ...(A.frameBusy ? [icon("spinner", "spin"), "Punkte werden verfolgt …"] : ["Noch kein Bild berechnet."]))); return; }
   frameInfo.append(...frameLines(f));
@@ -206,20 +195,20 @@ function frameLines(f: InspectFrame): HTMLElement[] {
     else {
       const fit = m.fit;
       out.push(frameLine("Bewegung", `Bildpaar ${m.pair} bei ${fmtClock(m.t)}: ${fit ? `${fit.inliers} von ${m.tracked} Punkten tragen die Bewegung, rms ${de(fit.rms ?? 0, 2)} px` : `kein Fit (${m.tracked} Punkte verfolgt)`}${fit?.yaw_deg_s != null ? `, Gierrate ${de(fit.yaw_deg_s, 1)} °/s` : ""}${fit?.pitch_deg_s != null ? `, Nicken ${de(fit.pitch_deg_s, 1)} °/s` : ""}${fit?.speed_ms != null ? `, Tempo ${de(fit.speed_ms, 1)} m/s` : ""}${m.source === "roh" ? " (ungefiltertes Bild)" : ""}`,
-        m.stored ? m.agree : undefined, m.diff ? `Abweichende Spalten: ${Object.keys(m.diff).join(", ")}. Mögliche Gründe: andere Pipeline-Version als bei der Berechnung, oder ein Video mit unregelmäßigen Zeitstempeln.` : undefined));
+        m.stored ? m.agree : undefined, m.diff ? `Abweichende Spalten: ${Object.keys(m.diff).join(", ")}.` : undefined));
       const tr = m.traffic, pf = m.plain_fit;
       if (tr?.state === "replaced")
-        out.push(frameLine("Verkehr", `Ein Fahrzeug hat den Fit verfälscht${pf?.speed_ms != null ? ` (er las ${de(pf.speed_ms, 1)} m/s, rms ${de(pf.rms ?? 0, 2)} px)` : ""}. Verwendet wird der Straßen-Kandidat ${tr.pick} von ${tr.candidates}; ${tr.n_traffic ?? 0} Punkte (magenta) sind ignoriert.`));
+        out.push(frameLine("Verkehr", `Fahrzeug im Fit${pf?.speed_ms != null ? ` (${de(pf.speed_ms, 1)} m/s, rms ${de(pf.rms ?? 0, 2)} px)` : ""}: Straßen-Kandidat ${tr.pick} von ${tr.candidates}, ${tr.n_traffic ?? 0} Punkte ignoriert.`));
       else if (tr?.state === "rejected")
-        out.push(frameLine("Fit", `${tr.pick === -1 ? "Kein Straßen-Kandidat passt zum Tempo davor und danach" : "Der Fit ist zu ungenau für ein Tempo"} (rms ${de(tr.rms ?? 0, 2)} px${tr.limit != null ? `, Grenze ${de(tr.limit, 2)} px` : ""}; vorbeifahrender Verkehr oder ein unscharfes Bild): dieses Bildpaar gibt kein Tempo, alle ${tr.n_ignored ?? tr.n_traffic ?? 0} Punkte (grau) sind ignoriert. Kurze Läufe solcher Paare werden überbrückt.`));
+        out.push(frameLine("Fit", `Kein verlässliches Tempo (rms ${de(tr.rms ?? 0, 2)} px${tr.limit != null ? `, Grenze ${de(tr.limit, 2)} px` : ""}): ${tr.n_ignored ?? tr.n_traffic ?? 0} Punkte ignoriert.`));
     }
   }
   if (r) {
     if (r.error) out.push(frameLine("Rotation", r.error));
     else {
       const b = shownBand(f);
-      out.push(frameLine("Rotation", `Fenster ${r.window} (${fmtClock(r.ta)}–${fmtClock(r.tb)}): ${r.chosen >= 0 && b ? `Band ${b.band + 1}, ${b.n_inl} von ${b.n_pts} Punkten tragen die Drehung, Gierrate ${r.yaw_deg_s != null ? de(r.yaw_deg_s, 1) + " °/s" : "–"}` : `kein Band mit brauchbarem Fit${b ? ` (${b.why || "unsicher"})` : ""}`}`,
-        r.agree, "Der Fit weicht von dem der Berechnung ab: andere Pipeline-Version oder ein Video mit unregelmäßigen Zeitstempeln."));
+      out.push(frameLine("Rotation", `Fenster ${r.window} (${fmtClock(r.ta)}–${fmtClock(r.tb)}): ${r.chosen >= 0 && b ? `Band ${b.band + 1}, ${b.n_inl}/${b.n_pts} Punkte, Gierrate ${r.yaw_deg_s != null ? de(r.yaw_deg_s, 1) + " °/s" : "–"}` : `kein brauchbarer Fit${b ? ` (${b.why || "unsicher"})` : ""}`}`,
+        r.agree, "Weicht von der Berechnung ab."));
     }
   }
   if (!out.length) out.push(el("div", { class: "muted" }, "Keine Daten."));
@@ -253,7 +242,7 @@ function renderChart() {
 }
 function renderLegend() {
   legendEl.replaceChildren();
-  const items: [keyof ChartLayers, string][] = [["curve", "Kurvenrate"], ["yaw", "Gierrate"], ["speed", "Geschwindigkeit"], ["quality", "Qualität"], ["band", "Sicherheit und Ereignisse"]];
+  const items: [keyof ChartLayers, string][] = [["curve", "Kurvenrate"], ["yaw", "Gierrate"], ["speed", "Geschwindigkeit"], ["quality", "Qualität"], ["band", "Sicherheit & Ereignisse"]];
   for (const [k, label] of items) {
     const c = el("input", { type: "checkbox", checked: layers[k], onchange: () => { layers[k] = c.checked; saveLayers(); chart.setLayers(layers); } });
     legendEl.append(el("label", { class: "check small elev-lg" }, c, el("span", {}, label)));
@@ -264,14 +253,14 @@ function renderList() {
   listBox.replaceChildren(el("h3", { id: "an-list-h" }, "Schwache Abschnitte"));
   const S_ = A.series;
   if (!S_) { listBox.append(el("p", { class: "muted small" }, "Noch keine Daten.")); return; }
-  if (!S_.stretches.length) { listBox.append(el("p", { class: "small" }, "Keine schwachen Abschnitte: Die Straße ist überall mit mittlerer oder hoher Sicherheit gefunden.")); return; }
-  listBox.append(el("p", { class: "small muted" }, "Abschnitte, die die Karte grau markiert (Sicherheit unter 50 % oder außerhalb des erkannten Abschnitts), mit den Ursachen, die auf ihnen gemessen wurden. Jede Ursache nennt ihren Wert."));
+  if (!S_.stretches.length) { listBox.append(el("p", { class: "small ok-text" }, "Keine schwachen Abschnitte: Die Straße wurde überall mit mittlerer oder hoher Sicherheit erkannt.")); return; }
+  listBox.append(el("p", { class: "small muted" }, "Abschnitte mit geringer Sicherheit (< 50 %) und ihre gemessenen Ursachen."));
   const ul = el("ul", { class: "an-list" });
   for (const st of S_.stretches) {
     const km = `${de(st.s0 / 1000, 2)}–${de(st.s1 / 1000, 2)} km`;
     const li = el("li", { class: "an-item" },
       el("div", { class: "row wrap between" },
-        el("span", {}, el("b", { class: "tnum" }, `${fmtClock(st.t0)}–${fmtClock(st.t1)}`), el("span", { class: "muted tnum" }, ` · ${km} · ${de(st.dur, 0)} s · Sicherheit ${de(100 * st.conf_mean, 0)} %`)),
+        el("span", {}, el("b", { class: "tnum" }, `${fmtClock(st.t0)}–${fmtClock(st.t1)}`), el("span", { class: "muted tnum" }, ` · ${km} · ${de(st.dur, 0)} s · ${de(100 * st.conf_mean, 0)} %`)),
         btn("Anzeigen", () => show(st), { size: "sm", icon: "map", title: "Im Diagramm und auf der Karte zeigen und das Video dorthin setzen" })),
       el("ul", { class: "an-causes small" }, ...st.causes.map((c) => el("li", { class: c.id === "none" || c.id === "ambiguous" ? "muted" : "" }, c.text))));
     ul.append(li);
@@ -296,16 +285,14 @@ function renderFigures() {
   const fig = (v: string, l: string) => el("div", { class: "ride-box" }, el("div", { class: "ride-v mono tnum" }, v), el("div", { class: "ride-l" }, l));
   const weak = S_.stretches.reduce((a, s) => a + s.dur, 0);
   figBox.append(el("div", { class: "elev-figs" },
-    fig(m.length ? `${de((100 * good) / m.length, 0)} %` : "–", "der 100-m-Stücke mit guter Passung"),
-    fig(fmtKm(S_.stretches.reduce((a, s) => a + Math.max(0, s.s1 - s.s0), 0) / 1000), "in schwachen Abschnitten"),
-    fig(`${de(weak / 60, weak >= 600 ? 0 : 1)} min`, "Dauer der schwachen Abschnitte"),
-    fig(S_.f_eff ? `${de(S_.f_eff, 0)} px` : "–", "wirksame Brennweite (Winkel = px / f)")));
+    fig(m.length ? `${de((100 * good) / m.length, 0)} %` : "–", "100-m-Stücke gut"),
+    fig(fmtKm(S_.stretches.reduce((a, s) => a + Math.max(0, s.s1 - s.s0), 0) / 1000), "schwach"),
+    fig(`${de(weak / 60, weak >= 600 ? 0 : 1)} min`, "schwache Dauer"),
+    fig(S_.f_eff ? `${de(S_.f_eff, 0)} px` : "–", "Brennweite")));
   const dl = el("dl", { class: "elev-dl small" });
   const add = (k: string, v: string) => dl.append(el("dt", {}, k), el("dd", {}, v));
-  add("Passung eines 100-m-Stücks", "1 minus die Abweichung der Kurvenrate (Video minus Karte, quadratisch gemittelt) im Verhältnis zur Kurvenrate der Karte; Kurven enger als R = 300 m zählen als Kurve.");
-  add("Streckenfaktor", S_.kappa ? `${de(S_.kappa, 2)} (Tempo des Videos × Faktor = Meter)` : "–");
-  add("Ursachen", "Gemessen, nicht geschätzt: jede nennt Wert und Grenze. „Mehrere Straßen passen ähnlich gut“ steht dort, wo keine Störung gemessen wurde.");
-  if (S_.odofail_spans.length) add("Wegmessung ausgefallen", S_.odofail_spans.map(([a, b]) => `${fmtClock(a)}–${fmtClock(b)}`).join(", "));
+  add("Streckenfaktor", S_.kappa ? `${de(S_.kappa, 2)} (Video-Tempo × Faktor = Meter)` : "–");
+  if (S_.odofail_spans.length) add("Wegmessung aus", S_.odofail_spans.map(([a, b]) => `${fmtClock(a)}–${fmtClock(b)}`).join(", "));
   if (S_.cuts.length) add("Szenenschnitte", S_.cuts.map(([a]) => fmtClock(a)).join(", "));
   figBox.append(dl);
 }
