@@ -48,6 +48,7 @@ typedef struct {
     const uint16_t *loc;       /* optional (backptr only) */
     float d_min;
     float d_max;
+    const float *utf;          /* optional: 1 where the entry's path contains a U-turn, else 0 (decision A31); NULL = no U-turn cost */
 } GroupBase;
 
 typedef struct {
@@ -61,6 +62,7 @@ typedef struct {
     const int32_t *b_us;
     float d_min;
     float d_max;
+    const float *b_utf;        /* optional, as GroupBase.utf (src-sorted) */
 } GroupBack;
 
 /* Full float32 precision log1pf(x) for x >= 0 via atanh series:
@@ -187,6 +189,7 @@ typedef struct {
     const int32_t *step_ok_steps;
     const uint8_t *const *step_ok_masks;
     float out_scores[4];
+    const float *ute4;          /* [T * 4] or NULL: extra U-turn cost (nats) per step and lane, charged on entries with utf = 1 */
 } Batch4Job;
 
 static void *run_batch4(void *arg) {
@@ -210,6 +213,9 @@ static void *run_batch4(void *arg) {
         float mu = J->mus[j], sd = J->sds[j];
         int has_dth = J->has_dth[j];
         v4f vdth = v4_load(J->dths4 + (size_t)j * 4);
+        const float *ute_j = J->ute4 ? J->ute4 + (size_t)j * 4 : NULL;
+        const int ut_step = ute_j && (ute_j[0] > 0.0f || ute_j[1] > 0.0f || ute_j[2] > 0.0f || ute_j[3] > 0.0f);
+        const v4f vute = ut_step ? v4_load(ute_j) : v4_dup(0.0f);
         for (int32_t i = 0; i < N; i++) v4_store(tmp + (size_t)i * 4, vNEG);
         const float inv_sd = 1.0f / sd;
         const float nh = -0.5f * inv_sd * inv_sd;
@@ -226,6 +232,7 @@ static void *run_batch4(void *arg) {
             const float *D = gr->D;
             const float *dphi = gr->dphi;
             const float *w = gr->w;
+            const float *uf = ut_step ? gr->utf : NULL;
             const float *ls4 = J->ls4[gi];
             const float *is2_4 = J->is2_4[gi];
 
@@ -244,6 +251,7 @@ static void *run_batch4(void *arg) {
                         v4f is2 = v4_load(is2_4 + (size_t)e * 4);
                         v4f ls = v4_load(ls4 + (size_t)e * 4);
                         v4f lt = v4_add(v4_dup(base), ls);
+                        if (uf) lt = v4_fms(lt, vute, v4_dup(uf[e]));
                         lt = v4_fms(lt, vc1, fast_log1pf_v4(v4_mul(r2, is2)));
                         best = v4_max(best, v4_add(val, lt));
                     }
@@ -259,7 +267,9 @@ static void *run_batch4(void *arg) {
                         v4f val = v4_load(a + (size_t)src[e] * 4);
                         float dd = D[e] - mu;
                         float base = nh * dd * dd + nlsd + w[e];
-                        best = v4_max(best, v4_add(val, v4_dup(base)));
+                        v4f lt = v4_dup(base);
+                        if (uf) lt = v4_fms(lt, vute, v4_dup(uf[e]));
+                        best = v4_max(best, v4_add(val, lt));
                     }
                     v4_store(dst_p, best);
                 }
@@ -295,6 +305,7 @@ static void *run_batch4(void *arg) {
         float mu = J->mus[j], sd = J->sds[j];
         int has_dth = J->has_dth[j];
         const float *dth4 = J->dths4 + (size_t)j * 4;
+        const float *ute_j = J->ute4 ? J->ute4 + (size_t)j * 4 : NULL;
         for (int32_t i = 0; i < N * 4; i++) tmp[i] = NEG;
         const float inv_sd = 1.0f / sd;
         const float nh = -0.5f * inv_sd * inv_sd;
@@ -313,15 +324,16 @@ static void *run_batch4(void *arg) {
                     const float *src_p = a + (size_t)gr->src[e] * 4;
                     float dd = gr->D[e] - mu;
                     float base = nh * dd * dd + nlsd + gr->w[e];
+                    const float u_e = (ute_j && gr->utf) ? gr->utf[e] : 0.0f;
                     if (has_dth) {
                         for (int k = 0; k < 4; k++) {
                             float r = dth4[k] - gr->dphi[e];
-                            float c = src_p[k] + base + ls4[(size_t)e * 4 + k] - c1 * fast_log1pf_scalar(r * r * is2_4[(size_t)e * 4 + k]);
+                            float c = src_p[k] + base - (u_e != 0.0f ? ute_j[k] * u_e : 0.0f) + ls4[(size_t)e * 4 + k] - c1 * fast_log1pf_scalar(r * r * is2_4[(size_t)e * 4 + k]);
                             if (c > dst_p[k]) dst_p[k] = c;
                         }
                     } else {
                         for (int k = 0; k < 4; k++) {
-                            float c = src_p[k] + base;
+                            float c = src_p[k] + base - (u_e != 0.0f ? ute_j[k] * u_e : 0.0f);
                             if (c > dst_p[k]) dst_p[k] = c;
                         }
                     }
@@ -387,7 +399,8 @@ float viterbi_single(
     const int32_t *step_ok_steps,
     const uint8_t *const *step_ok_masks,
     uint16_t *out_bps,          /* NULL if backptr=False, else (T-1)*N */
-    int32_t *out_final_cell
+    int32_t *out_final_cell,
+    const float *utes           /* [T] or NULL: extra U-turn cost (nats) per step, charged on entries with utf = 1 */
 ) {
     const float NEG = -INFINITY;
     float *a = (float *)malloc((size_t)N * sizeof(float));
@@ -402,6 +415,7 @@ float viterbi_single(
     for (int32_t j = 1; j < T; j++) {
         float mu = mus[j], sd = sds[j], dth = dths[j];
         int hd = has_dth[j];
+        const float ute = utes ? utes[j] : 0.0f;
         for (int32_t i = 0; i < N; i++) tmp[i] = NEG;
         uint16_t *code = out_bps ? (out_bps + (size_t)(j - 1) * (size_t)N) : NULL;
         if (code) memset(code, 0xFF, (size_t)N * sizeof(uint16_t));
@@ -420,6 +434,7 @@ float viterbi_single(
             const float *D = gr->D;
             const float *dphi = gr->dphi;
             const float *w = gr->w;
+            const float *uf = ute > 0.0f ? gr->utf : NULL;
             const float *ls = ls_ptrs[gi];
             const float *is2 = is2_ptrs[gi];
             const uint16_t *loc = gr->loc;
@@ -435,7 +450,7 @@ float viterbi_single(
                         float val = a[src[e]];
                         if (val == NEG) continue;
                         float dd = D[e] - mu;
-                        float lt = nh * dd * dd + nlsd + w[e];
+                        float lt = nh * dd * dd + nlsd + w[e] - (uf ? ute * uf[e] : 0.0f);
                         if (hd) {
                             float r = dth - dphi[e];
                             lt += ls[e] - c1 * fast_log1pf_scalar(r * r * is2[e]);
@@ -462,7 +477,7 @@ float viterbi_single(
                         float val = a[src[e]];
                         if (val == NEG) continue;
                         float dd = D[e] - mu;
-                        float lt = nh * dd * dd + nlsd + w[e];
+                        float lt = nh * dd * dd + nlsd + w[e] - (uf ? ute * uf[e] : 0.0f);
                         if (hd) {
                             float r = dth - dphi[e];
                             lt += ls[e] - c1 * fast_log1pf_scalar(r * r * is2[e]);
@@ -513,7 +528,8 @@ void fb_forward_step(
     const float *const *is2_ptrs,
     const float *a,
     float *out_new,
-    float mu, float sd, int32_t hd, float dth, float c1
+    float mu, float sd, int32_t hd, float dth, float c1,
+    float ute                   /* extra U-turn cost (nats) of this step, charged on entries with utf = 1 */
 ) {
     const float NEG = -INFINITY;
     for (int32_t i = 0; i < N; i++) out_new[i] = NEG;
@@ -531,6 +547,7 @@ void fb_forward_step(
         const float *D = gr->D;
         const float *dphi = gr->dphi;
         const float *w = gr->w;
+        const float *uf = ute > 0.0f ? gr->utf : NULL;
         const float *ls = ls_ptrs[gi];
         const float *is2 = is2_ptrs[gi];
 
@@ -542,7 +559,7 @@ void fb_forward_step(
                 float av = a[src[s0]];
                 if (av == NEG) continue;
                 float dd = D[s0] - mu;
-                float lt = nh * dd * dd + nlsd + w[s0];
+                float lt = nh * dd * dd + nlsd + w[s0] - (uf ? ute * uf[s0] : 0.0f);
                 if (hd) {
                     float r = dth - dphi[s0];
                     lt += ls[s0] - c1 * fast_log1pf_scalar(r * r * is2[s0]);
@@ -560,7 +577,7 @@ void fb_forward_step(
                 float av = a[src[e]];
                 if (av == NEG) { vals[k] = NEG; continue; }
                 float dd = D[e] - mu;
-                float lt = nh * dd * dd + nlsd + w[e];
+                float lt = nh * dd * dd + nlsd + w[e] - (uf ? ute * uf[e] : 0.0f);
                 if (hd) {
                     float r = dth - dphi[e];
                     lt += ls[e] - c1 * fast_log1pf_scalar(r * r * is2[e]);
@@ -590,7 +607,8 @@ void fb_backward_step(
     const float *const *b_is2_ptrs,
     const float *beta,
     float *out_nb,
-    float mu, float sd, int32_t hd, float dth, float c1
+    float mu, float sd, int32_t hd, float dth, float c1,
+    float ute                   /* as fb_forward_step */
 ) {
     const float NEG = -INFINITY;
     for (int32_t i = 0; i < N; i++) out_nb[i] = NEG;
@@ -608,6 +626,7 @@ void fb_backward_step(
         const float *D = gr->b_D;
         const float *dphi = gr->b_dphi;
         const float *w = gr->b_w;
+        const float *uf = ute > 0.0f ? gr->b_utf : NULL;
         const float *ls = b_ls_ptrs[gi];
         const float *is2 = b_is2_ptrs[gi];
 
@@ -619,7 +638,7 @@ void fb_backward_step(
                 float bv = beta[dst[s0]];
                 if (bv == NEG) continue;
                 float dd = D[s0] - mu;
-                float lt = nh * dd * dd + nlsd + w[s0];
+                float lt = nh * dd * dd + nlsd + w[s0] - (uf ? ute * uf[s0] : 0.0f);
                 if (hd) {
                     float r = dth - dphi[s0];
                     lt += ls[s0] - c1 * fast_log1pf_scalar(r * r * is2[s0]);
@@ -636,7 +655,7 @@ void fb_backward_step(
                 float bv = beta[dst[e]];
                 if (bv == NEG) { vals[k] = NEG; continue; }
                 float dd = D[e] - mu;
-                float lt = nh * dd * dd + nlsd + w[e];
+                float lt = nh * dd * dd + nlsd + w[e] - (uf ? ute * uf[e] : 0.0f);
                 if (hd) {
                     float r = dth - dphi[e];
                     lt += ls[e] - c1 * fast_log1pf_scalar(r * r * is2[e]);

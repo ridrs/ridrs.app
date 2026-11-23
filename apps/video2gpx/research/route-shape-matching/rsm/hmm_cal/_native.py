@@ -20,6 +20,7 @@ class _GroupBase(ctypes.Structure):
         ("w", ctypes.c_void_p), ("starts", ctypes.c_void_p), ("ud", ctypes.c_void_p),
         ("loc", ctypes.c_void_p),
         ("d_min", ctypes.c_float), ("d_max", ctypes.c_float),
+        ("utf", ctypes.c_void_p),
     ]
 
 
@@ -29,6 +30,7 @@ class _GroupBack(ctypes.Structure):
         ("b_dst", ctypes.c_void_p), ("b_D", ctypes.c_void_p), ("b_dphi", ctypes.c_void_p),
         ("b_w", ctypes.c_void_p), ("b_starts", ctypes.c_void_p), ("b_us", ctypes.c_void_p),
         ("d_min", ctypes.c_float), ("d_max", ctypes.c_float),
+        ("b_utf", ctypes.c_void_p),
     ]
 
 
@@ -44,6 +46,7 @@ class _Batch4Job(ctypes.Structure):
         ("n_step_ok", ctypes.c_int32), ("step_ok_steps", ctypes.c_void_p),
         ("step_ok_masks", ctypes.POINTER(ctypes.c_void_p)),
         ("out_scores", ctypes.c_float * 4),
+        ("ute4", ctypes.c_void_p),
     ]
 
 
@@ -58,21 +61,21 @@ def _bind(p: Path):
         ctypes.c_float, ctypes.c_int32,
         ctypes.c_void_p, ctypes.c_void_p,
         ctypes.c_int32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
-        ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32),
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32), ctypes.c_void_p,
     ]
     lib.viterbi_single.restype = ctypes.c_float
     lib.fb_forward_step.argtypes = [
         ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBase),
         ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
         ctypes.c_void_p, ctypes.c_void_p,
-        ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float,
+        ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float, ctypes.c_float,
     ]
     lib.fb_forward_step.restype = None
     lib.fb_backward_step.argtypes = [
         ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBack),
         ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
         ctypes.c_void_p, ctypes.c_void_p,
-        ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float,
+        ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float, ctypes.c_float,
     ]
     lib.fb_backward_step.restype = None
     return lib
@@ -101,7 +104,14 @@ def available() -> bool:
     return LIB is not None
 
 
-def _pack_groups(grid, locs=None):
+def _utf(ut, on: bool):
+    """float 0/1 view of a Group's U-turn flags for the C kernels, or None (no flags, none set, or the U-turn cost is off)"""
+    if not on or ut is None or not np.any(ut):
+        return None
+    return np.ascontiguousarray(ut, np.float32)
+
+
+def _pack_groups(grid, locs=None, ut: bool = False):
     n_g = len(grid.groups)
     arr = (_GroupBase * n_g)()
     refs = []
@@ -113,7 +123,8 @@ def _pack_groups(grid, locs=None):
         starts = np.ascontiguousarray(gr.starts, np.int64)
         ud = np.ascontiguousarray(gr.ud, np.int32)
         loc = np.ascontiguousarray(locs[gi], np.uint16) if locs is not None else None
-        refs.append((src, D, dphi, w, starts, ud, loc))
+        utf = _utf(getattr(gr, "ut", None), ut)
+        refs.append((src, D, dphi, w, starts, ud, loc, utf))
         dmin = float(getattr(gr, "d_min", D.min() if len(D) else 0.0)) if gr.n else 0.0
         dmax = float(getattr(gr, "d_max", D.max() if len(D) else 0.0)) if gr.n else 0.0
         arr[gi] = _GroupBase(
@@ -122,11 +133,12 @@ def _pack_groups(grid, locs=None):
             starts.ctypes.data, ud.ctypes.data,
             loc.ctypes.data if loc is not None else 0,
             dmin, dmax,
+            utf.ctypes.data if utf is not None else 0,
         )
     return arr, refs
 
 
-def _pack_groups_back(grid):
+def _pack_groups_back(grid, ut: bool = False):
     n_g = len(grid.groups)
     arr = (_GroupBack * n_g)()
     refs = []
@@ -137,7 +149,8 @@ def _pack_groups_back(grid):
         b_w = np.ascontiguousarray(gr.b_w, np.float32)
         b_starts = np.ascontiguousarray(gr.b_starts, np.int64)
         b_us = np.ascontiguousarray(gr.b_us, np.int32)
-        refs.append((b_dst, b_D, b_dphi, b_w, b_starts, b_us))
+        b_utf = _utf(getattr(gr, "b_ut", None), ut)
+        refs.append((b_dst, b_D, b_dphi, b_w, b_starts, b_us, b_utf))
         dmin = float(getattr(gr, "d_min", b_D.min() if len(b_D) else 0.0)) if gr.n else 0.0
         dmax = float(getattr(gr, "d_max", b_D.max() if len(b_D) else 0.0)) if gr.n else 0.0
         arr[gi] = _GroupBack(
@@ -145,6 +158,7 @@ def _pack_groups_back(grid):
             b_dst.ctypes.data, b_D.ctypes.data, b_dphi.ctypes.data, b_w.ctypes.data,
             b_starts.ctypes.data, b_us.ctypes.data,
             dmin, dmax,
+            b_utf.ctypes.data if b_utf is not None else 0,
         )
     return arr, refs
 
@@ -198,7 +212,8 @@ def viterbi_scan(grid, base_par, st, a_angs, start_ok=None, end_ok=None, step_ok
         return np.zeros(0, np.float64)
     N, T, n_g = grid.N, st.T, len(grid.groups)
     floor = base_par.floor_frac * grid.h
-    gbases, grefs = _pack_groups(grid)
+    ut_on = base_par.ut_extra > 0
+    gbases, grefs = _pack_groups(grid, ut=ut_on)
     mus, sds, has_dth = _step_arrays(base_par, floor, st)
     a0, end_arr = _init_end_arrays(N, start_ok, end_ok, step_ok, s_lp, e_lp)
     n_so, so_steps, so_ptrs, so_refs = _pack_step_ok(step_ok, N)
@@ -228,7 +243,9 @@ def viterbi_scan(grid, base_par, st, a_angs, start_ok=None, end_ok=None, step_ok
         ls4_ptrs = (ctypes.c_void_p * n_g)(*(x.ctypes.data for x in ls4_list))
         is2_ptrs = (ctypes.c_void_p * n_g)(*(x.ctypes.data for x in is2_list))
         dths4 = np.ascontiguousarray(np.stack([(dth_clean * a_ang).astype(np.float32) for a_ang in sub], axis=-1), np.float32)
-        refs.extend([ls4_list, is2_list, ls4_ptrs, is2_ptrs, dths4])
+        # the U-turn cost depends on the video heading range, which scales with a_ang: one column per lane (dp.ut_cost)
+        ute4 = np.ascontiguousarray(np.stack([_dp.ut_cost(dataclasses.replace(base_par, a_ang=float(a_ang)), st) for a_ang in sub], axis=-1), np.float32) if ut_on else None
+        refs.extend([ls4_list, is2_list, ls4_ptrs, is2_ptrs, dths4, ute4])
         jobs[bi] = _Batch4Job(
             N, T, n_g, gbases, ls4_ptrs, is2_ptrs,
             mus.ctypes.data, sds.ctypes.data, has_dth.ctypes.data, dths4.ctypes.data,
@@ -236,6 +253,8 @@ def viterbi_scan(grid, base_par, st, a_angs, start_ok=None, end_ok=None, step_ok
             a0.ctypes.data, end_arr.ctypes.data if end_arr is not None else 0,
             n_so, so_steps.ctypes.data if so_steps is not None else 0,
             so_ptrs if so_ptrs is not None else ctypes.POINTER(ctypes.c_void_p)(),
+            (ctypes.c_float * 4)(),
+            ute4.ctypes.data if ute4 is not None else 0,
         )
     LIB.viterbi_scan_batches(nb, max(1, int(threads)), jobs)
     out = np.empty(n_f, np.float64)
@@ -248,7 +267,10 @@ def viterbi_scan(grid, base_par, st, a_angs, start_ok=None, end_ok=None, step_ok
 def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step_ok=None, s_lp=None, e_lp=None) -> dict:
     grid, par = pre.grid, pre.par
     N, T, n_g = grid.N, st.T, len(grid.groups)
-    gbases, grefs = _pack_groups(grid, pre.loc if backptr else None)
+    from . import dp as _dp
+    ut_on = par.ut_extra > 0
+    gbases, grefs = _pack_groups(grid, pre.loc if backptr else None, ut=ut_on)
+    utes = np.ascontiguousarray(_dp.ut_cost(par, st), np.float32) if ut_on else None
     ls_arrs = [np.ascontiguousarray(x, np.float32) for x in pre.ls]
     is2_arrs = [np.ascontiguousarray(x, np.float32) for x in pre.is2]
     ls_ptrs = (ctypes.c_void_p * n_g)(*(x.ctypes.data for x in ls_arrs))
@@ -268,6 +290,7 @@ def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step
         so_ptrs if so_ptrs is not None else ctypes.POINTER(ctypes.c_void_p)(),
         bps.ctypes.data if bps is not None else 0,
         ctypes.byref(final_cell),
+        utes.ctypes.data if utes is not None else 0,
     ))
     c = int(final_cell.value)
     if c < 0 or not np.isfinite(best):
@@ -299,8 +322,10 @@ class FBContext:
         self.N = grid.N
         self.n_g = n_g
         self.c1 = float(pre.c1)
-        self.gbases, self._frefs = _pack_groups(grid)
-        self.gbacks, self._brefs = _pack_groups_back(grid)
+        self.pre = pre                     # pre._ute: the extra U-turn cost of the current step, set by dp._step_terms right before every step
+        ut_on = pre.par.ut_extra > 0
+        self.gbases, self._frefs = _pack_groups(grid, ut=ut_on)
+        self.gbacks, self._brefs = _pack_groups_back(grid, ut=ut_on)
         self._ls = [np.ascontiguousarray(x, np.float32) for x in pre.ls]
         self._is2 = [np.ascontiguousarray(x, np.float32) for x in pre.is2]
         self._bls = [np.ascontiguousarray(x, np.float32) for x in pre.b_ls]
@@ -317,6 +342,7 @@ class FBContext:
             self.N, self.n_g, self.gbases, self.ls_ptrs, self.is2_ptrs,
             a_c.ctypes.data, self._buf.ctypes.data,
             float(mu), float(sd), 0 if dth is None else 1, 0.0 if dth is None else float(dth), self.c1,
+            float(getattr(self.pre, "_ute", 0.0)),
         )
         return self._buf
 
@@ -326,5 +352,6 @@ class FBContext:
             self.N, self.n_g, self.gbacks, self.bls_ptrs, self.bis2_ptrs,
             b_c.ctypes.data, self._buf.ctypes.data,
             float(mu), float(sd), 0 if dth is None else 1, 0.0 if dth is None else float(dth), self.c1,
+            float(getattr(self.pre, "_ute", 0.0)),
         )
         return self._buf

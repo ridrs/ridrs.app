@@ -107,6 +107,44 @@ def test_native_hmm_matches_numpy_scan_viterbi_and_fb():
     assert np.nanmax(np.abs(fb_nat["p_vit"] - fb_py["p_vit"])) < 1e-4
 
 
+@pytest.mark.skipif(not N.available(), reason="native HMM library not compiled for this platform")
+def test_native_hmm_charges_the_no_video_uturn_cost_like_numpy():
+    """decision A31: the extra cost of a U-turn without a video reversal (Group.ut, dp.ut_cost) reaches the native scan, Viterbi and forward-backward;
+    before, only the NumPy path charged it and every run with the native library decoded without it"""
+    g = _toy_graph()
+    G = grid.build(g, h=30.0, sm=10.0, **C.UTURN)
+    assert any(gr.ut.any() for gr in G.groups[1:])
+    st = _toy_steps()
+    a_angs = [C.F_REF / f for f in C.F_GRID[:6]]
+    ut = dict(ut_extra=20.0, ut_video_deg=135.0, ut_win_m=60.0)
+    assert any(dp.ut_cost(dp.Par(kappa=1.0, a_ang=a, **ut), st)[1:].any() for a in a_angs)
+
+    def run(par_kw):
+        sc = dp.viterbi_scan(G, dp.Par(kappa=1.0, **par_kw), st, a_angs, threads=2)
+        pre = dp.prepare(G, dp.Par(kappa=1.0, a_ang=a_angs[2], **par_kw))
+        vit = dp.viterbi(pre, st, backptr=True)
+        fb = dp.forward_backward(pre, st, vit["cell_path"])
+        return sc, vit, fb
+
+    sc_nat, vit_nat, fb_nat = run(ut)
+    sc_off, _, _ = run({})
+    saved = N.LIB
+    N.LIB = None
+    try:
+        sc_py = np.array([dp.viterbi(dp.Prepared(G, dp.Par(kappa=1.0, a_ang=a, **ut)), st)["score"] for a in a_angs])
+        pre = dp.prepare(G, dp.Par(kappa=1.0, a_ang=a_angs[2], **ut))
+        vit_py = dp.viterbi(pre, st, backptr=True)
+        fb_py = dp.forward_backward(pre, st, vit_py["cell_path"])
+    finally:
+        N.LIB = saved
+    assert np.max(np.abs(sc_nat - sc_py)) < 1e-4
+    assert abs(vit_nat["score"] - vit_py["score"]) < 1e-4
+    assert np.array_equal(vit_nat["cell_path"], vit_py["cell_path"])
+    assert abs(fb_nat["logev"] - fb_py["logev"]) < 1e-3
+    assert np.nanmax(np.abs(fb_nat["p_vit"] - fb_py["p_vit"])) < 1e-4
+    assert np.all(sc_nat <= sc_off + 1e-4)          # the cost only ever lowers a score
+
+
 # ------------------------------------------------------------------ parallel interpret parity
 def test_parallel_interpret_is_byte_identical_to_single_worker(tmp_path):
     from tests.test_insight import _encode, _world
@@ -312,7 +350,7 @@ def test_dp_native_compiles_for_simd_scalar_and_x86_64_sse2(tmp_path):
                     '    int32_t src[2] = {0, 1}, ud[2] = {1, 2};\n'
                     '    int64_t starts[2] = {0, 1};\n'
                     '    float D[2] = {30.0f, 31.0f}, dphi[2] = {0.1f, -0.2f}, w[2] = {0.0f, -0.1f};\n'
-                    '    GroupBase gr = {2, 2, src, D, dphi, w, starts, ud, NULL, 30.0f, 31.0f};\n'
+                    '    GroupBase gr = {2, 2, src, D, dphi, w, starts, ud, NULL, 30.0f, 31.0f, NULL};\n'
                     '    float ls4[8] = {-0.1f,-0.2f,-0.3f,-0.4f, -0.1f,-0.2f,-0.3f,-0.4f};\n'
                     '    float is2_4[8] = {1.0f, 2.0f, 3.0f, 4.0f, 1.5f, 2.5f, 3.5f, 4.5f};\n'
                     '    const float *ls_p[1] = {ls4}, *is2_p[1] = {is2_4};\n'
@@ -320,7 +358,7 @@ def test_dp_native_compiles_for_simd_scalar_and_x86_64_sse2(tmp_path):
                     '    int32_t has_dth[3] = {0, 1, 1};\n'
                     '    float dths4[12] = {0,0,0,0, 0.1f,0.2f,0.3f,0.4f, -0.2f,-0.1f,0.0f,0.1f};\n'
                     '    float s0[3] = {0.0f, -INFINITY, -INFINITY};\n'
-                    '    Batch4Job job = {3, 3, 1, &gr, ls_p, is2_p, mus, sds, has_dth, dths4, 2.0f, s0, NULL, 0, NULL, NULL, {0,0,0,0}};\n'
+                    '    Batch4Job job = {3, 3, 1, &gr, ls_p, is2_p, mus, sds, has_dth, dths4, 2.0f, s0, NULL, 0, NULL, NULL, {0,0,0,0}, NULL};\n'
                     '    viterbi_scan_batches(1, 1, &job);\n'
                     '    for (int k = 0; k < 4; k++) {\n'
                     '        if (!isfinite(job.out_scores[k])) return 10 + k;\n'
