@@ -164,7 +164,9 @@ Then(
     await eventually(this, () => {
       assert.equal(element.dataset.status, 'available');
       assert.equal(Number(element.style.opacity || '1'), 1);
-      assert.equal(within(element).getByTestId('value').textContent, value);
+      const valueEl = within(element).getByTestId('value');
+      assert.equal(valueEl.textContent, value);
+      assert.equal(valueEl.getAttribute('fill'), 'color(display-p3 1 1 1)');
       assert.equal(within(element).getByTestId('unit').textContent, unit);
     });
   },
@@ -270,15 +272,21 @@ Then('the {word} gauge shows no average', async function (this: RidrsWorld, kind
 });
 
 Then(
-  'the {word} gauge is dimmed and shows {string} {string}',
+  'the {word} gauge shows a dimmed {string} {string}',
   async function (this: RidrsWorld, kind: string, value: string, unit: string) {
     const element = await gauge(this, kind);
     await eventually(this, () => {
       assert.equal(element.dataset.status, 'unavailable');
-      const opacity = Number(element.style.opacity || '1');
-      assert.ok(opacity < 1, `Expected the ${kind} gauge to be dimmed, got opacity ${opacity}`);
-      assert.equal(within(element).getByTestId('value').textContent, value);
-      assert.equal(within(element).getByTestId('unit').textContent, unit);
+      assert.equal(Number(element.style.opacity || '1'), 1);
+      const valueEl = within(element).getByTestId('value');
+      assert.equal(valueEl.textContent, value);
+      assert.notEqual(valueEl.getAttribute('fill'), 'color(display-p3 1 1 1)');
+      const unitEl = within(element).getByTestId('unit');
+      assert.equal(unitEl.textContent, unit);
+      assert.equal(unitEl.getAttribute('fill'), 'rgb(203 213 225)');
+      for (const band of zones(element)) {
+        assert.match(band.getAttribute('stroke') ?? '', /^oklch\(/);
+      }
       assert.equal(within(element).queryByTestId('reason'), null);
       assert.equal(within(element).queryByTestId('active-arc'), null);
     });

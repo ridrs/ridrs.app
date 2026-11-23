@@ -28,8 +28,6 @@ const TICK_INNER_MINOR = 80.7;
 const TICK_LABEL = 64;
 /** The scale's colour without zones (no FTP, say). */
 const NEUTRAL = '#38bdf8';
-/** The track while the metric has no value: no zone colours, so a glance tells it is not live. */
-const IDLE_TRACK = 'rgb(51 65 85)';
 /** Half the lit arc's width as an angle: its round caps end exactly at the value, not beyond it. */
 const CAP_ANGLE = ((ARC_WIDTH / 2 / ARC_RADIUS) * 180) / Math.PI;
 /** Where the average's mark ends: just across the outer edge of the scale. */
@@ -53,6 +51,8 @@ const WHITE = 'color(display-p3 1 1 1)';
 const GREY_LIGHT = 'rgb(226 232 240)';
 const GREY = 'rgb(203 213 225)';
 const GREY_DARK = 'rgb(148 163 184)';
+/** Lower-contrast number colour when a sensor has no signal: the rest of the dial stays normal. */
+const VALUE_IDLE = 'rgb(100 116 139)';
 /** The outline that keeps a mark apart from the scale under it. */
 const OUTLINE = '#0b1220';
 /** The workout target on the scale (Spotlight 3): an outer arc with a center triangle and a radial spotlight. */
@@ -152,7 +152,7 @@ export function Gauge({
   const value = reading?.status === 'available' ? reading.value : undefined;
   const live = value !== undefined;
   const valueText = live ? display.text : '0';
-  const onHdr = drawsOnHdrCanvas(hdr !== undefined, capturing, live);
+  const onHdr = drawsOnHdrCanvas(hdr !== undefined, capturing);
   const band = value === undefined ? undefined : bandNear(scale, value, shownZone.current);
   shownZone.current = band?.zone;
   const start = angleOf(scale, scale.min);
@@ -200,7 +200,7 @@ export function Gauge({
 
   // Every render the HDR canvas draws the dial again; the latest drawing wins.
   useLayoutEffect(() => {
-    if (onHdr && hdr && svg.current) {
+    if (hdr && svg.current) {
       hdr.draw(svg.current);
     }
   });
@@ -244,8 +244,6 @@ export function Gauge({
           '0 20px 45px -12px rgb(0 0 0 / .55), inset 0 1px 1px rgb(255 255 255 / .18), inset 0 -2px 8px rgb(0 0 0 / .35)',
         fontFamily: 'var(--ridrs-font-text)',
         fontVariantNumeric: 'tabular-nums',
-        opacity: live ? 1 : 0.45,
-        transition: 'opacity 200ms ease',
       }}
     >
       <svg
@@ -327,7 +325,7 @@ export function Gauge({
           <path
             d={arc(ARC_RADIUS, start, angleOf(scale, scale.max))}
             fill="none"
-            stroke={live ? dimmed(NEUTRAL) : IDLE_TRACK}
+            stroke={dimmed(NEUTRAL)}
             strokeWidth={TRACK_WIDTH}
             strokeLinecap="round"
           />
@@ -341,7 +339,7 @@ export function Gauge({
             data-to={String(item.to)}
             d={arc(ARC_RADIUS, angleOf(scale, item.from), angleOf(scale, item.to))}
             fill="none"
-            stroke={live ? dimmed(item.colour) : IDLE_TRACK}
+            stroke={dimmed(item.colour)}
             strokeWidth={TRACK_WIDTH}
           >
             <title>{`${zoneName(item.zone)}${item.name ? ` · ${item.name}` : ''}`}</title>
@@ -405,7 +403,7 @@ export function Gauge({
           fontSize={valueText.length > 3 ? SIZE.valueLong : SIZE.value}
           fontWeight={WEIGHT.medium}
           letterSpacing={-1.5}
-          fill={live ? WHITE : GREY_DARK}
+          fill={live ? WHITE : VALUE_IDLE}
         >
           {valueText}
         </text>
@@ -417,7 +415,7 @@ export function Gauge({
           dominantBaseline="central"
           fontSize={SIZE.unit}
           fontWeight={WEIGHT.medium}
-          fill={live ? GREY : GREY_DARK}
+          fill={GREY}
         >
           {unit}
         </text>

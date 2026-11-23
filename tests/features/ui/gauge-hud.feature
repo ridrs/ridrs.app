@@ -168,17 +168,17 @@ Feature: An alternative HUD shows power, heart rate and cadence as analogue gaug
     Then the power gauge marks zone 4
     And the heart-rate gauge marks zone 1
 
-  Scenario: Without data the gauges are dimmed and show zero
+  Scenario: Without data the gauges render normally with a dimmed zero
     When I press "Start ride"
-    Then the power gauge is dimmed and shows "0" "W"
-    And the heart-rate gauge is dimmed and shows "0" "bpm"
-    And the cadence gauge is dimmed and shows "0" "rpm"
+    Then the power gauge shows a dimmed "0" "W"
+    And the heart-rate gauge shows a dimmed "0" "bpm"
+    And the cadence gauge shows a dimmed "0" "rpm"
 
-  Scenario: A lost device dims the gauge and shows zero, without a dash or disconnected label
+  Scenario: A lost device renders the gauge normally with a dimmed zero, without a dash or disconnected label
     Given I press "Start ride"
     And "test-device" published a power measurement of 200 W from device "trainer-1"
     When "test-device" reports device "trainer-1" as "reconnecting"
-    Then the power gauge is dimmed and shows "0" "W"
+    Then the power gauge shows a dimmed "0" "W"
 
   Scenario: A signal recovers from dimmed zero back to the live value
     Given I press "Start ride"

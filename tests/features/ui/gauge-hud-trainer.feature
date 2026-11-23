@@ -21,11 +21,11 @@ Feature: The gauge HUD shows the gear in the cadence gauge and takes the keys of
     Then eventually the cadence gauge shows the gear "12"
     And the cadence gauge shows no average
 
-  Scenario: The gear stays when the cadence is lost, and the gauge dims to zero
+  Scenario: The gear stays when the cadence is lost, and the gauge shows a dimmed zero
     Given eventually the cadence gauge shows the gear "12"
     And "test-device" published a cadence measurement of 90 rpm from device "trainer-1"
     When "test-device" reports device "trainer-1" as "reconnecting"
-    Then the cadence gauge is dimmed and shows "0" "rpm"
+    Then the cadence gauge shows a dimmed "0" "rpm"
     And the cadence gauge shows the gear "12"
 
   Scenario: In ERG the gear is not shown
