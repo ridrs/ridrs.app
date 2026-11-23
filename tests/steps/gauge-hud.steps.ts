@@ -6,8 +6,6 @@ import { type PhysicsState, physicsStateEvent, trainerTargetPowerEvent } from '@
 import { waitFor, within } from '@testing-library/dom';
 import type { RidrsWorld } from '../support/world.ts';
 
-const EN_DASH = '–';
-
 function ui(world: RidrsWorld): HTMLElement {
   const view = world.uiViews[0];
   assert.ok(view, 'Expected the ridrs UI to be shown');
@@ -165,6 +163,7 @@ Then(
     const element = await gauge(this, kind);
     await eventually(this, () => {
       assert.equal(element.dataset.status, 'available');
+      assert.equal(Number(element.style.opacity || '1'), 1);
       assert.equal(within(element).getByTestId('value').textContent, value);
       assert.equal(within(element).getByTestId('unit').textContent, unit);
     });
@@ -270,20 +269,18 @@ Then('the {word} gauge shows no average', async function (this: RidrsWorld, kind
   assert.equal(within(element).queryByTestId('average'), null);
 });
 
-Then('the {word} gauge is unavailable', async function (this: RidrsWorld, kind: string) {
-  const element = await gauge(this, kind);
-  assert.equal(element.dataset.status, 'unavailable');
-  assert.equal(within(element).getByTestId('value').textContent, EN_DASH);
-});
-
 Then(
-  'the {word} gauge is unavailable with the reason {string}',
-  async function (this: RidrsWorld, kind: string, reason: string) {
+  'the {word} gauge is dimmed and shows {string} {string}',
+  async function (this: RidrsWorld, kind: string, value: string, unit: string) {
     const element = await gauge(this, kind);
     await eventually(this, () => {
       assert.equal(element.dataset.status, 'unavailable');
-      assert.equal(within(element).getByTestId('value').textContent, EN_DASH);
-      assert.equal(within(element).getByTestId('reason').textContent, reason);
+      const opacity = Number(element.style.opacity || '1');
+      assert.ok(opacity < 1, `Expected the ${kind} gauge to be dimmed, got opacity ${opacity}`);
+      assert.equal(within(element).getByTestId('value').textContent, value);
+      assert.equal(within(element).getByTestId('unit').textContent, unit);
+      assert.equal(within(element).queryByTestId('reason'), null);
+      assert.equal(within(element).queryByTestId('active-arc'), null);
     });
   },
 );

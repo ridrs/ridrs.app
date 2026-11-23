@@ -202,8 +202,11 @@ describe('bandNear', () => {
 });
 
 describe('drawsOnHdrCanvas', () => {
-  it('shows the dial on the HDR canvas only with one and while no screenshot is taken', () => {
+  it('shows the dial on the HDR canvas only with one, while live, and while no screenshot is taken', () => {
     expect(drawsOnHdrCanvas(true, false)).toBe(true);
+    expect(drawsOnHdrCanvas(true, false, true)).toBe(true);
+    // Signal lost: drop out of HDR so the dimmed gauge does not glow above SDR white.
+    expect(drawsOnHdrCanvas(true, false, false)).toBe(false);
     // The snapshot fills a see-through WebGPU canvas with black: the SVG shows instead.
     expect(drawsOnHdrCanvas(true, true)).toBe(false);
     expect(drawsOnHdrCanvas(false, false)).toBe(false);

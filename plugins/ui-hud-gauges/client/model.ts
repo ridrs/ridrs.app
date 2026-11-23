@@ -341,12 +341,13 @@ export function formatDuration(seconds: number): string {
 }
 
 /**
- * Whether the HDR canvas shows the dial (ADR 0099): only where there is one, and not while a
- * screenshot is taken, since the native snapshot fills a see-through WebGPU canvas with black
- * (ADR 0102). Otherwise the SVG shows itself.
+ * Whether the HDR canvas shows the dial (ADR 0099): only where there is one, while the reading is
+ * live, and not while a screenshot is taken, since the native snapshot fills a see-through WebGPU
+ * canvas with black (ADR 0102). Otherwise the SVG shows itself (and dims cleanly without HDR gain
+ * when the sensor signal is lost).
  */
-export function drawsOnHdrCanvas(hasHdrLayer: boolean, capturing: boolean): boolean {
-  return hasHdrLayer && !capturing;
+export function drawsOnHdrCanvas(hasHdrLayer: boolean, capturing: boolean, live = true): boolean {
+  return hasHdrLayer && !capturing && live;
 }
 
 /** A workout target on a gauge's scale, in the gauge's unit (`low === high` for an exact value). */

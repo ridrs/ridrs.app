@@ -53,8 +53,6 @@ const WHITE = 'color(display-p3 1 1 1)';
 const GREY_LIGHT = 'rgb(226 232 240)';
 const GREY = 'rgb(203 213 225)';
 const GREY_DARK = 'rgb(148 163 184)';
-/** Why there is no value: the Kinetic look's warning amber (`--ridrs-warn`). */
-const WARN = '#ffb62e';
 /** The outline that keeps a mark apart from the scale under it. */
 const OUTLINE = '#0b1220';
 /** The workout target on the scale (Spotlight 3): an outer arc with a center triangle and a radial spotlight. */
@@ -150,15 +148,16 @@ export function Gauge({
   const svg = useRef<SVGSVGElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [hdr, setHdr] = useState<HdrLayer>();
-  const onHdr = drawsOnHdrCanvas(hdr !== undefined, capturing);
   const display = describeMetricReading(reading, language);
   const value = reading?.status === 'available' ? reading.value : undefined;
+  const live = value !== undefined;
+  const valueText = live ? display.text : '0';
+  const onHdr = drawsOnHdrCanvas(hdr !== undefined, capturing, live);
   const band = value === undefined ? undefined : bandNear(scale, value, shownZone.current);
   shownZone.current = band?.zone;
   const start = angleOf(scale, scale.min);
   const angle = angleOf(scale, value ?? scale.min);
   const accent = lit(band?.colour ?? NEUTRAL);
-  const live = value !== undefined;
   const averageValue = average?.value === undefined ? undefined : Math.round(average.value);
   const averageText = averageValue === undefined ? '–' : formatDecimal(averageValue, 0);
   const lights = live && angle - start > 0.5;
@@ -171,7 +170,7 @@ export function Gauge({
       }
     : undefined;
   const spoken = [
-    `${label} ${display.text} ${unit}`,
+    `${label} ${valueText} ${unit}`,
     band ? `${zoneName(band.zone)}${band.name ? ` ${band.name}` : ''}` : undefined,
     average ? `${average.label} ${averageText} ${unit}` : undefined,
   ]
@@ -201,7 +200,7 @@ export function Gauge({
 
   // Every render the HDR canvas draws the dial again; the latest drawing wins.
   useLayoutEffect(() => {
-    if (hdr && svg.current) {
+    if (onHdr && hdr && svg.current) {
       hdr.draw(svg.current);
     }
   });
@@ -245,6 +244,8 @@ export function Gauge({
           '0 20px 45px -12px rgb(0 0 0 / .55), inset 0 1px 1px rgb(255 255 255 / .18), inset 0 -2px 8px rgb(0 0 0 / .35)',
         fontFamily: 'var(--ridrs-font-text)',
         fontVariantNumeric: 'tabular-nums',
+        opacity: live ? 1 : 0.45,
+        transition: 'opacity 200ms ease',
       }}
     >
       <svg
@@ -387,7 +388,7 @@ export function Gauge({
         {lights ? (
           <path
             data-testid="active-arc"
-            data-value={display.text}
+            data-value={valueText}
             d={arc(ARC_RADIUS, start + CAP_ANGLE, Math.max(angle - CAP_ANGLE, start + CAP_ANGLE + 0.01))}
             fill="none"
             stroke={accent}
@@ -401,41 +402,25 @@ export function Gauge({
           y={C}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={display.text.length > 3 ? SIZE.valueLong : SIZE.value}
+          fontSize={valueText.length > 3 ? SIZE.valueLong : SIZE.value}
           fontWeight={WEIGHT.medium}
           letterSpacing={-1.5}
           fill={live ? WHITE : GREY_DARK}
         >
-          {display.text}
+          {valueText}
         </text>
-        {display.reason === undefined ? (
-          <text
-            data-testid="unit"
-            x={C}
-            y={134}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={SIZE.unit}
-            fontWeight={WEIGHT.medium}
-            fill={GREY}
-          >
-            {unit}
-          </text>
-        ) : (
-          // Why there is no value, in the unit's place: the dash above says the rest.
-          <text
-            data-testid="reason"
-            x={C}
-            y={134}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={SIZE.unit}
-            fontWeight={WEIGHT.medium}
-            fill={WARN}
-          >
-            {display.reason}
-          </text>
-        )}
+        <text
+          data-testid="unit"
+          x={C}
+          y={134}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={SIZE.unit}
+          fontWeight={WEIGHT.medium}
+          fill={live ? GREY : GREY_DARK}
+        >
+          {unit}
+        </text>
         {gear ?? average ? (
           <>
             <text
