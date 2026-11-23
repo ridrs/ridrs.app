@@ -16,7 +16,7 @@ cd "$HERE/build"
 ARCH=$(uname -m)
 NATIVE_SO="$RSM/rsm/hmm_cal/_dp_native_${ARCH}.so"
 if [ -f "$RSM/rsm/hmm_cal/_dp_native.c" ] && [ ! -f "$NATIVE_SO" -o "$RSM/rsm/hmm_cal/_dp_native.c" -nt "$NATIVE_SO" ]; then
-  cc -O3 -shared -fPIC -lpthread -o "$NATIVE_SO" "$RSM/rsm/hmm_cal/_dp_native.c"
+  cc -O3 -shared -fPIC -lm -lpthread -o "$NATIVE_SO" "$RSM/rsm/hmm_cal/_dp_native.c"
 fi
 PBF_SO="$RSM/rsm/pipeline/_pbf_native_${ARCH}.so"
 if [ -f "$RSM/rsm/pipeline/_pbf_native.c" ] && [ ! -f "$PBF_SO" -o "$RSM/rsm/pipeline/_pbf_native.c" -nt "$PBF_SO" ]; then
@@ -48,25 +48,30 @@ PYTHONDONTWRITEBYTECODE=1 "$PY" -m PyInstaller --noconfirm --clean --onedir --na
 du -sh sidecar/rsm-pipeline
 
 INT="$HERE/build/sidecar/rsm-pipeline/_internal"
-# 1. symlink de-dup: drop the top-level links into <pkg>/.dylibs, give every Mach-O an rpath to each such folder
-DIRS=$(cd "$INT" && find . -maxdepth 1 -type l -exec readlink {} \; | grep '/\.dylibs/' | sed 's#/[^/]*$##' | sort -u)
-(cd "$INT" && find . -maxdepth 1 -type l | while read -r l; do case "$(readlink "$l")" in */.dylibs/*) rm "$l";; esac; done)
-# a link to a removed link (libzstd.1.dylib -> libzstd.1.5.7.dylib, for the stdlib _zstd module) now points into the void:
-# point it at the real file instead (Tauri copies it once, 0.6 MB); a bundle with a dangling link does not build
-(cd "$INT" && find . -maxdepth 1 -type l ! -exec test -e {} \; -print | while read -r l; do
-  t=$(for d in $DIRS; do [ -f "$d/$(readlink "$l")" ] && echo "$d/$(readlink "$l")" && break; done)
-  if [ -n "$t" ]; then ln -sfh "$t" "$l"; else echo "dangling link $l" >&2; exit 1; fi
-done)
-# (the main executable carries the appended PyInstaller archive: neither rewritten nor stripped)
-MACHOS=$(find "$INT" -type f \( -name '*.so' -o -name '*.dylib' \) ! -path '*Python.framework*')
-for f in $MACHOS; do
-  otool -l "$f" | grep -q LC_RPATH || continue
-  fdir=$(dirname "$f")
-  for d in $DIRS; do
-    rel=$("$PY" -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$INT/$d" "$fdir")
-    install_name_tool -add_rpath "@loader_path/$rel" "$f" 2>/dev/null || true
+if [ "$(uname -s)" = "Darwin" ]; then
+  # 1. symlink de-dup: drop the top-level links into <pkg>/.dylibs, give every Mach-O an rpath to each such folder
+  DIRS=$(cd "$INT" && find . -maxdepth 1 -type l -exec readlink {} \; | grep '/\.dylibs/' | sed 's#/[^/]*$##' | sort -u)
+  (cd "$INT" && find . -maxdepth 1 -type l | while read -r l; do case "$(readlink "$l")" in */.dylibs/*) rm "$l";; esac; done)
+  # a link to a removed link (libzstd.1.dylib -> libzstd.1.5.7.dylib, for the stdlib _zstd module) now points into the void:
+  # point it at the real file instead (Tauri copies it once, 0.6 MB); a bundle with a dangling link does not build
+  (cd "$INT" && find . -maxdepth 1 -type l ! -exec test -e {} \; -print | while read -r l; do
+    t=$(for d in $DIRS; do [ -f "$d/$(readlink "$l")" ] && echo "$d/$(readlink "$l")" && break; done)
+    if [ -n "$t" ]; then ln -sfh "$t" "$l"; else echo "dangling link $l" >&2; exit 1; fi
+  done)
+  # (the main executable carries the appended PyInstaller archive: neither rewritten nor stripped)
+  MACHOS=$(find "$INT" -type f \( -name '*.so' -o -name '*.dylib' \) ! -path '*Python.framework*')
+  for f in $MACHOS; do
+    otool -l "$f" | grep -q LC_RPATH || continue
+    fdir=$(dirname "$f")
+    for d in $DIRS; do
+      rel=$("$PY" -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$INT/$d" "$fdir")
+      install_name_tool -add_rpath "@loader_path/$rel" "$f" 2>/dev/null || true
+    done
   done
-done
-# 2. strip local symbols, 3. ad-hoc re-sign (install_name_tool and strip invalidate the signature; arm64 refuses unsigned code)
-for f in $MACHOS; do strip -x "$f" 2>/dev/null || true; codesign -f -s - "$f" 2>/dev/null; done
+  # 2. strip local symbols, 3. ad-hoc re-sign (install_name_tool and strip invalidate the signature; arm64 refuses unsigned code)
+  for f in $MACHOS; do strip -x "$f" 2>/dev/null || true; codesign -f -s - "$f" 2>/dev/null; done
+else
+  # Linux ELF: strip debug/unneeded symbols from shared libraries (never strip the main PyInstaller executable)
+  find "$INT" -type f \( -name '*.so' -o -name '*.so.*' \) -exec strip --strip-unneeded {} + 2>/dev/null || true
+fi
 du -sh sidecar/rsm-pipeline

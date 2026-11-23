@@ -20,7 +20,7 @@ from rsm.odometry import gating, heading
 from rsm.odometry.vms_csv import load_pairs
 
 from . import config as C, cuts as K, osm, resources as R, standstill as SS, tracks as T
-from .common import Worker, ffmpeg_bin, ffprobe_bin, file_sig, hwaccel_enabled, jdump, jload, sha
+from .common import Worker, ffmpeg_bin, ffprobe_bin, file_sig, hwaccel_enabled, hwaccel_name, jdump, jload, sha
 from .vmsx import extract as EX, interpret as VI, motion as vm
 from .vmsx.decode import probe
 
@@ -159,7 +159,8 @@ def ffmpeg_frames(path, info, height, first_frame, n_frames, k, threads=2, hwacc
     width = round(info.width * height / info.height / 2) * 2
     ss = max(0.0, (first_frame - 0.5) / info.fps)
     cmd = [ffmpeg_bin(), "-v", "error", "-nostdin"]
-    cmd += ["-hwaccel", "videotoolbox"] if (hwaccel and hwaccel_enabled()) else ["-threads", str(threads)]
+    hw = hwaccel_name() if hwaccel else None
+    cmd += ["-hwaccel", hw] if hw else ["-threads", str(threads)]
     cmd += ["-ss", f"{ss:.4f}", "-i", path, "-an", "-vf", f"select='not(mod(n\\,{k}))',scale={width}:{height}:flags=area,format=gray", "-fps_mode", "passthrough",
             "-frames:v", str(n_frames), "-f", "rawvideo", "-pix_fmt", "gray", "-"]
     size = width * height

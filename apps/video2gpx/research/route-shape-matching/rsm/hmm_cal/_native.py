@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Optional native C / ARM NEON backend for rsm.hmm_cal.dp (falls back transparently to NumPy when absent or RSM_NO_NATIVE=1)."""
+"""Optional native C / 4-wide SIMD (ARM NEON + x86_64 SSE2/FMA) backend for rsm.hmm_cal.dp (falls back transparently to NumPy when absent or RSM_NO_NATIVE=1)."""
 from __future__ import annotations
 
 import ctypes
@@ -47,6 +47,37 @@ class _Batch4Job(ctypes.Structure):
     ]
 
 
+def _bind(p: Path):
+    lib = ctypes.CDLL(str(p))
+    lib.viterbi_scan_batches.argtypes = [ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_Batch4Job)]
+    lib.viterbi_scan_batches.restype = None
+    lib.viterbi_single.argtypes = [
+        ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBase),
+        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_float, ctypes.c_int32,
+        ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_int32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32),
+    ]
+    lib.viterbi_single.restype = ctypes.c_float
+    lib.fb_forward_step.argtypes = [
+        ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBase),
+        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float,
+    ]
+    lib.fb_forward_step.restype = None
+    lib.fb_backward_step.argtypes = [
+        ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBack),
+        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float,
+    ]
+    lib.fb_backward_step.restype = None
+    return lib
+
+
 def _load():
     if os.environ.get("RSM_NO_NATIVE") == "1":
         return None
@@ -57,34 +88,7 @@ def _load():
         if not p.is_file():
             continue
         try:
-            lib = ctypes.CDLL(str(p))
-            lib.viterbi_scan_batches.argtypes = [ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_Batch4Job)]
-            lib.viterbi_scan_batches.restype = None
-            lib.viterbi_single.argtypes = [
-                ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBase),
-                ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
-                ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
-                ctypes.c_float, ctypes.c_int32,
-                ctypes.c_void_p, ctypes.c_void_p,
-                ctypes.c_int32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
-                ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32),
-            ]
-            lib.viterbi_single.restype = ctypes.c_float
-            lib.fb_forward_step.argtypes = [
-                ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBase),
-                ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
-                ctypes.c_void_p, ctypes.c_void_p,
-                ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float,
-            ]
-            lib.fb_forward_step.restype = None
-            lib.fb_backward_step.argtypes = [
-                ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBack),
-                ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
-                ctypes.c_void_p, ctypes.c_void_p,
-                ctypes.c_float, ctypes.c_float, ctypes.c_int32, ctypes.c_float, ctypes.c_float,
-            ]
-            lib.fb_backward_step.restype = None
-            return lib
+            return _bind(p)
         except OSError:
             continue
     return None

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from rsm.pipeline.common import hwaccel_enabled
+from rsm.pipeline.common import hwaccel_enabled, hwaccel_name
 
 from . import rotflow
 
@@ -73,8 +73,8 @@ def read_frames(path: str, info: dict, height: int, start: float, duration: floa
     """Grey frames of `height` rows from `start` for `duration` s: yields (index from start, array)."""
     width = round(info['width'] * height / info['height'] / 2) * 2
     cmd = ['ffmpeg', '-v', 'error', '-nostdin']
-    if hwaccel and hwaccel_enabled():
-        cmd += ['-hwaccel', 'videotoolbox']
+    if hwaccel and (hw := hwaccel_name()):
+        cmd += ['-hwaccel', hw]
     cmd += ['-ss', f'{start:.3f}', '-i', path, '-t', f'{duration:.3f}', '-an', '-vf', f'scale={width}:{height}:flags=area,format=gray', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']
     size = width * height
     with subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=size * 8) as proc:

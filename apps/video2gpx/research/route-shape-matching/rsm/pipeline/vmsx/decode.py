@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Iterator
 
-from ..common import ffmpeg_bin, ffprobe_bin, hwaccel_enabled
+from ..common import ffmpeg_bin, ffprobe_bin, hwaccel_enabled, hwaccel_name
 
 import numpy as np
 
@@ -56,8 +56,8 @@ def frames(
     width = round(info.width * height / info.height / 2) * 2
     filters = ([f'framestep={step}'] if step > 1 else []) + [f'scale={width}:{height}:flags=area', 'format=gray']
     cmd = [ffmpeg_bin(), '-v', 'error', '-nostdin']
-    if hwaccel and hwaccel_enabled():
-        cmd += ['-hwaccel', 'videotoolbox']
+    if hwaccel and (hw := hwaccel_name()):
+        cmd += ['-hwaccel', hw]
     if start > 0:
         cmd += ['-ss', f'{start:.3f}']
     cmd += ['-i', path]
@@ -86,7 +86,8 @@ def frames_from(path: str, info: VideoInfo, height: int, first_frame: int, n_fra
     width = round(info.width * height / info.height / 2) * 2
     ss = max(0.0, (first_frame - 0.5) / info.fps)
     cmd = [ffmpeg_bin(), '-v', 'error', '-nostdin']
-    cmd += ['-hwaccel', 'videotoolbox'] if (hwaccel and hwaccel_enabled()) else ['-threads', str(threads)]
+    hw = hwaccel_name() if hwaccel else None
+    cmd += ['-hwaccel', hw] if hw else ['-threads', str(threads)]
     cmd += ['-ss', f'{ss:.4f}', '-i', path, '-an', '-vf', f'scale={width}:{height}:flags=area,format=gray', '-fps_mode', 'passthrough']
     if n_frames is not None:
         cmd += ['-frames:v', str(n_frames)]

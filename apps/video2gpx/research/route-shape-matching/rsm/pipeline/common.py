@@ -28,9 +28,20 @@ def ffprobe_bin() -> str:
     return "ffprobe"
 
 
+def hwaccel_name() -> str | None:
+    """FFmpeg -hwaccel backend name: 'videotoolbox' by default on macOS, None (software) elsewhere.
+    RSM_HWACCEL=0 disables; RSM_HWACCEL=1 selects 'videotoolbox' on macOS or 'auto' elsewhere; RSM_HWACCEL=<name> (e.g. 'vaapi', 'cuda') passes <name>."""
+    v = os.environ.get("RSM_HWACCEL", "1" if sys.platform == "darwin" else "0").strip()
+    if not v or v == "0":
+        return None
+    if v == "1":
+        return "videotoolbox" if sys.platform == "darwin" else "auto"
+    return v
+
+
 def hwaccel_enabled() -> bool:
-    """VideoToolbox decoding: on by default on macOS only (it does not exist elsewhere); RSM_HWACCEL=0/1 overrides."""
-    return os.environ.get("RSM_HWACCEL", "1" if sys.platform == "darwin" else "0") != "0"
+    """True when hardware video decoding is active (on by default on macOS only; RSM_HWACCEL=0/1/<backend> overrides)."""
+    return hwaccel_name() is not None
 
 
 def data_dir(out: Path) -> Path:

@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Native C / ARM NEON kernels for dense road HMM inference (rsm.hmm_cal.dp).
+/* Native C / 4-wide SIMD (ARM NEON + x86_64 SSE2/FMA) kernels for dense road HMM inference (rsm.hmm_cal.dp).
  *
  * Implements:
  *  - viterbi_scan_batch: evaluates N_F values of f_eff (a_ang) for one Grid in parallel across pthreads,
- *    using 4-wide ARM NEON SIMD across 4 f_eff lanes at a time so graph arrays (src, D, dphi, w) and the
- *    distance term are loaded once per 4 f_eff lanes.
+ *    using 4-wide float32 SIMD (ARM NEON on aarch64/arm64, SSE2/FMA on x86_64) across 4 f_eff lanes at a time
+ *    so graph arrays (src, D, dphi, w) and the distance term are loaded once per 4 f_eff lanes.
  *  - viterbi_decode: exact single-f_eff Viterbi with optional uint16 backpointers (matching dp.viterbi tie-breaking).
  *  - forward_backward_pass: exact forward-backward alpha (float16) and edge-posterior pass.
  *
@@ -17,11 +17,23 @@
 #include <string.h>
 #include <pthread.h>
 
-#if defined(__ARM_NEON) || defined(__aarch64__)
+#if !defined(RSM_NO_SIMD) && (defined(__ARM_NEON) || defined(__aarch64__))
 #include <arm_neon.h>
 #define RSM_HAS_NEON 1
+#define RSM_HAS_SSE2 0
+#define RSM_HAS_SIMD 1
+#elif !defined(RSM_NO_SIMD) && defined(__SSE2__)
+#include <emmintrin.h>
+#if defined(__FMA__)
+#include <immintrin.h>
+#endif
+#define RSM_HAS_NEON 0
+#define RSM_HAS_SSE2 1
+#define RSM_HAS_SIMD 1
 #else
 #define RSM_HAS_NEON 0
+#define RSM_HAS_SSE2 0
+#define RSM_HAS_SIMD 0
 #endif
 
 typedef struct {
@@ -75,7 +87,18 @@ static inline float fast_log1pf_scalar(float x) {
 }
 
 #if RSM_HAS_NEON
-static inline float32x4_t fast_log1pf_neon(float32x4_t x) {
+typedef float32x4_t v4f;
+static inline v4f v4_dup(float x) { return vdupq_n_f32(x); }
+static inline v4f v4_load(const float *p) { return vld1q_f32(p); }
+static inline void v4_store(float *p, v4f v) { vst1q_f32(p, v); }
+static inline v4f v4_add(v4f a, v4f b) { return vaddq_f32(a, b); }
+static inline v4f v4_sub(v4f a, v4f b) { return vsubq_f32(a, b); }
+static inline v4f v4_mul(v4f a, v4f b) { return vmulq_f32(a, b); }
+static inline v4f v4_fma(v4f acc, v4f a, v4f b) { return vfmaq_f32(acc, a, b); }
+static inline v4f v4_fms(v4f acc, v4f a, v4f b) { return vfmsq_f32(acc, a, b); }
+static inline v4f v4_max(v4f a, v4f b) { return vmaxq_f32(a, b); }
+
+static inline v4f fast_log1pf_v4(v4f x) {
     float32x4_t one = vdupq_n_f32(1.0f);
     float32x4_t y = vaddq_f32(one, x);
     uint32x4_t yi = vreinterpretq_u32_f32(y);
@@ -88,11 +111,55 @@ static inline float32x4_t fast_log1pf_neon(float32x4_t x) {
     float32x4_t t = vdivq_f32(vsubq_f32(m, one), vaddq_f32(m, one));
     float32x4_t t2 = vmulq_f32(t, t);
     float32x4_t p = vdupq_n_f32(0.142857143f);
-    p = vfmaq_f32(vdupq_n_f32(0.200000000f), t2, p);
-    p = vfmaq_f32(vdupq_n_f32(0.333333333f), t2, p);
-    p = vfmaq_f32(one, t2, p);
+    p = v4_fma(vdupq_n_f32(0.200000000f), t2, p);
+    p = v4_fma(vdupq_n_f32(0.333333333f), t2, p);
+    p = v4_fma(one, t2, p);
     float32x4_t lnm = vmulq_f32(vaddq_f32(t, t), p);
-    return vfmaq_f32(lnm, vcvtq_f32_s32(exp), vdupq_n_f32(0.69314718056f));
+    return v4_fma(lnm, vcvtq_f32_s32(exp), vdupq_n_f32(0.69314718056f));
+}
+#elif RSM_HAS_SSE2
+typedef __m128 v4f;
+static inline v4f v4_dup(float x) { return _mm_set1_ps(x); }
+static inline v4f v4_load(const float *p) { return _mm_loadu_ps(p); }
+static inline void v4_store(float *p, v4f v) { _mm_storeu_ps(p, v); }
+static inline v4f v4_add(v4f a, v4f b) { return _mm_add_ps(a, b); }
+static inline v4f v4_sub(v4f a, v4f b) { return _mm_sub_ps(a, b); }
+static inline v4f v4_mul(v4f a, v4f b) { return _mm_mul_ps(a, b); }
+static inline v4f v4_fma(v4f acc, v4f a, v4f b) {
+#if defined(__FMA__)
+    return _mm_fmadd_ps(a, b, acc);
+#else
+    return _mm_add_ps(acc, _mm_mul_ps(a, b));
+#endif
+}
+static inline v4f v4_fms(v4f acc, v4f a, v4f b) {
+#if defined(__FMA__)
+    return _mm_fnmadd_ps(a, b, acc);
+#else
+    return _mm_sub_ps(acc, _mm_mul_ps(a, b));
+#endif
+}
+static inline v4f v4_max(v4f best, v4f cand) { return _mm_max_ps(cand, best); }
+
+static inline v4f fast_log1pf_v4(v4f x) {
+    v4f one = _mm_set1_ps(1.0f);
+    v4f y = _mm_add_ps(one, x);
+    __m128i yi = _mm_castps_si128(y);
+    __m128i exp = _mm_sub_epi32(_mm_srli_epi32(yi, 23), _mm_set1_epi32(127));
+    __m128i mi = _mm_or_si128(_mm_and_si128(yi, _mm_set1_epi32(0x007FFFFF)), _mm_set1_epi32(0x3F800000));
+    v4f m = _mm_castsi128_ps(mi);
+    v4f gt = _mm_cmpgt_ps(m, _mm_set1_ps(1.41421356f));
+    v4f m_half = _mm_mul_ps(m, _mm_set1_ps(0.5f));
+    m = _mm_or_ps(_mm_and_ps(gt, m_half), _mm_andnot_ps(gt, m));
+    exp = _mm_sub_epi32(exp, _mm_castps_si128(gt));
+    v4f t = _mm_div_ps(_mm_sub_ps(m, one), _mm_add_ps(m, one));
+    v4f t2 = _mm_mul_ps(t, t);
+    v4f p = _mm_set1_ps(0.142857143f);
+    p = v4_fma(_mm_set1_ps(0.200000000f), t2, p);
+    p = v4_fma(_mm_set1_ps(0.333333333f), t2, p);
+    p = v4_fma(one, t2, p);
+    v4f lnm = _mm_mul_ps(_mm_add_ps(t, t), p);
+    return v4_fma(lnm, _mm_cvtepi32_ps(exp), _mm_set1_ps(0.69314718056f));
 }
 #endif
 
@@ -134,16 +201,16 @@ static void *run_batch4(void *arg) {
     }
     const float NEG = -INFINITY;
 
-#if RSM_HAS_NEON
-    const float32x4_t vNEG = vdupq_n_f32(NEG);
-    const float32x4_t vc1 = vdupq_n_f32(J->c1);
-    for (int32_t i = 0; i < N; i++) vst1q_f32(a + (size_t)i * 4, vdupq_n_f32(J->start_init[i]));
+#if RSM_HAS_SIMD
+    const v4f vNEG = v4_dup(NEG);
+    const v4f vc1 = v4_dup(J->c1);
+    for (int32_t i = 0; i < N; i++) v4_store(a + (size_t)i * 4, v4_dup(J->start_init[i]));
 
     for (int32_t j = 1; j < T; j++) {
         float mu = J->mus[j], sd = J->sds[j];
         int has_dth = J->has_dth[j];
-        float32x4_t vdth = vld1q_f32(J->dths4 + (size_t)j * 4);
-        for (int32_t i = 0; i < N; i++) vst1q_f32(tmp + (size_t)i * 4, vNEG);
+        v4f vdth = v4_load(J->dths4 + (size_t)j * 4);
+        for (int32_t i = 0; i < N; i++) v4_store(tmp + (size_t)i * 4, vNEG);
         const float inv_sd = 1.0f / sd;
         const float nh = -0.5f * inv_sd * inv_sd;
         const float nlsd = -logf(sd);
@@ -167,56 +234,56 @@ static void *run_batch4(void *arg) {
                     int64_t s0 = starts[b];
                     int64_t s1 = (b + 1 < n_ud) ? starts[b + 1] : gr->n;
                     float *dst_p = tmp + (size_t)ud[b] * 4;
-                    float32x4_t best = vld1q_f32(dst_p);
+                    v4f best = v4_load(dst_p);
                     for (int64_t e = s0; e < s1; e++) {
-                        float32x4_t val = vld1q_f32(a + (size_t)src[e] * 4);
+                        v4f val = v4_load(a + (size_t)src[e] * 4);
                         float dd = D[e] - mu;
                         float base = nh * dd * dd + nlsd + w[e];
-                        float32x4_t r = vsubq_f32(vdth, vdupq_n_f32(dphi[e]));
-                        float32x4_t r2 = vmulq_f32(r, r);
-                        float32x4_t is2 = vld1q_f32(is2_4 + (size_t)e * 4);
-                        float32x4_t ls = vld1q_f32(ls4 + (size_t)e * 4);
-                        float32x4_t lt = vaddq_f32(vdupq_n_f32(base), ls);
-                        lt = vfmsq_f32(lt, vc1, fast_log1pf_neon(vmulq_f32(r2, is2)));
-                        best = vmaxq_f32(best, vaddq_f32(val, lt));
+                        v4f r = v4_sub(vdth, v4_dup(dphi[e]));
+                        v4f r2 = v4_mul(r, r);
+                        v4f is2 = v4_load(is2_4 + (size_t)e * 4);
+                        v4f ls = v4_load(ls4 + (size_t)e * 4);
+                        v4f lt = v4_add(v4_dup(base), ls);
+                        lt = v4_fms(lt, vc1, fast_log1pf_v4(v4_mul(r2, is2)));
+                        best = v4_max(best, v4_add(val, lt));
                     }
-                    vst1q_f32(dst_p, best);
+                    v4_store(dst_p, best);
                 }
             } else {
                 for (int32_t b = 0; b < n_ud; b++) {
                     int64_t s0 = starts[b];
                     int64_t s1 = (b + 1 < n_ud) ? starts[b + 1] : gr->n;
                     float *dst_p = tmp + (size_t)ud[b] * 4;
-                    float32x4_t best = vld1q_f32(dst_p);
+                    v4f best = v4_load(dst_p);
                     for (int64_t e = s0; e < s1; e++) {
-                        float32x4_t val = vld1q_f32(a + (size_t)src[e] * 4);
+                        v4f val = v4_load(a + (size_t)src[e] * 4);
                         float dd = D[e] - mu;
                         float base = nh * dd * dd + nlsd + w[e];
-                        best = vmaxq_f32(best, vaddq_f32(val, vdupq_n_f32(base)));
+                        best = v4_max(best, v4_add(val, v4_dup(base)));
                     }
-                    vst1q_f32(dst_p, best);
+                    v4_store(dst_p, best);
                 }
             }
         }
         const uint8_t *mask = find_step_mask(j, J->n_step_ok, J->step_ok_steps, J->step_ok_masks);
         if (mask) {
             for (int32_t i = 0; i < N; i++) {
-                if (!mask[i]) vst1q_f32(tmp + (size_t)i * 4, vNEG);
+                if (!mask[i]) v4_store(tmp + (size_t)i * 4, vNEG);
             }
         }
         float *sw = a; a = tmp; tmp = sw;
     }
-    float32x4_t best = vNEG;
+    v4f best = vNEG;
     if (J->end_lp) {
         for (int32_t i = 0; i < N; i++) {
             float elp = J->end_lp[i];
             if (elp == NEG) continue;
-            best = vmaxq_f32(best, vaddq_f32(vld1q_f32(a + (size_t)i * 4), vdupq_n_f32(elp)));
+            best = v4_max(best, v4_add(v4_load(a + (size_t)i * 4), v4_dup(elp)));
         }
     } else {
-        for (int32_t i = 0; i < N; i++) best = vmaxq_f32(best, vld1q_f32(a + (size_t)i * 4));
+        for (int32_t i = 0; i < N; i++) best = v4_max(best, v4_load(a + (size_t)i * 4));
     }
-    vst1q_f32(J->out_scores, best);
+    v4_store(J->out_scores, best);
 #else
     for (int32_t i = 0; i < N; i++) {
         float s0 = J->start_init[i];

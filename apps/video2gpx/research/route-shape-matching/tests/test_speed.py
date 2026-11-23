@@ -254,3 +254,97 @@ def test_metal_lk_matches_opencv_and_is_deterministic_across_chunks(tmp_path, mo
     err = np.linalg.norm(m_fl[both] - cv_fl[both], axis=1)
     assert float(np.median(err)) < 0.05
     assert float(np.percentile(err, 90)) < 0.15
+
+
+def test_hwaccel_name_respects_platform_and_env(monkeypatch):
+    from rsm.pipeline import common as CM
+    monkeypatch.delenv("RSM_HWACCEL", raising=False)
+    monkeypatch.setattr(CM.sys, "platform", "darwin")
+    assert CM.hwaccel_name() == "videotoolbox" and CM.hwaccel_enabled() is True
+
+    monkeypatch.setattr(CM.sys, "platform", "linux")
+    assert CM.hwaccel_name() is None and CM.hwaccel_enabled() is False
+
+    monkeypatch.setenv("RSM_HWACCEL", "1")
+    assert CM.hwaccel_name() == "auto" and CM.hwaccel_enabled() is True
+
+    monkeypatch.setenv("RSM_HWACCEL", "vaapi")
+    assert CM.hwaccel_name() == "vaapi" and CM.hwaccel_enabled() is True
+
+    monkeypatch.setenv("RSM_HWACCEL", "0")
+    assert CM.hwaccel_name() is None and CM.hwaccel_enabled() is False
+
+
+def test_dp_native_compiles_for_simd_scalar_and_x86_64_sse2(tmp_path):
+    import shutil
+    import subprocess
+    if not shutil.which("cc"):
+        pytest.skip("C compiler (cc) not available")
+    c_src = Path(N.__file__).resolve().parent / "_dp_native.c"
+    so_simd = tmp_path / "dp_simd.so"
+    so_scalar = tmp_path / "dp_scalar.so"
+    subprocess.run(["cc", "-O3", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC", "-lm", "-lpthread", "-o", str(so_simd), str(c_src)], check=True)
+    subprocess.run(["cc", "-O3", "-Wall", "-Wextra", "-Werror", "-DRSM_NO_SIMD=1", "-shared", "-fPIC", "-lm", "-lpthread", "-o", str(so_scalar), str(c_src)], check=True)
+
+    # On macOS with universal clang SDK, also verify that the x86_64 SSE2 path compiles cleanly with -Werror
+    if shutil.which("clang") and os.uname().sysname == "Darwin":
+        so_x86 = tmp_path / "dp_x86_64.so"
+        subprocess.run(["clang", "-arch", "x86_64", "-O3", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC", "-lm", "-lpthread", "-o", str(so_x86), str(c_src)], check=True)
+        # Verify the compiled x86_64 binary uses the SIMD path (not scalar fallback) by checking RSM_HAS_SIMD via nm/objdump or running under Rosetta if available
+        if shutil.which("arch"):
+            chk = subprocess.run(["arch", "-x86_64", "/usr/bin/true"], capture_output=True)
+            if chk.returncode == 0:
+                c_test = tmp_path / "test_x86.c"
+                c_test.write_text(
+                    '#include <stdio.h>\n'
+                    '#include <math.h>\n'
+                    '#include "' + str(c_src) + '"\n'
+                    'int main(void) {\n'
+                    '#if !RSM_HAS_SIMD || !RSM_HAS_SSE2\n'
+                    '#error "Expected RSM_HAS_SIMD == 1 and RSM_HAS_SSE2 == 1 on x86_64"\n'
+                    '#endif\n'
+                    '    float in[4] = {0.0f, 0.25f, 1.5f, 12.0f}, out[4];\n'
+                    '    v4_store(out, fast_log1pf_v4(v4_load(in)));\n'
+                    '    for (int i = 0; i < 4; i++) {\n'
+                    '        float ref = fast_log1pf_scalar(in[i]);\n'
+                    '        if (fabsf(out[i] - ref) > 1e-6f) return i + 1;\n'
+                    '    }\n'
+                    '    int32_t src[2] = {0, 1}, ud[2] = {1, 2};\n'
+                    '    int64_t starts[2] = {0, 1};\n'
+                    '    float D[2] = {30.0f, 31.0f}, dphi[2] = {0.1f, -0.2f}, w[2] = {0.0f, -0.1f};\n'
+                    '    GroupBase gr = {2, 2, src, D, dphi, w, starts, ud, NULL, 30.0f, 31.0f};\n'
+                    '    float ls4[8] = {-0.1f,-0.2f,-0.3f,-0.4f, -0.1f,-0.2f,-0.3f,-0.4f};\n'
+                    '    float is2_4[8] = {1.0f, 2.0f, 3.0f, 4.0f, 1.5f, 2.5f, 3.5f, 4.5f};\n'
+                    '    const float *ls_p[1] = {ls4}, *is2_p[1] = {is2_4};\n'
+                    '    float mus[3] = {0.0f, 30.0f, 30.5f}, sds[3] = {0.0f, 5.0f, 5.0f};\n'
+                    '    int32_t has_dth[3] = {0, 1, 1};\n'
+                    '    float dths4[12] = {0,0,0,0, 0.1f,0.2f,0.3f,0.4f, -0.2f,-0.1f,0.0f,0.1f};\n'
+                    '    float s0[3] = {0.0f, -INFINITY, -INFINITY};\n'
+                    '    Batch4Job job = {3, 3, 1, &gr, ls_p, is2_p, mus, sds, has_dth, dths4, 2.0f, s0, NULL, 0, NULL, NULL, {0,0,0,0}};\n'
+                    '    viterbi_scan_batches(1, 1, &job);\n'
+                    '    for (int k = 0; k < 4; k++) {\n'
+                    '        if (!isfinite(job.out_scores[k])) return 10 + k;\n'
+                    '    }\n'
+                    '    return 0;\n'
+                    '}\n'
+                )
+                bin_x86 = tmp_path / "test_x86"
+                subprocess.run(["clang", "-arch", "x86_64", "-O3", "-Wall", "-Wextra", "-Werror", "-lm", "-lpthread", "-o", str(bin_x86), str(c_test)], check=True)
+                subprocess.run(["arch", "-x86_64", str(bin_x86)], check=True)
+
+    # Compare SIMD vs scalar C build on the same HMM problem
+    g = _toy_graph()
+    G = grid.build(g, h=30.0, sm=10.0)
+    st = _toy_steps()
+    a_angs = [C.F_REF / f for f in C.F_GRID[:6]]
+    par0 = dp.Par(kappa=1.0)
+    saved = N.LIB
+    try:
+        N.LIB = N._bind(so_simd)
+        sc_simd = N.viterbi_scan(G, par0, st, a_angs, threads=2)
+        N.LIB = N._bind(so_scalar)
+        sc_scalar = N.viterbi_scan(G, par0, st, a_angs, threads=2)
+    finally:
+        N.LIB = saved
+    assert np.max(np.abs(sc_simd - sc_scalar)) < 1e-5
+

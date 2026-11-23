@@ -31,7 +31,7 @@ ARCH="$(uname -m)"
 NATIVE_SRC="$RSM/rsm/hmm_cal/_dp_native.c"
 NATIVE_SO="$RSM/rsm/hmm_cal/_dp_native_${ARCH}.so"
 if [ -f "$NATIVE_SRC" ] && command -v cc >/dev/null && [ ! -f "$NATIVE_SO" -o "$NATIVE_SRC" -nt "$NATIVE_SO" ]; then
-  cc -O3 -shared -fPIC -lpthread -o "$NATIVE_SO" "$NATIVE_SRC" || true
+  cc -O3 -shared -fPIC -lm -lpthread -o "$NATIVE_SO" "$NATIVE_SRC" || true
 fi
 PBF_SRC="$RSM/rsm/pipeline/_pbf_native.c"
 PBF_SO="$RSM/rsm/pipeline/_pbf_native_${ARCH}.so"
