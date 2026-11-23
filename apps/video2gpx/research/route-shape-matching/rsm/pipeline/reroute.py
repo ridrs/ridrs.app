@@ -162,7 +162,13 @@ def _build_edge_index(g: NetGraph) -> tuple[cKDTree, np.ndarray]:
     return cKDTree(np.vstack(pts_list)), np.concatenate(eid_list)
 
 
-def _snap_candidates(g: NetGraph, tree: cKDTree, sample_eid: np.ndarray, p: np.ndarray, max_cands: int = 6) -> list[tuple[int, float, float]]:
+USER_SNAP_BAND_M = 3.0
+FALLBACK_SNAP_BAND_M = 20.0
+
+
+def _snap_candidates(
+    g: NetGraph, tree: cKDTree, sample_eid: np.ndarray, p: np.ndarray, max_cands: int = 6, band_m: float = FALLBACK_SNAP_BAND_M
+) -> list[tuple[int, float, float]]:
     """Snap point p=(x,y) to candidate directed edges -> list of (edge_id, off_m, dist_m), sorted by dist_m."""
     k = min(48, len(sample_eid))
     _, idxs = tree.query(p, k=k)
@@ -175,28 +181,33 @@ def _snap_candidates(g: NetGraph, tree: cKDTree, sample_eid: np.ndarray, p: np.n
     if not cands:
         return []
     best_d = cands[0][2]
-    # Keep candidates close to the nearest road (covers both directions of a two-way street and nearby junctions)
-    kept = [c for c in cands if c[2] <= best_d + 20.0][:max_cands]
+    # Keep candidates within band_m of the nearest road (both directions of a two-way street have equal dist)
+    kept = [c for c in cands if c[2] <= best_d + band_m][:max_cands]
     return kept
 
 
-def _base_edge_weights(g: NetGraph, orig_xy: np.ndarray) -> np.ndarray:
-    """Per-edge cost multiplier: 0.35 for edges aligned with orig_xy in position & direction, 1.0 for normal roads/paths/bridges,
-    mild soft preference against footways/pedestrian (1.3) and steps (2.5) so short connections/bridges are used cleanly while roads/cycleways win ties."""
+def _base_edge_weights(g: NetGraph, orig_xy: np.ndarray, exclude_spans: list[tuple[float, float]] | None = None) -> np.ndarray:
+    """Per-edge cost multiplier: 0.35 for edges aligned with orig_xy in position & direction (outside detour exclude_spans around off-route vias),
+    1.0 for normal roads/paths/bridges, mild soft preference against footways/pedestrian (1.3) and steps (2.5) so short connections/bridges are used cleanly while roads/cycleways win ties."""
     scale = np.ones(g.n_edges, float)
     hw = np.asarray(g.edge_highway).astype(str)
     scale[np.isin(hw, ("footway", "pedestrian"))] = 1.3
     scale[hw == "steps"] = 2.5
     if len(orig_xy) < 2:
         return scale
-    dense, _, tang = _densify(orig_xy, 5.0)
+    dense, orig_sg, tang = _densify(orig_xy, 5.0)
     otree = cKDTree(dense)
+    spans = exclude_spans or []
     for e in range(g.n_edges):
         poly = g.geom(e)
         p0, p1 = poly[0], poly[-1]
         pm = poly[len(poly) // 2]
         dists, idxs = otree.query(np.vstack([p0, pm, p1]))
         if float(dists.max()) <= 18.0:
+            if spans:
+                sm = 0.5 * (float(orig_sg[idxs[0]]) + float(orig_sg[idxs[2]]))
+                if any(lo <= sm <= hi for lo, hi in spans):
+                    continue
             v = p1 - p0
             vn = float(np.hypot(v[0], v[1]))
             if vn < 1e-6 or float(np.dot(v / vn, tang[idxs[1]])) >= 0.45:
@@ -345,8 +356,6 @@ def route_through_waypoints(
     end_moved: bool,
 ) -> RoutePath:
     """Find a directed road/path route on `g` through [start, ...vias, end], preserving untouched stretches of orig_xy."""
-    w_scale = _base_edge_weights(g, orig_xy)
-    adj = _build_adj(g, w_scale)
     tree, sample_eid = _build_edge_index(g)
     dense_orig, orig_sg, _ = _densify(orig_xy, 5.0)
     otree = cKDTree(dense_orig)
@@ -360,10 +369,17 @@ def route_through_waypoints(
     s0, d0 = (0.0, 0.0) if not start_moved else _orig_pos(start_xy, None)
     s1, d1 = (L_orig, 0.0) if not end_moved else _orig_pos(end_xy, None)
     user_pts: list[tuple[np.ndarray, float, float, bool]] = [(start_xy, s0, d0, True)]
+    exclude_spans: list[tuple[float, float]] = []
     for v_xy, hint_s in vias:
         sv, dv = _orig_pos(v_xy, hint_s)
         user_pts.append((v_xy, sv, dv, True))
+        if dv > 5.0:
+            exc = max(250.0, 1.8 * dv)
+            exclude_spans.append((sv - exc, sv + exc))
     user_pts.append((end_xy, s1, d1, True))
+
+    w_scale = _base_edge_weights(g, orig_xy, exclude_spans=exclude_spans)
+    adj = _build_adj(g, w_scale)
 
     # Insert automatic base-route guide points between consecutive user waypoints so untouched loops stay intact
     seq: list[tuple[np.ndarray, bool]] = []
@@ -381,51 +397,81 @@ def route_through_waypoints(
                 gxy = np.array([np.interp(gs, orig_sg, dense_orig[:, 0]), np.interp(gs, orig_sg, dense_orig[:, 1])])
                 seq.append((gxy, False))
 
-    # Snap every point in seq to candidate directed edges
-    snapped: list[tuple[list[tuple[int, float, float]], bool]] = []
+    # Snap every point in seq to candidate directed edges.
+    # User waypoints use a tight snap band (USER_SNAP_BAND_M) so a dot placed on a parallel road 5-20 m from orig_xy
+    # never snaps back onto the 0.35x-discounted orig route; if that tight snap is unreachable in the DP, it retries with FALLBACK_SNAP_BAND_M.
+    snapped: list[tuple[np.ndarray, list[tuple[int, float, float]], bool]] = []
     for pt, is_user in seq:
-        cands = _snap_candidates(g, tree, sample_eid, pt, max_cands=6 if is_user else 3)
+        cands = _snap_candidates(g, tree, sample_eid, pt, max_cands=6 if is_user else 3, band_m=USER_SNAP_BAND_M if is_user else FALLBACK_SNAP_BAND_M)
         if not cands:
             if is_user:
                 raise RuntimeError("Kein Weg oder keine Straße in der Nähe des gesetzten Punkts gefunden.")
             continue
-        snapped.append((cands, is_user))
+        snapped.append((pt, cands, is_user))
 
-    # Dynamic programming over candidate snaps across the sequence (skipping unreachable guide points)
-    dp_cost = [c[2] * 2.0 for c in snapped[0][0]]  # small snap distance tie-breaker
-    dp_chain: list[tuple[int, list[int]]] = [(c[0], []) for c in snapped[0][0]]  # (start_cand_idx_unused -> start_off tracked below)
-    dp_start_cand = list(range(len(snapped[0][0])))
-    dp_edges: list[list[int]] = [[c[0]] for c in snapped[0][0]]
-    cur_cands = snapped[0][0]
-
-    for nxt_cands, is_user in snapped[1:]:
-        segs = _segment_paths(g, adj, w_scale, cur_cands, nxt_cands)
+    def _step_dp(
+        prev_cands: list[tuple[int, float, float]],
+        prev_cost: list[float],
+        prev_edges: list[list[int]],
+        prev_start: list[int],
+        nxt_cands: list[tuple[int, float, float]],
+        snap_w: float,
+    ):
+        segs = _segment_paths(g, adj, w_scale, prev_cands, nxt_cands)
         new_cost = [float("inf")] * len(nxt_cands)
         new_edges: list[list[int]] = [[] for _ in nxt_cands]
         new_start = [0] * len(nxt_cands)
         for j, (eb, _off_b, dist_b) in enumerate(nxt_cands):
             best_c = float("inf")
             best_i = -1
-            for i in range(len(cur_cands)):
-                if not np.isfinite(dp_cost[i]) or (i, j) not in segs:
+            for i in range(len(prev_cands)):
+                if not np.isfinite(prev_cost[i]) or (i, j) not in segs:
                     continue
                 sc, _ = segs[(i, j)]
-                tot = dp_cost[i] + sc + dist_b * 2.0
+                tot = prev_cost[i] + sc + dist_b * snap_w
                 if tot < best_c:
                     best_c = tot
                     best_i = i
             if best_i >= 0:
                 new_cost[j] = best_c
-                new_start[j] = dp_start_cand[best_i]
+                new_start[j] = prev_start[best_i]
                 _, mid = segs[(best_i, j)]
-                ea = cur_cands[best_i][0]
-                chain = list(dp_edges[best_i])
+                ea = prev_cands[best_i][0]
+                chain = list(prev_edges[best_i])
                 if ea == eb and not mid:
                     pass  # still on the same edge
                 else:
                     chain.extend(mid)
                     chain.append(eb)
                 new_edges[j] = chain
+        return new_cost, new_edges, new_start
+
+    # Dynamic programming over candidate snaps across the sequence (skipping unreachable guide points)
+    start_cands = snapped[0][1]
+    dp_cost = [c[2] * 20.0 for c in start_cands]
+    dp_start_cand = list(range(len(start_cands)))
+    dp_edges: list[list[int]] = [[c[0]] for c in start_cands]
+    cur_cands = start_cands
+
+    for step_idx, (pt, nxt_cands, is_user) in enumerate(snapped[1:], start=1):
+        snap_w = 20.0 if is_user else 2.0
+        new_cost, new_edges, new_start = _step_dp(cur_cands, dp_cost, dp_edges, dp_start_cand, nxt_cands, snap_w)
+        if not any(np.isfinite(c) for c in new_cost) and is_user:
+            # Retry with the wider fallback band in case the tight snap landed only on a disconnected or wrong-way stub
+            wide = _snap_candidates(g, tree, sample_eid, pt, max_cands=8, band_m=FALLBACK_SNAP_BAND_M)
+            if len(wide) > len(nxt_cands):
+                nxt_cands = wide
+                new_cost, new_edges, new_start = _step_dp(cur_cands, dp_cost, dp_edges, dp_start_cand, nxt_cands, snap_w)
+        if not any(np.isfinite(c) for c in new_cost) and step_idx == 1:
+            # If the start snap itself was on a disconnected stub, widen start candidates once
+            wide_s = _snap_candidates(g, tree, sample_eid, snapped[0][0], max_cands=8, band_m=FALLBACK_SNAP_BAND_M)
+            if len(wide_s) > len(start_cands):
+                start_cands = wide_s
+                cur_cands = wide_s
+                dp_cost = [c[2] * 20.0 for c in start_cands]
+                dp_start_cand = list(range(len(start_cands)))
+                dp_edges = [[c[0]] for c in start_cands]
+                new_cost, new_edges, new_start = _step_dp(cur_cands, dp_cost, dp_edges, dp_start_cand, nxt_cands, snap_w)
         if not any(np.isfinite(c) for c in new_cost):
             if is_user:
                 raise RuntimeError("Keine durchgehende Straßen- oder Wegeverbindung durch die gesetzten Punkte gefunden.")
@@ -439,7 +485,7 @@ def route_through_waypoints(
     if not np.isfinite(dp_cost[best_j]):
         raise RuntimeError("Keine durchgehende Route durch die gesetzten Punkte gefunden.")
     occ = dp_edges[best_j]
-    start_off = snapped[0][0][dp_start_cand[best_j]][1]
+    start_off = start_cands[dp_start_cand[best_j]][1]
     end_off = cur_cands[best_j][1]
     return _build_trimmed_path(g, occ, start_off, end_off)
 

@@ -364,6 +364,16 @@ def _bike_classes(paths: bool):
         C.CLASSES_BIKE = old
 
 
+def _refine_vehicle(d: Path) -> str:
+    """the vehicle decided by route_search (calibration-corrected in vehicle_final.json), falling back to rotation/vehicle.json"""
+    vf = d / "route_search" / "vehicle_final.json"
+    if vf.exists():
+        v = jload(vf).get("vehicle")
+        if v:
+            return str(v)
+    return str(jload(d / "rotation" / "vehicle.json")["effective"])
+
+
 def refine(d: Path, P: dict, W: Worker):
     out = d / "refine"
     out.mkdir(exist_ok=True)
@@ -384,10 +394,10 @@ def refine(d: Path, P: dict, W: Worker):
         E = np.load(d / "map" / "edges_full.npy")
     elif route.get("edge_set") == "paths":       # the bike-path fallback decoded on the map with paths (steps_b.route_search)
         g, E = load_map(d, "paths")
+    veh = _refine_vehicle(d)
     # local pass: corridor with all road classes and finer steps (local.py); progress 0-30 %
     local_info, P0, gap_nom = None, 30.0 if C.LOCAL_ON else 0.0, None
     if C.LOCAL_ON:
-        veh = jload(d / "rotation" / "vehicle.json")["effective"]
         gap_nom = T.gap_nominal(csv, tracks)
         gap_nom = [x if x is not None else g for x, g in zip(OF.still_gap_nominal(csv, tracks, still), gap_nom)]
         with _bike_classes(route.get("edge_set") == "paths" or _paths_searched(d)):
@@ -418,7 +428,7 @@ def refine(d: Path, P: dict, W: Worker):
     ctx.extra["fine"] = fine_profile(csv)        # per-pair odometry distance over time: shapes the distance inside a step in the fusion (shaped_D)
     k = route["kappa"]
     G = grid.build(g, E, h=route.get("h", C.H * k), sm=10.0 * k,
-                   edge_cost=L.minor_cost(g, E, jload(d / "rotation" / "vehicle.json")["effective"]) if route.get("local") else None)
+                   edge_cost=L.minor_cost(g, E, veh) if route.get("local") else None)
     assert G.N == len(cell_edge)
     par = dp.Par(a_ang=route["a_ang"], kappa=k)
     pre = dp.prepare(G, par)

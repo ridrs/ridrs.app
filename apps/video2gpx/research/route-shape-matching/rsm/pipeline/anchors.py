@@ -11,8 +11,9 @@ from pathlib import Path
 
 import numpy as np
 
-TOL_CELLS = 1.0          # frame tolerance in cells (grid spacing h)
-MIN_TOL_M = 10.0         # at least this tolerance in m
+TOL_CELLS = 1.0          # along-road frame tolerance in cells (grid spacing h: accounts for step-time and cell-centre discretization)
+MIN_TOL_M = 10.0         # minimum along-road tolerance in m
+LAT_TOL_M = 3.0          # lateral (perpendicular to the road) margin around the frame in m (avoids swallowing parallel streets 10-20 m away)
 NEAR_S = 5.0             # an anchor applies to a step sequence only if one of its steps lies within this many seconds of t
 GROW_MARGIN_M = 500.0    # margin around an anchor frame that lies outside the search area
 KEYS = ("south", "west", "north", "east")
@@ -78,7 +79,7 @@ def grow_bbox(bbox: dict, anchors: list[dict], margin_m: float = GROW_MARGIN_M) 
 def hash_part(P: dict) -> list:
     """the anchors in the hashes of route_search onward ([] without anchors: old hashes unchanged)"""
     a = P.get("anchors")
-    return [["anchors1", [[x["t"], [x["bbox"][k] for k in KEYS]] for x in a], TOL_CELLS, MIN_TOL_M, NEAR_S]] if a else []
+    return [["anchors2", [[x["t"], [x["bbox"][k] for k in KEYS]] for x in a], TOL_CELLS, MIN_TOL_M, LAT_TOL_M, NEAR_S]] if a else []
 
 
 def step_of(t_steps, t: float, near_s: float = NEAR_S) -> int | None:
@@ -107,11 +108,40 @@ def rect_xy(crs: str, b: dict) -> tuple:
     return _RECT_CACHE[key]
 
 
+def _seg_hits_rect(x0: np.ndarray, y0: np.ndarray, x1: np.ndarray, y1: np.ndarray, rx0: float, ry0: float, rx1: float, ry1: float) -> np.ndarray:
+    """Vectorized Liang-Barsky intersection test of segments (x0,y0)-(x1,y1) against axis-aligned rectangle [rx0,rx1] x [ry0,ry1]."""
+    dx = x1 - x0
+    dy = y1 - y0
+    tmin = np.zeros_like(x0, dtype=float)
+    tmax = np.ones_like(x0, dtype=float)
+    ok = np.ones(len(x0), dtype=bool)
+    for p, q in ((-dx, x0 - rx0), (dx, rx1 - x0), (-dy, y0 - ry0), (dy, ry1 - y0)):
+        par = np.abs(p) < 1e-12
+        ok &= ~(par & (q < 0.0))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            r = np.where(par, 0.0, q / p)
+        tmin = np.where(~par & (p < 0.0), np.maximum(tmin, r), tmin)
+        tmax = np.where(~par & (p > 0.0), np.minimum(tmax, r), tmax)
+    return ok & (tmin <= tmax)
+
+
 def cell_mask(G, rect: tuple, tol_m: float | None = None) -> np.ndarray:
-    """bool over the grid cells: centre inside rect grown by tol_m (default: about one cell)"""
-    tol = max(MIN_TOL_M, TOL_CELLS * float(G.h)) if tol_m is None else tol_m
+    """bool over the grid cells: along the cell's road heading within +-along_tol (~1 cell) of rect and laterally within LAT_TOL_M,
+    so tight frames distinguish parallel streets 10-20 m apart even at coarse search spacing h. Falls back to isotropic along_tol
+    when no cell intersects the tight frame (e.g. a small box drawn beside a road) or when an explicit tol_m is given."""
     x, y = G.xy[:, 0], G.xy[:, 1]
-    return (x >= rect[0] - tol) & (x <= rect[2] + tol) & (y >= rect[1] - tol) & (y <= rect[3] + tol)
+    along = max(MIN_TOL_M, TOL_CELLS * float(G.h)) if tol_m is None else tol_m
+    phi = getattr(G, "phi", None)
+    if tol_m is None and phi is not None:
+        ux, uy = np.cos(phi), np.sin(phi)
+        m = _seg_hits_rect(
+            x - along * ux, y - along * uy,
+            x + along * ux, y + along * uy,
+            rect[0] - LAT_TOL_M, rect[1] - LAT_TOL_M, rect[2] + LAT_TOL_M, rect[3] + LAT_TOL_M,
+        )
+        if m.any():
+            return m
+    return (x >= rect[0] - along) & (x <= rect[2] + along) & (y >= rect[1] - along) & (y <= rect[3] + along)
 
 
 def step_masks(G, st, anchors: list[dict], crs: str | None = None) -> dict:

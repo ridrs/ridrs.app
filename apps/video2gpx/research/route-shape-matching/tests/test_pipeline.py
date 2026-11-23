@@ -756,6 +756,20 @@ def test_local_classes_add_residential_for_motor_vehicles():
     assert set(C.CLASSES_BIKE) <= set(L.classes_for("bike"))
 
 
+def test_refine_uses_calibrated_vehicle_final_over_rotation_guess(tmp_path):
+    """When rotation/vehicle.json guessed 'bike' under vehicle='auto' but route_search calibrated 'motorcycle' in vehicle_final.json,
+    refine must pass 'motorcycle' to local_pass and minor_cost so parallel residential streets receive the road-class prior."""
+    from rsm.pipeline import steps_c as SC
+    (tmp_path / "rotation").mkdir()
+    (tmp_path / "route_search").mkdir()
+    (tmp_path / "rotation" / "vehicle.json").write_text(json.dumps(dict(requested="auto", effective="bike")))
+    # Before vehicle_final.json exists, fall back to rotation/vehicle.json
+    assert SC._refine_vehicle(tmp_path) == "bike"
+    # Once route_search wrote vehicle_final.json, refine must use the calibrated vehicle
+    (tmp_path / "route_search" / "vehicle_final.json").write_text(json.dumps(dict(vehicle="motorcycle", from_kappa=True)))
+    assert SC._refine_vehicle(tmp_path) == "motorcycle"
+
+
 # ------------------------------------------------------------------ timing: measured standstills, dense heading alignment
 def test_make_steps_uses_a_measured_gap_instead_of_the_mean_speed():
     from rsm.hmm import seq

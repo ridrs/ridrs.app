@@ -258,3 +258,97 @@ def test_contraflow_bike_oneway_allowed_in_reroute_graph():
     assert int((g_bike.edge_way == 22756869).sum()) == 2
     assert int((g_bike.edge_way == 169723496).sum()) == 1
 
+
+def _make_close_parallel_graph(sep_m: float = 16.0, crs: str = "EPSG:32632", x0: float = 500000.0, y0: float = 5200000.0) -> tuple[NetGraph, float, float]:
+    """Two parallel roads `sep_m` apart over 420 m (like Menton: Avenue Cernuschi vs Cours René Coty), joining at both ends
+    plus a mid-block cross street at x=195 m (like Avenue Guillaume I de Provence)."""
+    # 0: entry (-100, 0), 1: north junction (0, 0), 2: mid south (195, 0), 3: south junction (420, 0), 4: exit (520, 0)
+    # 5: north main (0, sep_m), 6: mid main (195, sep_m), 7: south main (420, sep_m)
+    nxy = np.array([
+        [x0 - 100.0, y0],
+        [x0, y0],
+        [x0 + 195.0, y0],
+        [x0 + 420.0, y0],
+        [x0 + 520.0, y0],
+        [x0, y0 + sep_m],
+        [x0 + 195.0, y0 + sep_m],
+        [x0 + 420.0, y0 + sep_m],
+    ], float)
+    nosm = np.arange(1, len(nxy) + 1, dtype=np.int64)
+    eu, ev, elen, eway, eoff, egeom, ename, eref, ehw, etu, ebr, eow = [], [], [], [], [0], [], [], [], [], [], [], []
+    wid = 200
+
+    def add_seg(u: int, v: int, hw: str, name: str, oneway: bool = False):
+        nonlocal wid
+        wid += 1
+        p0, p1 = nxy[u], nxy[v]
+        pts = np.column_stack([np.linspace(p0[0], p1[0], 5), np.linspace(p0[1], p1[1], 5)])
+        L = float(np.hypot(*(p1 - p0)))
+        dirs = ((u, v, pts),) if oneway else ((u, v, pts), (v, u, pts[::-1]))
+        for a, b, g_ in dirs:
+            eu.append(a); ev.append(b); elen.append(L); eway.append(wid)
+            egeom.append(g_); eoff.append(eoff[-1] + len(g_))
+            ename.append(name); eref.append(""); ehw.append(hw)
+            etu.append(False); ebr.append(False); eow.append(oneway)
+
+    add_seg(0, 1, "tertiary", "Approach")
+    add_seg(1, 2, "residential", "Avenue Cernuschi", oneway=True)
+    add_seg(2, 3, "residential", "Avenue Cernuschi", oneway=True)
+    add_seg(1, 5, "tertiary", "North Roundabout", oneway=True)
+    add_seg(5, 6, "tertiary", "Cours René Coty")
+    add_seg(6, 7, "tertiary", "Cours René Coty")
+    add_seg(2, 6, "residential", "Avenue Guillaume I de Provence")
+    add_seg(7, 3, "tertiary", "South Roundabout", oneway=True)
+    add_seg(3, 4, "secondary", "Exit")
+
+    g = NetGraph(
+        crs=crs, node_xy=nxy, node_osm=nosm,
+        edge_u=np.array(eu, np.int32), edge_v=np.array(ev, np.int32),
+        edge_len=np.array(elen, float), edge_way=np.array(eway, np.int64),
+        edge_off=np.array(eoff, np.int64), edge_geom=np.vstack(egeom),
+        edge_name=np.array(ename), edge_ref=np.array(eref), edge_highway=np.array(ehw),
+        edge_tunnel=np.array(etu, bool), edge_bridge=np.array(ebr, bool), edge_oneway=np.array(eow, bool),
+    )
+    return g, x0, y0
+
+
+@pytest.mark.parametrize("sep_m", [16.0, 6.0])
+def test_via_on_close_parallel_street_does_not_snap_back_to_orig_route(sep_m):
+    """Dragging a via dot onto a parallel road 6–16 m from orig_xy must switch cleanly onto that road for the full block
+    instead of snapping back or zig-zagging across a mid-block side street."""
+    g, x0, y0 = _make_close_parallel_graph(sep_m=sep_m)
+    orig_xy = np.column_stack([np.arange(x0 - 100.0, x0 + 521.0, 1.0), np.full(621, y0)])
+    # User places via past the mid-block cross-street (at x=260 m), 1.5 m from the parallel main street
+    via_xy = np.array([x0 + 260.0, y0 + sep_m - 1.5])
+    path = RR.route_through_waypoints(g, orig_xy, orig_xy[0], orig_xy[-1], [(via_xy, 360.0)], start_moved=False, end_moved=False)
+    d_via = float(np.min(np.hypot(path.xy[:, 0] - via_xy[0], path.xy[:, 1] - via_xy[1])))
+    assert d_via < 2.5, f"via on {sep_m} m parallel road snapped back (min dist {d_via:.1f} m)"
+    # Entire parallel stretch (both before and after the mid-block cross-street) stays on Cours René Coty, no jog via Avenue Cernuschi
+    mid = path.xy[(path.xy[:, 0] >= x0 + 30.0) & (path.xy[:, 0] <= x0 + 390.0)]
+    assert float(np.min(mid[:, 1])) == pytest.approx(y0 + sep_m, abs=1.0)
+
+
+def test_via_near_unreachable_stub_falls_back_to_wider_snap_band():
+    """If the tight user snap lands only on a disconnected/unreachable edge, the DP retries with the wider 20 m band."""
+    g, x0, y0 = _make_close_parallel_graph(sep_m=16.0)
+    # Add an isolated dead-end stub 10 m south of orig_xy (at y0 - 10)
+    n0 = len(g.node_xy)
+    nxy = np.vstack([g.node_xy, [[x0 + 200.0, y0 - 10.0], [x0 + 220.0, y0 - 10.0]]])
+    nosm = np.concatenate([g.node_osm, [9001, 9002]])
+    stub = np.array([[x0 + 200.0, y0 - 10.0], [x0 + 220.0, y0 - 10.0]])
+    g2 = NetGraph(
+        crs=g.crs, node_xy=nxy, node_osm=nosm,
+        edge_u=np.concatenate([g.edge_u, [n0]]), edge_v=np.concatenate([g.edge_v, [n0 + 1]]),
+        edge_len=np.concatenate([g.edge_len, [20.0]]), edge_way=np.concatenate([g.edge_way, [999]]),
+        edge_off=np.concatenate([g.edge_off, [g.edge_off[-1] + 2]]), edge_geom=np.vstack([g.edge_geom, stub]),
+        edge_name=np.concatenate([g.edge_name, ["Isolated Stub"]]), edge_ref=np.concatenate([g.edge_ref, [""]]),
+        edge_highway=np.concatenate([g.edge_highway, ["service"]]),
+        edge_tunnel=np.concatenate([g.edge_tunnel, [False]]), edge_bridge=np.concatenate([g.edge_bridge, [False]]),
+        edge_oneway=np.concatenate([g.edge_oneway, [True]]),
+    )
+    orig_xy = np.column_stack([np.arange(x0 - 100.0, x0 + 521.0, 1.0), np.full(621, y0)])
+    # Click right on the isolated stub (10 m from orig_xy): tight snap hits only the unreachable stub -> fallback reaches orig_xy
+    via_xy = np.array([x0 + 210.0, y0 - 10.0])
+    path = RR.route_through_waypoints(g2, orig_xy, orig_xy[0], orig_xy[-1], [(via_xy, 310.0)], start_moved=False, end_moved=False)
+    assert path.sg[-1] > 500.0
+

@@ -184,3 +184,43 @@ def test_from_step_needs_resume_and_earlier_results(tmp_path, monkeypatch):
     assert rc == 2 and ran == []
     rc, ran, _ = _fake_pipeline(tmp_path, monkeypatch, ["--resume", "--from-step", "refine"])
     assert rc == 2 and ran == []                        # no earlier run to reuse
+
+
+def test_tight_anchor_separates_close_parallel_streets_even_with_large_cell_spacing():
+    """Two parallel roads 16 m apart running diagonally (like Menton: Cours René Coty vs Avenue Cernuschi).
+    Even at search grid spacing h=48 m, an anchor frame covering only the main road must include the main road's cells
+    (with along-road tolerance for step discretization) and exclude the parallel street 16 m sideways."""
+    from rsm.hmm import grid
+    from rsm.network.graph import NetGraph
+    x0, y0 = 378400.0, 4847900.0
+    # Diagonal unit vector SE and perpendicular NE (separation 16 m)
+    d_se = np.array([1.0, -1.0]) / np.sqrt(2.0)
+    d_ne = np.array([1.0, 1.0]) / np.sqrt(2.0)
+    p0 = np.array([x0, y0])
+    nxy = np.array([
+        p0, p0 + 400.0 * d_se,                           # 0->1: parallel residential street (SW)
+        p0 + 16.0 * d_ne, p0 + 16.0 * d_ne + 400.0 * d_se,  # 2->3: main road (NE, 16 m away)
+    ], float)
+    egeom = np.vstack([nxy[0:2], nxy[2:4]])
+    g = NetGraph(
+        crs="EPSG:32632", node_xy=nxy, node_osm=np.array([1, 2, 3, 4], np.int64),
+        edge_u=np.array([0, 2], np.int32), edge_v=np.array([1, 3], np.int32),
+        edge_len=np.array([400.0, 400.0], float), edge_way=np.array([10, 20], np.int64),
+        edge_off=np.array([0, 2, 4], np.int64), edge_geom=egeom,
+        edge_name=np.array(["Avenue Cernuschi", "Cours René Coty"]), edge_ref=np.array(["", "D 22"]),
+        edge_highway=np.array(["residential", "tertiary"]),
+        edge_tunnel=np.array([False, False]), edge_bridge=np.array([False, False]), edge_oneway=np.array([True, False]),
+    )
+    # Anchor box placed right over the midpoint of the main road, extending NE (strictly >= 8 m away from the SW parallel street)
+    mid_main = p0 + 16.0 * d_ne + 200.0 * d_se
+    rect = (float(mid_main[0] - 5.0), float(mid_main[1] - 5.0), float(mid_main[0] + 40.0), float(mid_main[1] + 25.0))
+    for h in (48.0, 24.0):
+        G = grid.build(g, None, h=h, sm=10.0)
+        m = AN.cell_mask(G, rect)
+        assert m[G.cell_edge == 1].any(), f"h={h}: main road cells missing from anchor mask"
+        assert not m[G.cell_edge == 0].any(), f"h={h}: parallel street 16 m away leaked into anchor mask"
+    # Fallback: a small off-road box 15 m away from the nearest road still falls back so it is not empty
+    off_pt = p0 + 31.0 * d_ne + 200.0 * d_se
+    G = grid.build(g, None, h=48.0, sm=10.0)
+    m_off = AN.cell_mask(G, (float(off_pt[0] - 2.0), float(off_pt[1] - 2.0), float(off_pt[0] + 2.0), float(off_pt[1] + 2.0)))
+    assert m_off.any()
