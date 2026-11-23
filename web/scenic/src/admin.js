@@ -10,6 +10,7 @@ import { basePath, VIDEO_ID } from './base.js';
 import { FTS_INSERT } from './search-index.js';
 import { buildTrack, anchorLevel, evaluateReview, kmAlong, project, LOC_RULES, KEYS } from '../site/lib/route-sync.js';
 import { sniffImage, contentId, MAX_IMAGE_BYTES, RIGHTS } from './images.js';
+import { routeLines } from './route-lines.js';
 import { buildJob, validateResult, resultMeta, routeAgreement, uploadLevel, MAX_RESULT_BYTES, ROUTE_OFFER_M } from './video2gpx.js';
 
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
@@ -452,7 +453,10 @@ async function listVideos(env, url) {
   if (loc) { binds.push(loc); where.push(`l.loc_level <= ?${binds.length}`); }
   const ONLY = { site_published: 'v.site_published = 1', unpublished: 'v.site_published = 0', hidden: 'v.hidden = 1', pick: 'v.editors_pick = 1', stars: 'v.stars IS NOT NULL', note: 'v.editor_note IS NOT NULL',
     manual: 'EXISTS (SELECT 1 FROM manual_field m WHERE m.video_id = v.video_id)', anchors: 'EXISTS (SELECT 1 FROM sync_anchor a WHERE a.video_id = v.video_id)',
-    review: 'l.loc_level = 2', route: 'r.video_id IS NOT NULL', optout: 'o.channel_id IS NOT NULL' };
+    review: 'l.loc_level = 2', route: 'r.video_id IS NOT NULL', optout: 'o.channel_id IS NOT NULL',
+    // level 1 or 2 and no picture the public dialog could show: no uploaded image, no picture in a ride package (ridePicture in src/rides.js)
+    noimage: `l.loc_level <= 2 AND NOT EXISTS (SELECT 1 FROM video_image i WHERE i.video_id = v.video_id)
+      AND NOT EXISTS (SELECT 1 FROM ride_package p WHERE p.video_id = v.video_id AND (p.thumbnail IS NOT NULL OR p.overlay IS NOT NULL))` };
   if (ONLY[only]) where.push(ONLY[only]);
   // Map view (?map=1): every matching video with a position, all at once, as compact positional rows.
   if (url.searchParams.get('map') === '1') {
@@ -754,6 +758,11 @@ export async function handleAdmin(request, env, who, ctx) {
       images: !!env.IMAGES });
   }
   if (a === 'videos' && !b && m === 'GET') return ajson(await listVideos(env, url));
+  // Lines of the video map: every video, published or not (the public lines.json has the visible ones only).
+  if (a === 'lines.json' && !b && m === 'GET') {
+    const asset = await env.ASSETS?.fetch(new Request(`${origin}/lines.json`));
+    return ajson(await routeLines(env, asset?.ok ? await asset.json() : {}));
+  }
   if (a === 'videos' && b) {
     if (!ID.test(b)) bad('Ungültige Video-ID');
     if (!c && m === 'GET') return ajson(await videoDetail(env, b, origin));

@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../src/worker.js';
+import { handleAdmin } from '../src/admin.js';
 import { buildImportSql } from '../scripts/lib/import-sql.mjs';
 import { encodeLine, decodeLine, simplify } from '../site/lib/lines.js';
 import { makeD1 } from './d1-shim.mjs';
@@ -40,7 +41,7 @@ function setup() {
     run("INSERT OR REPLACE INTO route_sync (video_id, method, path, hash) VALUES (?, 'video2gpx', ?, 'h')", id, `api/sync/${id}.json`);
     run('INSERT OR REPLACE INTO sync_track (video_id, json, hash) VALUES (?, ?, ?)', id, JSON.stringify({ v: 1, t: lonLat.map((_, i) => i), c: lonLat }), 'h');
   };
-  return { run, lines, manualRoute, upload };
+  return { run, lines, manualRoute, upload, DB };
 }
 
 test('encoding: delta in 1e-5 degrees, simplified to about 30 m; decodeLine gives the kept points back', () => {
@@ -80,4 +81,13 @@ test('admin lines of unpublished videos stay out', async () => {
   manualRoute(DRAFT, bend);
   upload(DRAFT, bend);
   assert.deepEqual(Object.keys(await lines()), [PUB]);
+});
+
+test('the admin\'s lines.json has the lines of every video, published or not, with the admin lines laid over them', async () => {
+  const { manualRoute, upload, DB } = setup();
+  const admin = async () => (await handleAdmin(new Request(`${BASE}/api/admin/lines.json`), { DB, ASSETS, BASE_PATH: '/scenic' }, { email: 'editor@example.org' }, null)).json();
+  assert.deepEqual(await admin(), { [PUB]: STATIC, [DRAFT]: STATIC });
+  manualRoute(DRAFT, bend);
+  upload(BARE, bend);
+  assert.deepEqual(await admin(), { [PUB]: STATIC, [DRAFT]: encodeLine(bend), [BARE]: encodeLine(bend) });
 });

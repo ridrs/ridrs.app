@@ -4,6 +4,7 @@
 // Talks only to /api/admin/* (403 without a Cloudflare Access identity, see src/auth.js).
 // The synced player is site/player.js; route geometry, sync rules and review logic are site/lib/route-sync.js.
 import { Map as MapGL, NavigationControl, Marker, LngLatBounds, Popup } from '../vendor/maplibre-gl/maplibre-gl.mjs';
+import { decodeLine } from '../lib/lines.js';
 import { mountPlayer } from '../player.js';
 // The admin is German only (editors); the shared player texts follow it.
 import { setLocale } from '../i18n.js';
@@ -48,8 +49,11 @@ const VIEW_KEY = 'ridrs-scenic.admin.view';
 let listState = { q: '', only: '', loc: '', offset: 0, view: (() => { try { return localStorage.getItem(VIEW_KEY) === 'map' ? 'map' : 'list'; } catch { return 'list'; } })(), camera: null };
 // Map of the video page (view "Karte"); removed when the page changes.
 let listMap = null;
+// Route lines of every video (../api/admin/lines.json), loaded with the map and kept for filter changes; null until loaded.
+let listLines = null, listVids = [];
 function dropListMap() {
   if (!listMap) return;
+  listLines = null;
   listState.camera = { center: listMap.getCenter(), zoom: listMap.getZoom() };
   listMap.remove(); listMap = null;
   $('#view').classList.remove('mapmode');
@@ -77,7 +81,7 @@ async function renderList() {
       <select id="list-only" aria-label="Nur">
         <option value="">alle Videos</option><option value="site_published">veröffentlicht</option><option value="unpublished">nicht veröffentlicht</option><option value="pick">Editor's Pick</option><option value="stars">mit Sternen</option><option value="note">mit Notiz</option>
         <option value="hidden">ausgeblendet</option><option value="manual">von Hand geändert</option><option value="anchors">mit Ankern</option>
-        <option value="review">Stufe 2 (zu prüfen)</option><option value="route">mit Route</option><option value="optout">Kanal mit Opt-out</option></select>
+        <option value="review">Stufe 2 (zu prüfen)</option><option value="noimage">Stufe 1–2 ohne Vorschaubild</option><option value="route">mit Route</option><option value="optout">Kanal mit Opt-out</option></select>
       <select id="list-loc" aria-label="Lokalisierungsstufe"><option value="">jede Stufe</option>${[1, 2, 3, 4, 5, 6].map((l) => `<option value="${l}">Stufe ≤ ${l}</option>`).join('')}</select>
       <span class="viewtoggle" role="group" aria-label="Ansicht"><button type="button" class="btn small" data-view="list">Liste</button><button type="button" class="btn small" data-view="map">Karte</button></span>
     </div><div class="wrap" id="list-body"></div>`;
@@ -130,19 +134,35 @@ async function loadMap() {
   const data = { type: 'FeatureCollection', features: vids.map((x) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [x.lon, x.lat] },
     properties: { id: x.id, title: x.title || x.id, loc: x.loc, pub: x.pub && !x.hidden && !x.optout ? 1 : 0 } })) };
   const nPub = data.features.filter((f) => f.properties.pub).length;
+  listVids = vids;
   if (listMap) {
     listMap.getSource('vids')?.setData(data);
+    setListLines();
     $('#lmap-count').textContent = `${num(vids.length)} Videos · ${num(nPub)} öffentlich`;
     return;
   }
   $('#view').classList.add('mapmode');
   body.innerHTML = `<div id="lmap"></div><p class="lmap-legend meta"><span id="lmap-count">${num(vids.length)} Videos · ${num(nPub)} öffentlich</span>
-    <span><i class="dot pub"></i>veröffentlicht</span><span><i class="dot draft"></i>nicht veröffentlicht</span></p>`;
+    <span><i class="dot pub"></i>veröffentlicht</span><span><i class="dot draft"></i>nicht veröffentlicht</span><span>Routen ab Zoom 5</span></p>`;
   const cam = listState.camera ?? { center: [10, 45], zoom: 3.2 };
   const map = listMap = new MapGL({ container: 'lmap', style: STYLE, center: cam.center, zoom: cam.zoom, attributionControl: false });
   map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+  api('GET', 'lines.json').then((raw) => {
+    if (listMap !== map) return;
+    listLines = new Map(Object.entries(raw).map(([id, f]) => [id, decodeLine(f)]));
+    setListLines();
+  }).catch((e) => toast(`Routen: ${e.message}`, true));
   map.on('load', () => {
     const level = ['match', ['get', 'loc'], 1, css('--l1'), 2, css('--l2'), 3, css('--l3'), 4, css('--l4'), 5, css('--l5'), 6, css('--l6'), css('--l7')];
+    // Routes of the filtered videos under the points, from zoom 5 on (as the public map); not published: thinner and paler.
+    map.addSource('lines', { type: 'geojson', data: fc([]), promoteId: 'id', tolerance: 0.5 });
+    map.addLayer({ id: 'lines', type: 'line', source: 'lines', minzoom: 5, layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': level, 'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, ['==', ['get', 'pub'], 1], 0.8, 0.5],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 5, ['case', ['boolean', ['feature-state', 'hover'], false], 3, 1.2],
+          10, ['case', ['boolean', ['feature-state', 'hover'], false], 5, 2.2], 14, ['case', ['boolean', ['feature-state', 'hover'], false], 7, 3.5]] } });
+    // Invisible, wider twin for hover and click: thin lines are hard to hit.
+    map.addLayer({ id: 'lines-hit', type: 'line', source: 'lines', minzoom: 5, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 12 } });
+    setListLines();
     map.addSource('vids', { type: 'geojson', data, cluster: true, clusterMaxZoom: 11, clusterRadius: 40, clusterProperties: { pub: ['+', ['get', 'pub']] } });
     map.addLayer({ id: 'cl', type: 'circle', source: 'vids', filter: ['has', 'point_count'],
       paint: { 'circle-color': css('--surface-raised'), 'circle-opacity': 0.92, 'circle-stroke-color': ['case', ['>', ['get', 'pub'], 0], css('--l2'), css('--cyan')], 'circle-stroke-width': 1.5,
@@ -171,10 +191,32 @@ async function loadMap() {
   const tip = new Popup({ closeButton: false, closeOnClick: false, offset: 10, className: 'lmap-tip' });
   map.on('mousemove', 'pt', (e) => { const f = e.features[0].properties; tip.setLngLat(e.lngLat).setHTML(`${esc(f.title)}${f.pub ? '' : ' · <em>nicht veröffentlicht</em>'}`).addTo(map); });
   map.on('mouseleave', 'pt', () => tip.remove());
-  for (const l of ['cl', 'pt']) {
+  let hoverId = null;
+  const setHover = (id) => {
+    if (hoverId != null && map.getSource('lines')) map.setFeatureState({ source: 'lines', id: hoverId }, { hover: false });
+    hoverId = id;
+    if (id != null) map.setFeatureState({ source: 'lines', id }, { hover: true });
+  };
+  const onPoint = (e) => map.queryRenderedFeatures(e.point, { layers: ['pt', 'cl'] }).length > 0; // the point wins
+  map.on('click', 'lines-hit', (e) => { if (!onPoint(e)) location.hash = `v=${e.features[0].properties.id}`; });
+  map.on('mousemove', 'lines-hit', (e) => {
+    if (onPoint(e)) return setHover(null);
+    const f = e.features[0]; setHover(f.id);
+    tip.setLngLat(e.lngLat).setHTML(`${esc(f.properties.title)}${f.properties.pub ? '' : ' · <em>nicht veröffentlicht</em>'}`).addTo(map);
+  });
+  map.on('mouseleave', 'lines-hit', () => { setHover(null); tip.remove(); });
+  for (const l of ['cl', 'pt', 'lines-hit']) {
     map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; });
   }
+}
+
+// The lines of the videos on the map now (listVids), once both the lines and the map's source are there.
+function setListLines() {
+  const src = listMap?.getSource('lines');
+  if (!src || !listLines) return;
+  src.setData(fc(listVids.filter((x) => listLines.has(x.id)).map((x) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: listLines.get(x.id) },
+    properties: { id: x.id, title: x.title || x.id, loc: x.loc, pub: x.pub && !x.hidden && !x.optout ? 1 : 0 } }))));
 }
 
 // --- video editor ---

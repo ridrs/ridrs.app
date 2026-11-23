@@ -181,3 +181,21 @@ test('collections, opt-out and export', async () => {
   assert.equal(v.manual.place, 'Hand');
   assert.ok(lines.filter((l) => l.type === 'edit').every((e) => e.who));
 });
+test('list filter "noimage": level 1 and 2 without a preview image, in the list and on the map', async () => {
+  const { env, call } = setup();
+  const run = (s, ...a) => env.DB.raw.prepare(s).run(...a);
+  const C = 'CCCCCCCCCCC', D = 'DDDDDDDDDDD';
+  env.DB.raw.exec(buildImportSql({ videos: [vid(ID), vid('BBBBBBBBBBB'), vid(C), vid(D)], yt: new Map(), sync: new Map(), today: '2026-11-18', at: 'x' }).sql.join('\n'));
+  run('UPDATE localization SET loc_level = 1 WHERE video_id = ?', ID);
+  run('UPDATE localization SET loc_level = 2 WHERE video_id IN (?, ?)', 'BBBBBBBBBBB', C);
+  // D stays at level 4: no image either, but not in the filter
+  run("INSERT INTO video_image (image_id, video_id, kind, r2_key, mime, is_primary) VALUES ('img1', 'BBBBBBBBBBB', 'upload', 'k', 'image/jpeg', 1)");
+  const list = await call('GET', 'videos?only=noimage');
+  assert.deepEqual(list.rows.map((r) => r.video_id).sort(), [ID, C]);
+  const map = await call('GET', 'videos?only=noimage&map=1');
+  assert.deepEqual(map.rows.map((r) => r[0]).sort(), [ID, C]);
+  // a ride whose package brings its own picture has a preview image
+  run(`INSERT INTO ride_package (video_id, download_url, download_format, download_size, distance_m, ascent_m, sparkline, thumbnail, package)
+    VALUES (?, 'u', 'incyclist-gpx-import', 1, 1, 1, '[]', '{"path":"thumbnail.jpg"}', '[]')`, C);
+  assert.deepEqual((await call('GET', 'videos?only=noimage')).rows.map((r) => r.video_id), [ID]);
+});
