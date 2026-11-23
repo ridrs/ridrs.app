@@ -6,16 +6,18 @@ direction (oneway=yes/true/1/-1/reverse and junction=roundabout are one-way), so
 """
 from __future__ import annotations
 
+import array
 import math
 import os
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 
 import numpy as np
 
 from rsm.network.graph import NetGraph
-from . import config as C
+from . import _pbf_native as PN, config as C
 from .common import jload, sha, file_sig
 
 TAGS = ("highway", "name", "ref", "oneway", "oneway:bicycle", "junction", "tunnel", "bridge", "access", "area",
@@ -159,7 +161,39 @@ def _ways(pbf, classes, progress=None, way_filter=None):
     cls = set(classes)
     ok_fn = way_ok if way_filter is None else way_filter
     prog = _FdProgress(pbf)
-    fp = osmium.FileProcessor(str(pbf), osmium.osm.NODE | osmium.osm.WAY).with_locations().with_filter(osmium.filter.KeyFilter("highway"))
+    large = Path(pbf).stat().st_size > 64 * 1024 * 1024
+    with tempfile.TemporaryDirectory(prefix="rsm_pbf_") as td:
+        loc_storage = f"sparse_file_array,{Path(td) / 'nodes.idx'}" if large else "flex_mem"
+        fp = osmium.FileProcessor(str(pbf), osmium.osm.NODE | osmium.osm.WAY).with_locations(loc_storage).with_filter(osmium.filter.KeyFilter("highway"))
+        n = 0
+        for w in fp:
+            if not w.is_way():
+                continue
+            n += 1
+            if progress and n % 20000 == 0:
+                f = prog.frac()
+                if f is not None:
+                    progress(f)
+            t = w.tags
+            if t.get("highway") not in cls or t.get("area") == "yes" or not ok_fn(t):
+                continue
+            try:
+                pts = [(nd.ref, nd.lat, nd.lon) for nd in w.nodes]
+            except osmium.InvalidLocationError:
+                continue
+            if len(pts) >= 2:
+                yield w.id, {k: t[k] for k in TAGS if k in t}, pts
+    if progress:
+        progress(1.0)
+
+
+def _iter_road_ways(pbf, classes, progress=None, way_filter=None):
+    """Stream matching highway ways WITHOUT reading or caching node locations (WAY-only PBF pass). Yields (wid, tags_dict, refs_list)."""
+    import osmium
+    cls = set(classes)
+    ok_fn = way_ok if way_filter is None else way_filter
+    prog = _FdProgress(pbf)
+    fp = osmium.FileProcessor(str(pbf), osmium.osm.WAY).with_filter(osmium.filter.KeyFilter("highway"))
     n = 0
     for w in fp:
         if not w.is_way():
@@ -172,14 +206,63 @@ def _ways(pbf, classes, progress=None, way_filter=None):
         t = w.tags
         if t.get("highway") not in cls or t.get("area") == "yes" or not ok_fn(t):
             continue
-        try:
-            pts = [(nd.ref, nd.lat, nd.lon) for nd in w.nodes]
-        except osmium.InvalidLocationError:
-            continue
-        if len(pts) >= 2:
-            yield w.id, {k: t[k] for k in TAGS if k in t}, pts
+        refs = [nd.ref for nd in w.nodes]
+        if len(refs) >= 2:
+            yield w.id, t, refs
     if progress:
         progress(1.0)
+
+
+def _density_native(pbf, classes, progress=None):
+    """Low-memory road density: collect only road-way node IDs, look up only their coords in C (8 B/node), then accumulate way lengths."""
+    if not PN.available():
+        return None
+    p1 = (lambda f: progress(0.30 * f)) if progress else None
+    p2 = (lambda f: progress(0.30 + 0.35 * f)) if progress else None
+    p3 = (lambda f: progress(0.65 + 0.35 * f)) if progress else None
+
+    # Pass 1: collect unique node IDs used by matching road ways (compact int64 chunks)
+    chunks: list[np.ndarray] = []
+    buf = array.array("q")
+    for _, _, refs in _iter_road_ways(pbf, classes, progress=p1):
+        buf.extend(refs)
+        if len(buf) >= 8_000_000:
+            chunks.append(np.unique(np.frombuffer(buf, dtype=np.int64)))
+            buf = array.array("q")
+    if buf:
+        chunks.append(np.unique(np.frombuffer(buf, dtype=np.int64)))
+        del buf
+    if not chunks:
+        return np.empty(0), np.empty(0), np.empty(0)
+    road_ids = chunks[0] if len(chunks) == 1 else np.unique(np.concatenate(chunks))
+    del chunks
+
+    # Pass 2: C streaming lookup of ONLY road_ids (ignores buildings, landuse, POIs, ...)
+    res = PN.lookup_nodes_by_ids(pbf, road_ids, progress=p2)
+    if res is None:
+        return None
+    lat_e7, lon_e7 = res
+    miss = int(PN.MISSING_E7)
+
+    # Pass 3: compute way midpoints and lengths into compact float64 arrays
+    la_a, lo_a, ln_a = array.array("d"), array.array("d"), array.array("d")
+    for _, _, refs in _iter_road_ways(pbf, classes, progress=p3):
+        r_arr = np.asarray(refs, dtype=np.int64)
+        idx = np.searchsorted(road_ids, r_arr)
+        if np.any(idx >= len(road_ids)) or np.any(road_ids[idx] != r_arr):
+            continue
+        la_i = lat_e7[idx]
+        if np.any(la_i == miss):
+            continue
+        la_d = la_i.astype(np.float64) / 1e7
+        lo_d = lon_e7[idx].astype(np.float64) / 1e7
+        d = np.hypot(np.diff(la_d) * 111.195, np.diff(lo_d) * 111.195 * math.cos(math.radians(float(la_d.mean()))))
+        m = len(la_d) // 2
+        la_a.append(float(la_d[m]))
+        lo_a.append(float(lo_d[m]))
+        ln_a.append(float(d.sum()))
+    del road_ids, lat_e7, lon_e7
+    return np.frombuffer(la_a, dtype=np.float64).copy(), np.frombuffer(lo_a, dtype=np.float64).copy(), np.frombuffer(ln_a, dtype=np.float64).copy()
 
 
 def density(pbf, classes, cache_dir: Path, progress=None) -> dict:
@@ -189,13 +272,17 @@ def density(pbf, classes, cache_dir: Path, progress=None) -> dict:
     if f.exists():
         z = np.load(f)
         return dict(lat0=float(z["lat0"]), lon0=float(z["lon0"]), km=z["km"])
-    la, lo, ln = [], [], []
-    for _, _, pts in _ways(pbf, classes, progress):
-        a = np.array([(p[1], p[2]) for p in pts])
-        d = np.hypot(np.diff(a[:, 0]) * 111.195, np.diff(a[:, 1]) * 111.195 * math.cos(math.radians(a[:, 0].mean())))
-        m = len(a) // 2
-        la.append(a[m, 0]); lo.append(a[m, 1]); ln.append(d.sum())
-    la, lo, ln = np.array(la), np.array(lo), np.array(ln)
+    nat = _density_native(pbf, classes, progress)
+    if nat is not None:
+        la, lo, ln = nat
+    else:
+        la, lo, ln = [], [], []
+        for _, _, pts in _ways(pbf, classes, progress):
+            a = np.array([(p[1], p[2]) for p in pts])
+            d = np.hypot(np.diff(a[:, 0]) * 111.195, np.diff(a[:, 1]) * 111.195 * math.cos(math.radians(a[:, 0].mean())))
+            m = len(a) // 2
+            la.append(a[m, 0]); lo.append(a[m, 1]); ln.append(d.sum())
+        la, lo, ln = np.array(la), np.array(lo), np.array(ln)
     lat0, lon0 = math.floor(la.min() / CELL_DEG) * CELL_DEG, math.floor(lo.min() / CELL_DEG) * CELL_DEG
     ny, nx = int((la.max() - lat0) / CELL_DEG) + 1, int((lo.max() - lon0) / CELL_DEG) + 1
     km = np.zeros((ny, nx))
@@ -261,8 +348,101 @@ def foreign_boxes(D: dict, bbox: dict, info_box: dict | None, n: int = C.N_FOREI
     return out
 
 
+def _extract_native(pbf, classes, boxes: dict[str, dict], progress=None, way_filter=None) -> dict | None:
+    """Two-pass low-memory extract using the C streaming PBF node scanner + WAY-only pyosmium pass (avoids caching all PBF nodes in RAM)."""
+    if not PN.available() or len(boxes) > 32:
+        return None
+    keys = list(boxes.keys())
+    if not keys:
+        return {}
+    box_swne = [(boxes[k]["south"], boxes[k]["west"], boxes[k]["north"], boxes[k]["east"]) for k in keys]
+    p1 = (lambda f: progress(0.30 * f)) if progress else None
+    p2 = (lambda f: progress(0.30 + 0.65 * f)) if progress else None
+    p3 = (lambda f: progress(0.95 + 0.05 * f)) if progress else None
+
+    scan = PN.scan_nodes_in_boxes(pbf, box_swne, pad_deg=0.05, progress=p1)
+    if scan is None:
+        return None
+    ids, lat_e7, lon_e7, mask = scan
+    if len(ids) == 0:
+        if progress:
+            progress(1.0)
+        return {k: ([], {}) for k in keys}
+
+    exact = mask != 0
+    if not np.any(exact):
+        del ids, lat_e7, lon_e7, mask, exact
+        if progress:
+            progress(1.0)
+        return {k: ([], {}) for k in keys}
+    ex_ids = np.ascontiguousarray(ids[exact], dtype=np.int64)
+    ex_mask = np.ascontiguousarray(mask[exact], dtype=np.uint32)
+    del exact, mask
+
+    c_fn = PN.LIB.pbf_way_box_mask_one
+    ex_ids_p = ex_ids.ctypes.data
+    ex_mask_p = ex_mask.ctypes.data
+    ex_n = len(ex_ids)
+
+    kept: list[tuple[int, dict, list[int], int]] = []
+    for wid, t, refs in _iter_road_ways(pbf, classes, progress=p2, way_filter=way_filter):
+        ra = array.array("q", refs)
+        wm = int(c_fn(ex_ids_p, ex_mask_p, ex_n, ra.buffer_info()[0], len(ra)))
+        if wm:
+            kept.append((wid, {k: t[k] for k in TAGS if k in t}, refs, wm))
+    del ex_ids, ex_mask
+
+    res = {k: ([], {}) for k in keys}
+    if not kept:
+        del ids, lat_e7, lon_e7
+        if progress:
+            progress(1.0)
+        return res
+
+    all_refs = array.array("q")
+    for _, _, refs, _ in kept:
+        all_refs.extend(refs)
+    need_ids = np.unique(np.frombuffer(all_refs, dtype=np.int64))
+    del all_refs
+
+    pos = np.searchsorted(ids, need_ids)
+    found = (pos < len(ids)) & (ids[np.minimum(pos, len(ids) - 1)] == need_ids)
+    coord_of: dict[int, tuple[float, float]] = {
+        int(r): (int(lat_e7[i]) / 1e7, int(lon_e7[i]) / 1e7)
+        for r, i in zip(need_ids[found], pos[found])
+    }
+    missing_ids = need_ids[~found]
+    del ids, lat_e7, lon_e7, need_ids, pos, found
+
+    if len(missing_ids):
+        ml = PN.lookup_nodes_by_ids(pbf, missing_ids, progress=p3)
+        if ml is None:
+            return None
+        mlat, mlon = ml
+        miss = int(PN.MISSING_E7)
+        for r, la, lo in zip(missing_ids, mlat, mlon):
+            if int(la) != miss:
+                coord_of[int(r)] = (int(la) / 1e7, int(lo) / 1e7)
+
+    for wid, tags, refs, wm in kept:
+        if not all(r in coord_of for r in refs):
+            continue
+        for bi, k in enumerate(keys):
+            if wm & (1 << bi):
+                ws, nd = res[k]
+                ws.append((wid, tags, refs))
+                for r in refs:
+                    nd[r] = coord_of[r]
+    if progress:
+        progress(1.0)
+    return res
+
+
 def extract(pbf, classes, boxes: dict[str, dict], progress=None, way_filter=None) -> dict:
-    """one pass; ways touching a box (any node inside), full geometry. -> {name: (ways, nodes)}"""
+    """ways touching a box (any node inside), full geometry. -> {name: (ways, nodes)}"""
+    nat = _extract_native(pbf, classes, boxes, progress=progress, way_filter=way_filter)
+    if nat is not None:
+        return nat
     res = {k: ([], {}) for k in boxes}
     for wid, tags, pts in _ways(pbf, classes, progress, way_filter=way_filter):
         for k, b in boxes.items():
@@ -333,7 +513,8 @@ def build_graph(ways, nodes, *, allow_contraflow_bike: bool = False) -> NetGraph
     zone = int((lon0 + 180) // 6) + 1
     crs = f"EPSG:{(32600 if lat0 >= 0 else 32700) + zone}"
     x, y = Transformer.from_crs(4326, crs, always_xy=True).transform(ll[:, 1], ll[:, 0])
-    xy_of = {int(i): (a, b) for i, a, b in zip(ids, x, y)}
+    xy_of = {int(i): (float(a), float(b)) for i, a, b in zip(ids, x, y)}
+    del ids, ll, x, y
     use = Counter()
     for _, _, refs in ways:
         use.update(refs)
@@ -368,6 +549,7 @@ def build_graph(ways, nodes, *, allow_contraflow_bike: bool = False) -> NetGraph
                 wd.append(w_); nl.append(n_); rb.append(tags.get("junction") in ("roundabout", "circular")); mk.append(mk_)
                 fw = (lf_ if direction == 1 else lb_) or ((n_ if one else n_ // 2 if n_ % 2 == 0 else 0) if n_ else 0)
                 nlf.append(fw); cy.append(_cycle(tags, direction))
+    del xy_of, use, node_ix
     if not eu:
         raise RuntimeError("no road ways in the area")
     return NetGraph(crs=crs, node_xy=np.array(nxy, float), node_osm=np.array(nosm, np.int64), edge_u=np.array(eu, np.int32), edge_v=np.array(ev, np.int32),
@@ -379,7 +561,9 @@ def build_graph(ways, nodes, *, allow_contraflow_bike: bool = False) -> NetGraph
 
 def edges_in_bbox(g: NetGraph, b: dict) -> np.ndarray:
     """edges whose middle vertex lies inside the lon/lat box (whole ways touching the box were read)"""
-    mid = np.array([g.geom(e)[len(g.geom(e)) // 2] for e in range(g.n_edges)])
+    if g.n_edges == 0:
+        return np.empty(0, np.int64)
+    mid = g.edge_geom[(g.edge_off[:-1] + g.edge_off[1:]) // 2]
     ll = g.to_wgs84(mid)
     return np.flatnonzero((ll[:, 0] >= b["west"]) & (ll[:, 0] <= b["east"]) & (ll[:, 1] >= b["south"]) & (ll[:, 1] <= b["north"]))
 

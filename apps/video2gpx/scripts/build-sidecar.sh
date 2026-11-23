@@ -18,6 +18,10 @@ NATIVE_SO="$RSM/rsm/hmm_cal/_dp_native_${ARCH}.so"
 if [ -f "$RSM/rsm/hmm_cal/_dp_native.c" ] && [ ! -f "$NATIVE_SO" -o "$RSM/rsm/hmm_cal/_dp_native.c" -nt "$NATIVE_SO" ]; then
   cc -O3 -shared -fPIC -lpthread -o "$NATIVE_SO" "$RSM/rsm/hmm_cal/_dp_native.c"
 fi
+PBF_SO="$RSM/rsm/pipeline/_pbf_native_${ARCH}.so"
+if [ -f "$RSM/rsm/pipeline/_pbf_native.c" ] && [ ! -f "$PBF_SO" -o "$RSM/rsm/pipeline/_pbf_native.c" -nt "$PBF_SO" ]; then
+  cc -O3 -shared -fPIC -lz -lpthread -o "$PBF_SO" "$RSM/rsm/pipeline/_pbf_native.c"
+fi
 METAL_SO="$RSM/rsm/pipeline/vmsx/_lk_metal_${ARCH}.so"
 if [ "$(uname -s)" = "Darwin" ] && [ -f "$RSM/rsm/pipeline/vmsx/_lk_metal.m" ] && [ ! -f "$METAL_SO" -o "$RSM/rsm/pipeline/vmsx/_lk_metal.m" -nt "$METAL_SO" ]; then
   clang -O3 -shared -fPIC -fobjc-arc -framework Foundation -framework Metal -o "$METAL_SO" "$RSM/rsm/pipeline/vmsx/_lk_metal.m"
@@ -25,6 +29,9 @@ fi
 NATIVE_ARGS=""
 if [ -f "$NATIVE_SO" ]; then
   NATIVE_ARGS="$NATIVE_ARGS --add-binary $NATIVE_SO:rsm/hmm_cal"
+fi
+if [ -f "$PBF_SO" ]; then
+  NATIVE_ARGS="$NATIVE_ARGS --add-binary $PBF_SO:rsm/pipeline"
 fi
 if [ -f "$METAL_SO" ]; then
   NATIVE_ARGS="$NATIVE_ARGS --add-binary $METAL_SO:rsm/pipeline/vmsx"

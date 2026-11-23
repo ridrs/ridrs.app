@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import gc
 import multiprocessing as mp
 import pickle
 import resource
@@ -73,16 +74,21 @@ def map_step(d: Path, P: dict, W: Worker):
                 box_alias[bk] = k
                 unique_boxes[k] = b
         p0 = 20 if want_decoys else 0
+        union_set = set(union)
         ex_u = osm.extract(pbf, union, unique_boxes, lambda f: W.progress(p0 + (60 - p0) * f, "filter"))   # one pass for all class sets
         for i, k in enumerate(need):
             b = extract_boxes[k]
             ways, nodes = ex_u[box_alias[(b["south"], b["west"], b["north"], b["east"])]]
-            ways, nodes = osm.subset(ways, nodes, need[k][1])
+            if set(need[k][1]) != union_set:
+                ways, nodes = osm.subset(ways, nodes, need[k][1])
             g = osm.build_graph(ways, nodes)
             g.save(cache / f"graph_{gkey[k]}.npz")
             if osm.rules_token(need[k][1]):
                 np.save(cache / f"tiers_{gkey[k]}.npy", osm.edge_tiers(g, ways))
+            del ways, nodes, g
             W.progress(60 + 35 * (i + 1) / len(need), "graph")
+        del ex_u
+        gc.collect()
     tiers_of = lambda k, g: np.load(cache / f"tiers_{gkey[k]}.npy") if osm.rules_token(sets[k][1]) else np.zeros(g.n_edges, np.int8)
     st = OF.route_steps(d)
     res = dict(vehicle=veh, classes=list(classes), bbox=bbox, pbf=file_sig(pbf), pbf_timestamp=info["timestamp"], real_road_km=real_km, foreign=[], steps=int(st.T))

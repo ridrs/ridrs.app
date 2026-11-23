@@ -33,6 +33,11 @@ NATIVE_SO="$RSM/rsm/hmm_cal/_dp_native_${ARCH}.so"
 if [ -f "$NATIVE_SRC" ] && command -v cc >/dev/null && [ ! -f "$NATIVE_SO" -o "$NATIVE_SRC" -nt "$NATIVE_SO" ]; then
   cc -O3 -shared -fPIC -lpthread -o "$NATIVE_SO" "$NATIVE_SRC" || true
 fi
+PBF_SRC="$RSM/rsm/pipeline/_pbf_native.c"
+PBF_SO="$RSM/rsm/pipeline/_pbf_native_${ARCH}.so"
+if [ -f "$PBF_SRC" ] && command -v cc >/dev/null && [ ! -f "$PBF_SO" -o "$PBF_SRC" -nt "$PBF_SO" ]; then
+  cc -O3 -shared -fPIC -lz -lpthread -o "$PBF_SO" "$PBF_SRC" || true
+fi
 METAL_SRC="$RSM/rsm/pipeline/vmsx/_lk_metal.m"
 METAL_SO="$RSM/rsm/pipeline/vmsx/_lk_metal_${ARCH}.so"
 if [ "$(uname -s)" = "Darwin" ] && [ -f "$METAL_SRC" ] && command -v clang >/dev/null && [ ! -f "$METAL_SO" -o "$METAL_SRC" -nt "$METAL_SO" ]; then
