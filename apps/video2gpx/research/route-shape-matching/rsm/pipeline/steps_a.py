@@ -235,29 +235,35 @@ def road_x0(csv_path: str) -> float | None:
     return float(np.median(-c[ok] / s[ok]))
 
 
-def scene_cuts(d: Path, out: Path, tracks: list[dict], ta, tb, ok, n_inl, W: Worker, video: str | None = None, intro_user: float | None = None) -> list[dict]:
-    """final cut decision (frame-difference impulse + road-flow or far-feature fit failure, rsm.pipeline.cuts) and the plan applied to the tracks:
+def scene_cuts(d: Path, out: Path, tracks: list[dict], ta, tb, ok, n_inl, W: Worker, video: str | None = None, intro_user: float | None = None, n_pts=None) -> list[dict]:
+    """final cut decision (classical frame-difference impulse + multi-type visual transition detection, rsm.pipeline.cuts) and the plan applied to the tracks:
     jumps at cuts, inserted shots dropped, start rule. Writes rotation/cuts.json; status lines only for a video with cuts."""
     f = d / "motion" / "cuts.json"
     stored = jload(f) if f.exists() else None
     csv = d / "motion" / "motion.csv"
+    pairs = None
     if stored is not None and (stored.get("version") == K.VERSION or not csv.exists()):
         cands = stored["candidates"]
     else:                                # motion step of an older run (no cuts.json, or one of an older detector): the candidates from its csv
-        p = load_pairs(str(d / "motion" / "motion.csv"))
-        cands = K.candidates(p.time, p.diff, p.inliers)
+        pairs = load_pairs(str(csv))
+        cands = K.candidates(pairs.time, pairs.diff, pairs.inliers)
     cands = K.far_cue(cands, ta, tb, ok, n_inl)
     cuts = K.decide(cands)
+    extra: list[dict] = []
+    if C.CUT_TRANS_ON and video and csv.exists():
+        if pairs is None:
+            pairs = load_pairs(str(csv))
+        extra = K.transition_candidates(pairs.time, pairs.diff, pairs.inliers, ta, tb, ok, n_pts, n_inl)
     rejected = []
-    if cuts and video:                   # same-scene veto: a sun flash or exposure jump is no cut (one short decode per cut)
-        cuts, rejected = K.veto_same_scene(video, cuts, ffmpeg_bin())
+    if (cuts or extra) and video:        # same-scene veto on classical cuts + visual verification of hard/fade/dissolve candidates
+        cuts, rejected = K.verify_transitions(video, cuts, extra, ffmpeg_bin())
         for c in rejected:
             W.log("info", f"scene cut candidate at {K.mmss(c['t'])} rejected: the frames before and after show the same scene "
                   f"({100 * c['same']['share']:.0f} % of the points fit, limit {100 * C.CUT_SAME_SHARE:.0f} %; a flash or an exposure jump)")
     tracks, info = K.plan(tracks, cuts, intro_user=intro_user)
-    jdump(out / "cuts.json", dict(version=K.VERSION, cuts=cuts, rejected=rejected, candidates=cands, **info,
+    jdump(out / "cuts.json", dict(version=K.VERSION, cuts=cuts, rejected=rejected, candidates=cands, transition_candidates=extra, **info,
                                   params=dict(impulse=C.CUT_IMPULSE, strong_impulse=C.CUT_STRONG_IMPULSE, strong_factor=C.CUT_STRONG_FACTOR, strong_min_diff=C.CUT_STRONG_MIN_DIFF, strong_around=C.CUT_STRONG_AROUND, strong_nb_share=C.CUT_STRONG_NB_SHARE, inl_share=C.CUT_INL_SHARE, merge_s=C.CUT_MERGE_S, min_piece_s=C.CUT_MIN_PIECE_S, intro_s=C.CUT_INTRO_S,
-                                              jump_m=C.CUT_JUMP_M, same_on=C.CUT_SAME_ON, same_share=C.CUT_SAME_SHARE, same_win_s=C.CUT_SAME_WIN_S)))
+                                              jump_m=C.CUT_JUMP_M, same_on=C.CUT_SAME_ON, same_share=C.CUT_SAME_SHARE, same_win_s=C.CUT_SAME_WIN_S, trans_on=C.CUT_TRANS_ON)))
     if info["intro_end"] is not None and info["intro_source"] == "user":
         W.status("intro_skipped", "good", info["intro_end"], f"intro up to {K.mmss(info['intro_end'])} skipped: the route starts at the intro end set by hand")
         W.log("info", f"intro end set by hand at {info['intro_end']:.2f} s (detected: "
@@ -273,7 +279,8 @@ def scene_cuts(d: Path, out: Path, tracks: list[dict], ta, tb, ok, n_inl, W: Wor
     if info["intro_end"] is not None and info["intro_source"] == "cuts":
         W.status("intro_skipped", "good", info["intro_end"], f"intro up to {K.mmss(info['intro_end'])} skipped: the route starts after the last cut of the first "
                  f"{C.CUT_INTRO_S / 60:.0f} minutes")
-    W.log("info", f"scene cuts: {len(cuts)} of {len(cands)} candidates confirmed; {info['dropped_tracks']} tracks dropped (intro, inserted shots)")
+    kinds = ", ".join(f"{sum(c.get('kind', 'hard') == k for c in cuts)} {k}" for k in ("hard", "dissolve", "fade") if any(c.get("kind", "hard") == k for c in cuts))
+    W.log("info", f"scene cuts: {len(cuts)} confirmed ({kinds}) from {len(cands)} spike + {len(extra)} transition candidates; {info['dropped_tracks']} tracks dropped (intro, inserted shots)")
     return tracks
 
 
@@ -370,7 +377,7 @@ def rotation_series(d: Path, P: dict, W: Worker, meta: dict | None = None):
     W.progress(97.0, "series")
     tr = T.far_tracks(str(d / "motion" / "motion.csv"), S)
     if C.CUT_ON:
-        tr = scene_cuts(d, out, tr, z["ta"], z["tb"], z["ok"], z["n_inl"], W, P["video"], intro_user=P.get("intro_end"))
+        tr = scene_cuts(d, out, tr, z["ta"], z["tb"], z["ok"], z["n_inl"], W, P["video"], intro_user=P.get("intro_end"), n_pts=z["n_pts"])
     pickle.dump(tr, open(out / "tracks.pkl", "wb"))
     cut_sp = [(float(c.get("t_first", c["t"])), float(c.get("t_last", c["t"]))) for c in jload(out / "cuts.json")["cuts"]] if (C.CUT_ON and (out / "cuts.json").exists()) else []
     T.save_far_heading(out / "far_heading.npz", T.far_heading(S, cut_sp))     # far-only heading for the vms speed gaps (odofail.build, ROT_BRIDGE_ON)

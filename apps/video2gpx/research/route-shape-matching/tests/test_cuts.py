@@ -361,3 +361,158 @@ def test_undecodable_frames_keep_the_cut(monkeypatch):
 
 def test_cut_same_constants_are_set():
     assert C.CUT_SAME_ON and 0.1 <= C.CUT_SAME_SHARE <= 0.3 and C.CUT_SAME_WIN_S > 0.04
+
+
+# ------------------------------------------------------------------ cuts4: multi-type transitions (low-inlier hard, dissolve, fade, negatives)
+def _color_scene(seed: int, h: int = 135, w: int = 240, pad: int = 180) -> np.ndarray:
+    """Richly textured 3-channel synthetic BGR canvas with distinct spatial color regions and fine texture."""
+    rng = np.random.default_rng(seed)
+    H, W = h + pad, w + pad
+    base = np.zeros((H, W, 3), np.float32)
+    for ch in range(3):
+        coarse = gaussian_filter(rng.normal(0, 1, (H, W)), 18.0)
+        fine = gaussian_filter(rng.normal(0, 1, (H, W)), 2.2)
+        mean = float(rng.uniform(75, 175))
+        base[:, :, ch] = np.clip(mean + 42.0 * coarse / (coarse.std() + 1e-6) + 32.0 * fine / (fine.std() + 1e-6), 0, 255)
+    return base.astype(np.uint8)
+
+
+def test_transition_candidates_catch_low_inlier_hard_cuts_dissolves_and_blackouts():
+    t = np.arange(3000) * 0.033
+    d = np.full(3000, 14.0)
+    inl = np.full(3000, 31.0)                 # busy rocky descent like Sa Calobra 2:45 (below CUT_STRONG_AROUND=100)
+    d[1500] = 42.9; inl[1500] = 0.0           # low-inlier hard cut
+    # road blackout (1.0 s fade)
+    inl[2400:2435] = 0.0
+    # far-feature windows (0.26 s step)
+    ta = np.arange(0.0, 99.0, 0.26); tb = ta + 0.26
+    m = len(ta)
+    ok = np.ones((m, 3), bool)
+    n_pts = np.full((m, 3), 220.0)
+    n_inl = np.full((m, 3), 160.0)
+    # 1.2 s dissolve: n_pts collapses around t=20 s
+    w_diss = int(round(20.0 / 0.26))
+    n_pts[w_diss - 1:w_diss + 2] = 0.0; n_inl[w_diss - 1:w_diss + 2] = 0.0; ok[w_diss - 1:w_diss + 2] = False
+    # 2.5 s slow dissolve: n_pts stays 70 (>25% of 220) while ~ok and n_inl collapses to 6 around t=35 s
+    w_slow = int(round(35.0 / 0.26))
+    n_pts[w_slow - 2:w_slow + 3] = 70.0; n_inl[w_slow - 2:w_slow + 3] = 6.0; ok[w_slow - 2:w_slow + 3] = False
+
+    cands = K.transition_candidates(t, d, inl, ta, tb, ok, n_pts, n_inl)
+    ts_found = [c["t"] for c in cands]
+    assert any(abs(x - t[1500]) < 0.2 and c["hint"] == "hard" for x, c in zip(ts_found, cands)), cands
+    assert any(abs(x - 20.0) < 0.6 for x in ts_found), cands
+    assert any(abs(x - 35.0) < 0.8 for x in ts_found), cands
+    assert any(abs(x - 0.5 * (t[2400] + t[2434])) < 0.6 for x in ts_found), cands
+
+
+def test_verify_hard_frames_detects_real_cut_and_rejects_flash_and_occlusion():
+    a = _texture(11, 128, h=135, w=240)
+    b = _texture(22, 110, h=135, w=240)
+    fps = 30.0
+    n = 48
+    # 1. Real hard cut at frame 24 (t = 10.0 + 24/30 = 10.80)
+    F_cut = np.array([a[20:155, i // 2:240 + i // 2] if i < 24 else b[20:155, (i - 24) // 2:240 + (i - 24) // 2] for i in range(n)], np.uint8)
+    hit = K.verify_hard_frames(F_cut, fps, t0=10.0, tc=10.8)
+    assert hit is not None and hit["kind"] == "hard" and abs(hit["t"] - (10.0 + 23.5 / fps)) < 0.05
+
+    # 2. Sun flash on same scene: brightness/contrast jump at frame 24, same underlying scene -> rejected
+    F_flash = np.array([a[20:155, i // 2:240 + i // 2] for i in range(n)], np.uint8)
+    F_flash[24:] = np.clip(F_flash[24:].astype(float) * 0.55 + 90.0, 0, 255).astype(np.uint8)
+    assert K.verify_hard_frames(F_flash, fps, t0=10.0, tc=10.8) is None
+
+    # 3. Brief foreground occlusion (dark object covers frame for 4 frames, then same scene returns) -> rejected by wide bracket
+    F_occ = np.array([a[20:155, i // 2:240 + i // 2] for i in range(n)], np.uint8)
+    F_occ[24:28] = 10
+    assert K.verify_hard_frames(F_occ, fps, t0=10.0, tc=10.8) is None
+
+
+@pytest.mark.parametrize("dur", [0.4, 1.2, 2.5])
+def test_verify_transition_frames_detects_moving_dissolves(dur):
+    sa, sb = _color_scene(101), _color_scene(202)
+    fps = 5.0
+    n = 25
+    ts = 100.0 + np.arange(n) / fps
+    tc = ts[n // 2]
+    # Gentle forward-camera drift (~0.3 px/step) during the crossfade
+    A = np.array([sa[60:195, 40 + i // 3:280 + i // 3] for i in range(n)], np.float32)
+    B = np.array([sb[60:195, 40 + i // 3:280 + i // 3] for i in range(n)], np.float32)
+    al = np.clip((ts - (tc - dur / 2.0)) / dur, 0.0, 1.0)
+    mix = ((1.0 - al[:, None, None, None]) * A + al[:, None, None, None] * B).astype(np.uint8)
+    hit = K.verify_transition_frames(mix, ts, tc)
+    assert hit is not None and hit["kind"] == "dissolve", (dur, hit)
+    assert abs(hit["t"] - tc) <= 0.35 and hit["t_first"] < hit["t"] < hit["t_last"]
+
+
+@pytest.mark.parametrize("level", [0.0, 255.0])
+def test_verify_transition_frames_detects_fade_through_black_and_dip_to_white(level):
+    sa, sb = _color_scene(303), _color_scene(404)
+    fps = 5.0
+    n = 25
+    ts = 50.0 + np.arange(n) / fps
+    tc = ts[12]
+    frames = []
+    for i in range(n):
+        if i <= 8:
+            frames.append(sa[60:195, 40 + i:280 + i])
+        elif i < 12:
+            w = (i - 8) / 4.0
+            frames.append(((1 - w) * sa[60:195, 40 + i:280 + i] + w * level).astype(np.uint8))
+        elif i == 12:
+            frames.append(np.full((135, 240, 3), int(level), np.uint8))
+        elif i < 16:
+            w = (i - 12) / 4.0
+            frames.append(((1 - w) * level + w * sb[60:195, 40 + i:280 + i]).astype(np.uint8))
+        else:
+            frames.append(sb[60:195, 40 + i:280 + i])
+    hit = K.verify_transition_frames(np.array(frames, np.uint8), ts, tc)
+    assert hit is not None and hit["kind"] == "fade" and abs(hit["t"] - tc) <= 0.25
+
+
+def test_verify_transition_frames_rejects_pan_tunnel_blur_pulse_and_sweeping_shadow():
+    import cv2
+    sc = _color_scene(505, h=135, w=240, pad=360)
+    fps = 5.0
+    n = 25
+    ts = 200.0 + np.arange(n) / fps
+    tc = ts[12]
+
+    # 1. Fast continuous horizontal pan (hairpin turn): 14 px per 0.2 s step
+    pan = np.array([sc[60:195, i * 14:240 + i * 14] for i in range(n)], np.uint8)
+    assert K.verify_transition_frames(pan, ts, tc) is None
+
+    # 2. Entering a dark tunnel (one-way dimming to pitch dark, stays dark)
+    base = np.array([sc[60:195, 40 + i:280 + i] for i in range(n)], np.float32)
+    gain = np.clip(1.0 - (ts - (tc - 0.6)) / 1.2, 0.03, 1.0)
+    tunnel = (base * gain[:, None, None, None]).astype(np.uint8)
+    assert K.verify_transition_frames(tunnel, ts, tc) is None
+
+    # 3. Focus blur-and-refocus pulse on the SAME scene (like Amalfi 55:19)
+    still = sc[60:195, 80:320]
+    blur_seq = []
+    for i in range(n):
+        dist = abs(i - 12)
+        if dist <= 3:
+            k = 2 * (4 - dist) * 4 + 1
+            blur_seq.append(cv2.GaussianBlur(still, (k, k), 0))
+        else:
+            blur_seq.append(still.copy())
+    assert K.verify_transition_frames(np.array(blur_seq, np.uint8), ts, tc) is None
+
+    # 4. Sweeping shadow / bridge overhead (dark curtain moving top-to-bottom across the same road)
+    sa = sc[60:195, 80:320].astype(np.float32)
+    sweep = []
+    for i in range(n):
+        row_cut = int(np.clip((i - 8) / 8.0, 0.0, 1.0) * 135)
+        f = sa.copy()
+        f[:row_cut] *= 0.25
+        sweep.append(f.astype(np.uint8))
+    assert K.verify_transition_frames(np.array(sweep, np.uint8), ts, tc) is None
+
+
+def test_plan_excises_samples_inside_multi_frame_dissolve_span():
+    tr = [_track(200.0, 900.0)]
+    out, info = K.plan(tr, [dict(t=500.0, t_first=498.5, t_last=501.5, kind="dissolve")])
+    assert info["split_tracks"] == 1 and len(out) == 2
+    assert float(out[0]["t"][-1]) <= 498.5
+    assert float(out[1]["t"][0]) >= 501.5 and out[1]["cut_before"] == 500.0
+    assert out[1]["s"][0] == 0.0 and out[1]["th"][0] == 0.0

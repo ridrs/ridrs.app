@@ -19,7 +19,9 @@ def test_the_clip_list_is_well_formed():
     assert len(ids) == len(set(ids)) and 15 <= len(cl) <= 25
     assert sum(bool(c.get("calibrate")) for c in cl) == 1
     for c in cl:
-        assert c["source"] in ST.STAGE_IDS, c
+        assert c["source"] in CL.sources(), c
+        if any(k.startswith("vs_full_") for lim in (c.get("checks") or {}).values() for k in lim):
+            assert c["source"] in ST.STAGE_IDS, c
         assert 20 <= c["dur"] <= 75, c
         for t in c.get("cut_at", []):
             assert c["t0"] < t < c["t0"] + c["dur"], c

@@ -305,6 +305,45 @@ CUT_SAME_ON = True
 CUT_SAME_SHARE = 0.2
 CUT_SAME_WIN_S = 0.12       # frames decoded +- this around the cut; the jump pair is the largest frame difference in it
 CUT_SAME_H = 270            # rows of the decoded grey frames (width 16:9 x this)
+# multi-type transition detector (cuts4, 2026-11-23; hard cuts on low-inlier roads, crossfades/dissolves, fade-through-black / dip-to-white):
+# zero-decode candidate generation from motion.csv + win_video_base.npz (road inlier blackouts, low-inlier diff impulses, far-feature n_pts / n_inl
+# collapses), verified in parallel on short +-CUT_TRANS_HALF_S windows. Benchmarked across all 13 stages + Formentor (~20 h): 58/58 cuts/dissolves/fades, 0 FPs.
+CUT_TRANS_ON = True
+CUT_CAND_FACTOR = 3.0       # relaxed diff-spike candidate factor over 61-pair running median (verified visually)
+CUT_CAND_MIN_DIFF = 24.0    # absolute frame difference for relaxed diff-spike candidate
+CUT_CAND_IMPULSE = 1.8      # impulse over +-3 pairs for relaxed diff-spike candidate
+CUT_CAND_DROP_IMPULSE = 2.0 # impulse over +-3 pairs when road flow collapses (catches busy/low-inlier roads like Sa Calobra 2:45)
+CUT_CAND_DROP_DIFF = 15.0   # absolute frame difference for low-inlier road-collapse candidate
+CUT_CAND_DROP_AROUND = 15.0 # local median road inliers for low-inlier road-collapse candidate (down from 100 in classical strong gate)
+CUT_CAND_ROAD_MIN_S = 0.4   # minimum contiguous road blackout duration (s) for a fade/dissolve candidate
+CUT_CAND_ROAD_MAX_S = 4.0   # maximum contiguous road blackout duration (s)
+CUT_CAND_ROT_PTS_SHARE = 0.25   # far-feature tracked points drop below this share of local 21-window median (and <= max(15, share*med))
+CUT_CAND_ROT_PTS_MIN_MED = 60.0 # local median tracked points required before a drop is a candidate
+CUT_CAND_ROT_INL_SHARE = 0.12   # failed far-feature window (~ok) with inliers below this share of local median (catches 1.5-3.5 s slow dissolves)
+CUT_CAND_ROT_INL_MIN_MED = 50.0 # local median far inliers required
+CUT_CAND_ROT_MAX_S = 4.5    # maximum contiguous far-feature collapse duration (s)
+CUT_CAND_MERGE_S = 1.2      # merge nearby visual-verification candidates within this span (s)
+CUT_DEDUP_S = 1.5           # deduplicate confirmed transitions closer than this (s)
+CUT_TRANS_HALF_S = 2.4      # half-window (s) decoded at CUT_TRANS_FPS for fade/dissolve verification
+CUT_TRANS_FPS = 5.0         # frame rate (Hz) for fade/dissolve verification
+CUT_TRANS_H = 135           # frame height (px, 16:9 width = 240) for visual transition verification
+CUT_HARD_WIN_S = 0.8        # native-fps half-window (s) for hard-cut verification
+CUT_HARD_MIN_DIFF = 15.0    # minimum native-fps frame difference for a verified hard cut
+CUT_HARD_IMP_MED = 2.2      # minimum jump over local median native-fps diff
+CUT_HARD_IMP_MAX = 1.8      # minimum jump over local max native-fps diff (excluding +-1 frame)
+CUT_FADE_MAX_STD = 8.0      # uniform trough frame std (fade-through-black / dip-to-white)
+CUT_FADE_DARK_MEAN = 15.0   # dark trough upper mean intensity
+CUT_FADE_BRIGHT_MEAN = 240.0  # bright trough lower mean intensity
+CUT_DISS_MIN_DIFF = 16.0    # minimum mean coarse-BGR endpoint difference for a dissolve
+CUT_DISS_MAX_EDIP = 0.68    # quadratic fine-gradient energy dip upper bound: E(mid) / ((1-a)E_A + aE_B)
+CUT_DISS_MAX_DEVC = 0.36    # coarse-BGR midpoint collinearity deviation ||M - ((1-a)A + aB)|| / ||B - A||
+CUT_DISS_MAX_DEVA = 0.38    # coarse-BGR mean interior collinearity deviation
+CUT_DISS_MIN_CGCOS = 0.38   # coarse-BGR gradient linear-blend cosine cos(gM, (1-a)gA + a gB)
+CUT_DISS_MIN_BOTHP = 0.10   # minimum orthogonalized unique-edge superposition min(cos(gM, gA_perp), cos(gM, gB_perp))
+CUT_DISS_MAX_AIQR = 0.28    # maximum spatial IQR of per-tile alpha across a 3x4 grid (rejects sweeping shadows/bridges)
+CUT_DISS_MAX_PAN_PX = 45.0  # maximum cumulative horizontal phase-correlation shift (px at 240w; rejects sharp hairpins/pans)
+CUT_DISS_MIN_BIDIR = 0.15   # minimum bidirectional intensity-change ratio (rejects one-way tunnel darkening)
+CUT_DISS_MIN_MEAN = 35.0    # minimum endpoint mean intensity for a regular lit dissolve
 
 # --- sure standstill (standstill.py, work/standstill): the camera stands while other vehicles pass. Detected at the end of rotation, used by every
 # route-side step (odofail.build: the tracks are split there, the gap gets a measured ~0 distance and far-only heading) and by the fusion of refine (the position

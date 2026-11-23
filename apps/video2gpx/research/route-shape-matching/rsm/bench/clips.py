@@ -31,6 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import stages as ST
 from .regress import ROOT, box, run_case
 
 HERE = Path(__file__).resolve().parent
@@ -145,7 +146,7 @@ def params(c: dict) -> dict:
     m = meta(c)
     P = dict(video=str(CLIPS / c["id"] / m["file"]), bbox=box(s["bbox"]), pbf="", vehicle=s.get("vehicle", "auto"), offset_m=None, start_time=None, traffic_side="auto",
              decoys=0, start_tol_m=150.0, hint_buffer_m=300.0, hint_fallback="auto")
-    if not c.get("calibrate"):
+    if not c.get("calibrate") and c["source"] in ST.STAGE_IDS:
         P["calibration"] = str(STAGES / c["source"] / "motion" / "motion.json")
     if m.get("frame0"):
         P["frame0"] = int(m["frame0"])          # seeds the traffic candidate fits as in the whole source (vmsx.motion.pair_row)
@@ -261,15 +262,16 @@ def score(c: dict) -> dict:
     row = dict(clip=c["id"], kind=c["kind"], usable=float(np.isfinite(vs).mean()), usable_pairs=usable_pairs, rot_cover=float(np.isfinite(hv).mean()),
                v_nom_p50=float(np.nanmedian(vs)) if np.isfinite(vs).any() else None, first_frame_equal=m.get("first_frame_equal"), t0_exact=t0)
     st = STAGES / c["source"]
-    vf, _ = _speed_per_second(st / "motion" / "motion.csv", t0, n)
-    row["vs_full_v_corr"] = _corr(vs, vf)
-    ok = np.isfinite(vs) & np.isfinite(vf) & (vf > 0)
-    row["vs_full_v_ratio"] = float(np.median(vs[ok] / vf[ok])) if ok.sum() >= 10 else None
-    hf, segf = _heading_on(_tracks(st), t0 + t)
-    i1, a1 = _increments(hv, seg)
-    i2, b1 = _increments(hf, segf)
-    both = np.intersect1d(i1, i2)
-    row["vs_full_yaw_corr"] = _corr(a1[np.isin(i1, both)], b1[np.isin(i2, both)]) if len(both) >= 10 else None
+    if c["source"] in ST.STAGE_IDS and (st / "motion" / "motion.csv").exists():
+        vf, _ = _speed_per_second(st / "motion" / "motion.csv", t0, n)
+        row["vs_full_v_corr"] = _corr(vs, vf)
+        ok = np.isfinite(vs) & np.isfinite(vf) & (vf > 0)
+        row["vs_full_v_ratio"] = float(np.median(vs[ok] / vf[ok])) if ok.sum() >= 10 else None
+        hf, segf = _heading_on(_tracks(st), t0 + t)
+        i1, a1 = _increments(hv, seg)
+        i2, b1 = _increments(hf, segf)
+        both = np.intersect1d(i1, i2)
+        row["vs_full_yaw_corr"] = _corr(a1[np.isin(i1, both)], b1[np.isin(i2, both)]) if len(both) >= 10 else None
     ref = verified_reference(s, t0, n)
     if ref is not None and ref["inside"]:
         vr = ref["speed"]
