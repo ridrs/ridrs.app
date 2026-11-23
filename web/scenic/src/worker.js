@@ -257,7 +257,8 @@ async function rideCatalogResponse(env, request, site) {
   // route's profile: the YouTube downloader of the app fetches the package and the video (ridrs_app ADR 0105).
   const { results: candidates } = await env.DB.prepare(`SELECT v.video_id, v.title, v.place, v.country, v.duration_s, v.source,
       c.name AS channel, t.fps, t.bitrate_kbps, r.distance_km, r.ascent_m, r.profile, rs.method AS sync_method,
-      rs.path AS sync_path, s.name AS source_name, s.author, s.url AS source_url, s.license_id, s.license_name, s.license_url
+      rs.path AS sync_path, s.name AS source_name, s.author, s.url AS source_url, s.license_id, s.license_name, s.license_url,
+      (SELECT i.image_id FROM video_image i WHERE i.video_id = v.video_id ORDER BY i.is_primary DESC, i.uploaded_at DESC LIMIT 1) AS image_id
     FROM video v JOIN localization l ON l.video_id = v.video_id LEFT JOIN route r ON r.video_id = v.video_id
     LEFT JOIN route_sync rs ON rs.video_id = v.video_id LEFT JOIN channel c ON c.channel_id = v.channel_id
     LEFT JOIN video_tech t ON t.video_id = v.video_id LEFT JOIN source s ON s.source_id = v.source

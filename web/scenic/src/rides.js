@@ -139,6 +139,7 @@ function youtubeRoute(r, site) {
     duration: r.duration_s };
   Object.assign(route, { distance: facts.distance, ascent: facts.ascent, duration: facts.duration,
     sparkline: sparklineOf(facts.profile), climbs: [], overlay: [] });
+  if (r.image_id) route.tile = `${site}/api/images/${r.image_id}`;
   const rate = Math.min(r.bitrate_kbps ?? Number.POSITIVE_INFINITY, kbps1080(r.fps ?? 30));
   route.download = { kind: 'youtube', url: `${site}/api/videos/${r.video_id}/incyclist.zip`, format: 'incyclist-gpx-import',
     size: Math.round(((rate * 1000) / 8) * facts.duration), video: r.video_id };

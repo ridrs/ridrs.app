@@ -133,4 +133,13 @@ describe('a YouTube video', () => {
       license: 'Standard YouTube License',
     });
   });
+
+  it('uses its catalog tile as both card tile and detail thumbnail', () => {
+    const tile = 'https://ridrs.example.org/scenic/api/images/bbbbbbbbbbbbbbbbbbbbbbbb';
+    const catalog = { ...catalogOf(vector), sources: { youtube: YOUTUBE_SOURCE }, routes: [{ ...YOUTUBE, tile }] } as unknown as RideCatalog;
+    const [offer] = catalogOffers(catalog);
+    expect(routeOfferSchema.safeParse(offer).error).toBeUndefined();
+    expect(offer?.tile).toBe(tile);
+    expect(offer?.thumbnail).toBe(tile);
+  });
 });

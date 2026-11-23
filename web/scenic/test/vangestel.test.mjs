@@ -245,6 +245,26 @@ test('ride catalog: a YouTube video without a route profile takes distance, clim
   // The size is estimated for 1080p at 60 fps (12000 kbit/s), not for Scenic's 4K bitrate: 12000 kbit/s over 100 s.
   assert.equal(route.download.size, 150_000_000);
   assert.equal(route.download.fps, 60);
+  assert.equal(route.tile, undefined);
+});
+
+test('ride catalog: a YouTube video with a preview image exposes its primary image as tile', async () => {
+  const RIDE = 'YTYTYTYTY05';
+  const climb = { ...yt(RIDE), localization: { level: 3, key: 'route', rules_version: 0 },
+    tech: { max_height: 1080, max_width: 1920, fps: 30, hdr: 0, codecs: ['vp9'], bitrate_kbps: 8000, aspect: 1.78, source: 'ytdlp', checked_at: '2026-11-21' },
+    route: { ...yt(RIDE).route, distance_km: 1.2, elevation: { ascent_m: 120, descent_m: 0, min_ele_m: 500, max_ele_m: 620, max_gradient: 10,
+      profile: [[0, 500], [0.6, 560], [1.2, 620]], source: 'copernicus_glo30' } } };
+  const snapshot = new Map([[RIDE, { title: 'Sa Calobra', duration_s: 600, channel_id: 'UCcccccccccccccccccccccc', channel_title: 'Test Channel' }]]);
+  const DB = makeD1();
+  DB.raw.exec(buildImportSql({ videos: [climb], yt: snapshot, sync: new Map(), rides: [], today: '2026-11-21', at: 'x' }).sql.join('\n'));
+  DB.raw.exec("UPDATE video SET site_published = 1");
+  DB.raw.prepare("INSERT INTO video_image (image_id, video_id, kind, r2_key, mime, is_primary, uploaded_at) VALUES (?1, ?2, 'upload', 'k1', 'image/jpeg', 0, '2026-11-22T12:00:00Z')").run('aaaaaaaaaaaaaaaaaaaaaaaa', RIDE);
+  DB.raw.prepare("INSERT INTO video_image (image_id, video_id, kind, r2_key, mime, is_primary, uploaded_at) VALUES (?1, ?2, 'upload', 'k2', 'image/jpeg', 1, '2026-11-21T12:00:00Z')").run('bbbbbbbbbbbbbbbbbbbbbbbb', RIDE);
+  const env = { DB, ASSETS, BASE_PATH: '/scenic' };
+  const catalog = await (await worker.fetch(new Request(`${BASE}/api/ride/v1/catalog.json`), env, null)).json();
+  const [route] = catalog.routes;
+  assert.equal(route?.id, RIDE);
+  assert.equal(route?.tile, `${BASE}/api/images/bbbbbbbbbbbbbbbbbbbbbbbb`);
 });
 
 test('filter "rideable in ridrs" (ride=1): only entries with a ride package, in the URL and as a facet', () => {
