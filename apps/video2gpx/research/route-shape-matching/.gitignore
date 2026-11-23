@@ -12,3 +12,5 @@ osm_cache/
 *.webm
 *.jpg
 *.jpeg
+rsm/hmm_cal/_dp_native_*.so
+rsm/pipeline/vmsx/_lk_metal_*.so

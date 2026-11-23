@@ -13,10 +13,27 @@ if [ ! -x "$PY" ]; then
   "$HERE/build/pyenv/bin/pip" install -r "$RSM/requirements-pipeline.txt" pyinstaller
 fi
 cd "$HERE/build"
+ARCH=$(uname -m)
+NATIVE_SO="$RSM/rsm/hmm_cal/_dp_native_${ARCH}.so"
+if [ -f "$RSM/rsm/hmm_cal/_dp_native.c" ] && [ ! -f "$NATIVE_SO" -o "$RSM/rsm/hmm_cal/_dp_native.c" -nt "$NATIVE_SO" ]; then
+  cc -O3 -shared -fPIC -lpthread -o "$NATIVE_SO" "$RSM/rsm/hmm_cal/_dp_native.c"
+fi
+METAL_SO="$RSM/rsm/pipeline/vmsx/_lk_metal_${ARCH}.so"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "$RSM/rsm/pipeline/vmsx/_lk_metal.m" ] && [ ! -f "$METAL_SO" -o "$RSM/rsm/pipeline/vmsx/_lk_metal.m" -nt "$METAL_SO" ]; then
+  clang -O3 -shared -fPIC -fobjc-arc -framework Foundation -framework Metal -o "$METAL_SO" "$RSM/rsm/pipeline/vmsx/_lk_metal.m"
+fi
+NATIVE_ARGS=""
+if [ -f "$NATIVE_SO" ]; then
+  NATIVE_ARGS="$NATIVE_ARGS --add-binary $NATIVE_SO:rsm/hmm_cal"
+fi
+if [ -f "$METAL_SO" ]; then
+  NATIVE_ARGS="$NATIVE_ARGS --add-binary $METAL_SO:rsm/pipeline/vmsx"
+fi
 PYTHONDONTWRITEBYTECODE=1 "$PY" -m PyInstaller --noconfirm --clean --onedir --name rsm-pipeline \
   --distpath sidecar --workpath sidecar-work --specpath sidecar-work --optimize 2 \
   --paths "$RSM" --collect-submodules rsm --hidden-import rsm.pipeline.allmods \
   --add-data "$RSM/rsm/pipeline/frozen.json:rsm/pipeline" \
+  $NATIVE_ARGS \
   --exclude-module tkinter --exclude-module matplotlib --exclude-module pandas \
   --exclude-module IPython --exclude-module pytest --exclude-module pip --exclude-module setuptools \
   --exclude-module lib2to3 --exclude-module xmlrpc --exclude-module curses --exclude-module sqlite3 \

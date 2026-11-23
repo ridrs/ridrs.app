@@ -27,6 +27,18 @@ if [ ! -x "$RSM/.venv/bin/python" ]; then
   "$RSM/.venv/bin/pip" install -q -r "$RSM/requirements-pipeline.txt"
 fi
 
+ARCH="$(uname -m)"
+NATIVE_SRC="$RSM/rsm/hmm_cal/_dp_native.c"
+NATIVE_SO="$RSM/rsm/hmm_cal/_dp_native_${ARCH}.so"
+if [ -f "$NATIVE_SRC" ] && command -v cc >/dev/null && [ ! -f "$NATIVE_SO" -o "$NATIVE_SRC" -nt "$NATIVE_SO" ]; then
+  cc -O3 -shared -fPIC -lpthread -o "$NATIVE_SO" "$NATIVE_SRC" || true
+fi
+METAL_SRC="$RSM/rsm/pipeline/vmsx/_lk_metal.m"
+METAL_SO="$RSM/rsm/pipeline/vmsx/_lk_metal_${ARCH}.so"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "$METAL_SRC" ] && command -v clang >/dev/null && [ ! -f "$METAL_SO" -o "$METAL_SRC" -nt "$METAL_SO" ]; then
+  clang -O3 -shared -fPIC -fobjc-arc -framework Foundation -framework Metal -o "$METAL_SO" "$METAL_SRC" || true
+fi
+
 command -v cargo >/dev/null || export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"
 command -v cargo >/dev/null || { echo "cargo not found (install Rust with rustup: https://rustup.rs)" >&2; exit 1; }
 command -v pnpm >/dev/null || { echo "pnpm not found (npm install -g pnpm@10, or corepack enable pnpm)" >&2; exit 1; }

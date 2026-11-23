@@ -50,6 +50,13 @@ class Group:
     b_blk: np.ndarray = None
     border: np.ndarray = None  # permutation dst-sorted -> src-sorted
     first: np.ndarray = None  # (n_cells,) index of the dst block of every cell in `starts` or -1
+    d_min: float = 0.0
+    d_max: float = 0.0
+
+    def __post_init__(self):
+        if len(self.D):
+            self.d_min = float(self.D.min())
+            self.d_max = float(self.D.max())
 
     @property
     def n(self) -> int:

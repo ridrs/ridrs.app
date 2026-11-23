@@ -55,18 +55,22 @@ def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None):
     a = dp.start_prior(G, np.full(N, -np.log(N), np.float32) if start_ok is None else dp._log_uniform(start_ok))   # + the start frame cost (A30)
     so = dp.STEP_OK_HOOK(G, st, None) if dp.STEP_OK_HOOK else None      # user anchors (anchors.py)
     al[0] = a
+    fb_c = dp._N.FBContext(pre) if dp._N.available() else None
     for j in range(1, T_):
         mu, sd, dth = dp._step_terms(pre, st, j)
-        new = np.full(N, NEG, np.float32)
-        for gi, gr in enumerate(G.groups):
-            if dp._skip(gr, mu, sd):
-                continue
-            cand = a[gr.src] + dp._cand(pre, gi, mu, sd, dth, a)
-            lse, ok = dp._lse_reduce(cand, gr.starts, gr.blk)
-            lse = np.where(ok, lse, NEG)
-            tmp = np.full(N, NEG, np.float32)
-            tmp[gr.ud] = lse
-            new = np.logaddexp(new, tmp)
+        if fb_c is not None:
+            new = fb_c.forward_step(a, mu, sd, dth)
+        else:
+            new = np.full(N, NEG, np.float32)
+            for gi, gr in enumerate(G.groups):
+                if dp._skip(gr, mu, sd):
+                    continue
+                cand = a[gr.src] + dp._cand(pre, gi, mu, sd, dth, a)
+                lse, ok = dp._lse_reduce(cand, gr.starts, gr.blk)
+                lse = np.where(ok, lse, NEG)
+                tmp = np.full(N, NEG, np.float32)
+                tmp[gr.ud] = lse
+                new = np.logaddexp(new, tmp)
         if so and j in so:
             new = np.where(so[j], new, NEG).astype(np.float32)
         mx = new.max()
@@ -89,16 +93,19 @@ def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None):
         if j == 0:
             break
         mu, sd, dth = dp._step_terms(pre, st, j)
-        nb = np.full(N, NEG, np.float32)
-        for gi, gr in enumerate(G.groups):
-            if dp._skip(gr, mu, sd):
-                continue
-            cand = beta[gr.b_dst] + dp._cand(pre, gi, mu, sd, dth, None, view="b")
-            lse, ok = dp._lse_reduce(cand, gr.b_starts, gr.b_blk)
-            lse = np.where(ok, lse, NEG)
-            tmp = np.full(N, NEG, np.float32)
-            tmp[gr.b_us] = lse
-            nb = np.logaddexp(nb, tmp)
+        if fb_c is not None:
+            nb = fb_c.backward_step(beta, mu, sd, dth)
+        else:
+            nb = np.full(N, NEG, np.float32)
+            for gi, gr in enumerate(G.groups):
+                if dp._skip(gr, mu, sd):
+                    continue
+                cand = beta[gr.b_dst] + dp._cand(pre, gi, mu, sd, dth, None, view="b")
+                lse, ok = dp._lse_reduce(cand, gr.b_starts, gr.b_blk)
+                lse = np.where(ok, lse, NEG)
+                tmp = np.full(N, NEG, np.float32)
+                tmp[gr.b_us] = lse
+                nb = np.logaddexp(nb, tmp)
         beta = nb - nb.max()
         if j % 20 == 0:
             progress(50.0 + 50.0 * (T_ - j) / T_)

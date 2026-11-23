@@ -37,39 +37,70 @@ def map_step(d: Path, P: dict, W: Worker):
         b = info["box"]
         if not (bbox["west"] >= b["west"] and bbox["east"] <= b["east"] and bbox["south"] >= b["south"] and bbox["north"] <= b["north"]):
             raise RuntimeError(f"the area {bbox} is not inside the extract {b}: download the map data for this area")
-    D = osm.density(pbf, roads, cache, lambda f: W.progress(20 * f, "read"))      # road density only: foreign boxes as before, also with paths
-    real_km = osm._box_km(D, bbox)
-    if not np.isfinite(real_km) or real_km < 5:
-        raise RuntimeError(f"no road data in the area ({real_km} km of {veh} roads): wrong area or extract")
-    fb = osm.foreign_boxes(D, bbox, info["box"])
-    if len(fb) < C.N_FOREIGN:
-        W.log("warn", f"only {len(fb)} foreign decoy boxes of similar road density found in the extract (3 wanted); more shuffles replace the missing ones")
+    want_decoys = int(P.get("decoys", 0)) > 0
+    if want_decoys:
+        D = osm.density(pbf, roads, cache, lambda f: W.progress(20 * f, "read"))      # road density only: foreign boxes as before, also with paths
+        real_km = osm._box_km(D, bbox)
+        if not np.isfinite(real_km) or real_km < 5:
+            raise RuntimeError(f"no road data in the area ({real_km} km of {veh} roads): wrong area or extract")
+        fb = osm.foreign_boxes(D, bbox, info["box"])
+        if len(fb) < C.N_FOREIGN:
+            W.log("warn", f"only {len(fb)} foreign decoy boxes of similar road density found in the extract (3 wanted); more shuffles replace the missing ones")
+    else:
+        real_km, fb = None, []
     boxes = {"real": bbox, **{f["name"]: f["bbox"] for f in fb}}
     sets = {k: (b, classes) for k, b in boxes.items()}
     if paths_fallback:
         sets["paths"] = (bbox, C.CLASSES_BIKE_PATHS)
+    # pre-build the local-pass class union for bbox in the same single PBF pass so refine's local_pass avoids a second full PBF scan
+    local_cls = tuple(sorted(set(classes) | set(C.LOCAL_EXTRA))) if C.LOCAL_ON else None
+    if local_cls is not None and local_cls != tuple(sorted(classes)):
+        sets["local_bbox"] = (bbox, local_cls)
     gkey = {k: sha(file_sig(pbf), b, sorted(cl), "graph1", *osm.rules_token(cl)) for k, (b, cl) in sets.items()}
     has = lambda k: (cache / f"graph_{gkey[k]}.npz").exists() and (not osm.rules_token(sets[k][1]) or (cache / f"tiers_{gkey[k]}.npy").exists())
     need = {k: v for k, v in sets.items() if not has(k)}
     if need:
         union = tuple(sorted(set().union(*(cl for _, cl in need.values()))))
-        ex = osm.extract(pbf, union, {k: b for k, (b, _) in need.items()}, lambda f: W.progress(20 + 40 * f, "filter"))   # one pass for all class sets
-        for i, (k, (ways, nodes)) in enumerate(ex.items()):
+        extract_boxes = {}
+        for k, (b, _) in need.items():
+            # share one bbox extraction across real / paths / local_bbox when they have the exact same bbox
+            extract_boxes[k] = b
+        # deduplicate identical bboxes before scanning the PBF (real / paths / local_bbox share bbox)
+        unique_boxes, box_alias = {}, {}
+        for k, b in extract_boxes.items():
+            bk = (b["south"], b["west"], b["north"], b["east"])
+            if bk not in box_alias:
+                box_alias[bk] = k
+                unique_boxes[k] = b
+        p0 = 20 if want_decoys else 0
+        ex_u = osm.extract(pbf, union, unique_boxes, lambda f: W.progress(p0 + (60 - p0) * f, "filter"))   # one pass for all class sets
+        for i, k in enumerate(need):
+            b = extract_boxes[k]
+            ways, nodes = ex_u[box_alias[(b["south"], b["west"], b["north"], b["east"])]]
             ways, nodes = osm.subset(ways, nodes, need[k][1])
             g = osm.build_graph(ways, nodes)
             g.save(cache / f"graph_{gkey[k]}.npz")
             if osm.rules_token(need[k][1]):
                 np.save(cache / f"tiers_{gkey[k]}.npy", osm.edge_tiers(g, ways))
-            W.progress(60 + 35 * (i + 1) / len(ex), "graph")
+            W.progress(60 + 35 * (i + 1) / len(need), "graph")
     tiers_of = lambda k, g: np.load(cache / f"tiers_{gkey[k]}.npy") if osm.rules_token(sets[k][1]) else np.zeros(g.n_edges, np.int8)
     st = OF.route_steps(d)
     res = dict(vehicle=veh, classes=list(classes), bbox=bbox, pbf=file_sig(pbf), pbf_timestamp=info["timestamp"], real_road_km=real_km, foreign=[], steps=int(st.T))
+    if local_cls is not None:
+        lk = "local_bbox" if "local_bbox" in gkey else "real"
+        res["local_bbox_graph"] = dict(bbox=bbox, classes=list(local_cls), file=f"graph_{gkey[lk]}.npz")
     tmax = None                                   # bike-path tier kept in the real box (None: all); the decoy boxes keep the same tiers
     for k, b in boxes.items():
         g = NetGraph.load(cache / f"graph_{gkey[k]}.npz")
         E = osm.edges_in_bbox(g, b)
         if len(E) == 0:
             raise RuntimeError(f"no road edges in box {k}")
+        if k == "real" and res["real_road_km"] is None:
+            on_road = np.isin(np.asarray(g.edge_highway)[E], list(roads))
+            rkm = float(np.asarray(g.edge_len)[E[on_road]].sum() / 2000)
+            if not np.isfinite(rkm) or rkm < 5:
+                raise RuntimeError(f"no road data in the area ({rkm} km of {veh} roads): wrong area or extract")
+            res["real_road_km"] = rkm
         tiers = tiers_of(k, g)
         if k == "real":
             E_all = E
@@ -328,14 +359,24 @@ def scan_kappa(pre, st, k, fvals, on_done=None, procs=C.MAX_WORKERS, masks=None)
         else:
             todo.append((fi, f))
     if todo:
-        _G["pre"], _G["st"] = pre, st
-        _G["sm"], _G["em"] = masks if masks else (None, None)
-        with mp.get_context("fork").Pool(min(procs, C.MAX_WORKERS, len(todo))) as pool:
-            for fi, sc in pool.imap_unordered(_job, todo):
-                out[fi] = sc + (st.T - 1) * np.log(k)
-                memo[repr(float(fvals[fi]))] = float(sc)
+        sm, em = masks if masks else (None, None)
+        n_threads = min(procs, C.MAX_WORKERS)
+        native_sc = dp.viterbi_scan(pre.grid, pre.par, st, [C.F_REF / f for _, f in todo], start_ok=sm, end_ok=em, threads=n_threads) if len(todo) >= 1 else None
+        if native_sc is not None:
+            for (fi, f), sc in zip(todo, native_sc):
+                out[fi] = float(sc) + (st.T - 1) * np.log(k)
+                memo[repr(float(f))] = float(sc)
                 if on_done:
                     on_done()
+        else:
+            _G["pre"], _G["st"] = pre, st
+            _G["sm"], _G["em"] = sm, em
+            with mp.get_context("fork").Pool(min(procs, C.MAX_WORKERS, len(todo))) as pool:
+                for fi, sc in pool.imap_unordered(_job, todo):
+                    out[fi] = sc + (st.T - 1) * np.log(k)
+                    memo[repr(float(fvals[fi]))] = float(sc)
+                    if on_done:
+                        on_done()
         if memo_f is not None:
             memo_f.parent.mkdir(parents=True, exist_ok=True)
             tmp = memo_f.with_suffix(".tmp")

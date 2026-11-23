@@ -17,6 +17,7 @@ import numpy as np
 
 from rsm.hmm.grid import Grid, check_budget
 from rsm.hmm.seq import Steps
+from . import _native as _N
 
 NEG = np.float32(-np.inf)
 STEP_OK_HOOK = None   # callable(grid, st, step_ok) -> step_ok with the user anchors merged in (rsm.pipeline.anchors.activate); None: off
@@ -86,7 +87,11 @@ def _cand(pre: Prepared, gi: int, mu: float, sd: float, dth, a_src: np.ndarray, 
 def _skip(gr, mu, sd) -> bool:
     if gr.n == 0:
         return True
-    return bool(gr.D.max() < mu - 6 * sd or gr.D.min() > mu + 6 * sd)
+    dmin = getattr(gr, "d_min", None)
+    dmax = getattr(gr, "d_max", None)
+    if dmin is None or dmax is None:
+        return bool(gr.D.max() < mu - 6 * sd or gr.D.min() > mu + 6 * sd)
+    return bool(dmax < mu - 6 * sd or dmin > mu + 6 * sd)
 
 
 def _prep_border(pre: Prepared):
@@ -99,6 +104,16 @@ def _prep_border(pre: Prepared):
         pre.b_ls.append(pre.ls[gi][o]); pre.b_is2.append(pre.is2[gi][o])
 
 
+def viterbi_scan(grid: Grid, base_par: Par, st: Steps, a_angs, start_ok=None, end_ok=None, step_ok: dict | None = None, threads: int = 3) -> np.ndarray | None:
+    """native batched Viterbi scan (no backpointers) for a list of a_ang values on one Grid; returns None if native backend is unavailable"""
+    if not _N.available():
+        return None
+    if STEP_OK_HOOK is not None:
+        step_ok = STEP_OK_HOOK(grid, st, step_ok)
+    s_lp, e_lp = FRAME_PRIOR_HOOK(grid) if FRAME_PRIOR_HOOK is not None else (None, None)
+    return _N.viterbi_scan(grid, base_par, st, a_angs, start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, s_lp=s_lp, e_lp=e_lp, threads=threads)
+
+
 def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0, start_ok=None, end_ok=None, step_ok: dict | None = None):
     """-> dict(score = best total log score, cell_path (T,) or None). Score has no initial prior constant.
     start_ok / end_ok (optional bool arrays over the cells): the path must start in / end in these cells (area hints). If no path satisfies them, score = -inf and cell_path None.
@@ -107,15 +122,17 @@ def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0,
     if STEP_OK_HOOK is not None:
         step_ok = STEP_OK_HOOK(grid, st, step_ok)
     N = grid.N
+    if backptr:
+        check_budget(N, st.T, bp_bytes=2, forward_backward=False)
+    s_lp, e_lp = FRAME_PRIOR_HOOK(grid) if FRAME_PRIOR_HOOK is not None else (None, None)
+    if _N.available():
+        return _N.viterbi_one(pre, st, backptr=backptr, start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, s_lp=s_lp, e_lp=e_lp)
     a = np.zeros(N, np.float32) if start_ok is None else np.where(start_ok, np.float32(0), NEG).astype(np.float32)
     if step_ok and 0 in step_ok:
         a = np.where(step_ok[0], a, NEG).astype(np.float32)
-    s_lp, e_lp = FRAME_PRIOR_HOOK(grid) if FRAME_PRIOR_HOOK is not None else (None, None)
     if s_lp is not None:
         a = (a + s_lp).astype(np.float32)
     bps = [] if backptr else None
-    if backptr:
-        check_budget(N, st.T, bp_bytes=2, forward_backward=False)
     for j in range(1, st.T):
         mu, sd, dth = _step_terms(pre, st, j)
         new = np.full(N, NEG, np.float32)
@@ -189,18 +206,22 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
     a = start_prior(grid, a)
     al[0] = a
     logev = 0.0
+    fb_c = _N.FBContext(pre) if _N.available() else None
     for j in range(1, T):
         mu, sd, dth = _step_terms(pre, st, j)
-        new = np.full(N, NEG, np.float32)
-        for gi, gr in enumerate(grid.groups):
-            if _skip(gr, mu, sd):
-                continue
-            cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
-            lse, ok = _lse_reduce(cand, gr.starts, gr.blk)
-            lse = np.where(ok, lse, NEG)
-            tmp = np.full(N, NEG, np.float32)
-            tmp[gr.ud] = lse
-            new = np.logaddexp(new, tmp)
+        if fb_c is not None:
+            new = fb_c.forward_step(a, mu, sd, dth)
+        else:
+            new = np.full(N, NEG, np.float32)
+            for gi, gr in enumerate(grid.groups):
+                if _skip(gr, mu, sd):
+                    continue
+                cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
+                lse, ok = _lse_reduce(cand, gr.starts, gr.blk)
+                lse = np.where(ok, lse, NEG)
+                tmp = np.full(N, NEG, np.float32)
+                tmp[gr.ud] = lse
+                new = np.logaddexp(new, tmp)
         if step_ok and j in step_ok:
             new = np.where(step_ok[j], new, NEG).astype(np.float32)
         mx = new.max()
@@ -232,16 +253,19 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
         if j == 0:
             break
         mu, sd, dth = _step_terms(pre, st, j)
-        nb = np.full(N, NEG, np.float32)
-        for gi, gr in enumerate(grid.groups):
-            if _skip(gr, mu, sd):
-                continue
-            cand = beta[gr.b_dst] + _cand(pre, gi, mu, sd, dth, None, view="b")
-            lse, ok = _lse_reduce(cand, gr.b_starts, gr.b_blk)
-            lse = np.where(ok, lse, NEG)
-            tmp = np.full(N, NEG, np.float32)
-            tmp[gr.b_us] = lse
-            nb = np.logaddexp(nb, tmp)
+        if fb_c is not None:
+            nb = fb_c.backward_step(beta, mu, sd, dth)
+        else:
+            nb = np.full(N, NEG, np.float32)
+            for gi, gr in enumerate(grid.groups):
+                if _skip(gr, mu, sd):
+                    continue
+                cand = beta[gr.b_dst] + _cand(pre, gi, mu, sd, dth, None, view="b")
+                lse, ok = _lse_reduce(cand, gr.b_starts, gr.b_blk)
+                lse = np.where(ok, lse, NEG)
+                tmp = np.full(N, NEG, np.float32)
+                tmp[gr.b_us] = lse
+                nb = np.logaddexp(nb, tmp)
         mx = nb.max()
         beta = nb - mx
     return dict(logev=logev, p_vit=p_vit, p_max=p_max, e_max=e_max, ent=ent)

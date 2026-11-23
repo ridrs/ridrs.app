@@ -17,6 +17,7 @@ and the fusion holds the position there (steps_c.fuse). A measurement gap (odofa
 from __future__ import annotations
 
 import json
+import multiprocessing as mp
 import time
 from pathlib import Path
 
@@ -179,6 +180,20 @@ def _blocks(ts) -> list[np.ndarray]:
     return np.split(ts, np.flatnonzero(np.diff(ts) > C.STILL_WIN_S + 1e-6) + 1) if len(ts) else []
 
 
+def _test_block(args) -> list[dict]:
+    video, fps, hz, blk = args
+    cv2.setNumThreads(1)
+    from .vmsx.decode import frames
+    a = float(blk[0])
+    dur = float(blk[-1] - blk[0]) + C.STILL_WIN_S + C.STILL_BASE_S + 0.05
+    fr = [f for _, f in frames(video, H, start=a, duration=dur)]
+    out = []
+    for t in blk:
+        r = window_test(fr, round((float(t) - a) * fps), fps, hz)
+        out.append(dict(t=float(t), **r))
+    return out
+
+
 def detect(d: Path, video: str, progress=None) -> dict:
     """decode the candidate windows, test them, write rotation/standstill.json -> its content"""
     from .vmsx.decode import frames, probe
@@ -192,16 +207,31 @@ def detect(d: Path, video: str, progress=None) -> dict:
 
     def test(ts, p0, p1):
         blocks = _blocks(ts)                      # contiguous windows -> one decode each
-        for gi, blk in enumerate(blocks):
-            a = float(blk[0])
-            dur = float(blk[-1] - blk[0]) + C.STILL_WIN_S + C.STILL_BASE_S + 0.05
-            fr = [f for _, f in frames(video, H, start=a, duration=dur)]
-            for t in blk:
-                r = window_test(fr, round((float(t) - a) * fps), fps, hz)
-                tested[float(t)] = r["still"]
-                rows.append(dict(t=float(t), **r))
-            if progress:
-                progress(p0 + (p1 - p0) * (gi + 1) / len(blocks))
+        if not blocks:
+            return
+        if len(blocks) >= 2 and C.MAX_WORKERS > 1:
+            done = 0
+            with mp.get_context("spawn").Pool(min(C.MAX_WORKERS, len(blocks))) as pool:
+                for res_blk in pool.imap_unordered(_test_block, [(video, fps, hz, blk) for blk in blocks], chunksize=1):
+                    for r in res_blk:
+                        tested[float(r["t"])] = r["still"]
+                        rows.append(r)
+                    done += 1
+                    if progress:
+                        progress(p0 + (p1 - p0) * done / len(blocks))
+                pool.close()
+                pool.join()
+        else:
+            for gi, blk in enumerate(blocks):
+                a = float(blk[0])
+                dur = float(blk[-1] - blk[0]) + C.STILL_WIN_S + C.STILL_BASE_S + 0.05
+                fr = [f for _, f in frames(video, H, start=a, duration=dur)]
+                for t in blk:
+                    r = window_test(fr, round((float(t) - a) * fps), fps, hz)
+                    tested[float(t)] = r["still"]
+                    rows.append(dict(t=float(t), **r))
+                if progress:
+                    progress(p0 + (p1 - p0) * (gi + 1) / len(blocks))
     test(np.concatenate([tw for _, tw in runs]) if runs else [], 0.0, 0.8)
     for k in range(3):                            # where the state changes between two samples, test every window in between
         fill = refill(runs, tested)

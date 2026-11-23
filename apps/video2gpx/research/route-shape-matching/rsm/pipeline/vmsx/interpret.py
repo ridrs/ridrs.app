@@ -40,6 +40,13 @@ def select(x: np.ndarray, y: np.ndarray, fb: np.ndarray, fb_max: float, cell: in
     if len(k) == 0:
         return k
     c = (y[k] // cell).astype(np.int64) * 100_000 + (x[k] // cell).astype(np.int64)
+    # extracted points are stored cell-by-cell in row-major order (non-decreasing c), so we can skip argsort in the common case
+    if len(c) == 1 or bool((c[1:] >= c[:-1]).all()):
+        first = np.r_[True, c[1:] != c[:-1]]
+        if USE_NPTS == 1:
+            return k[first]
+        start = np.maximum.accumulate(np.where(first, np.arange(len(c)), 0))
+        return k[(np.arange(len(c)) - start) < USE_NPTS]
     o = np.argsort(c, kind="stable")
     cs = c[o]
     first = np.r_[True, cs[1:] != cs[:-1]]
@@ -185,8 +192,27 @@ def horizon_track(P: Points, horizon: float) -> dict:
     return vm.track_of(starts, foes, H)
 
 
+_M: dict = {}       # read-only context of analyse(), inherited by forked workers
+
+
+def _fit_slice(args) -> tuple[int, list]:
+    i0, i1 = args
+    M = _M
+    P, mask, fbm, mr, dt, W, H, sc, seed0, alt_thr, times, yh = (
+        M["P"], M["mask"], M["fbm"], M["mr"], M["dt"], M["W"], M["H"], M["sc"], M["seed0"], M["alt_thr"], M["times"], M["yh"]
+    )
+    rows = []
+    for i in range(i0, i1):
+        j = int(P.idx[i])
+        ri = P.rpos.get(j)
+        first = lambda i=i: P.get("des", i, mask, fbm)
+        fallback = (lambda ri=ri: P.get("raw", ri, mask, fbm)) if ri is not None else None
+        rows.append(vm.fit_row(j, float(times[i]), float(P.diff[i]), first, fallback, float(yh[i]), mr, dt, W, H, sc, seed0=seed0, alt_thr=alt_thr))
+    return i0, rows
+
+
 def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 0, road_width=vm.ROAD_WIDTH, on_progress=None, running: bool = True,
-            spread_iqr: float | None = None) -> dict:
+            spread_iqr: float | None = None, workers: int = 1) -> dict:
     """motion.csv of the extraction in ex_dir and the run statistics of `vmsx.motion.analyse_parallel`. `calibration`, `seed0`: as there (a clip
     of a source passes the source's calibration with its track in source seconds and the index of its first source frame). running=False: every pair
     is fitted with the calibrated row (no running horizon, A24 off; the calibration's track is None). `spread_iqr` (with running=False): when the
@@ -195,7 +221,7 @@ def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 
     t0 = time.perf_counter()
     if on_progress is not None:
         on_progress(0, 1, "horizon")
-    P = Points(ex_dir)
+    P = Points(ex_dir, streams=("des", "raw"))
     H, W, fps, sc = P.height, P.width, P.fps, _scale(P)
     cal = dict(calibration) if calibration is not None else calibrate_horizon(P)
     spread = None
@@ -219,21 +245,45 @@ def analyse(ex_dir, out_csv: str, calibration: dict | None = None, seed0: int = 
     times = (P.idx - 0.5) / fps
     yh = vm.running_horizon(cal["track"], times + t_src, horizon)
     n = len(P.idx)
-    last_cb = 0.0
-    with open(out_csv, "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(vm.COLUMNS)
-        for i in range(n):
-            j = int(P.idx[i])
-            ri = P.rpos.get(j)
-            first = lambda i=i: P.get("des", i, mask, fbm)
-            fallback = (lambda ri=ri: P.get("raw", ri, mask, fbm)) if ri is not None else None
-            w.writerow(vm.fit_row(j, float(times[i]), float(P.diff[i]), first, fallback, float(yh[i]), mr, dt, W, H, sc, seed0=seed0, alt_thr=alt_thr))
-            if on_progress is not None and i % 600 == 0:
-                now = time.perf_counter()
-                if now - last_cb >= 1.0:
-                    last_cb = now
-                    on_progress(i, n, "pairs")
+    slice_n = 1200
+    slices = [(s, min(s + slice_n, n)) for s in range(0, n, slice_n)]
+    if workers > 1 and len(slices) > 1:
+        _M.clear()
+        _M.update(P=P, mask=mask, fbm=fbm, mr=mr, dt=dt, W=W, H=H, sc=sc, seed0=seed0, alt_thr=alt_thr, times=times, yh=yh)
+        parts, done = [], 0
+        try:
+            with mp.get_context("fork").Pool(min(workers, len(slices)), initializer=EX._worker_init) as pool:
+                for i0, rows in pool.imap_unordered(_fit_slice, slices, chunksize=1):
+                    parts.append((i0, rows))
+                    done += len(rows)
+                    if on_progress is not None:
+                        on_progress(done, n, "pairs")
+                pool.close()
+                pool.join()
+        finally:
+            _M.clear()
+        parts.sort(key=lambda x: x[0])
+        with open(out_csv, "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(vm.COLUMNS)
+            for _, rows in parts:
+                w.writerows(rows)
+    else:
+        last_cb = 0.0
+        with open(out_csv, "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(vm.COLUMNS)
+            for i in range(n):
+                j = int(P.idx[i])
+                ri = P.rpos.get(j)
+                first = lambda i=i: P.get("des", i, mask, fbm)
+                fallback = (lambda ri=ri: P.get("raw", ri, mask, fbm)) if ri is not None else None
+                w.writerow(vm.fit_row(j, float(times[i]), float(P.diff[i]), first, fallback, float(yh[i]), mr, dt, W, H, sc, seed0=seed0, alt_thr=alt_thr))
+                if on_progress is not None and i % 600 == 0:
+                    now = time.perf_counter()
+                    if now - last_cb >= 1.0:
+                        last_cb = now
+                        on_progress(i, n, "pairs")
     traffic = vm.pick_alternatives(out_csv, sc) if vm.ALT_TRIGGER > 0 else {}
     elapsed = time.perf_counter() - t0
     if on_progress is not None:

@@ -20,7 +20,9 @@ from __future__ import annotations
 import io
 import json
 import multiprocessing as mp
+import os
 import time
+import zipfile
 from collections import deque
 from pathlib import Path
 
@@ -28,12 +30,12 @@ import cv2
 import numpy as np
 
 from .. import config as C
-from . import motion as vm
+from . import _metal, motion as vm
 from .decode import frames, frames_from, probe
 
 VERSION = "extract1"
 CELL = 16
-NPTS = 2
+NPTS = 1
 MIN_D = 8
 #: absolute minimum of cv2.cornerMinEigenVal (blockSize EIG_BLOCK, ksize EIG_KSIZE) on the plain and on the destatic frame (gain 3: more contrast)
 THR = {"raw": 1.0e-4, "des": 2.5e-4}
@@ -47,6 +49,9 @@ EIG0 = 1.0e-5
 FB_MAX = 1.0
 RAW_EVERY = 3
 RAW_LOW_MIN = 40
+#: vertical frame-fraction bounds for the des (lower portion) and rot (upper portion) streams; aligned to CELL rows so retained points are bit-identical
+DES_Y_MIN = 0.40
+ROT_Y_MAX = 0.62
 STREAMS = ("des", "raw", "rot")
 #: speed (2026-11-20; neither shapes the data): chunks of CHUNK_S s keep every worker busy to the end (with 120 s, 10 min were 5 chunks on 4
 #: workers: two rounds), and THREADS OpenCV threads per worker parallelise the LK tracking (85 % of the time). Pontaix 10 min, 4 workers:
@@ -54,17 +59,34 @@ STREAMS = ("des", "raw", "rot")
 CHUNK_S = 30.0
 THREADS = 2
 COLS = ("x", "y", "dx", "dy", "fb", "q")
+ZIP_LEVEL = 1       # zlib level for chunk_*.npz (6.2x faster than default 6, +4% size; readable by np.load)
+METAL_BATCH = 8     # pairs dispatched per Metal command buffer (~12 LK calls + pyramid downsamples per GPU sync)
+
+
+def tracker_name() -> str:
+    """name of the active LK backend recorded in extract.json"""
+    return "metal" if _metal.available(vm.LK_PARAMS) else "opencv"
 
 
 def params(k: int | None = None) -> dict:
     """everything that shapes the stored data (extract.json `params`, part of the key)"""
     return dict(cell=CELL, npts=NPTS, min_d=MIN_D, thr=dict(THR), eig_block=EIG_BLOCK, eig_ksize=EIG_KSIZE, q_xy=Q_XY, q_flow=Q_FLOW, q_fb=Q_FB,
-                q_strength=Q_STRENGTH, eig0=EIG0, fb_max=FB_MAX, raw_every=RAW_EVERY, raw_low_min=RAW_LOW_MIN, k_s=C.FAR["k_s"], k=k,
-                destatic_tau=vm.DESTATIC_TAU, destatic_gain=vm.DESTATIC_GAIN, lk=dict(win=list(vm.LK_PARAMS["winSize"]), levels=vm.LK_PARAMS["maxLevel"]))
+                q_strength=Q_STRENGTH, eig0=EIG0, fb_max=FB_MAX, raw_every=RAW_EVERY, raw_low_min=RAW_LOW_MIN, des_y_min=DES_Y_MIN, rot_y_max=ROT_Y_MAX,
+                k_s=C.FAR["k_s"], k=k, destatic_tau=vm.DESTATIC_TAU, destatic_gain=vm.DESTATIC_GAIN,
+                lk=dict(win=list(vm.LK_PARAMS["winSize"]), levels=vm.LK_PARAMS["maxLevel"]), tracker=tracker_name())
 
 
 def eig_map(frame: np.ndarray) -> np.ndarray:
     return cv2.cornerMinEigenVal(frame, EIG_BLOCK, EIG_KSIZE)
+
+
+def _eig_slice(frame: np.ndarray, y0: int, y1: int) -> tuple[np.ndarray, int]:
+    """cornerMinEigenVal over rows [y0, y1) with enough margin that every row in [y0, y1) is bit-identical to full-frame eig_map; -> (sub_eig, top_offset)"""
+    H = frame.shape[0]
+    pad = EIG_BLOCK + EIG_KSIZE
+    a = max(0, y0 - pad)
+    b = min(H, y1 + pad)
+    return eig_map(frame[a:b, :]), a
 
 
 def strength_code(v: np.ndarray) -> np.ndarray:
@@ -75,36 +97,72 @@ def strength_value(q: np.ndarray) -> np.ndarray:
     return EIG0 * 2.0 ** (np.asarray(q, np.float64) / Q_STRENGTH)
 
 
-def detect(eig: np.ndarray, thr: float) -> tuple[np.ndarray, np.ndarray]:
-    """(points (n, 2) float32 x, y; strength codes (n,) uint8): per CELL cell the strongest local maximum of `eig` at or above `thr`, then the next
-    strongest at least MIN_D px from it; cell by cell (row-major), the strongest first"""
-    H, W = eig.shape
-    v = np.where((eig == cv2.dilate(eig, None)) & (eig >= thr), eig, 0).astype(np.float32)
-    gy, gx = -(-H // CELL), -(-W // CELL)
-    pad = np.zeros((gy * CELL, gx * CELL), np.float32)
-    pad[:H, :W] = v
+def detect(eig: np.ndarray, thr: float, y0: int = 0, y1: int | None = None, eig_top: int = 0) -> tuple[np.ndarray, np.ndarray]:
+    """(points (n, 2) float32 x, y; strength codes (n,) uint8): per CELL cell in rows [y0, y1) (y0 aligned to CELL) the strongest local maximum of
+    `eig` at or above `thr`, then the next strongest at least MIN_D px from it; cell by cell (row-major), the strongest first.
+    `eig_top`: frame row index of eig[0] (0 when `eig` is a full-frame map)."""
+    H_sub, W = eig.shape
+    H = eig_top + H_sub
+    y1 = H if y1 is None else min(H, int(y1))
+    y0 = max(eig_top, int(y0))
+    if y1 <= y0:
+        return np.zeros((0, 2), np.float32), np.zeros(0, np.uint8)
+    # 3x3 dilate needs 1 row of context above/below [y0, y1) when available so boundary maxima match full-frame cv2.dilate
+    da = max(0, y0 - eig_top - 1)
+    db = min(H_sub, y1 - eig_top + 1)
+    sub = eig[da:db, :]
+    dil = cv2.dilate(sub, None)
+    off = (y0 - eig_top) - da
+    rows = y1 - y0
+    e_roi = sub[off:off + rows, :]
+    d_roi = dil[off:off + rows, :]
+    v = np.where((e_roi == d_roi) & (e_roi >= thr), e_roi, 0).astype(np.float32)
+    gy, gx = -(-rows // CELL), -(-W // CELL)
+    if rows == gy * CELL and W == gx * CELL:
+        pad = v
+    else:
+        pad = np.zeros((gy * CELL, gx * CELL), np.float32)
+        pad[:rows, :W] = v
     blocks = pad.reshape(gy, CELL, gx, CELL).transpose(0, 2, 1, 3).reshape(gy * gx, CELL * CELL)
-    by, bx = np.divmod(np.arange(gy * gx), gx)
+    if NPTS == 1:
+        # np.argmax returns the first index on ties -> bit-identical to lexsort((top, -tv))
+        idx = np.argmax(blocks, axis=1)
+        vals = blocks[np.arange(gy * gx), idx]
+        active = np.flatnonzero(vals > 0)
+        if len(active) == 0:
+            return np.zeros((0, 2), np.float32), np.zeros(0, np.uint8)
+        by, bx = np.divmod(active, gx)
+        ty, tx = np.divmod(idx[active], CELL)
+        xs = bx * CELL + tx
+        ys = y0 + by * CELL + ty
+        pts = np.column_stack([xs, ys]).astype(np.float32)
+        return pts, strength_code(vals[active])
+    active = np.flatnonzero(blocks.max(axis=1) > 0)
+    if len(active) == 0:
+        return np.zeros((0, 2), np.float32), np.zeros(0, np.uint8)
+    ab = blocks[active]
+    by, bx = np.divmod(active, gx)
     K = min(8, CELL * CELL - 1)
-    top = np.argpartition(-blocks, K, axis=1)[:, :K]
-    tv = np.take_along_axis(blocks, top, 1)
+    top = np.argpartition(-ab, K, axis=1)[:, :K]
+    tv = np.take_along_axis(ab, top, 1)
     o = np.lexsort((top, -tv), axis=1)                    # strongest first, ties by position: deterministic
     top, tv = np.take_along_axis(top, o, 1), np.take_along_axis(tv, o, 1)
     ty, tx = top // CELL, top % CELL
-    pick = [np.where(tv[:, 0] > 0, 0, -1)]
+    pick = [np.zeros(len(active), np.int64)]              # every active cell has tv[:, 0] > 0
     if NPTS >= 2:
-        sec = np.full(len(top), -1)
+        sec = np.full(len(active), -1, np.int64)
         for j in range(K - 1, 0, -1):                     # the strongest candidate far enough from the best one
             ok = (tv[:, j] > 0) & (np.hypot(ty[:, j] - ty[:, 0], tx[:, j] - tx[:, 0]) >= MIN_D)
             sec = np.where(ok, j, sec)
-        pick.append(np.where(pick[0] >= 0, sec, -1))
-    P = np.stack(pick, 1)                                 # (cells, NPTS) candidate index or -1
+        pick.append(sec)
+    P = np.stack(pick, 1)                                 # (active_cells, NPTS) candidate index or -1
     cells, rank = np.nonzero(P >= 0)
     j = P[cells, rank]
     xs = bx[cells] * CELL + tx[cells, j]
-    ys = by[cells] * CELL + ty[cells, j]
+    ys_local = by[cells] * CELL + ty[cells, j]
+    ys = y0 + ys_local
     pts = np.column_stack([xs, ys]).astype(np.float32)
-    return pts, strength_code(eig[ys, xs])
+    return pts, strength_code(e_roi[ys_local, xs])
 
 
 def track(a: np.ndarray, b: np.ndarray, p0: np.ndarray):
@@ -138,13 +196,16 @@ class _Stream:
         self.cols = {c: [] for c in COLS}
         self.count = []
 
-    def add(self, pts, q, a, b):
-        flow, fb, ok = track(a, b, pts)
+    def add_tracked(self, pts, q, flow, fb, ok):
         keep = ok & (np.round(fb * Q_FB) < FB_MAX * Q_FB)          # as stored: a quantised error of 1 px is not kept
         for c, arr in zip(COLS, (*quantise(pts[keep], flow[keep], fb[keep]), q[keep])):
             self.cols[c].append(arr)
         self.count.append(int(keep.sum()))
         return pts[keep]
+
+    def add(self, pts, q, a, b):
+        flow, fb, ok = track(a, b, pts)
+        return self.add_tracked(pts, q, flow, fb, ok)
 
     def arrays(self, s):
         dt = dict(x=np.uint16, y=np.uint16, dx=np.int16, dy=np.int16, fb=np.uint8, q=np.uint8)
@@ -163,11 +224,23 @@ def _extract_init(threads: int):
     cv2.setNumThreads(int(threads))
 
 
+def _write_npz(dst: Path, data: dict) -> None:
+    """write a standard .npz archive readable by np.load using fast zlib level ZIP_LEVEL (6x faster than np.savez_compressed)"""
+    with zipfile.ZipFile(dst, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=ZIP_LEVEL) as zf:
+        for k, arr in data.items():
+            buf = io.BytesIO()
+            np.save(buf, arr, allow_pickle=False)
+            zf.writestr(f"{k}.npy", buf.getvalue())
+
+
 def _range(job) -> dict:
     """the data of the pairs (j - 1, j), a < j <= b (b None: to the end), the windows ending in that range, and the hashes of the first / last
-    WARM_FRAMES + 1 decoded frames (seam check as in vmsx.motion._par_chunk)"""
+    WARM_FRAMES + 1 decoded frames (seam check as in vmsx.motion._par_chunk). When X['out_dir'] is set, the chunk archive is written inside the
+    worker as chunk_<a>.npz.tmp so large arrays never cross the IPC pipe or sit in parent memory."""
     X, a, b = job
     info, H, hw, k, n_win = X["info"], X["height"], X["hwaccel"], X["k"], X["n_win"]
+    des_y0 = (int(H * DES_Y_MIN) // CELL) * CELL
+    rot_y1 = min(H, ((int(H * ROT_Y_MAX) + CELL - 1) // CELL) * CELL)
     s = max(0, a - vm.WARM_FRAMES)
     if s == 0:
         src = (f for _, f in frames(X["path"], H, hwaccel=hw))
@@ -177,50 +250,143 @@ def _range(job) -> dict:
     st = {x: _Stream() for x in STREAMS}
     idx, diff, raw_idx, rot_w = [], [], [], []
     head, tail = [], deque(maxlen=vm.WARM_FRAMES + 1)
-    prev = prev_f = prev_e = prev_ef = key = key_e = None
+    prev = prev_f = prev_ef = key = None
+    prev_ef_top = 0
+    key_j = -1
+    use_metal = _metal.available(vm.LK_PARAMS)
+    sess = None
+    batch = []
+
+    def _flush_metal():
+        if not batch:
+            return
+        gpu_pairs = []
+        tags = []  # (item_idx, kind)
+        for bi, it in enumerate(batch):
+            jj, p_fr, c_fr, p_ff, c_ff, pd, qd, sraw, srot = it
+            gpu_pairs.append((("des", jj - 1), p_ff, ("des", jj), c_ff, pd))
+            tags.append((bi, "des"))
+            if sraw is not None:
+                gpu_pairs.append((("raw", jj - 1), p_fr, ("raw", jj), c_fr, sraw[0]))
+                tags.append((bi, "raw"))
+            if srot is not None:
+                _, k_jj, k_fr, prt, _ = srot
+                gpu_pairs.append((("raw", k_jj), k_fr, ("raw", jj), c_fr, prt))
+                tags.append((bi, "rot"))
+        res_list = sess.run_batch(gpu_pairs)
+        res_des = [None] * len(batch)
+        res_raw = [None] * len(batch)
+        res_rot = [None] * len(batch)
+        for (bi, kind), r in zip(tags, res_list):
+            if kind == "des":
+                res_des[bi] = r
+            elif kind == "raw":
+                res_raw[bi] = r
+            else:
+                res_rot[bi] = r
+        # Pass 1: commit des stream and detect rare RAW_LOW_MIN fallback pairs
+        fb_reqs = []
+        for bi, it in enumerate(batch):
+            jj, p_fr, c_fr, _, _, pd, qd, sraw, _ = it
+            kept = st["des"].add_tracked(pd, qd, *res_des[bi])
+            if sraw is None and int((kept[:, 1] >= H / 2).sum()) < RAW_LOW_MIN:
+                pr, qr = detect(eig_map(p_fr), THR["raw"])
+                fb_reqs.append((bi, jj, p_fr, c_fr, pr, qr))
+        fb_by_bi = {}
+        if fb_reqs:
+            fb_res = sess.run_batch([(("raw", jj - 1), p_fr, ("raw", jj), c_fr, pr) for _, jj, p_fr, c_fr, pr, _ in fb_reqs])
+            for (bi, _, _, _, pr, qr), r in zip(fb_reqs, fb_res):
+                fb_by_bi[bi] = (pr, qr, r)
+        # Pass 2: commit raw and rot streams in strictly increasing frame order
+        for bi, it in enumerate(batch):
+            jj, _, _, _, _, _, _, sraw, srot = it
+            if sraw is not None:
+                st["raw"].add_tracked(sraw[0], sraw[1], *res_raw[bi])
+                raw_idx.append(jj)
+            elif bi in fb_by_bi:
+                pr, qr, r = fb_by_bi[bi]
+                st["raw"].add_tracked(pr, qr, *r)
+                raw_idx.append(jj)
+            if srot is not None:
+                w, _, _, prt, qrt = srot
+                st["rot"].add_tracked(prt, qrt, *res_rot[bi])
+                rot_w.append(w)
+        batch.clear()
+
     j = s - 1
     try:
         for fr in src:
             j += 1
+            if use_metal and sess is None:
+                sess = _metal.MetalLKSession(fr.shape[1], fr.shape[0], vm.LK_PARAMS, n_slots=max(48, 4 * METAL_BATCH + 16))
             if len(head) <= vm.WARM_FRAMES:
                 head.append(vm._sha(fr))
             tail.append(fr)
             ff = filt(fr)
-            e = ef = None
-            if j > a or j % k == 0 or j == a:
-                e, ef = eig_map(fr), eig_map(ff)
             if prev is not None and j > a:
                 idx.append(j)
                 diff.append(float(np.mean(np.abs(fr[::4, ::4].astype(np.int16) - prev[::4, ::4].astype(np.int16)))))
-                p, q = detect(prev_ef, THR["des"])
-                kept = st["des"].add(p, q, prev_f, ff)
-                if j % RAW_EVERY == 0 or int((kept[:, 1] >= H / 2).sum()) < RAW_LOW_MIN:
-                    p, q = detect(prev_e, THR["raw"])
-                    st["raw"].add(p, q, prev, fr)
-                    raw_idx.append(j)
-                w = j // k - 1
-                if j % k == 0 and key is not None and 0 <= w < n_win:
-                    p, q = detect(key_e, THR["raw"])
-                    st["rot"].add(p, q, key, fr)
-                    rot_w.append(w)
+                p, q = detect(prev_ef, THR["des"], y0=des_y0, y1=H, eig_top=prev_ef_top)
+                if use_metal:
+                    sraw = detect(eig_map(prev), THR["raw"]) if j % RAW_EVERY == 0 else None
+                    w = j // k - 1
+                    if j % k == 0 and key is not None and 0 <= w < n_win:
+                        ke, ke_top = _eig_slice(key, 0, rot_y1)
+                        prt, qrt = detect(ke, THR["raw"], y0=0, y1=rot_y1, eig_top=ke_top)
+                        srot = (w, key_j, key, prt, qrt)
+                    else:
+                        srot = None
+                    batch.append((j, prev, fr, prev_f, ff, p, q, sraw, srot))
+                    if len(batch) >= METAL_BATCH:
+                        _flush_metal()
+                else:
+                    kept = st["des"].add(p, q, prev_f, ff)
+                    if j % RAW_EVERY == 0 or int((kept[:, 1] >= H / 2).sum()) < RAW_LOW_MIN:
+                        p, q = detect(eig_map(prev), THR["raw"])
+                        st["raw"].add(p, q, prev, fr)
+                        raw_idx.append(j)
+                    w = j // k - 1
+                    if j % k == 0 and key is not None and 0 <= w < n_win:
+                        ke, ke_top = _eig_slice(key, 0, rot_y1)
+                        p, q = detect(ke, THR["raw"], y0=0, y1=rot_y1, eig_top=ke_top)
+                        st["rot"].add(p, q, key, fr)
+                        rot_w.append(w)
             if j % k == 0:
-                key, key_e = fr, e
-            prev, prev_f, prev_e, prev_ef = fr, ff, e, ef
+                key = fr
+                key_j = j
+            if j >= a and (b is None or j < b):
+                prev_ef, prev_ef_top = _eig_slice(ff, des_y0, H)
+            else:
+                prev_ef = None
+            prev, prev_f = fr, ff
             if b is not None and j >= b:
                 break
+        if use_metal:
+            _flush_metal()
     finally:
+        if sess is not None:
+            sess.close()
         src.close()
     out = dict(idx=np.array(idx, np.int32), diff=np.array(diff, np.float32), raw_idx=np.array(raw_idx, np.int32), rot_w=np.array(rot_w, np.int32))
     for x in STREAMS:
         out.update(st[x].arrays(x))
-    return dict(a=a, b=b, last=j, data=out, head=head, tail=[vm._sha(f) for f in tail])
+    res = dict(a=a, b=b, last=j, pairs=len(idx), windows=len(rot_w), head=head, tail=[vm._sha(f) for f in tail])
+    out_dir = X.get("out_dir")
+    if out_dir is not None:
+        tmp = f"chunk_{a:08d}.npz.tmp"
+        _write_npz(Path(out_dir) / tmp, out)
+        res["tmp"] = tmp
+    else:
+        res["data"] = out
+    return res
 
 
 def _write(d: Path, r: dict) -> str:
     name = f"chunk_{r['a']:08d}.npz"
-    buf = io.BytesIO()
-    np.savez_compressed(buf, **r["data"])
-    (d / name).write_bytes(buf.getvalue())
+    if "tmp" in r:
+        os.replace(d / r["tmp"], d / name)
+        return name
+    _write_npz(d / name, r["data"])
     return name
 
 
@@ -230,8 +396,9 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
     log = log or (lambda level, msg: None)
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
-    for f in d.glob("chunk_*.npz"):
-        f.unlink()
+    for pat in ("chunk_*.npz", "chunk_*.npz.tmp"):
+        for f in d.glob(pat):
+            f.unlink()
     t0 = time.perf_counter()
     info = probe(path)
     width = round(info.width * height / info.height / 2) * 2
@@ -239,7 +406,7 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
     if k > vm.WARM_FRAMES:
         raise ValueError(f"rotation window of {k} frames is longer than the chunk overlap of {vm.WARM_FRAMES}")
     n_win = int(info.duration * info.fps / k) - 1
-    X = dict(path=path, info=info, height=height, hwaccel=hwaccel, k=k, n_win=n_win)
+    X = dict(path=path, info=info, height=height, hwaccel=hwaccel, k=k, n_win=n_win, out_dir=str(d))
     cf = max(4 * vm.WARM_FRAMES, int(round(chunk_s * info.fps)))
     n_est = int(info.duration * info.fps)
     starts = [i * cf for i in range(max(1, n_est // cf))]
@@ -269,8 +436,11 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
         if why is None:
             for r in res:
                 chunks.append([r["a"], r["last"], _write(d, r)])
-                pairs += len(r["data"]["idx"]); windows += len(r["data"]["rot_w"])
+                pairs += r["pairs"]; windows += r["windows"]
         else:
+            for r in res:
+                if "tmp" in r:
+                    (d / r["tmp"]).unlink(missing_ok=True)
             log("warn", f"extract: parallel extraction not used ({why}); sequential extraction")
     fallback = why if workers > 1 else None
     if not chunks:
@@ -278,7 +448,7 @@ def extract(path: str, out_dir, height: int = 360, workers: int = 4, chunk_s: fl
             on_progress(0, 1, "extract")
         r = _range((X, 0, None))
         chunks.append([0, r["last"], _write(d, r)])
-        pairs, windows = len(r["data"]["idx"]), len(r["data"]["rot_w"])
+        pairs, windows = r["pairs"], r["windows"]
     pr = params(k)
     meta = dict(version=VERSION, key=key, params=pr, video=str(path), fps=float(info.fps), duration=float(info.duration), width=int(width), height=int(height), pairs=int(pairs), windows=int(windows),
                 n_win=int(n_win), k=int(k), chunks=chunks, opencv=cv2.__version__, seconds=round(time.perf_counter() - t0, 2),

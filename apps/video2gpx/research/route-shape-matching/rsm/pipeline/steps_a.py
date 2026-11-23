@@ -113,7 +113,7 @@ def motion_from_extract(d: Path, P: dict, W: Worker, cal: dict | None, s0: int) 
         W.progress(100.0 * (split[0] + (1 - split[0]) * (0.0 if phase == "horizon" else n / max(total, 1))), phase)
 
     stats = VI.analyse(d / "extract", str(d / "motion" / "motion.csv"), calibration=cal, seed0=s0, on_progress=cb2, running=P.get("horizon", "running") == "running",
-                       spread_iqr=C.HZ_SPREAD_IQR)
+                       spread_iqr=C.HZ_SPREAD_IQR, workers=R.policy()["workers"])
     sp = stats.get("horizon_spread")
     if sp and sp["running"]:
         W.log("info", f"horizon calibration scattered over {sp['iqr']:.0f} rows (limit {sp['limit']:.0f}): no fixed row fits the video, the running horizon is used")
@@ -291,7 +291,27 @@ def rotation(d: Path, P: dict, W: Worker):
     ends = band_ends(hz, 360, p, F["band_step"], F["n_bands"])
     t0 = time.time()
     ex = d / "extract"
-    if extract_of_run(d, mj, k):              # the windows from the stored `rot` stream of the motion step's extraction: no decode
+    want_source = "extract" if extract_of_run(d, mj, k) else "video"
+    stashed = d / "_pass1_win_video_base.npz"
+    reused_win = None
+    if stashed.exists():
+        try:
+            with np.load(stashed) as z0:
+                m0 = json.loads(str(z0["meta"]))
+            if (int(m0.get("k", -1)) == int(k) and int(m0.get("n_windows", -1)) == int(n_win)
+                    and m0.get("source") == want_source and m0.get("band_ends") == ends
+                    and float(m0.get("f", -1)) == float(C.F_FAR)):
+                import shutil
+                shutil.move(str(stashed), str(out / "win_video_base.npz"))
+                reused_win = m0
+                W.log("info", f"rotation: reused {n_win} far-feature windows from pass 1 (same horizon {hz:.1f})")
+                W.progress(95.0, "bands")
+        except Exception:
+            pass
+        stashed.unlink(missing_ok=True)
+    if reused_win is not None:
+        return rotation_series(d, P, W, reused_win)
+    if want_source == "extract":              # the windows from the stored `rot` stream of the motion step's extraction: no decode
         arr = VI.rotation_windows(VI.Points(ex, streams=("rot",)), ends, p, C.F_FAR, F["min_inl"], n_win, cw, FIELDS, WHY, workers=min(C.MAX_WORKERS, len(chunks)),
                                   on_progress=lambda n, total, phase: W.progress(95.0 * n / max(total, 1), phase))
         source = "extract"

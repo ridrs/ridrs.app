@@ -74,13 +74,26 @@ def corridor_graph(d: Path, P: dict, W: Worker, g, E, route, vehicle: str, progr
     cache = data_dir(d)
     key = sha(file_sig(P["pbf"]), box, list(cls), "local_graph1", *osm.rules_token(cls))   # rule token only for bike-path classes: road keys unchanged
     f = cache / f"graph_local_{key}.npz"
+    gl = None
     if f.exists():
         gl = NetGraph.load(f)
         progress(1.0)
     else:
-        ex = osm.extract(P["pbf"], cls, {"local": box}, progress)
-        gl = osm.build_graph(*ex["local"])
-        gl.save(f)
+        # reuse the full-bbox local-class graph extracted during map_step when it already covers the corridor box (avoids a 2nd full PBF scan)
+        mf = d / "map" / "map.json"
+        if mf.exists():
+            from .common import jload
+            lbg = jload(mf).get("local_bbox_graph")
+            if lbg and sorted(lbg.get("classes") or []) == sorted(cls):
+                bb, gf = lbg.get("bbox") or {}, cache / str(lbg.get("file", ""))
+                if (gf.exists() and bb.get("south", 1e9) <= box["south"] and bb.get("north", -1e9) >= box["north"]
+                        and bb.get("west", 1e9) <= box["west"] and bb.get("east", -1e9) >= box["east"]):
+                    gl = NetGraph.load(gf)
+                    progress(1.0)
+        if gl is None:
+            ex = osm.extract(P["pbf"], cls, {"local": box}, progress)
+            gl = osm.build_graph(*ex["local"])
+            gl.save(f)
     from pyproj import Transformer
     tr = Transformer.from_crs("EPSG:4326", gl.crs, always_xy=True)
     lx, ly = tr.transform(ll[:, 0], ll[:, 1])

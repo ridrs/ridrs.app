@@ -163,6 +163,7 @@ class Run:
         bike_cal = [["bike_cal", C.CAL_VMAX_BIKE, C.K_GRID_BIKE]] if (C.CAL_VMAX_BIKE != C.CAL_VMAX or C.K_GRID_BIKE != C.K_GRID) else []   # F2/F5 only when switched on
         bp = P.get("bike_paths")                 # F1: only a run with bike paths gets a new map hash (off and the default keep the old one while the config flags are off)
         paths_map = [["bike_paths", bp, C.BIKE_PATH_RULES]] if bp in ("on", "fallback") or (bp is None and (C.BIKE_PATHS_ON or C.BIKE_PATHS_FALLBACK)) else []
+        decoy_map = [["decoys_map1"]] if int(P.get("decoys", 0)) > 0 else []
         odo = [["odo1", C.ODO_FAIL_USABLE, C.ODO_FAIL_WIN_S, C.ODO_FAIL_MIN_S, C.ODO_FAIL_MERGE_S, C.ODO_NB_S, C.ODO_GAP_MU_X, C.ODO_GAP_REL, C.ODO_GAP_UPPER, C.GAP_SYS_REL,
                 C.ODO_LOW_USABLE, C.ODO_LOW_WIN_S, C.ODO_LOW_REL]] if C.ODO_FAIL_ON else []
         odo += [["vmp2", C.VEH_K_MOTOR, C.VEH_V90_MOTOR, C.VEH_K_BIKE, C.VEH_V90_BIKE, C.VERDICT_MOTOR_SAME]] if C.VERDICT_MOTOR_POST else []   # verdict posterior on the motor roads (steps_b.motor_posterior)   # odometry failure handling (odofail.py): all route-side steps
@@ -182,7 +183,7 @@ class Run:
                                *([["same1", C.CUT_SAME_SHARE, C.CUT_SAME_WIN_S, C.CUT_SAME_H]] if (C.CUT_ON and C.CUT_SAME_ON) else []),
                                *([["intro_user1", P["intro_end"]]] if P.get("intro_end") is not None else []),
                                *([["strong2", C.CUT_STRONG_IMPULSE, C.CUT_STRONG_FACTOR, C.CUT_STRONG_MIN_DIFF, C.CUT_STRONG_AROUND, C.CUT_STRONG_NB_SHARE]] if C.CUT_ON else []), *still],
-                     map=[P["bbox"], file_sig(P["pbf"]), P["vehicle"], C.CLASSES_BIKE, C.CLASSES_MOTOR, C.HMM_CAP_GB, "map1", *hint_map, *paths_map],
+                     map=[P["bbox"], file_sig(P["pbf"]), P["vehicle"], C.CLASSES_BIKE, C.CLASSES_MOTOR, C.HMM_CAP_GB, "map1", *hint_map, *paths_map, *decoy_map],
                      route_search=[C.F_GRID, C.K_GRID, C.REFINE_K, C.REFINE_F, C.H, "search1", C.CUT_PRIOR_SD_M, *cons, *bike_cal, *odo, *bridge, *AN.hash_part(P), *HI_COST(P), *HI_FRAMES(P)],
                      plausibility=[C.N_FOREIGN, C.N_SHUFFLE, C.SEED0, C.VERDICT_CONFIDENT_MARGIN, P["decoys"], "plaus1"],
                      refine=["refine4", "bridge1", "bikepath_free1", *HI_COST(P), *(["hold1"] if C.STILL_ON else []), *(["shape1"] if C.FUSE_SHAPE_STEPS else []), *([["align_post1", C.ALIGN_POST_BAND_M, C.ALIGN_POST_FLOOR_M, C.ALIGN_POST_INFL, C.ALIGN_POST_MAX_SD_M, C.ALIGN_POST_GATE_M]] if AL.meas_mode(P) == "posterior" else []), "raster1", C.GPX_HZ, C.LOCAL_MINOR_NATS_PER_KM, C.LOCAL_ON, C.LOCAL_BUF_M, C.LOCAL_D0, C.LOCAL_EXTRA, C.LOCAL_SAME_M, file_sig(P["pbf"]), C.GAP_MEASURED_SHARE, C.ALIGN_ON, C.ALIGN_DS,
@@ -329,6 +330,10 @@ class Run:
                 if want != P["horizon"]:                 # the second pass: the horizon of the calibrated vehicle, from the stored extraction
                     emit({"type": "log", "level": "info", "message": f"the calibration says {'a motor vehicle' if want == 'running' else 'a bike'}: motion to route_search "
                                                                      f"run once more with the {want} horizon (from the stored extraction, no video decode)"})
+                    # preserve pass-1 far-band windows across the rotation/ wipe: horizon_vms is unchanged between running and fixed horizon
+                    win_src = d / "rotation" / "win_video_base.npz"
+                    if win_src.exists():
+                        shutil.copy2(win_src, d / "_pass1_win_video_base.npz")
                     P["horizon"], second, from_step, k = want, True, None, 0
                     jdump(d / "project.params.json", P)
                     H = self.hashes(P)

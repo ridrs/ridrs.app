@@ -112,7 +112,7 @@ HZ_GATE_SPAN = 300.0
 #: Focal length in px at 360 rows for the second-order rotation terms of the flow model (config.F360).
 F_ROT = 449.0
 
-LK_PARAMS = dict(winSize=(21, 21), maxLevel=4, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
+LK_PARAMS = dict(winSize=(15, 15), maxLevel=3, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
 
 
 @dataclass
@@ -120,6 +120,19 @@ class Fit:
     params: np.ndarray
     inliers: np.ndarray
     rms: float
+
+
+def _solve_ls(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """least-squares solve via normal equations (5-7 columns), falling back to SVD lstsq if singular or ill-conditioned"""
+    ata = a.T @ a
+    atb = a.T @ b
+    try:
+        p = np.linalg.solve(ata, atb)
+        if np.isfinite(p).all():
+            return p
+    except np.linalg.LinAlgError:
+        pass
+    return np.linalg.lstsq(a, b, rcond=None)[0]
 
 
 def _robust_lstsq(a: np.ndarray, b: np.ndarray, n: int, min_residual: float) -> Fit | None:
@@ -130,7 +143,7 @@ def _robust_lstsq(a: np.ndarray, b: np.ndarray, n: int, min_residual: float) -> 
         rows = np.concatenate([keep, keep])
         if keep.sum() < MIN_INLIERS:
             return None
-        params, *_ = np.linalg.lstsq(a[rows], b[rows], rcond=None)
+        params = _solve_ls(a[rows], b[rows])
         res = b - a @ params
         dist = np.hypot(res[:n], res[n:])
         threshold = max(min_residual, 2.5 * 1.4826 * float(np.median(dist[keep])))
@@ -189,38 +202,68 @@ def candidates(mid: np.ndarray, flow: np.ndarray, cx: float, cy: float, yh: floa
     a, n = _flow_design(mid, flow, cx, cy, yh)
     if n < max(MIN_INLIERS, ALT_SAMPLE + 1):
         return []
-    b = np.concatenate([flow[:, 0], flow[:, 1]])
+    bx, by = flow[:, 0], flow[:, 1]
     ax, ay = a[:n], a[n:]
     thr = ALT_THR * scale if thr is None else float(thr)
     rng = np.random.default_rng(seed)
-    hyp = []
-    for _ in range(ALT_HYP):
-        i = rng.choice(n, ALT_SAMPLE, replace=False)
-        p, *_ = np.linalg.lstsq(np.vstack([ax[i], ay[i]]), np.concatenate([b[i], b[n + i]]), rcond=None)
-        hyp.append(p)
-    P = np.array(hyp)
-    dist = np.hypot(b[:n][None] - P @ ax.T, b[n:][None] - P @ ay.T)
+    # exact RNG draw sequence of the original loop, solved in one batched (ALT_HYP, k, k) normal-equations call
+    idx = np.array([rng.choice(n, ALT_SAMPLE, replace=False) for _ in range(ALT_HYP)])
+    Ax, Ay = ax[idx], ay[idx]
+    ATA = np.einsum("hij,hik->hjk", Ax, Ax) + np.einsum("hij,hik->hjk", Ay, Ay)
+    ATb = np.einsum("hij,hi->hj", Ax, bx[idx]) + np.einsum("hij,hi->hj", Ay, by[idx])
+    try:
+        P = np.linalg.solve(ATA, ATb[..., None])[..., 0]
+        if not np.isfinite(P).all():
+            raise np.linalg.LinAlgError
+    except np.linalg.LinAlgError:
+        P = np.empty((ALT_HYP, a.shape[1]), dtype=np.float64)
+        for h in range(ALT_HYP):
+            try:
+                p_ = np.linalg.solve(ATA[h], ATb[h])
+                if not np.isfinite(p_).all():
+                    raise np.linalg.LinAlgError
+                P[h] = p_
+            except np.linalg.LinAlgError:
+                i = idx[h]
+                P[h], *_ = np.linalg.lstsq(np.vstack([ax[i], ay[i]]), np.concatenate([bx[i], by[i]]), rcond=None)
+    dist = np.hypot(bx[None] - P @ ax.T, by[None] - P @ ay.T)
     inl = dist < thr
     cnt = inl.sum(1)
     chosen = []
+    chosen_inl = []
+    chosen_cnt = []
     for j in np.argsort(-cnt, kind="stable"):
-        if cnt[j] < MIN_INLIERS or len(chosen) == ALT_POLISH:
+        cj = int(cnt[j])
+        if cj < MIN_INLIERS or len(chosen) == ALT_POLISH:
             break
-        if all((inl[j] & inl[k]).sum() < ALT_OVERLAP * min(cnt[j], cnt[k]) for k in chosen):
+        row_j = inl[j]
+        if not chosen_inl or all(int(np.count_nonzero(row_j & rk)) < ALT_OVERLAP * min(cj, ck) for rk, ck in zip(chosen_inl, chosen_cnt)):
             chosen.append(j)
+            chosen_inl.append(row_j)
+            chosen_cnt.append(cj)
     out = []
     for j in chosen:
         keep = inl[j]
         p = P[j]
         for _ in range(2):
-            if keep.sum() < MIN_INLIERS:
+            if int(keep.sum()) < MIN_INLIERS:
                 break
-            p, *_ = np.linalg.lstsq(np.vstack([ax[keep], ay[keep]]), np.concatenate([b[:n][keep], b[n:][keep]]), rcond=None)
-            keep = np.hypot(b[:n] - ax @ p, b[n:] - ay @ p) < thr
-        if keep.sum() < MIN_INLIERS:
+            akx, aky = ax[keep], ay[keep]
+            bkx, bky = bx[keep], by[keep]
+            ata = akx.T @ akx + aky.T @ aky
+            atb = akx.T @ bkx + aky.T @ bky
+            try:
+                p_ = np.linalg.solve(ata, atb)
+                p = p_ if np.isfinite(p_).all() else np.linalg.lstsq(np.vstack([akx, aky]), np.concatenate([bkx, bky]), rcond=None)[0]
+            except np.linalg.LinAlgError:
+                p, *_ = np.linalg.lstsq(np.vstack([akx, aky]), np.concatenate([bkx, bky]), rcond=None)
+            keep = np.hypot(bx - ax @ p, by - ay @ p) < thr
+        nk = int(keep.sum())
+        if nk < MIN_INLIERS:
             continue
-        res = np.concatenate([b[:n][keep] - ax[keep] @ p, b[n:][keep] - ay[keep] @ p])
-        out.append((p, int(keep.sum()), float(np.sqrt(np.mean(res ** 2) * 2))))
+        rx = bx[keep] - ax[keep] @ p
+        ry = by[keep] - ay[keep] @ p
+        out.append((p, nk, float(np.sqrt(np.mean(rx * rx + ry * ry)))))
     out.sort(key=lambda x: -x[1])
     uniq = []
     for c in out:
