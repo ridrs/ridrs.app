@@ -297,9 +297,49 @@ fn playback_lock(project: &str) -> std::sync::Arc<std::sync::Mutex<()>> {
     m.entry(project.to_string()).or_default().clone()
 }
 
+/// WebM/MKV, and MP4s whose frame index is spread over fragments (DASH, as downloaded from streaming sites): WebKit
+/// reads WebM whole into memory, and walks every fragment of a fragmented MP4 before it knows the duration (minutes for
+/// a long video). A copy without re-encoding into a plain MP4 with the index in front plays at once.
 fn needs_playback_copy(path: &str, codec: &str) -> bool {
+    if !matches!(codec, "av1" | "h264" | "hevc") {
+        return false;
+    }
     let ext = Path::new(path).extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-    (ext == "webm" || ext == "mkv") && matches!(codec, "av1" | "h264" | "hevc")
+    match ext.as_str() {
+        "webm" | "mkv" => true,
+        "mp4" | "m4v" | "mov" => std::fs::File::open(path).map(is_fragmented_mp4).unwrap_or(false),
+        _ => false,
+    }
+}
+
+/// A fragmented MP4: a `moof` box comes before the first `mdat` among the top-level boxes.
+fn is_fragmented_mp4(mut f: impl std::io::Read + std::io::Seek) -> bool {
+    use std::io::SeekFrom;
+    let mut pos = 0u64;
+    for _ in 0..64 {
+        let mut h = [0u8; 8];
+        if f.seek(SeekFrom::Start(pos)).is_err() || f.read_exact(&mut h).is_err() {
+            return false;
+        }
+        let mut size = u32::from_be_bytes([h[0], h[1], h[2], h[3]]) as u64;
+        match &h[4..8] {
+            b"moof" => return true,
+            b"mdat" => return false,
+            _ => {}
+        }
+        if size == 1 {
+            let mut l = [0u8; 8];
+            if f.read_exact(&mut l).is_err() {
+                return false;
+            }
+            size = u64::from_be_bytes(l);
+        }
+        if size < 8 {
+            return false;
+        }
+        pos += size;
+    }
+    false
 }
 
 /// An ffmpeg left over from an app that was quit mid-run keeps decoding at full speed into the same folder; stop it.
@@ -329,6 +369,60 @@ fn pts_time(line: &str) -> Option<f64> {
 #[cfg(test)]
 mod frames_tests {
     use super::*;
+
+    fn mp4_box(kind: &[u8; 4], body: usize) -> Vec<u8> {
+        let mut b = ((8 + body) as u32).to_be_bytes().to_vec();
+        b.extend_from_slice(kind);
+        b.resize(8 + body, 0);
+        b
+    }
+
+    #[test]
+    fn fragmented_mp4_has_moof_before_mdat() {
+        let file = |kinds: &[&[u8; 4]]| std::io::Cursor::new(kinds.iter().flat_map(|k| mp4_box(k, 20)).collect::<Vec<u8>>());
+        assert!(is_fragmented_mp4(file(&[b"ftyp", b"moov", b"sidx", b"moof", b"mdat"])));
+        assert!(!is_fragmented_mp4(file(&[b"ftyp", b"moov", b"mdat"])));
+        assert!(!is_fragmented_mp4(file(&[b"ftyp", b"mdat", b"moov"])));
+        assert!(!is_fragmented_mp4(file(&[])));
+        // a 64-bit box size (size field 1) before the fragments
+        let mut big = mp4_box(b"ftyp", 12);
+        big.extend_from_slice(&1u32.to_be_bytes());
+        big.extend_from_slice(b"free");
+        big.extend_from_slice(&24u64.to_be_bytes());
+        big.resize(big.len() + 8, 0);
+        big.extend(mp4_box(b"moof", 4));
+        assert!(is_fragmented_mp4(std::io::Cursor::new(big)));
+        // a broken size stops the walk instead of looping
+        let mut bad = 4u32.to_be_bytes().to_vec();
+        bad.extend_from_slice(b"ftyp");
+        assert!(!is_fragmented_mp4(std::io::Cursor::new(bad)));
+    }
+
+    /// Real ffmpeg (skipped without it): a fragmented MP4 (DASH, as from streaming sites) gets the playback copy, a
+    /// normal one is played as it is.
+    #[test]
+    fn playback_copy_for_fragmented_mp4() {
+        let d = std::env::temp_dir().join(format!("v2g-frag-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let ctx = Ctx::new(d.clone(), std::sync::Arc::new(|_, _| {}));
+        let Some(ff) = tools(&ctx).0 else { return };
+        let mk = |name: &str, flags: &str| {
+            let f = d.join(name);
+            let ok = Command::new(&ff).args(["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25", "-t", "3", "-c:v", "libx264", "-g", "25", "-movflags", flags])
+                .arg(&f).status().map(|s| s.success()).unwrap_or(false);
+            ok.then(|| f.to_string_lossy().to_string())
+        };
+        let (Some(frag), Some(plain)) = (mk("frag.mp4", "frag_keyframe+empty_moov+default_base_moof"), mk("plain.mp4", "+faststart")) else { return };
+        assert!(needs_playback_copy(&frag, "h264"));
+        assert!(!needs_playback_copy(&plain, "h264"));
+        assert!(!needs_playback_copy(&frag, "vp9"));
+        std::fs::create_dir_all(ctx.project_dir("p").unwrap()).unwrap();
+        let copy = playback(&ctx, "p", &frag, "h264").unwrap();
+        assert!(copy.ends_with("playback.mp4"));
+        assert!(!is_fragmented_mp4(std::fs::File::open(&copy).unwrap()));
+        let _ = std::fs::remove_dir_all(&d);
+    }
 
     #[test]
     fn playback_copy_only_for_webm_mkv_with_mp4_codecs() {

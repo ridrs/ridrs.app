@@ -131,7 +131,8 @@ async function loadVideo(app: ProjectApp | null) {
     player = new VideoPlayer(v); bus.emit("player");
   });
   v.addEventListener("error", () => fallback(`Das Videoformat (${[p?.container, p?.codec, p?.hdr ? "HDR" : null].filter(Boolean).join(", ") || "unbekannt"}) kann die App nicht abspielen.`));
-  // WebM/MKV: played from a one-time MP4 copy (WebKit reads WebM whole into memory and the app hangs)
+  // WebM/MKV and fragmented MP4: played from a one-time plain MP4 copy (WebKit reads WebM whole into memory and walks
+  // every fragment of a fragmented MP4 before loadedmetadata, longer than the timeout below)
   const slow = setTimeout(() => { if (token === loadToken) showMsg("Das Video wird einmalig für die Wiedergabe vorbereitet (ohne Neukodierung, etwa 1 Minute pro 45 Minuten Video) …", "info"); }, 500);
   let file: string;
   try {
