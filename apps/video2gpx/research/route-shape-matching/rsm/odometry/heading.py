@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .calib import CAMERA_HEIGHT_M, YAW_SIGN
-from .gating import Segment
+from .gating import FALSE_STOP, Segment
 from .vms_csv import Pairs
 
 
@@ -41,7 +41,7 @@ def integrate(p: Pairs, seg: Segment, flags: np.ndarray, f360: float, height_m: 
     c * delta to the yaw flow (post-hoc first-order horizon correction: a(h + delta) = a(h) + c * delta, see calibration.json); needs the CSV column c."""
     sl = slice(seg.i0, seg.i1)
     ok = flags[sl] == 0
-    yaw = _fill(p.yaw[sl], ok)
+    yaw = _fill(p.yaw[sl], (flags[sl] & ~FALSE_STOP) == 0)  # a false stop keeps its measured yaw; only its distance is filled
     if c_delta_px:
         if p.c is None:
             raise ValueError("c_delta_px needs the CSV column c")
