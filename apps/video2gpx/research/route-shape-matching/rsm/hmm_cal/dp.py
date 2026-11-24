@@ -178,7 +178,20 @@ def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0,
     if s_lp is not None:
         a = (a + s_lp).astype(np.float32)
     bps = [] if backptr else None
+    is_jump = st.jump
+    jump_src = np.full(st.T, -1, np.int32) if backptr else None
     for j in range(1, st.T):
+        if is_jump is not None and is_jump[j]:
+            best_prev = int(np.argmax(a))
+            m_prev = a[best_prev]
+            new = np.full(N, m_prev if np.isfinite(m_prev) else NEG, np.float32)
+            if step_ok and j in step_ok:
+                new = np.where(step_ok[j], new, NEG).astype(np.float32)
+            a = new
+            if backptr:
+                jump_src[j] = best_prev
+                bps.append(None)
+            continue
         mu, sd, dth = _step_terms(pre, st, j)
         new = np.full(N, NEG, np.float32)
         code = np.full(N, 65535, np.uint16) if backptr else None
@@ -216,6 +229,10 @@ def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0,
         path[-1] = c
         mask = (1 << pre.par.slot_bits) - 1
         for j in range(st.T - 1, 0, -1):
+            if jump_src[j] >= 0:
+                c = int(jump_src[j])
+                path[j - 1] = c
+                continue
             cd = int(bps[j - 1][c])
             if cd == 65535:
                 path[:j] = -1
@@ -252,21 +269,26 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
     al[0] = a
     logev = 0.0
     fb_c = _N.FBContext(pre) if _N.available() else None
+    is_jump = st.jump
     for j in range(1, T):
-        mu, sd, dth = _step_terms(pre, st, j)
-        if fb_c is not None:
-            new = fb_c.forward_step(a, mu, sd, dth)
+        if is_jump is not None and is_jump[j]:
+            mx_a = a.max()
+            new = np.full(N, np.float32(-np.log(N)) if np.isfinite(mx_a) else NEG, np.float32)
         else:
-            new = np.full(N, NEG, np.float32)
-            for gi, gr in enumerate(grid.groups):
-                if _skip(gr, mu, sd):
-                    continue
-                cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
-                lse, ok = _lse_reduce(cand, gr.starts, gr.blk)
-                lse = np.where(ok, lse, NEG)
-                tmp = np.full(N, NEG, np.float32)
-                tmp[gr.ud] = lse
-                new = np.logaddexp(new, tmp)
+            mu, sd, dth = _step_terms(pre, st, j)
+            if fb_c is not None:
+                new = fb_c.forward_step(a, mu, sd, dth)
+            else:
+                new = np.full(N, NEG, np.float32)
+                for gi, gr in enumerate(grid.groups):
+                    if _skip(gr, mu, sd):
+                        continue
+                    cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
+                    lse, ok = _lse_reduce(cand, gr.starts, gr.blk)
+                    lse = np.where(ok, lse, NEG)
+                    tmp = np.full(N, NEG, np.float32)
+                    tmp[gr.ud] = lse
+                    new = np.logaddexp(new, tmp)
         if step_ok and j in step_ok:
             new = np.where(step_ok[j], new, NEG).astype(np.float32)
         mx = new.max()
@@ -297,6 +319,9 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
             p_vit[j] = float(em[grid.cell_ei[cell_path[j]]])
         if j == 0:
             break
+        if is_jump is not None and is_jump[j]:
+            beta = np.zeros(N, np.float32) if np.isfinite(beta.max()) else np.full(N, NEG, np.float32)
+            continue
         mu, sd, dth = _step_terms(pre, st, j)
         if fb_c is not None:
             nb = fb_c.backward_step(beta, mu, sd, dth)

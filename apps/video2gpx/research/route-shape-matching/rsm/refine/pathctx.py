@@ -49,6 +49,7 @@ class Path:
     phi: np.ndarray          # (n,) heading of the OSM polyline segment, unwrapped (rad, left +)
     tunnel: np.ndarray       # (n,) bool, OSM tunnel edge
     filled: int = 0          # edges inserted to connect steps that skipped over a short edge
+    breaks: tuple[float, ...] = ()   # arc lengths (m) where consecutive edges are disconnected (free cut jumps)
 
     @property
     def length(self) -> float:
@@ -96,29 +97,42 @@ def build_path(g: NetGraph, step_edge: np.ndarray, step_off: np.ndarray) -> tupl
             occ.extend(mid); occ.append(e)
         occ_of[j] = len(occ) - 1
     occ = np.array(occ, np.int64)
-    L = np.asarray(g.edge_len)[occ]
-    start = np.concatenate([[0.0], np.cumsum(L)])
-    # dense polyline of the path (own cumulative length of the geometry, so that arc length and xy agree)
-    pts, cum0 = [], 0.0
-    for e in occ:
-        p = g.geom(int(e))
-        pts.append(p if not pts else p[1:])
-    P = np.vstack(pts)
-    d = np.hypot(*np.diff(P, axis=0).T)
-    cp = np.concatenate([[0.0], np.cumsum(d)])
-    # edge starts in geometry arc length
+    # split occ into connected pieces (consecutive edges with edge_v[prev] != edge_u[e] are a disconnected cut jump: never insert a straight flight line)
+    cut_oi = [i for i in range(1, len(occ)) if int(g.edge_v[occ[i - 1]]) != int(g.edge_u[occ[i]])]
+    piece_bounds = [0] + cut_oi + [len(occ)]
     sg_start = [0.0]
-    for e in occ:
-        sg_start.append(sg_start[-1] + float(np.hypot(*np.diff(g.geom(int(e)), axis=0).T).sum()))
+    sg_parts, xy_parts, phi_parts, tun_parts, breaks = [], [], [], [], []
+    for pa, pb in zip(piece_bounds[:-1], piece_bounds[1:]):
+        if sg_parts:
+            breaks.append(sg_start[-1])
+        pts = []
+        base_s = sg_start[-1]
+        for o in range(pa, pb):
+            p = g.geom(int(occ[o]))
+            sg_start.append(sg_start[-1] + float(np.hypot(*np.diff(p, axis=0).T).sum()))
+            pts.append(p if not pts else p[1:])
+        P = np.vstack(pts)
+        d = np.hypot(*np.diff(P, axis=0).T)
+        cp = np.concatenate([[0.0], np.cumsum(d)])
+        L_p = float(cp[-1])
+        sg_p = np.arange(0.0, L_p, 1.0) if L_p > 0 else np.zeros(1)
+        xy_p = np.column_stack([np.interp(sg_p, cp, P[:, 0]), np.interp(sg_p, cp, P[:, 1])])
+        seg_h = np.unwrap(np.arctan2(np.diff(P[:, 1]), np.diff(P[:, 0])))
+        k = np.clip(np.searchsorted(cp, sg_p, side="right") - 1, 0, len(seg_h) - 1)
+        phi_p = seg_h[k]
+        p_starts = np.array(sg_start[pa:pb + 1]) - base_s
+        oi_p = np.clip(np.searchsorted(p_starts, sg_p, side="right") - 1, 0, pb - pa - 1)
+        tun_p = np.asarray(g.edge_tunnel)[occ[pa:pb]][oi_p]
+        sg_parts.append(base_s + sg_p)
+        xy_parts.append(xy_p)
+        phi_parts.append(phi_p)
+        tun_parts.append(tun_p)
     start = np.array(sg_start)
-    sg = np.arange(0.0, cp[-1], 1.0)
-    xy = np.column_stack([np.interp(sg, cp, P[:, 0]), np.interp(sg, cp, P[:, 1])])
-    seg_h = np.unwrap(np.arctan2(np.diff(P[:, 1]), np.diff(P[:, 0])))
-    k = np.clip(np.searchsorted(cp, sg, side="right") - 1, 0, len(seg_h) - 1)
-    phi = seg_h[k]
-    oi = np.clip(np.searchsorted(start, sg, side="right") - 1, 0, len(occ) - 1)
-    tun = np.asarray(g.edge_tunnel)[occ][oi]
-    path = Path(g, occ, start, sg, xy, phi, tun, filled)
+    sg = np.concatenate(sg_parts)
+    xy = np.vstack(xy_parts)
+    phi = np.concatenate(phi_parts)
+    tun = np.concatenate(tun_parts)
+    path = Path(g, occ, start, sg, xy, phi, tun, filled, tuple(breaks))
     # arc length of every step: edge start + offset (edge length of the cell layout is the graph edge_len; geometry length differs by < 1 %)
     scale = np.asarray(g.edge_len)[occ] / np.maximum(start[1:] - start[:-1], 1e-9)
     s = start[occ_of] + np.asarray(step_off, float) / scale[occ_of]

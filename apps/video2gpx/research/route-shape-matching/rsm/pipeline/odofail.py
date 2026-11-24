@@ -138,11 +138,15 @@ def _gap_runs(st):
 def shape_steps(st, spans, d0: float, low_usable=None, gap_dth=None):
     """systematic gap sd, failure gaps with more sub-steps and a wide sd, low-usable emitting steps with a wide sd (see module doc)"""
     T_, DT, MU, REL, V, GAP, SEG = ([] for _ in range(7))
+    has_jump = getattr(st, "jump", None) is not None
+    JMP = [] if has_jump else None
     pos = 0
 
     def take(a, b):
         for L, f in zip((T_, DT, MU, REL, V, GAP, SEG), ("t", "dth", "mu", "rel", "v", "gap", "seg")):
             L.extend(np.asarray(getattr(st, f))[a:b].tolist())
+        if JMP is not None:
+            JMP.extend(np.asarray(st.jump, bool)[a:b].tolist())
     for a, b in _gap_runs(st):
         take(pos, a)
         pos = b
@@ -159,11 +163,15 @@ def shape_steps(st, spans, d0: float, low_usable=None, gap_dth=None):
             for q in range(1, ng + 1):
                 ta_, tb_ = tp + (te - tp) * (q - 1) / ng, tp + (te - tp) * q / ng
                 T_.append(tb_); DT.append(np.nan if gap_dth is None else float(gap_dth(ta_, tb_))); MU.append(gnom / ng); REL.append(rel); V.append(v); GAP.append(True); SEG.append(int(st.seg[a]))
+                if JMP is not None:
+                    JMP.append(False)
         else:
             take(a, b)
             REL[-n:] = [C.GAP_SYS_REL * np.sqrt(n)] * n
     take(pos, st.T)
-    out = st.copy(t=np.array(T_), dth=np.array(DT), mu=np.array(MU), rel=np.array(REL), v=np.array(V), gap=np.array(GAP, bool), seg=np.array(SEG))
+    jmp_arr = np.array(JMP, bool) if JMP is not None else None
+    out = st.copy(t=np.array(T_), dth=np.array(DT), mu=np.array(MU), rel=np.array(REL), v=np.array(V), gap=np.array(GAP, bool), seg=np.array(SEG),
+                  jump=jmp_arr if (jmp_arr is not None and jmp_arr.any()) else None)
     if low_usable is not None and out.T > 1:
         u = low_usable(out.t, C.ODO_LOW_WIN_S)
         widen = (~out.gap) & (u < C.ODO_LOW_USABLE)

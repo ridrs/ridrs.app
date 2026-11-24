@@ -56,21 +56,25 @@ def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None):
     so = dp.STEP_OK_HOOK(G, st, None) if dp.STEP_OK_HOOK else None      # user anchors (anchors.py)
     al[0] = a
     fb_c = dp._N.FBContext(pre) if dp._N.available() else None
+    is_jump = getattr(st, "jump", None)
     for j in range(1, T_):
-        mu, sd, dth = dp._step_terms(pre, st, j)
-        if fb_c is not None:
-            new = fb_c.forward_step(a, mu, sd, dth)
+        if is_jump is not None and is_jump[j]:
+            new = np.full(N, np.float32(-np.log(N)) if np.isfinite(a.max()) else NEG, np.float32)
         else:
-            new = np.full(N, NEG, np.float32)
-            for gi, gr in enumerate(G.groups):
-                if dp._skip(gr, mu, sd):
-                    continue
-                cand = a[gr.src] + dp._cand(pre, gi, mu, sd, dth, a)
-                lse, ok = dp._lse_reduce(cand, gr.starts, gr.blk)
-                lse = np.where(ok, lse, NEG)
-                tmp = np.full(N, NEG, np.float32)
-                tmp[gr.ud] = lse
-                new = np.logaddexp(new, tmp)
+            mu, sd, dth = dp._step_terms(pre, st, j)
+            if fb_c is not None:
+                new = fb_c.forward_step(a, mu, sd, dth)
+            else:
+                new = np.full(N, NEG, np.float32)
+                for gi, gr in enumerate(G.groups):
+                    if dp._skip(gr, mu, sd):
+                        continue
+                    cand = a[gr.src] + dp._cand(pre, gi, mu, sd, dth, a)
+                    lse, ok = dp._lse_reduce(cand, gr.starts, gr.blk)
+                    lse = np.where(ok, lse, NEG)
+                    tmp = np.full(N, NEG, np.float32)
+                    tmp[gr.ud] = lse
+                    new = np.logaddexp(new, tmp)
         if so and j in so:
             new = np.where(so[j], new, NEG).astype(np.float32)
         mx = new.max()
@@ -92,6 +96,11 @@ def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None):
         out[j] = cb(j, p)
         if j == 0:
             break
+        if is_jump is not None and is_jump[j]:
+            beta = np.zeros(N, np.float32) if np.isfinite(beta.max()) else np.full(N, NEG, np.float32)
+            if j % 20 == 0:
+                progress(50.0 + 50.0 * (T_ - j) / T_)
+            continue
         mu, sd, dth = dp._step_terms(pre, st, j)
         if fb_c is not None:
             nb = fb_c.backward_step(beta, mu, sd, dth)
@@ -285,7 +294,25 @@ def fuse(v: Video, anchors, t_out, fp=None, pp=None, extra=None, cut_spans=None,
     res = rts.fuse(nodes, dm, dg, meas, s0, fp)
     xs, Ps = res["xs"], res["Ps"]
     j = np.clip(np.searchsorted(nodes, t_out), 0, len(nodes) - 1)
-    return dict(s=np.clip(xs[j, 0], 0, ctx.path.sg[-1]), s_sd=np.sqrt(Ps[j, 0, 0]), n_post=n_post)
+    s_out = np.clip(xs[j, 0], 0, ctx.path.sg[-1])
+    # Clamp each cut piece to its own connected arc interval so RTS never bleeds across a disconnected free-jump seam
+    breaks = tuple(getattr(ctx.path, "breaks", ()))
+    if breaks and cut_spans:
+        arc_edges = [0.0, *breaks, float(ctx.path.sg[-1])]
+        t_cuts = sorted(float(sp[1]) for sp in cut_spans)
+        t_out_a = np.asarray(t_out, float)
+        t_bounds = [-np.inf, *t_cuts, np.inf]
+        for ta_p, tb_p in zip(t_bounds[:-1], t_bounds[1:]):
+            m = (t_out_a >= ta_p) & (t_out_a < tb_p)
+            if not m.any():
+                continue
+            s_ref = float(np.median(np.interp(t_out_a[m], ctx.t_step, ctx.s_vit)))
+            pi = min(max(int(np.searchsorted(arc_edges, s_ref, side="right")) - 1, 0), len(arc_edges) - 2)
+            lo_s = arc_edges[pi] + (1e-3 if pi > 0 else 0.0)
+            hi_s = arc_edges[pi + 1] - (1e-3 if pi + 1 < len(arc_edges) - 1 else 0.0)
+            if lo_s < hi_s:
+                s_out[m] = np.clip(s_out[m], lo_s, hi_s)
+    return dict(s=s_out, s_sd=np.sqrt(Ps[j, 0, 0]), n_post=n_post)
 
 
 def cut_process(nodes, dm, dg, meas, cut_spans, gap_rel: float, kappa: float = 1.0):
@@ -333,12 +360,35 @@ def build_ctx(g, E, st, tracks, route: dict):
 
 def align_pieces(sg, xy, tracks, kappa, a_ang, t_prior, s_prior, gap_nom=None):
     """align.align, run separately on every piece between scene cuts (tracks with `cut_before` start a piece): the alignment never advances through a cut
-    as if riding. Without cuts: exactly align.align."""
+    as if riding. When `xy` has disconnected cut seams (> 5 m jump between adjacent 1 m samples), each piece is restricted to its own connected arc slice.
+    Without cuts: exactly align.align."""
     starts = [0] + [i for i, tr in enumerate(tracks) if i > 0 and tr.get("cut_before") is not None] + [len(tracks)]
     if len(starts) == 2:
         return AL.align(sg, xy, tracks, kappa, a_ang, t_prior, s_prior, gap_nom)
-    parts = [AL.align(sg, xy, tracks[a:b], kappa, a_ang, t_prior, s_prior, None if gap_nom is None else gap_nom[a:b]) for a, b in zip(starts[:-1], starts[1:])]
-    parts = [p for p in parts if p is not None]
+    br = np.flatnonzero(np.hypot(*np.diff(np.asarray(xy, float), axis=0).T) > 5.0) + 1
+    seg_bounds = [0] + [int(x) for x in br] + [len(sg)]
+    parts = []
+    for a, b in zip(starts[:-1], starts[1:]):
+        sub_tr = tracks[a:b]
+        sub_gn = None if gap_nom is None else gap_nom[a:b]
+        if len(br) > 0 and sub_tr:
+            s_ref = float(np.interp(float(sub_tr[0]["t"][0]), t_prior, s_prior))
+            pi = 0
+            for idx_p, (ia, ib) in enumerate(zip(seg_bounds[:-1], seg_bounds[1:])):
+                if sg[ia] <= s_ref <= sg[ib - 1] + 1.0:
+                    pi = idx_p
+                    break
+            ia, ib = seg_bounds[pi], seg_bounds[pi + 1]
+            off = float(sg[ia])
+            p = AL.align(sg[ia:ib] - off, xy[ia:ib], sub_tr, kappa, a_ang, t_prior, s_prior - off, sub_gn)
+            if p is not None:
+                p["s"] = p["s"] + off
+                if "s_mean" in p:
+                    p["s_mean"] = p["s_mean"] + off
+        else:
+            p = AL.align(sg, xy, sub_tr, kappa, a_ang, t_prior, s_prior, sub_gn)
+        if p is not None:
+            parts.append(p)
     if not parts:
         return None
     post = {k: np.concatenate([p[k] for p in parts]) for k in ("s_mean", "s_sd") if all(k in p for p in parts)}

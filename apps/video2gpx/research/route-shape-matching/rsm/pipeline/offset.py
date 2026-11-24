@@ -13,6 +13,18 @@ from scipy.ndimage import gaussian_filter1d
 from . import config as C
 
 
+def _piece_bounds(xy: np.ndarray, step: float = 1.0) -> list[tuple[int, int]]:
+    """connected slices [a, b) of a `step`-m polyline, split at any disconnected cut jump (> max(5 m, 5*step))"""
+    n = len(xy)
+    if n < 2:
+        return [(0, n)]
+    br = np.flatnonzero(np.hypot(*np.diff(xy, axis=0).T) > max(5.0, 5.0 * step)) + 1
+    if len(br) == 0:
+        return [(0, n)]
+    edges = [0] + [int(x) for x in br] + [n]
+    return list(zip(edges[:-1], edges[1:]))
+
+
 def driving_line(xy: np.ndarray, delta_m: float, side: str = "right", oneway: np.ndarray | None = None, step: float = 1.0, smooth_m: float = C.OFFSET_SMOOTH_M,
                  max_frac: float = C.OFFSET_MAX_FRAC):
     """xy (n,2) metres on a grid of `step` m. -> (P (n,2), delta (n,) signed right-positive, g (n,) length element of the offset curve)"""
@@ -20,6 +32,16 @@ def driving_line(xy: np.ndarray, delta_m: float, side: str = "right", oneway: np
     n = len(xy)
     if n < 3:
         return xy.copy(), np.zeros(n), np.ones(n)
+    pieces = _piece_bounds(xy, step)
+    if len(pieces) > 1:
+        ow = None if oneway is None else np.asarray(oneway)
+        dm_arr = np.asarray(delta_m)
+        Ps, dls, gs = [], [], []
+        for a, b in pieces:
+            d_sub = dm_arr[a:b] if dm_arr.ndim > 0 else delta_m
+            P_, dl_, g_ = driving_line(xy[a:b], d_sub, side, None if ow is None else ow[a:b], step, smooth_m, max_frac)
+            Ps.append(P_); dls.append(dl_); gs.append(g_)
+        return np.vstack(Ps), np.concatenate(dls), np.concatenate(gs)
     d = np.diff(xy, axis=0)
     phi = np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
     phi = np.concatenate([phi, phi[-1:]])                     # heading of the segment starting at each point
@@ -42,11 +64,18 @@ def driving_line(xy: np.ndarray, delta_m: float, side: str = "right", oneway: np
 def has_loops(P: np.ndarray, xy: np.ndarray) -> bool:
     """an offset curve reversing against the centre line (dot product of the steps <= 0) or crossing itself"""
     from shapely.geometry import LineString
+    pieces = _piece_bounds(np.asarray(xy, float))
+    if len(pieces) > 1:
+        return any(has_loops(P[a:b], xy[a:b]) for a, b in pieces if b - a >= 2)
     dp_ = np.einsum("ij,ij->i", np.diff(P, axis=0), np.diff(xy, axis=0))
     return bool((dp_ <= 0).any()) or not LineString(P).is_simple
 
 
 def compass(P: np.ndarray, half: int = 5) -> np.ndarray:
+    P = np.asarray(P, float)
+    pieces = _piece_bounds(P)
+    if len(pieces) > 1:
+        return np.concatenate([compass(P[a:b], half) for a, b in pieces])
     n = len(P)
     a, b = np.clip(np.arange(n) - half, 0, n - 1), np.clip(np.arange(n) + half, 0, n - 1)
     dd = P[b] - P[a]
@@ -55,7 +84,13 @@ def compass(P: np.ndarray, half: int = 5) -> np.ndarray:
 
 def path_curvature(xy: np.ndarray, step: float = 1.0, smooth_m: float = C.OFFSET_SMOOTH_M) -> np.ndarray:
     """1/m, left positive: derivative of the smoothed unwrapped heading (as in driving_line)"""
-    d = np.diff(np.asarray(xy, float), axis=0)
+    xy = np.asarray(xy, float)
+    pieces = _piece_bounds(xy, step)
+    if len(pieces) > 1:
+        return np.concatenate([path_curvature(xy[a:b], step, smooth_m) for a, b in pieces])
+    if len(xy) < 2:
+        return np.zeros(len(xy))
+    d = np.diff(xy, axis=0)
     phi = np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
     psi = gaussian_filter1d(np.concatenate([phi, phi[-1:]]), smooth_m / step, mode="nearest")
     return np.gradient(psi, step)
@@ -79,6 +114,12 @@ def solve_line(xy: np.ndarray, d_pref: np.ndarray, lo: np.ndarray, hi: np.ndarra
     and 0 on roundabouts. k_c - d'' is the curvature of the right-offset line to first order. A box-constrained QP with a pentadiagonal Hessian, solved exactly
     by ADMM on the whole path (one sparse LU; an iterative bounded least squares did not converge in 200 iterations on a synthetic bend)."""
     from scipy import sparse
+    xy = np.asarray(xy, float)
+    pieces = _piece_bounds(xy, step)
+    if len(pieces) > 1:
+        rb = None if roundabout is None else np.asarray(roundabout)
+        return np.concatenate([solve_line(xy[a:b], np.asarray(d_pref)[a:b], np.asarray(lo)[a:b], np.asarray(hi)[a:b], np.asarray(v)[a:b],
+                                          side, None if rb is None else rb[a:b], step) for a, b in pieces])
     n = len(xy)
     lo, hi = np.asarray(lo, float), np.asarray(hi, float)
     dp = np.clip(np.asarray(d_pref, float), lo, hi)

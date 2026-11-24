@@ -128,20 +128,24 @@ def steps_of(tracks, d0: float | None = None, gap_nom: list | None = None, prior
         pend = None
         kept.append(tr)
         kgn.append(g)
-    n = jump_substeps(d0)
-    kgn = [n * d0 if (i > 0 and tr.get("cut_before") is not None) else g for i, (tr, g) in enumerate(zip(kept, kgn))]
+    free_jump = bool(C.CUT_FREE_JUMP and prior_sd is None)
+    n = 1 if free_jump else jump_substeps(d0)
+    kgn = [(0.0 if free_jump else n * d0) if (i > 0 and tr.get("cut_before") is not None) else g for i, (tr, g) in enumerate(zip(kept, kgn))]
     st = seq.make_steps(kept, d0=d0, gap_nom=kgn, gap_dth=gap_dth)
     rel, mu, dth = st.rel.copy(), st.mu.copy(), st.dth.copy()
+    jump = np.zeros(st.T, bool) if free_jump else None
     for tr in kept[1:]:
         if tr.get("cut_before") is None:
             continue
         j = min(int(np.searchsorted(st.t, float(tr["t"][0]) - 1e-6)), st.T - 1)   # last sub-step of the gap ends at the track start
         while j > 0 and st.gap[j]:
-            rel[j] = sd / np.sqrt(n) / CUT_SUB_MU
+            rel[j] = 1.0 if free_jump else sd / np.sqrt(n) / CUT_SUB_MU
             mu[j] = CUT_SUB_MU
             dth[j] = np.nan                          # a jump never emits heading
+            if jump is not None:
+                jump[j] = True
             j -= 1
-    return st.copy(rel=rel, mu=mu, dth=dth)
+    return st.copy(rel=rel, mu=mu, dth=dth, jump=jump if (jump is not None and jump.any()) else None)
 
 
 CUT_SUB_MU = 1.0     # nominal metres of a jump sub-step: ~0, so the zero-advance entry (stay) is the most likely; the spread comes from `rel`

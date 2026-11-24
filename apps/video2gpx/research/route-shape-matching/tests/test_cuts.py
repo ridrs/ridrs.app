@@ -184,18 +184,21 @@ SDS = [None, C.CUT_PRIOR_SD_SOFT_M]     # None = the shipped default (flat jump,
 def test_a_cut_gap_is_a_run_of_flat_jump_substeps(sd):
     tr = [_track(0, 200), dict(_track(201, 500), cut_before=200.5)]
     st = T.steps_of(tr, prior_sd=sd)
-    n = T.jump_substeps(C.D0)
     jump = st.mu == T.CUT_SUB_MU
-    assert n <= jump.sum() <= n + 1 and np.all(st.gap[jump]) and np.all(np.isnan(st.dth[jump]))
+    if sd is None and C.CUT_FREE_JUMP:
+        assert st.jump is not None and st.jump.sum() == 1 and np.array_equal(jump, st.jump)
+        assert np.all(st.gap[jump]) and np.all(np.isnan(st.dth[jump]))
+    else:
+        n = T.jump_substeps(C.D0)
+        assert st.jump is None and n <= jump.sum() <= n + 1 and np.all(st.gap[jump]) and np.all(np.isnan(st.dth[jump]))
+        want = C.CUT_PRIOR_SD_M if sd is None else sd
+        assert st.rel[jump][0] * np.sqrt(jump.sum()) * T.CUT_SUB_MU == pytest.approx(want, rel=0.05) and st.mu[jump].sum() < 30
     (ta, tb, tc, v), = K.spans(st, tr)
     assert tc == pytest.approx(200.5) and v == pytest.approx(6.0, rel=0.1)
     assert ta < 200.0 and tb == pytest.approx(201.0)
-    # the gap substeps of a normal gap keep their rel
+    # the gap substeps of a normal gap keep their rel and have no jump flag
     st0 = T.steps_of([tr[0], _track(201, 500)])
-    assert not np.any(st0.mu == T.CUT_SUB_MU)
-    # distance prior: total sd of the walk through the jump = the chosen sd, sub-steps carry ~0 nominal distance
-    want = C.CUT_PRIOR_SD_M if sd is None else sd
-    assert st.rel[jump][0] * np.sqrt(jump.sum()) * T.CUT_SUB_MU == pytest.approx(want, rel=0.05) and st.mu[jump].sum() < 30
+    assert not np.any(st0.mu == T.CUT_SUB_MU) and st0.jump is None
 
 
 def test_the_default_cut_jump_is_flat_and_the_soft_prior_is_the_option():
@@ -516,3 +519,138 @@ def test_plan_excises_samples_inside_multi_frame_dissolve_span():
     assert float(out[0]["t"][-1]) <= 498.5
     assert float(out[1]["t"][0]) >= 501.5 and out[1]["cut_before"] == 500.0
     assert out[1]["s"][0] == 0.0 and out[1]["th"][0] == 0.0
+
+
+def test_free_cut_jump_handles_arbitrary_distance_and_matches_numpy_and_native(monkeypatch):
+    from rsm.hmm_cal import _native
+    from rsm.refine import post as P
+    g, p = _zigzag(n=65, seg=100.0, seed=11)
+    c = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(p, axis=0).T))])
+    A = _track_on(p, 0.0, 900.0, 0.0)
+    B = _track_on(p, 5200.0, 6200.0, float(A["t"][-1]) + 1.0)
+    tracks = [A, dict(B, cut_before=float(A["t"][-1]) + 0.5)]
+    G = grid.build(g, None, h=30.0)
+    par = dp.Par()
+    pre = dp.prepare(G, par)
+    st = T.steps_of(tracks)
+    assert st.jump is not None and int(st.jump.sum()) == 1
+
+    def arc_err(cell_path):
+        xy = G.xy[cell_path]
+        ss = np.arange(0, c[-1], 1.0)
+        q = np.column_stack([np.interp(ss, c, p[:, 0]), np.interp(ss, c, p[:, 1])])
+        arc = ss[np.argmin(((xy[:, None, :] - q[None]) ** 2).sum(-1), axis=1)]
+        out = []
+        for X, s0 in ((A, 0.0), (B, 5200.0)):
+            m = (~st.gap) & (st.t > X["t"][0] + 5) & (st.t <= X["t"][-1])
+            out.append(float(np.median(np.abs(arc[m] - (s0 + (st.t[m] - X["t"][0]) * 8.0)))))
+        return out
+
+    # Native C path (when available) + NumPy path must agree identically and place both pieces across the 4.3 km jump
+    r_nat = dp.viterbi(pre, st, backptr=True)
+    sc_nat = dp.viterbi_scan(G, par, st, [par.a_ang, par.a_ang * 1.1])
+    fb_nat = dp.forward_backward(pre, st, r_nat["cell_path"])
+    assert max(arc_err(r_nat["cell_path"])) < 40.0
+    if sc_nat is not None:
+        assert sc_nat[0] == pytest.approx(r_nat["score"], abs=1e-3)
+    assert float(np.nanmean(fb_nat["p_vit"])) > 0.7
+
+    monkeypatch.setattr(_native, "available", lambda: False)
+    r_np = dp.viterbi(pre, st, backptr=True)
+    fb_np = dp.forward_backward(pre, st, r_np["cell_path"])
+    assert r_np["score"] == pytest.approx(r_nat["score"], abs=1e-3)
+    np.testing.assert_array_equal(r_np["cell_path"], r_nat["cell_path"])
+    if sc_nat is not None:
+        r_np2 = dp.viterbi(dp.prepare(G, dp.Par(a_ang=par.a_ang * 1.1)), st, backptr=False)
+        assert sc_nat[1] == pytest.approx(r_np2["score"], abs=1e-3)
+    np.testing.assert_allclose(fb_np["p_vit"], fb_nat["p_vit"], atol=1e-4)
+
+    # refine.post.forward_backward_cb handles st.jump without crashing or losing mass
+    seen = []
+    P.forward_backward_cb(dp, pre, st, lambda j, p_: seen.append((j, float(p_.sum()))))
+    assert len(seen) == st.T and all(abs(s - 1.0) < 1e-2 for _, s in seen)
+
+    # Legacy fixed-budget walk cannot reach across 4.3 km (> CUT_JUMP_M = 1500 m)
+    st_leg = T.steps_of(tracks, prior_sd=C.CUT_PRIOR_SD_SOFT_M)
+    assert st_leg.jump is None
+    r_leg = dp.viterbi(pre, st_leg, backptr=True)
+    # Use st_leg's own non-gap mask
+    xy_l = G.xy[r_leg["cell_path"]]
+    ss = np.arange(0, c[-1], 1.0)
+    q = np.column_stack([np.interp(ss, c, p[:, 0]), np.interp(ss, c, p[:, 1])])
+    arc_l = ss[np.argmin(((xy_l[:, None, :] - q[None]) ** 2).sum(-1), axis=1)]
+    err_leg = []
+    for X, s0 in ((A, 0.0), (B, 5200.0)):
+        m = (~st_leg.gap) & (st_leg.t > X["t"][0] + 5) & (st_leg.t <= X["t"][-1])
+        err_leg.append(float(np.median(np.abs(arc_l[m] - (s0 + (st_leg.t[m] - X["t"][0]) * 8.0)))))
+    assert max(err_leg) > 1000.0
+
+
+def test_disconnected_path_after_free_jump_breaks_cleanly_through_pathctx_offset_and_align():
+    from rsm.pipeline import align as AL, offset as OF
+    from rsm.refine import pathctx
+    # Two disconnected straight roads 8 km apart
+    segs = [((0.0, 0.0), (100.0, 0.0)), ((100.0, 0.0), (200.0, 0.0)),
+            ((8000.0, 500.0), (8100.0, 500.0)), ((8100.0, 500.0), (8200.0, 500.0))]
+    g = make_graph(segs)
+    # Find forward edges along piece 0 and piece 1
+    def edge_from(x0, x1):
+        for e in range(g.n_edges):
+            gm = g.geom(e)
+            if abs(gm[0, 0] - x0) < 1 and abs(gm[-1, 0] - x1) < 1:
+                return e
+        raise AssertionError((x0, x1))
+
+    e0, e1 = edge_from(0.0, 100.0), edge_from(100.0, 200.0)
+    e2, e3 = edge_from(8000.0, 8100.0), edge_from(8100.0, 8200.0)
+    path, s_steps = pathctx.build_path(g, np.array([e0, e1, e2, e3]), np.array([20.0, 50.0, 30.0, 70.0]))
+    assert len(path.breaks) == 1 and path.breaks[0] == pytest.approx(200.0, abs=1.0)
+    assert path.start[-1] == pytest.approx(path.sg[-1], abs=1.0)
+    assert s_steps[0] < s_steps[1] < path.breaks[0] < s_steps[2] < s_steps[3]
+    # Within each piece consecutive samples are 1 m apart; only the break jumps ~8 km
+    ds = np.hypot(*np.diff(path.xy, axis=0).T)
+    jumps = np.flatnonzero(ds > 5.0)
+    assert len(jumps) == 1 and ds[jumps[0]] > 7000.0
+    # offset & align stay clean across the 8 km seam
+    dl, _, _ = OF.driving_line(path.xy, delta_m=1.6, step=1.0)
+    assert not OF.has_loops(dl, path.xy)
+    assert np.all(np.isfinite(dl)) and dl.shape == path.xy.shape
+    assert np.allclose(dl[:180, 1], -1.6, atol=0.1) and np.allclose(dl[220:, 1], 498.4, atol=0.1)
+    phi = AL.path_heading(path.xy, smooth_m=8.0)
+    assert np.all(np.isfinite(phi)) and np.allclose(phi, 0.0, atol=1e-2)
+
+
+def test_scan_kappa_excludes_free_jumps_from_log_kappa_scale():
+    from rsm.pipeline import steps_b
+    g, p = _zigzag(n=30, seg=100.0, seed=7)
+    A = _track_on(p, 0.0, 600.0, 0.0)
+    B = _track_on(p, 1800.0, 2500.0, float(A["t"][-1]) + 1.0)
+    st = T.steps_of([A, dict(B, cut_before=float(A["t"][-1]) + 0.5)])
+    assert st.jump is not None and int(st.jump.sum()) == 1
+    k = 1.4
+    G = grid.build(g, None, h=30.0 * k)
+    pre = dp.prepare(G, dp.Par(kappa=k))
+    f = C.F_REF
+    sc = steps_b.scan_kappa(pre, st, k, [f], lambda: None)
+    raw = dp.viterbi(pre, st, backptr=False)["score"]
+    n_trans = st.T - 1 - int(st.jump.sum())
+    assert sc[0] == pytest.approx(raw + n_trans * np.log(k), abs=1e-4)
+
+
+def test_odofail_shape_steps_and_islands_slice_preserve_jump_alignment():
+    from rsm.pipeline import islands as ISL, odofail as OF
+    # Track 0 -> odometry-failure gap (100..130s) -> Track 1 -> scene cut (250.5s) -> Track 2
+    tr = [_track(0.0, 100.0), _track(130.0, 250.0), dict(_track(251.0, 400.0), cut_before=250.5)]
+    st = T.steps_of(tr)
+    assert st.jump is not None and int(st.jump.sum()) == 1
+    t_jump = float(st.t[st.jump][0])
+    # Expand the odometry-failure gap before the cut so st.T grows and shifts the jump index
+    st2 = OF.shape_steps(st, spans=[(100.0, 130.0)], d0=C.D0)
+    assert st2.T > st.T and st2.jump is not None and len(st2.jump) == st2.T
+    assert int(st2.jump.sum()) == 1 and float(st2.t[st2.jump][0]) == pytest.approx(t_jump)
+    # Slice containing the cut keeps jump aligned; slice starting AT the cut clears jump[0]
+    j_idx = int(np.flatnonzero(st2.jump)[0])
+    sl_with = ISL.slice_steps(st2, j_idx - 3, j_idx + 3)
+    assert sl_with.jump is not None and len(sl_with.jump) == sl_with.T and int(np.flatnonzero(sl_with.jump)[0]) == 3
+    sl_at = ISL.slice_steps(st2, j_idx, j_idx + 3)
+    assert sl_at.jump is None

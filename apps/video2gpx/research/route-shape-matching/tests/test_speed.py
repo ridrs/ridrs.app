@@ -358,7 +358,7 @@ def test_dp_native_compiles_for_simd_scalar_and_x86_64_sse2(tmp_path):
                     '    int32_t has_dth[3] = {0, 1, 1};\n'
                     '    float dths4[12] = {0,0,0,0, 0.1f,0.2f,0.3f,0.4f, -0.2f,-0.1f,0.0f,0.1f};\n'
                     '    float s0[3] = {0.0f, -INFINITY, -INFINITY};\n'
-                    '    Batch4Job job = {3, 3, 1, &gr, ls_p, is2_p, mus, sds, has_dth, dths4, 2.0f, s0, NULL, 0, NULL, NULL, {0,0,0,0}, NULL};\n'
+                    '    Batch4Job job = {3, 3, 1, &gr, ls_p, is2_p, mus, sds, has_dth, dths4, 2.0f, s0, NULL, 0, NULL, NULL, {0,0,0,0}, NULL, NULL};\n'
                     '    viterbi_scan_batches(1, 1, &job);\n'
                     '    for (int k = 0; k < 4; k++) {\n'
                     '        if (!isfinite(job.out_scores[k])) return 10 + k;\n'

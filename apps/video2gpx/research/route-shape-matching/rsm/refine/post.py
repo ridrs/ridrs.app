@@ -19,18 +19,22 @@ def forward_backward_cb(dpm, pre, st, cb, cap_gb: float = 4.0):
     al = np.empty((T, N), np.float16)
     a = np.full(N, -np.log(N), np.float32)
     al[0] = a
+    is_jump = getattr(st, "jump", None)
     for j in range(1, T):
-        mu, sd, dth = dpm._step_terms(pre, st, j)
-        new = np.full(N, NEG, np.float32)
-        for gi, gr in enumerate(grid.groups):
-            if dpm._skip(gr, mu, sd):
-                continue
-            cand = a[gr.src] + dpm._cand(pre, gi, mu, sd, dth, a)
-            lse, ok = dpm._lse_reduce(cand, gr.starts, gr.blk)
-            lse = np.where(ok, lse, NEG)
-            tmp = np.full(N, NEG, np.float32)
-            tmp[gr.ud] = lse
-            new = np.logaddexp(new, tmp)
+        if is_jump is not None and is_jump[j]:
+            new = np.full(N, np.float32(-np.log(N)) if np.isfinite(a.max()) else NEG, np.float32)
+        else:
+            mu, sd, dth = dpm._step_terms(pre, st, j)
+            new = np.full(N, NEG, np.float32)
+            for gi, gr in enumerate(grid.groups):
+                if dpm._skip(gr, mu, sd):
+                    continue
+                cand = a[gr.src] + dpm._cand(pre, gi, mu, sd, dth, a)
+                lse, ok = dpm._lse_reduce(cand, gr.starts, gr.blk)
+                lse = np.where(ok, lse, NEG)
+                tmp = np.full(N, NEG, np.float32)
+                tmp[gr.ud] = lse
+                new = np.logaddexp(new, tmp)
         mx = new.max()
         a = new - (mx + np.log(np.exp(new - mx).sum()))
         al[j] = np.maximum(a, -60000).astype(np.float16)
@@ -43,6 +47,9 @@ def forward_backward_cb(dpm, pre, st, cb, cap_gb: float = 4.0):
         out[j] = cb(j, p)
         if j == 0:
             break
+        if is_jump is not None and is_jump[j]:
+            beta = np.zeros(N, np.float32) if np.isfinite(beta.max()) else np.full(N, NEG, np.float32)
+            continue
         mu, sd, dth = dpm._step_terms(pre, st, j)
         nb = np.full(N, NEG, np.float32)
         for gi, gr in enumerate(grid.groups):

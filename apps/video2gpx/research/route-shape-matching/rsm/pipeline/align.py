@@ -25,7 +25,15 @@ def meas_mode(P: dict) -> str:
 
 
 def path_heading(xy: np.ndarray, smooth_m: float) -> np.ndarray:
-    """heading (rad, counter-clockwise, unwrapped) of a path sampled every 1 m, smoothed along the path"""
+    """heading (rad, counter-clockwise, unwrapped) of a path sampled every 1 m, smoothed along each connected piece (never across a disconnected cut jump)"""
+    xy = np.asarray(xy, float)
+    n = len(xy)
+    if n < 2:
+        return np.zeros(n)
+    br = np.flatnonzero(np.hypot(*np.diff(xy, axis=0).T) > 5.0) + 1
+    if len(br) > 0:
+        edges = [0] + [int(x) for x in br] + [n]
+        return np.concatenate([path_heading(xy[a:b], smooth_m) for a, b in zip(edges[:-1], edges[1:])])
     phi = np.unwrap(np.arctan2(np.gradient(xy[:, 1]), np.gradient(xy[:, 0])))
     return gaussian_filter1d(phi, smooth_m, mode="nearest")
 

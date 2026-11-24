@@ -88,6 +88,10 @@ def decide(hyps: list[dict], nats: float | None = None) -> tuple[int, bool]:
 def slice_steps(st, a: int, b: int, scale: float = 1.0):
     kw = {f: np.asarray(getattr(st, f))[a:b + 1] for f in ("t", "dth", "mu", "rel", "v", "gap", "seg")}
     kw["mu"] = kw["mu"] * scale
+    if getattr(st, "jump", None) is not None:
+        jm = np.asarray(st.jump, bool)[a:b + 1].copy()
+        jm[0] = False
+        kw["jump"] = jm if jm.any() else None
     return st.copy(**kw)
 
 

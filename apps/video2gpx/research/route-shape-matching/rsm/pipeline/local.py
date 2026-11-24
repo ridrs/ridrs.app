@@ -97,10 +97,15 @@ def corridor_graph(d: Path, P: dict, W: Worker, g, E, route, vehicle: str, progr
     from pyproj import Transformer
     tr = Transformer.from_crs("EPSG:4326", gl.crs, always_xy=True)
     lx, ly = tr.transform(ll[:, 0], ll[:, 1])
-    Ec = HI.corridor_edges(gl, np.arange(gl.n_edges), [np.column_stack([lx, ly])], buf)
+    lxy = np.column_stack([lx, ly])
+    br = np.flatnonzero(np.hypot(*np.diff(lxy, axis=0).T) > 2.0 * buf) + 1
+    edges_p = [0] + [int(x) for x in br] + [len(lxy)]
+    pieces = [lxy[a:b] if b - a >= 2 else np.vstack([lxy[a:b], lxy[a:b]]) for a, b in zip(edges_p[:-1], edges_p[1:]) if b > a] or [lxy]
+    Ec = HI.corridor_edges(gl, np.arange(gl.n_edges), pieces, buf)
+    seg_km = float(sum(np.hypot(*np.diff(xy[a:b], axis=0).T).sum() for a, b in zip(edges_p[:-1], edges_p[1:]) if b - a >= 2) / 1000)
     info = dict(box=box, classes=list(cls), buffer_m=buf, graph_edges=int(gl.n_edges), corridor_edges=int(len(Ec)),
-                corridor_km=float(np.asarray(gl.edge_len)[Ec].sum() / 2000), search_path_km=float(np.hypot(*np.diff(xy, axis=0).T).sum() / 1000))
-    return gl, Ec, np.column_stack([lx, ly]), info
+                corridor_km=float(np.asarray(gl.edge_len)[Ec].sum() / 2000), search_path_km=seg_km)
+    return gl, Ec, lxy, info
 
 
 def local_pass(d: Path, P: dict, W: Worker, g, E, tracks, route: dict, vehicle: str, progress=lambda f, label: None, gap_nom=None):
@@ -140,7 +145,7 @@ def local_pass(d: Path, P: dict, W: Worker, g, E, tracks, route: dict, vehicle: 
         info["infeasible"] = True
         return None, info
     from scipy.spatial import cKDTree
-    dense = _densify(lxy, 2.0)
+    dense = _densify(lxy, 2.0, max_seg=2.0 * C.LOCAL_BUF_M)
     # acceptance test: a long change to another road must be supported by the video (turns) and by the score
     step_ok, info["kept_search"], info["accept_tested"] = None, [], []
     if C.LOCAL_ACCEPT_ON:
@@ -162,7 +167,7 @@ def local_pass(d: Path, P: dict, W: Worker, g, E, tracks, route: dict, vehicle: 
         isl, info["islands"] = I.refine_islands(d, P, W, g, E, route, vehicle, st, tracks, gl, G, r, fb, lxy, dense, info["box"], route.get("cons"))
         if isl is not None:
             gl, Ec, G, pre, r, fb, step_ok, sm, em, cost, lxy = (isl[x] for x in ("gl", "Ec", "G", "pre", "r", "fb", "step_ok", "sm", "em", "cost", "lxy"))
-            dense = _densify(lxy, 2.0)
+            dense = _densify(lxy, 2.0, max_seg=2.0 * C.LOCAL_BUF_M)
             info["kept_search"] = sorted(info["kept_search"] + isl["uncertain"], key=lambda x: x["t0"])
         for p_ in info["islands"].get("parts", []):
             W.log("info", f"islands: {p_['kind']} {p_['t0']:.0f}-{p_['t1']:.0f} s: " + (p_.get("skipped") or f"{p_['chosen']}{' (uncertain)' if p_['uncertain'] else ''}, scale {p_['scale']:.2f}; "
@@ -332,9 +337,13 @@ def prior_decided(gl, G, Ec, t, cells, cells0, same_m: float | None = None, min_
     return out
 
 
-def _densify(xy, step):
+def _densify(xy, step, max_seg: float | None = None):
     out = [xy[:1]]
     for a, b in zip(xy[:-1], xy[1:]):
-        n = max(1, int(np.hypot(*(b - a)) // step))
+        dist = float(np.hypot(*(b - a)))
+        if max_seg is not None and dist > max_seg:
+            out.append(b[None])
+            continue
+        n = max(1, int(dist // step))
         out.append(a + (b - a) * (np.arange(1, n + 1)[:, None] / n))
     return np.vstack(out)

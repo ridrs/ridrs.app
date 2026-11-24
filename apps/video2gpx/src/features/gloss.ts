@@ -46,6 +46,11 @@ export function gloss(s: StatusInfo): { label: string; text: string } {
       const ins = s.message.match(/; (\d+) inserted shots/)?.[1];
       return { label: "Schnitte", text: `Das Video ist geschnitten: ${Math.round(v ?? 0)} Schnitte; die Route springt dort, statt durchzufahren` + (ins ? `; ${ins} eingefügte Szenen (Titel, Nahaufnahmen) nicht verwendet` : "") };
     }
+    case "cut_jump": {
+      const jumps = [...s.message.matchAll(/(\d+:\d\d) \(([\d.]+ (?:km|m))\)/g)].map((m) => `${m[1]} (${m[2].replace(".", ",")})`).join(", ");
+      const more = s.message.match(/and (\d+) more/)?.[1];
+      return { label: "Schnitt-Sprung", text: `Freier Sprung über einen Videoschnitt${jumps ? ` bei ${jumps}${more ? ` und ${more} weitere` : ""}` : ""}: der Abschnitt danach wurde frei auf der Karte neu angesetzt; bitte Position nach dem Schnitt prüfen` };
+    }
     case "intro_skipped":
       return { label: "Intro", text: `Intro bis ${mmss(v ?? 0)} übersprungen` + (/set by hand/.test(s.message ?? "") ? " (von Hand gesetzt)" : "") };
     case "parallel_street":

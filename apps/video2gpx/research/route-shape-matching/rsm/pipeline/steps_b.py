@@ -335,6 +335,8 @@ def _memo_key(pre, st, masks) -> str:
     h.update(repr(dataclasses.replace(pre.par, a_ang=0.0)).encode())
     for a in (st.t, st.dth, st.mu, st.rel, st.v, st.gap):
         h.update(np.ascontiguousarray(a).tobytes())
+    if getattr(st, "jump", None) is not None:
+        h.update(np.packbits(np.asarray(st.jump, bool)).tobytes())
     for m in (masks or (None, None)):
         h.update(b"-" if m is None else np.packbits(np.asarray(m, bool)).tobytes())
     for f in (dp.__file__, grid.__file__, seq.__file__):
@@ -356,10 +358,11 @@ def scan_kappa(pre, st, k, fvals, on_done=None, procs=C.MAX_WORKERS, masks=None)
         memo_f = data_dir(Path(os.environ.get("RSM_DATA_DIR", "."))) / "scan_memo" / f"{_memo_key(pre, st, masks)}.json"
         memo = json.loads(memo_f.read_text()) if memo_f.exists() else {}
     out = np.full(len(fvals), np.nan)
+    n_trans = st.T - 1 - (int(np.count_nonzero(st.jump[1:])) if getattr(st, "jump", None) is not None else 0)
     todo = []
     for fi, f in enumerate(fvals):
         if repr(float(f)) in memo:
-            out[fi] = memo[repr(float(f))] + (st.T - 1) * np.log(k)
+            out[fi] = memo[repr(float(f))] + n_trans * np.log(k)
             if on_done:
                 on_done()
         else:
@@ -370,7 +373,7 @@ def scan_kappa(pre, st, k, fvals, on_done=None, procs=C.MAX_WORKERS, masks=None)
         native_sc = dp.viterbi_scan(pre.grid, pre.par, st, [C.F_REF / f for _, f in todo], start_ok=sm, end_ok=em, threads=n_threads) if len(todo) >= 1 else None
         if native_sc is not None:
             for (fi, f), sc in zip(todo, native_sc):
-                out[fi] = float(sc) + (st.T - 1) * np.log(k)
+                out[fi] = float(sc) + n_trans * np.log(k)
                 memo[repr(float(f))] = float(sc)
                 if on_done:
                     on_done()
@@ -379,7 +382,7 @@ def scan_kappa(pre, st, k, fvals, on_done=None, procs=C.MAX_WORKERS, masks=None)
             _G["sm"], _G["em"] = sm, em
             with mp.get_context("fork").Pool(min(procs, C.MAX_WORKERS, len(todo))) as pool:
                 for fi, sc in pool.imap_unordered(_job, todo):
-                    out[fi] = sc + (st.T - 1) * np.log(k)
+                    out[fi] = sc + n_trans * np.log(k)
                     memo[repr(float(fvals[fi]))] = float(sc)
                     if on_done:
                         on_done()
@@ -775,6 +778,23 @@ def route_search(d: Path, P: dict, W: Worker):
                          f"({res_score(paths_info, 'paths')}): the {'bike-path' if better else 'road'} result is used")
     # ---- statuses of the chosen result
     ll = res.pop("_ll"); xy = res.pop("_xy")
+    cut_jumps = []
+    if getattr(st, "jump", None) is not None and np.any(st.jump):
+        st_t = np.asarray(res["step_t"], float)
+        for j in np.flatnonzero(st.jump):
+            k_idx = int(j) if len(xy) == st.T else int(np.searchsorted(st_t, float(st.t[j]) - 1e-4))
+            if 0 < k_idx < len(xy):
+                dist_m = float(np.hypot(*(xy[k_idx] - xy[k_idx - 1])))
+                cut_jumps.append(dict(t=round(float(st.t[j]), 2), dist_m=round(dist_m, 1)))
+    if cut_jumps:
+        res["cut_jumps"] = cut_jumps
+        max_d = max(x["dist_m"] for x in cut_jumps)
+        mmss = lambda t_: f"{int(round(t_)) // 60}:{int(round(t_)) % 60:02d}"
+        fmt_d = lambda d_: f"{d_ / 1000:.1f} km" if d_ >= 1000.0 else f"{d_:.0f} m"
+        desc = ", ".join(f"{mmss(x['t'])} ({fmt_d(x['dist_m'])})" for x in cut_jumps[:6]) + (f" and {len(cut_jumps) - 6} more" if len(cut_jumps) > 6 else "")
+        W.status("cut_jump", "difficult", max_d,
+                 f"free jump across scene cut at {desc}: the section after the cut was re-matched freely on the map; verify the route after the cut")
+        W.log("warn", f"scene cut jump: {desc} (free map jump, no distance limit)")
     if cons:
         tol = cons["tol"]
         if cons_used is None:

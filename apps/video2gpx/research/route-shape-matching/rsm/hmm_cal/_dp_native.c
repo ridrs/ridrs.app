@@ -190,6 +190,7 @@ typedef struct {
     const uint8_t *const *step_ok_masks;
     float out_scores[4];
     const float *ute4;          /* [T * 4] or NULL: extra U-turn cost (nats) per step and lane, charged on entries with utf = 1 */
+    const uint8_t *is_jump;     /* [T] or NULL: 1 on a 1-step free cut-jump transition (broadcast max(a) to all cells) */
 } Batch4Job;
 
 static void *run_batch4(void *arg) {
@@ -210,6 +211,19 @@ static void *run_batch4(void *arg) {
     for (int32_t i = 0; i < N; i++) v4_store(a + (size_t)i * 4, v4_dup(J->start_init[i]));
 
     for (int32_t j = 1; j < T; j++) {
+        if (J->is_jump && J->is_jump[j]) {
+            v4f m = vNEG;
+            for (int32_t i = 0; i < N; i++) m = v4_max(m, v4_load(a + (size_t)i * 4));
+            for (int32_t i = 0; i < N; i++) v4_store(tmp + (size_t)i * 4, m);
+            const uint8_t *mask = find_step_mask(j, J->n_step_ok, J->step_ok_steps, J->step_ok_masks);
+            if (mask) {
+                for (int32_t i = 0; i < N; i++) {
+                    if (!mask[i]) v4_store(tmp + (size_t)i * 4, vNEG);
+                }
+            }
+            float *sw = a; a = tmp; tmp = sw;
+            continue;
+        }
         float mu = J->mus[j], sd = J->sds[j];
         int has_dth = J->has_dth[j];
         v4f vdth = v4_load(J->dths4 + (size_t)j * 4);
@@ -302,6 +316,29 @@ static void *run_batch4(void *arg) {
     }
     const float c1 = J->c1;
     for (int32_t j = 1; j < T; j++) {
+        if (J->is_jump && J->is_jump[j]) {
+            float m[4] = { NEG, NEG, NEG, NEG };
+            for (int32_t i = 0; i < N; i++) {
+                for (int k = 0; k < 4; k++) {
+                    float v = a[(size_t)i * 4 + k];
+                    if (v > m[k]) m[k] = v;
+                }
+            }
+            for (int32_t i = 0; i < N; i++) {
+                for (int k = 0; k < 4; k++) tmp[(size_t)i * 4 + k] = m[k];
+            }
+            const uint8_t *mask = find_step_mask(j, J->n_step_ok, J->step_ok_steps, J->step_ok_masks);
+            if (mask) {
+                for (int32_t i = 0; i < N; i++) {
+                    if (!mask[i]) {
+                        tmp[(size_t)i * 4 + 0] = NEG; tmp[(size_t)i * 4 + 1] = NEG;
+                        tmp[(size_t)i * 4 + 2] = NEG; tmp[(size_t)i * 4 + 3] = NEG;
+                    }
+                }
+            }
+            float *sw = a; a = tmp; tmp = sw;
+            continue;
+        }
         float mu = J->mus[j], sd = J->sds[j];
         int has_dth = J->has_dth[j];
         const float *dth4 = J->dths4 + (size_t)j * 4;
@@ -400,7 +437,9 @@ float viterbi_single(
     const uint8_t *const *step_ok_masks,
     uint16_t *out_bps,          /* NULL if backptr=False, else (T-1)*N */
     int32_t *out_final_cell,
-    const float *utes           /* [T] or NULL: extra U-turn cost (nats) per step, charged on entries with utf = 1 */
+    const float *utes,          /* [T] or NULL: extra U-turn cost (nats) per step, charged on entries with utf = 1 */
+    const uint8_t *is_jump,     /* [T] or NULL: 1 on a 1-step free cut-jump transition */
+    int32_t *out_jump_src       /* [T] or NULL: argmax(a) before each jump step (init -1) */
 ) {
     const float NEG = -INFINITY;
     float *a = (float *)malloc((size_t)N * sizeof(float));
@@ -413,6 +452,23 @@ float viterbi_single(
     memcpy(a, start_init, (size_t)N * sizeof(float));
 
     for (int32_t j = 1; j < T; j++) {
+        if (is_jump && is_jump[j]) {
+            float m = NEG;
+            int32_t best_prev = -1;
+            for (int32_t i = 0; i < N; i++) {
+                if (a[i] > m) { m = a[i]; best_prev = i; }
+            }
+            if (out_jump_src) out_jump_src[j] = best_prev;
+            for (int32_t i = 0; i < N; i++) tmp[i] = m;
+            const uint8_t *mask = find_step_mask(j, n_step_ok, step_ok_steps, step_ok_masks);
+            if (mask) {
+                for (int32_t i = 0; i < N; i++) {
+                    if (!mask[i]) tmp[i] = NEG;
+                }
+            }
+            float *sw = a; a = tmp; tmp = sw;
+            continue;
+        }
         float mu = mus[j], sd = sds[j], dth = dths[j];
         int hd = has_dth[j];
         const float ute = utes ? utes[j] : 0.0f;

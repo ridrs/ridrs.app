@@ -27,6 +27,11 @@ class Steps:
     gap: np.ndarray     # (T,) bool
     seg: np.ndarray     # (T,) segment index (gap steps: the segment before)
     d0: float
+    jump: np.ndarray | None = None   # (T,) bool: True on a 1-step free cut-jump transition (arbitrary jump across the graph)
+
+    def __post_init__(self):
+        if self.jump is not None and len(self.jump) != len(self.t):
+            raise ValueError(f"Steps.jump length {len(self.jump)} != Steps.T {len(self.t)}")
 
     @property
     def T(self) -> int:

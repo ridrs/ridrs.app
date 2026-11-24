@@ -47,6 +47,7 @@ class _Batch4Job(ctypes.Structure):
         ("step_ok_masks", ctypes.POINTER(ctypes.c_void_p)),
         ("out_scores", ctypes.c_float * 4),
         ("ute4", ctypes.c_void_p),
+        ("is_jump", ctypes.c_void_p),
     ]
 
 
@@ -62,6 +63,7 @@ def _bind(p: Path):
         ctypes.c_void_p, ctypes.c_void_p,
         ctypes.c_int32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
         ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32), ctypes.c_void_p,
+        ctypes.c_void_p, ctypes.c_void_p,
     ]
     lib.viterbi_single.restype = ctypes.c_float
     lib.fb_forward_step.argtypes = [
@@ -223,7 +225,8 @@ def viterbi_scan(grid, base_par, st, a_angs, start_ok=None, end_ok=None, step_ok
         padded.append(padded[-1])
     nb = len(padded) // 4
     jobs = (_Batch4Job * nb)()
-    refs = [grefs, mus, sds, has_dth, a0, end_arr, so_steps, so_ptrs, so_refs]
+    is_jump = np.ascontiguousarray(st.jump, np.uint8) if getattr(st, "jump", None) is not None else None
+    refs = [grefs, mus, sds, has_dth, a0, end_arr, so_steps, so_ptrs, so_refs, is_jump]
     dth_clean = np.nan_to_num(st.dth, nan=0.0).astype(np.float64)
     n_emit = int(np.count_nonzero(~np.isnan(st.dth[1:])))
     c1 = np.float32((base_par.nu + 1) / 2)
@@ -255,6 +258,7 @@ def viterbi_scan(grid, base_par, st, a_angs, start_ok=None, end_ok=None, step_ok
             so_ptrs if so_ptrs is not None else ctypes.POINTER(ctypes.c_void_p)(),
             (ctypes.c_float * 4)(),
             ute4.ctypes.data if ute4 is not None else 0,
+            is_jump.ctypes.data if is_jump is not None else 0,
         )
     LIB.viterbi_scan_batches(nb, max(1, int(threads)), jobs)
     out = np.empty(n_f, np.float64)
@@ -279,6 +283,8 @@ def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step
     dths = np.ascontiguousarray(np.nan_to_num(st.dth * par.a_ang, nan=0.0), np.float32)
     a0, end_arr = _init_end_arrays(N, start_ok, end_ok, step_ok, s_lp, e_lp)
     n_so, so_steps, so_ptrs, so_refs = _pack_step_ok(step_ok, N)
+    is_jump = np.ascontiguousarray(st.jump, np.uint8) if getattr(st, "jump", None) is not None else None
+    jump_src = np.full(T, -1, np.int32) if (backptr and is_jump is not None) else None
     bps = np.empty((max(0, T - 1), N), np.uint16) if backptr else None
     final_cell = ctypes.c_int32(-1)
     best = float(LIB.viterbi_single(
@@ -291,6 +297,8 @@ def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step
         bps.ctypes.data if bps is not None else 0,
         ctypes.byref(final_cell),
         utes.ctypes.data if utes is not None else 0,
+        is_jump.ctypes.data if is_jump is not None else 0,
+        jump_src.ctypes.data if jump_src is not None else 0,
     ))
     c = int(final_cell.value)
     if c < 0 or not np.isfinite(best):
@@ -302,6 +310,10 @@ def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step
         path[-1] = c
         mask = (1 << par.slot_bits) - 1
         for j in range(T - 1, 0, -1):
+            if jump_src is not None and jump_src[j] >= 0:
+                c = int(jump_src[j])
+                path[j - 1] = c
+                continue
             cd = int(bps[j - 1, c])
             if cd == 65535:
                 path[:j] = -1
