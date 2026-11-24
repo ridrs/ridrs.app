@@ -26,16 +26,17 @@ import {
  * recording keeps it, with the planned entry it came from.
  */
 export function workoutOf(recording: Pick<Recording, 'events'>): RideWorkout | undefined {
+  let latest: RideWorkout | undefined;
   for (const { envelope } of recording.events) {
     if (envelope.type !== activityStateChangedEvent.id) {
       continue;
     }
     const state = activityStateSchema.safeParse(envelope.payload);
     if (state.success && state.data.state !== 'idle' && state.data.workout) {
-      return state.data.workout;
+      latest = state.data.workout;
     }
   }
-  return undefined;
+  return latest;
 }
 
 /**

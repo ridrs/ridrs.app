@@ -17,7 +17,8 @@ Feature: The road moves smoothly while I ride
     And the landscape's distance never decreases over 30 frames
     And between 50 and 62 frames are rendered per second
     And the virtual-speed widget keeps rising
-    When I press "Finish ride"
+    When I press "Menu"
+    And I press "Finish ride"
     Then the "debriefing" screen is shown
     And the debriefing offers "Save"
     When I press "Save"

@@ -10,7 +10,7 @@ import { besideControl, entryNamed, findControl, parseTrackPositions, type Track
 import type { UiContext } from '@ridrs/ui-sdk';
 import { useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
-import { type MeasuredPlace, trackOffset } from './route.ts';
+import { locateOnTrack, type MeasuredPlace, trackOffset } from './route.ts';
 
 /** The route of the ride: the offer whose world route the running ride rides; none for a free ride. */
 export function useRideRoute(ctx: UiContext): RouteOffer | undefined {
@@ -69,8 +69,18 @@ export function useTrackOffset(
   const last = useRef<{ track: readonly MeasuredPlace[]; distance: number }>(undefined);
   useEffect(() => {
     if (!track || !position) return;
-    const same = last.current?.track === track && position.distance >= last.current.distance;
-    setOffset((previous) => trackOffset(track, position, same ? previous : 0));
+    const before = last.current;
+    const same = before?.track === track && position.distance >= before.distance;
+    const switched = before !== undefined && before.track !== track;
+    setOffset((previous) => {
+      if (same) {
+        return trackOffset(track, position, previous);
+      }
+      if (!switched && locateOnTrack(track, position, position.distance) !== undefined) {
+        return trackOffset(track, position, 0);
+      }
+      return trackOffset(track, position, -position.distance);
+    });
     last.current = { track, distance: position.distance };
   }, [track, position]);
   return track && position ? offset : 0;

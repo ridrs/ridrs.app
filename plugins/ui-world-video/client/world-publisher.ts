@@ -25,21 +25,25 @@ export interface ObservedPosition {
 }
 
 /** The terrain of the route from the grid point at or before `distance`, `windowLength` m ahead. */
-export function terrainWindow(track: Track, distance: number): Omit<TerrainWindow, 'revision'> {
+export function terrainWindow(
+  track: Track,
+  distance: number,
+  startDistance = 0,
+): Omit<TerrainWindow, 'revision'> {
   const { windowLength, spacing } = TERRAIN_WINDOW;
   const originDistance = Math.floor(distance / spacing) * spacing;
   return {
     originDistance,
     spacing,
     samples: Array.from({ length: Math.round(windowLength / spacing) + 1 }, (_, i) => ({
-      gradient: gradientAt(track, originDistance + i * spacing),
+      gradient: gradientAt(track, Math.max(0, originDistance + i * spacing - startDistance)),
     })),
   };
 }
 
-/** Where the rider is at `distance` on the route. */
-export function positionAt(track: Track, distance: number): ObservedPosition {
-  const place = placeAt(track, distance);
+/** Where the rider is at `distance` on the route (`startDistance` anchors a mid-ride route switch). */
+export function positionAt(track: Track, distance: number, startDistance = 0): ObservedPosition {
+  const place = placeAt(track, Math.max(0, distance - startDistance));
   return { distance, latitude: place.latitude, longitude: place.longitude, altitude: place.elevation };
 }
 
@@ -55,6 +59,7 @@ export class WorldPublisher {
   private window: TerrainWindow | undefined;
   private positioned: number | undefined;
   private ride: string | undefined;
+  private startDistance = 0;
 
   constructor(
     private readonly track: Track,
@@ -64,8 +69,9 @@ export class WorldPublisher {
     },
   ) {}
 
-  mount(): void {
-    this.sendTerrain(0);
+  mount(startDistance = 0): void {
+    this.startDistance = startDistance;
+    this.sendTerrain(startDistance);
   }
 
   rideState(state: ActivityState): void {
@@ -91,12 +97,12 @@ export class WorldPublisher {
 
   private sendTerrain(distance: number): void {
     this.revision += 1;
-    this.window = { revision: this.revision, ...terrainWindow(this.track, distance) };
+    this.window = { revision: this.revision, ...terrainWindow(this.track, distance, this.startDistance) };
     this.publish.terrain(this.window);
   }
 
   private sendPosition(distance: number): void {
     this.positioned = distance;
-    this.publish.position(positionAt(this.track, distance));
+    this.publish.position(positionAt(this.track, distance, this.startDistance));
   }
 }

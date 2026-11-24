@@ -28,6 +28,7 @@ Feature: Continue an interrupted ride in the app
     When I press "Resume"
     Then the power widget shows "220" "W"
     When 2 seconds pass in real time
+    And I press "Menu"
     And I press "Finish ride"
     Then the "debriefing" screen is shown
     And the debriefing offers "Save" and "Delete"

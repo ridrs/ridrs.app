@@ -9,6 +9,8 @@ export {
   activityStartRequestedEvent,
   activityStateChangedEvent,
   activityStateSchema,
+  activityWorkoutRequestedEvent,
+  activityWorldRequestedEvent,
   type RideWorkout,
   type RideWorld,
   rideWorkoutSchema,

@@ -70,6 +70,10 @@ const SAMPLES: Record<string, unknown> = {
   'activity.pause-requested': {},
   'activity.resume-requested': {},
   'activity.interrupted': {},
+  'activity.world-requested': {
+    world: { landscape: 'ui-world-video/landscape', route: 'FR_Col_de_Pennes' },
+  },
+  'activity.workout-requested': {},
   'activity.state-changed': { state: 'finished', sessionId: 's-1', startedAt: T, endedAt: T + 1 },
   'core.host.started': { startedPlugins: ['a', 'b'] },
   'core.ui-registry.changed': { revision: 3 },

@@ -15,6 +15,7 @@ Feature: A ridrs://activity link opens the debriefing of that ride
 
   Scenario: A link to a ride of this device opens its debriefing
     When I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And I press "Save"
     Then the "main" screen is shown
@@ -23,6 +24,7 @@ Feature: A ridrs://activity link opens the debriefing of that ride
 
   Scenario: The ride is named in a link by the external id of its upload, which has no colon
     When I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     And I press "Save"

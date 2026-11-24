@@ -15,7 +15,8 @@ Feature: Ride onto a climb
     Then the gradient widget shows "0.0" "%"
     And eventually the gradient widget shows "5.0" "%"
     And the virtual-speed widget keeps falling
-    When I press "Finish ride"
+    When I press "Menu"
+    And I press "Finish ride"
     Then the "debriefing" screen is shown
     And the debriefing offers "Save"
     When I press "Save"

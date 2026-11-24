@@ -69,3 +69,26 @@ Feature: Activity session
   Scenario: A free ride has no world
     When "test-ui" publishes "activity.start-requested"
     Then the ride has no world
+
+  Scenario: Switching to another route during a ride keeps the session and updates its world
+    Given "test-ui" published "activity.start-requested"
+    And "test-ui" published "activity.pause-requested"
+    When "test-ui" asks to switch the ride to the landscape "ui-world-video/landscape" along the route "FR_Alpe_d_Huez"
+    Then the latest "activity.state-changed" event has the state "paused"
+    And it carries the same session id as the "running" event
+    And the ride takes place on the landscape "ui-world-video/landscape" along the route "FR_Alpe_d_Huez"
+    When "test-ui" publishes "activity.resume-requested"
+    Then the ride takes place on the landscape "ui-world-video/landscape" along the route "FR_Alpe_d_Huez"
+    When "test-ui" asks to switch the ride to a free ride
+    Then the ride has no world
+
+  Scenario Outline: Switching the route without an active ride changes nothing (<situation>)
+    Given the ride is <situation>
+    When "test-ui" asks to switch the ride to the landscape "ui-world-video/landscape" along the route "FR_Alpe_d_Huez"
+    Then the host reported an "invalid-transition" problem for plugin "activity-session"
+    And the latest "activity.state-changed" event has the state "<state>"
+
+    Examples:
+      | situation | state    |
+      | idle      | idle     |
+      | finished  | finished |

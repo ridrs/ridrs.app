@@ -35,10 +35,12 @@ import {
   zoneColour,
 } from './model.ts';
 
-/** The ride this widget follows: the workout is frozen at the start, the rest is read as it comes. */
+/** The ride this widget follows: its workout may be loaded or switched during the ride (ADR 0108). */
 interface Ride {
   readonly sessionId: string;
   readonly startedAt: number;
+  readonly loadedAt: number;
+  readonly key: string;
   readonly workout: Workout;
 }
 
@@ -50,6 +52,7 @@ interface StepEvent {
 /** Where the ride's clock stands in the step; refs, because frames must not wait for a render. */
 interface Track {
   sessionId?: string;
+  workoutKey?: string;
   stepStartedAt?: number;
   pausedAt?: number;
   pausedMs: number;
@@ -72,16 +75,24 @@ function useWorkoutRide(ctx: UiContext) {
   const track = useRef<Track>({ pausedMs: 0 });
 
   useEffect(() => {
-    const stopState = ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
+    const stopState = ctx.events.subscribe(activityStateChangedEvent, ({ payload, timestamp }) => {
       if (payload.state === 'idle' || payload.state === 'finished') {
         track.current = { pausedMs: 0 };
         setRide(undefined);
         return;
       }
-      if (track.current.sessionId !== payload.sessionId) {
-        track.current = { sessionId: payload.sessionId, pausedMs: 0 };
+      const workout = payload.workout?.workout;
+      const key = workout ? JSON.stringify(workout) : undefined;
+      const newSession = track.current.sessionId !== payload.sessionId;
+      if (newSession || track.current.workoutKey !== key) {
+        track.current = {
+          sessionId: payload.sessionId,
+          ...(key === undefined ? {} : { workoutKey: key }),
+          pausedMs: 0,
+        };
         setStep(undefined);
         setFinishedAt(undefined);
+        setIntensity(undefined);
         setElapsed(0);
       }
       setPaused(payload.state === 'paused');
@@ -93,13 +104,18 @@ function useWorkoutRide(ctx: UiContext) {
         now.pausedMs += Math.max(0, payload.resumedAt - now.pausedAt);
         now.pausedAt = undefined;
       }
-      const workout = payload.workout?.workout;
       setRide((was) =>
-        !workout
+        !workout || !key
           ? undefined
-          : was?.sessionId === payload.sessionId
+          : was?.sessionId === payload.sessionId && was.key === key
             ? was
-            : { sessionId: payload.sessionId, startedAt: payload.startedAt, workout },
+            : {
+                sessionId: payload.sessionId,
+                startedAt: payload.startedAt,
+                loadedAt: was?.sessionId === payload.sessionId ? timestamp : payload.startedAt,
+                key,
+                workout,
+              },
       );
     });
     const stopAthlete = ctx.events.subscribe(activityAthleteEvent, ({ payload }) => {
@@ -135,13 +151,17 @@ function useWorkoutRide(ctx: UiContext) {
     };
   }, [ctx]);
 
-  // An event of an earlier ride, replayed to a widget that mounts late, is not this ride's.
-  const thisStep = ride && step && step.startedAt >= ride.startedAt ? step : undefined;
-  const finished = ride && finishedAt !== undefined && finishedAt >= ride.startedAt;
+  // An event of an earlier ride or an earlier workout in this ride is ignored.
+  const thisStep = ride && step && step.startedAt >= ride.loadedAt ? step : undefined;
+  const finished =
+    ride &&
+    finishedAt !== undefined &&
+    finishedAt >= ride.loadedAt &&
+    (thisStep === undefined || finishedAt >= thisStep.startedAt);
   const ftp = ride && ftpOf?.sessionId === ride.sessionId ? ftpOf.ftp : undefined;
-  // A ride starts at 100 %; an intensity of an earlier ride, replayed late, is not this ride's.
+  // Every loaded workout starts at 100 %; an intensity of an earlier workout is ignored.
   const percent =
-    ride && intensity && intensity.at >= ride.startedAt ? intensity.percent : WORKOUT_INTENSITY.default;
+    ride && intensity && intensity.at >= ride.loadedAt ? intensity.percent : WORKOUT_INTENSITY.default;
   return { ride, ftp, step: thisStep, finished: finished === true, elapsed, paused, intensity: percent };
 }
 

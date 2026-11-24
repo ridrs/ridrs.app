@@ -34,6 +34,7 @@ Feature: A ride done from a planned entry is listed as that plan's ride
     And I press Enter
     And I press Enter
     And intervals.icu renames the plan "Sweet Spot 3x12" to "Tuesday intervals"
+    And I press "Menu"
     And I press "Finish ride"
     And I press "Save"
     Then the "main" screen is shown

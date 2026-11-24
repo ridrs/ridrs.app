@@ -1,13 +1,14 @@
 @training @ui
-Feature: A finished ride is saved or deleted in its debriefing
-  Finish ride pauses the ride and opens the debriefing in a dialog over the activity screen. The
-  rider closes it with Save or Delete, which end the ride, or goes back to the ride with Continue
-  ride or Back: a ride that ran before goes on, a paused one stays paused. With intervals.icu
-  connected, Save uploads the ride's FIT file as a done activity and closes the debriefing once
-  intervals.icu has it; without an account, Save keeps the ride on this device. Delete removes the
-  recording and its FIT file after a confirmation. Once the ride is ended, Back only offers Save:
-  no ride is thrown away or left undecided by accident. Settings and Devices open from the
-  debriefing in the same dialog and lead back to it.
+Feature: The activity menu over a ride and saving or deleting a finished ride
+  Menu on the activity screen pauses a running ride and opens the activity menu in a dialog over the
+  activity screen (ADR 0108). From there the rider goes back to the ride with Continue ride or Back
+  (a ride that ran before goes on, a paused one stays paused), opens Devices or Settings in the same
+  dialog, or presses Finish ride to end the ride. Only once the ride is ended does the dialog show
+  Ride finished with a large Save button and a small Delete button. With intervals.icu connected,
+  Save uploads the ride's FIT file as a done activity and closes the dialog once intervals.icu has
+  it; without an account, Save keeps the ride on this device. Delete asks "Are you sure?" with Yes
+  and No before removing the recording and its FIT file. Once the ride is ended, Back only offers
+  Save: no ride is thrown away or left undecided by accident.
 
   Here intervals.icu, the browser and the secret store are simulated.
 
@@ -16,38 +17,38 @@ Feature: A finished ride is saved or deleted in its debriefing
     And intervals.icu knows the athlete "Alex Rider" with an FTP of 250 W and a weight of 72 kg
     And the local time is "2026-11-04 08:00"
 
-  Scenario: Finishing a ride opens its debriefing in a dialog over the ride
+  Scenario: Menu pauses the ride and opens the activity menu without Save or Delete yet
     Given the secret store holds a token for intervals.icu
     And the host has started
     And the ridrs UI is shown
     When I press "Start ride"
-    And I press "Finish ride"
+    And I press "Menu"
     Then the "debriefing" screen is shown
     And the "debriefing" screen is shown in a dialog over the "activity" screen
     And the latest "activity.state-changed" event has the state "paused"
-    And the debriefing shows "Ride finished"
-    And the debriefing shows "Save uploads the ride to intervals.icu as Alex Rider."
-    And the debriefing offers "Save", "Delete" and "Continue ride"
-    And the focus is on "Save"
+    And the debriefing shows "Ride menu"
+    And the debriefing offers "Continue ride" and "Finish ride"
+    And the debriefing offers neither "Save" nor "Delete"
+    And the focus is on "Continue ride"
 
   Scenario: Continue ride goes back to the ride
     Given the host has started
     And the ridrs UI is shown
     And I press "Start ride"
-    And I press "Finish ride"
-    And the debriefing shows "Save keeps the ride on this device."
+    And I press "Menu"
+    And the debriefing shows "Ride menu"
     When I press "Continue ride"
     Then no dialog is shown
     And the "activity" screen is shown
     And the latest "activity.state-changed" event has the state "running"
-    And the focus is on "Finish ride"
+    And the focus is on "Menu"
 
   Scenario: Back goes back to the ride while it is not ended
     Given the host has started
     And the ridrs UI is shown
     And I press "Start ride"
-    And I press "Finish ride"
-    And the debriefing shows "Save keeps the ride on this device."
+    And I press "Menu"
+    And the debriefing shows "Ride menu"
     When I press Back
     Then no dialog is shown
     And the "activity" screen is shown
@@ -58,42 +59,60 @@ Feature: A finished ride is saved or deleted in its debriefing
     And the ridrs UI is shown
     And I press "Start ride"
     And I press "Pause"
-    And I press "Finish ride"
-    And the debriefing shows "Save keeps the ride on this device."
+    And I press "Menu"
+    And the debriefing shows "Ride menu"
     When I press "Continue ride"
     Then no dialog is shown
     And the latest "activity.state-changed" event has the state "paused"
     And the page offers a "Resume" button
 
-  Scenario: The settings open from the debriefing and lead back to it
+  Scenario: The settings open from the activity menu and lead back to it
     Given the host has started
     And the ridrs UI is shown
     And I press "Start ride"
-    And I press "Finish ride"
-    And the debriefing shows "Save keeps the ride on this device."
+    And I press "Menu"
+    And the debriefing shows "Ride menu"
     When I press "Settings"
     Then the "settings" screen is shown in a dialog over the "activity" screen
     When I press Back
     Then the "debriefing" screen is shown in a dialog over the "activity" screen
+    And the debriefing shows "Ride menu"
     And the latest "activity.state-changed" event has the state "paused"
 
-  Scenario: The devices open from the debriefing and lead back to it
+  Scenario: The devices open from the activity menu and lead back to it
     Given the host has started
     And the ridrs UI is shown
     And I press "Start ride"
-    And I press "Finish ride"
-    And the debriefing shows "Save keeps the ride on this device."
+    And I press "Menu"
+    And the debriefing shows "Ride menu"
     When I press "Devices"
     Then the "setup" screen is shown in a dialog over the "activity" screen
     When I press Back
     Then the "debriefing" screen is shown in a dialog over the "activity" screen
+    And the debriefing shows "Ride menu"
     And the latest "activity.state-changed" event has the state "paused"
+
+  Scenario: Finish ride in the menu ends the ride and shows a large Save button and a small Delete button
+    Given the secret store holds a token for intervals.icu
+    And the host has started
+    And the ridrs UI is shown
+    When I press "Start ride"
+    And I press "Menu"
+    And I press "Finish ride"
+    Then the latest "activity.state-changed" event has the state "finished"
+    And the debriefing shows "Ride finished"
+    And the debriefing shows "Save uploads the ride to intervals.icu as Alex Rider."
+    And the debriefing offers "Save" and "Delete"
+    And the debriefing offers no "Continue ride"
+    And the "Save" button in the debriefing is emphasized over the small "Delete" button
+    And the focus is on "Save"
 
   Scenario: Save uploads the FIT file and closes the debriefing
     Given the secret store holds a token for intervals.icu
     And the host has started
     And the ridrs UI is shown
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     When I press "Save"
@@ -107,6 +126,7 @@ Feature: A finished ride is saved or deleted in its debriefing
     And the ridrs UI is shown
     And the app files are written slowly from now on
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     Then the debriefing shows "Save uploads the ride to intervals.icu as Alex Rider."
     And the debriefing offers "Save"
@@ -123,6 +143,7 @@ Feature: A finished ride is saved or deleted in its debriefing
     And the ridrs UI is shown
     And intervals.icu cannot be reached for uploads
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     When I press "Save"
@@ -140,6 +161,7 @@ Feature: A finished ride is saved or deleted in its debriefing
     And the ridrs UI is shown
     And intervals.icu answers uploads with 403
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     When I press "Save"
@@ -157,6 +179,7 @@ Feature: A finished ride is saved or deleted in its debriefing
     Given the host has started
     And the ridrs UI is shown
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save keeps the ride on this device. Connect intervals.icu in Me to upload rides."
     When I press "Save"
@@ -164,27 +187,32 @@ Feature: A finished ride is saved or deleted in its debriefing
     And intervals.icu received no upload
     And the memory storage keeps the ride's recording and FIT file
 
-  Scenario: Delete asks first, Keep ride goes back
+  Scenario: Delete asks "Are you sure?" with Yes and No, and No goes back
     Given the host has started
     And the ridrs UI is shown
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save keeps the ride on this device."
     When I press "Delete"
-    Then the debriefing shows "Delete this ride? It cannot be brought back."
-    When I press "Keep ride"
+    Then the debriefing shows "Are you sure?"
+    And the debriefing offers "Yes" and "No"
+    And the focus is on "No"
+    When I press "No"
     Then the "debriefing" screen is shown
     And the debriefing offers "Save" and "Delete"
+    And the focus is on "Save"
 
-  Scenario: Delete removes the recording and its FIT file
+  Scenario: Delete removes the recording and its FIT file when confirmed with Yes
     Given the secret store holds a token for intervals.icu
     And the host has started
     And the ridrs UI is shown
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     When I press "Delete"
-    And I press "Delete ride"
+    And I press "Yes"
     Then the "main" screen is shown
     And the memory storage holds no recording and no FIT file
     And intervals.icu received no upload
@@ -194,6 +222,7 @@ Feature: A finished ride is saved or deleted in its debriefing
     Given the host has started
     And the ridrs UI is shown
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save keeps the ride on this device."
     And I press "Delete"
@@ -207,6 +236,7 @@ Feature: A finished ride is saved or deleted in its debriefing
     And the ridrs UI is shown
     And intervals.icu cannot be reached for uploads
     And I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     And I press "Save"

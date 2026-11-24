@@ -10,6 +10,8 @@ import {
   activityResumeRequestedEvent,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  activityWorkoutRequestedEvent,
+  activityWorldRequestedEvent,
   athleteProfileChangedEvent,
   type Bicycle,
   definePlugin,
@@ -119,6 +121,32 @@ export default definePlugin({
         startedAt: state.startedAt,
         resumedAt: ctx.clock.now(),
         ...fixedOf(state),
+      });
+    });
+
+    ctx.events.subscribe(activityWorldRequestedEvent, ({ payload }) => {
+      const state = current();
+      if (state.state !== 'running' && state.state !== 'paused') {
+        reject(ctx, 'change the world of', state);
+        return;
+      }
+      const { world: _previous, ...rest } = state;
+      transition(ctx, {
+        ...rest,
+        ...(payload.world ? { world: payload.world } : {}),
+      });
+    });
+
+    ctx.events.subscribe(activityWorkoutRequestedEvent, ({ payload }) => {
+      const state = current();
+      if (state.state !== 'running' && state.state !== 'paused') {
+        reject(ctx, 'change the workout of', state);
+        return;
+      }
+      const { workout: _previous, ...rest } = state;
+      transition(ctx, {
+        ...rest,
+        ...(payload.workout ? { workout: payload.workout } : {}),
       });
     });
 

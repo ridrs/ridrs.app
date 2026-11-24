@@ -15,6 +15,7 @@ Feature: Ride, save, export and replay
     And I start a free ride in the briefing
     Then the power widget shows "220" "W"
     When 5 seconds pass in real time
+    And I press "Menu"
     And I press "Finish ride"
     Then the "debriefing" screen is shown
     And the debriefing offers "Save" and "Delete"

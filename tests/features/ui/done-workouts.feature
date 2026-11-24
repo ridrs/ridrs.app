@@ -34,6 +34,7 @@ Feature: The Training area shows the workouts that were done
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And I press "Save"
     Then the "main" screen is shown
@@ -46,6 +47,7 @@ Feature: The Training area shows the workouts that were done
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     And I press "Save"
@@ -111,6 +113,7 @@ Feature: The Training area shows the workouts that were done
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And I press "Save"
     Then the "main" screen is shown
@@ -131,6 +134,7 @@ Feature: The Training area shows the workouts that were done
     And the main screen is 1400 px wide
     And the ridrs UI is shown
     When I press "Start ride"
+    And I press "Menu"
     And I press "Finish ride"
     And the debriefing shows "Save uploads the ride to intervals.icu"
     And I press "Save"

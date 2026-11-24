@@ -111,4 +111,16 @@ export const activityResumeRequestedEvent = defineEvent(
 /** The input a recovery injects where the journal ends: the ride stood still from there (ADR 0057). */
 export const activityInterruptedEvent = defineEvent('activity.interrupted', z.object({}).strict());
 
+/** Changes the ongoing ride's world (or clears it for a free ride when `world` is omitted; ADR 0108). */
+export const activityWorldRequestedEvent = defineEvent(
+  'activity.world-requested',
+  z.object({ world: rideWorldSchema.optional() }).strict(),
+);
+
+/** Loads, switches or clears (`workout` omitted) the structured workout of an ongoing ride (ADR 0108). */
+export const activityWorkoutRequestedEvent = defineEvent(
+  'activity.workout-requested',
+  z.object({ workout: rideWorkoutSchema.optional() }).strict(),
+);
+
 export const activityStateChangedEvent = defineEvent('activity.state-changed', activityStateSchema);

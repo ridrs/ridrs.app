@@ -161,3 +161,33 @@ Feature: The workout player rides the workout of a ride
     And the workout's target power was:
       | at   | target |
       | +1 s | 200 W  |
+
+  Scenario: Loading, switching and clearing a workout during an ongoing ride
+    Given the workout "Sprint" for the workout player:
+      | duration | target |
+      | 1 min    | 320 W  |
+      | 1 min    | 140 W  |
+    When the rider starts a ride without a workout
+    And 30 s pass
+    And "test-ui" publishes "activity.pause-requested"
+    And the rider switches the ride's workout to "Mixed"
+    And "test-ui" publishes "activity.resume-requested"
+    And 15 s pass
+    And the rider asks ERG for "up"
+    And "test-ui" publishes "activity.pause-requested"
+    And the rider switches the ride's workout to "Sprint"
+    And "test-ui" publishes "activity.resume-requested"
+    And 65 s pass
+    Then the workout's target power was:
+      | at     | target |
+      | +30 s  | 200 W  |
+      | +45 s  | 320 W  |
+      | +104 s | 320 W  |
+      | +105 s | 140 W  |
+    When "test-ui" publishes "activity.pause-requested"
+    And the rider clears the ride's workout
+    And "test-ui" publishes "activity.resume-requested"
+    And 5 s pass
+    Then the workout's target power was:
+      | at     | target |
+      | +110 s | off    |

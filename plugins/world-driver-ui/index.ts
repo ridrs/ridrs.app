@@ -26,26 +26,39 @@ export default definePlugin({
     const lastRevisions = new Map<string, number>();
     let accepted = 0;
     let session: string | undefined;
-    let ride: { sessionId: string; odometer: number } | undefined;
+    let worldKey: string | undefined;
+    let odometer = 0;
 
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-      if ('sessionId' in payload && payload.sessionId !== session) {
+      if (payload.state === 'idle' || payload.state === 'finished') {
+        session = undefined;
+        worldKey = undefined;
+        odometer = 0;
+        lastRevisions.clear();
+        return;
+      }
+      const nextWorld = payload.world ? `${payload.world.landscape}/${payload.world.route ?? ''}` : '';
+      if (payload.sessionId !== session) {
         session = payload.sessionId;
+        worldKey = nextWorld;
+        odometer = 0;
+        lastRevisions.clear();
+      } else if (nextWorld !== worldKey) {
+        worldKey = nextWorld;
         lastRevisions.clear();
       }
-      ride = payload.state === 'running' ? { sessionId: payload.sessionId, odometer: 0 } : undefined;
     });
 
     ctx.events.subscribe(physicsStateBatchEvent, ({ payload }) => {
       const distance = payload.samples.at(-1)?.distance;
-      if (ride?.sessionId === payload.sessionId && distance !== undefined) {
-        ride.odometer = distance;
+      if (session === payload.sessionId && distance !== undefined) {
+        odometer = distance;
       }
     });
 
     ctx.events.subscribe(uiTerrainObservedEvent, ({ payload, source }) => {
       const result = validateTerrainWindow(payload, {
-        odometer: ride?.odometer ?? 0,
+        odometer: session !== undefined ? odometer : 0,
         lastRevision: lastRevisions.get(source),
       });
       if (!result.valid) {
@@ -62,7 +75,7 @@ export default definePlugin({
     });
 
     ctx.events.subscribe(uiPositionObservedEvent, ({ payload, source }) => {
-      const result = validatePosition(payload, { odometer: ride?.odometer ?? 0 });
+      const result = validatePosition(payload, { odometer: session !== undefined ? odometer : 0 });
       if (!result.valid) {
         ctx.reportDiagnostic(
           'position-rejected',

@@ -74,14 +74,19 @@ function useLandscape(ctx: UiContext, model: LandscapeModel) {
       svg.current?.setAttribute('data-basis', shown.status === 'available' ? shown.basis : 'none');
     };
     moveTo(position);
+    let session: string | undefined;
     const stopWatching = ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
       publisher.rideState(payload);
+      session = 'sessionId' in payload ? payload.sessionId : undefined;
       // For the manual check: how many frames had an exact, interpolated or held state.
       if (payload.state === 'finished') {
         ctx.logger.info(`Landscape presentation at ride finish: ${JSON.stringify(presentation.stats())}`);
       }
     });
-    publisher.mount();
+    const initial = presentation.at(Number.MAX_SAFE_INTEGER);
+    const startDistance =
+      initial.status === 'available' && initial.sessionId === session ? initial.distance : 0;
+    publisher.mount(startDistance);
     const stopFrames = ctx.frames.onFrame((frame) => {
       const shown = presentation.at(frame.time);
       draw(shown);

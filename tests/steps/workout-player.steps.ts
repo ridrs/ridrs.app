@@ -6,6 +6,7 @@ import {
   type ActivityState,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  activityWorkoutRequestedEvent,
   type CompletedWorkout,
   controllerButtonSchema,
   controllerButtonsChangedEvent,
@@ -224,6 +225,25 @@ for (const verb of ['starts', 'started']) {
   );
 }
 
+When('the rider starts a ride without a workout', async function (this: RidrsWorld) {
+  await startWith(this, {});
+});
+
+When(
+  "the rider switches the ride's workout to {string}",
+  async function (this: RidrsWorld, name: string) {
+    this.ensureHost().publishEvent('ui-bridge', activityWorkoutRequestedEvent, {
+      workout: { workout: workoutNamed(this, name) },
+    });
+    await this.settle();
+  },
+);
+
+When("the rider clears the ride's workout", async function (this: RidrsWorld) {
+  this.ensureHost().publishEvent('ui-bridge', activityWorkoutRequestedEvent, {});
+  await this.settle();
+});
+
 When(
   'the rider starts a ride with the workout {string} planned as the {string} entry {string}',
   async function (this: RidrsWorld, name: string, provider: string, id: string) {
@@ -352,6 +372,13 @@ Then('the latest target power is {int} W', function (this: RidrsWorld, watts: nu
     | TrainerTargetPowerPayload
     | undefined;
   assert.equal(latest?.watts, watts);
+});
+
+Then('the latest target power is off', function (this: RidrsWorld) {
+  const latest = tappedOfType(this, trainerTargetPowerEvent.id).at(-1)?.payload as
+    | TrainerTargetPowerPayload
+    | undefined;
+  assert.equal(latest?.watts, null);
 });
 
 Then(

@@ -78,6 +78,10 @@ export default definePlugin({
     let target: number | null = null;
     let ride: Ride | undefined;
     let waiting: Waiting | undefined;
+    let sessionId: string | undefined;
+    let workoutKey: string | undefined;
+    let rollingSession: string | undefined;
+    let sessionDistance = 0;
     /** The intensity of the ride that waits for its first pedal stroke; a new ride is at 100 %. */
     let intensity: number = WORKOUT_INTENSITY.default;
 
@@ -87,8 +91,13 @@ export default definePlugin({
 
     ctx.events.subscribe(physicsStateBatchEvent, ({ payload }) => {
       const distance = payload.samples.at(-1)?.distance;
-      if (ride?.sessionId === payload.sessionId && distance !== undefined) {
-        ride.distance = distance;
+      if (distance !== undefined) {
+        if (sessionId === payload.sessionId) {
+          sessionDistance = distance;
+        }
+        if (ride?.sessionId === payload.sessionId) {
+          ride.distance = distance;
+        }
       }
     });
 
@@ -173,30 +182,38 @@ export default definePlugin({
     };
 
     /**
-     * Begins the workout at `from`, when the ride's time began: now, or a little before, at the
-     * step of the `physics.state` that said the ride rolls. The workout counts from there.
+     * Begins the workout at `from`, when the ride's time began (or when a workout was loaded
+     * mid-ride): `paused` holds the workout's clock until the ride resumes.
      */
-    const begin = (sessionId: string, run: WorkoutRun, from: number): void => {
+    const begin = (
+      currentSessionId: string,
+      run: WorkoutRun,
+      from: number,
+      paused = false,
+    ): void => {
       waiting = undefined;
       const current: Ride = {
-        sessionId,
+        sessionId: currentSessionId,
         run,
         intensity,
         ridden: 0,
-        since: from,
-        distance: 0,
+        ...(paused ? {} : { since: from }),
+        distance: sessionDistance,
         work: 0,
-        workAt: ctx.clock.now() - from,
+        workAt: paused ? 0 : ctx.clock.now() - from,
       };
       ride = current;
-      const progress: Progress = { ...progressOf(current), ridden: 0, distance: 0, work: 0 };
+      const progress: Progress = { ...progressOf(current), ridden: 0, distance: sessionDistance, work: 0 };
       apply(current, run.begin(progress), progress, from);
-      if (ride === current) {
+      if (ride === current && !paused) {
         schedule(current);
       }
     };
 
     ctx.events.subscribe(physicsStateEvent, ({ payload }) => {
+      if (payload.rolling !== false) {
+        rollingSession = payload.sessionId;
+      }
       const wait = waiting;
       if (!wait || payload.sessionId !== wait.sessionId || payload.rolling === false) {
         return;
@@ -206,31 +223,65 @@ export default definePlugin({
     });
 
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-      if (payload.state === 'running' && payload.resumedAt === undefined) {
+      if (payload.state === 'idle') {
         if (ride) {
           stop(ride);
           ride = undefined;
         }
         waiting = undefined;
+        sessionId = undefined;
+        workoutKey = undefined;
+        rollingSession = undefined;
+        sessionDistance = 0;
         intensity = WORKOUT_INTENSITY.default;
-        if (payload.workout) {
-          const run = new WorkoutRun(payload.workout.workout);
-          if (hasMotion) {
-            waiting = { sessionId: payload.sessionId, run };
-          } else {
-            begin(payload.sessionId, run, ctx.clock.now());
-          }
+        return;
+      }
+      if (payload.state === 'finished') {
+        if (waiting?.sessionId === payload.sessionId) {
+          waiting = undefined;
+        }
+        if (ride?.sessionId === payload.sessionId) {
+          stop(ride);
+          ride = undefined;
+        }
+        if (sessionId === payload.sessionId) {
+          sessionId = undefined;
+          workoutKey = undefined;
+          rollingSession = undefined;
+          sessionDistance = 0;
         }
         return;
       }
-      if (
-        payload.state === 'idle' ||
-        (payload.state === 'finished' && waiting?.sessionId === payload.sessionId)
-      ) {
+      const newSession = payload.sessionId !== sessionId;
+      const nextKey = payload.workout ? JSON.stringify(payload.workout.workout) : undefined;
+      if (newSession || nextKey !== workoutKey) {
+        if (ride) {
+          stop(ride);
+          ride = undefined;
+        }
         waiting = undefined;
+        if (newSession) {
+          sessionId = payload.sessionId;
+          sessionDistance = 0;
+        }
+        workoutKey = nextKey;
+        intensity = WORKOUT_INTENSITY.default;
+        if (!payload.workout) {
+          if (!newSession) {
+            setTarget(null);
+          }
+          return;
+        }
+        const run = new WorkoutRun(payload.workout.workout);
+        if (hasMotion && rollingSession !== payload.sessionId) {
+          waiting = { sessionId: payload.sessionId, run };
+        } else {
+          begin(payload.sessionId, run, ctx.clock.now(), payload.state === 'paused');
+        }
+        return;
       }
       const current = ride;
-      if (!current || payload.state === 'idle' || payload.sessionId !== current.sessionId) {
+      if (!current || payload.sessionId !== current.sessionId) {
         return;
       }
       if (payload.state === 'paused' && current.since !== undefined) {
@@ -241,9 +292,6 @@ export default definePlugin({
       } else if (payload.state === 'running' && current.since === undefined) {
         current.since = ctx.clock.now();
         schedule(current);
-      } else if (payload.state === 'finished') {
-        stop(current);
-        ride = undefined;
       }
     });
 

@@ -16,7 +16,8 @@ Feature: Pedal and see the virtual speed
     And eventually the virtual-speed widget shows more than "10.0" "km/h"
     And the virtual-speed widget keeps rising
     And eventually the virtual-distance widget shows at least "0.01" "km"
-    When I press "Finish ride"
+    When I press "Menu"
+    And I press "Finish ride"
     Then the "debriefing" screen is shown
     And the debriefing offers "Save"
     When I press "Save"

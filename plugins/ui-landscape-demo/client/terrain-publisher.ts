@@ -28,8 +28,8 @@ export class TerrainPublisher {
     private readonly publish: (window: PublishedWindow) => void,
   ) {}
 
-  mount(): void {
-    this.send(terrainWindow(this.model, 0));
+  mount(startDistance = 0): void {
+    this.send(terrainWindow(this.model, startDistance));
   }
 
   rideState(state: ActivityState): void {

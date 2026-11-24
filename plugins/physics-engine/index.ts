@@ -147,6 +147,9 @@ export default definePlugin({
         arm(ctx, current);
         return;
       }
+      if (payload.state === 'running' && current?.sessionId === payload.sessionId) {
+        return;
+      }
       if (payload.state === 'running') {
         stopRide(ctx, engine);
         const { sessionId, startedAt } = payload;

@@ -283,10 +283,16 @@ export default definePlugin({
    * is an earlier ride's. Runs in the turn that started the ride, before its step 0.
    */
   start(ctx) {
+    let sessionId: string | undefined;
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
-      if (payload.state !== 'running' || payload.resumedAt !== undefined) {
+      if (payload.state === 'idle' || payload.state === 'finished') {
+        sessionId = undefined;
         return;
       }
+      if (payload.state !== 'running' || payload.sessionId === sessionId) {
+        return;
+      }
+      sessionId = payload.sessionId;
       const terrain = terrainOf(ctx);
       const read = terrain.reader.valueAt(0);
       terrain.before =

@@ -6,6 +6,7 @@ import {
   type ActivityState,
   activityStartRequestedEvent,
   activityStateChangedEvent,
+  activityWorldRequestedEvent,
 } from '@ridrs/contracts';
 import type { RidrsWorld } from '../support/world.ts';
 
@@ -70,6 +71,26 @@ When(
     const ctx = this.ensureHost().getPluginContext(pluginId);
     assert.ok(ctx, `Expected plugin "${pluginId}" to be running`);
     ctx.inputs.accept(activityStartRequestedEvent, { world: { landscape, route } });
+    await this.settle();
+  },
+);
+
+When(
+  '{string} asks to switch the ride to the landscape {string} along the route {string}',
+  async function (this: RidrsWorld, pluginId: string, landscape: string, route: string) {
+    const ctx = this.ensureHost().getPluginContext(pluginId);
+    assert.ok(ctx, `Expected plugin "${pluginId}" to be running`);
+    ctx.inputs.accept(activityWorldRequestedEvent, { world: { landscape, route } });
+    await this.settle();
+  },
+);
+
+When(
+  '{string} asks to switch the ride to a free ride',
+  async function (this: RidrsWorld, pluginId: string) {
+    const ctx = this.ensureHost().getPluginContext(pluginId);
+    assert.ok(ctx, `Expected plugin "${pluginId}" to be running`);
+    ctx.inputs.accept(activityWorldRequestedEvent, {});
     await this.settle();
   },
 );

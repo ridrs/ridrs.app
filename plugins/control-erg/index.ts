@@ -52,6 +52,7 @@ export default definePlugin({
     /** The unrolled steps of the ride's workout, and whether the current one holds the target. */
     let steps: readonly TimelineSegment[] = [];
     let workoutSession: string | undefined;
+    let workoutKey: string | undefined;
     let held = false;
     /** % of the workout's targets, as this driver set it last or heard it on the bus. */
     let intensity: number = WORKOUT_INTENSITY.default;
@@ -143,13 +144,18 @@ export default definePlugin({
       if (payload.state === 'idle' || payload.state === 'finished') {
         steps = [];
         workoutSession = undefined;
+        workoutKey = undefined;
         held = false;
         intensity = WORKOUT_INTENSITY.default;
-      } else if (payload.sessionId !== workoutSession) {
-        workoutSession = payload.sessionId;
-        steps = payload.workout ? workoutTimeline(payload.workout.workout).segments : [];
-        held = false;
-        intensity = WORKOUT_INTENSITY.default;
+      } else {
+        const nextKey = payload.workout ? JSON.stringify(payload.workout.workout) : undefined;
+        if (payload.sessionId !== workoutSession || nextKey !== workoutKey) {
+          workoutSession = payload.sessionId;
+          workoutKey = nextKey;
+          steps = payload.workout ? workoutTimeline(payload.workout.workout).segments : [];
+          held = false;
+          intensity = WORKOUT_INTENSITY.default;
+        }
       }
       if (payload.state === 'finished') {
         set(null);

@@ -15,7 +15,8 @@ Feature: Start a ride and see power and cadence
     And I start a free ride in the briefing
     Then the power widget shows "220" "W"
     And the cadence widget shows "92" "rpm"
-    When I press "Finish ride"
+    When I press "Menu"
+    And I press "Finish ride"
     Then the "debriefing" screen is shown
     And the debriefing offers "Save"
     When I press "Save"
@@ -46,7 +47,7 @@ Feature: Start a ride and see power and cadence
     When I press "Start ride"
     And I start a free ride in the briefing
     Then the app keeps the screen awake
-    When I press "Finish ride"
+    When I press "Menu"
     Then the app lets the screen sleep
 
   Scenario: The platform's back button goes back, like Escape

@@ -31,6 +31,7 @@ const FROM_DEBRIEFING = new Set([SETTINGS, DEVICES]);
 const PAUSE = new URL('./assets/icons/pause.svg', import.meta.url).href;
 const RESUME = new URL('./assets/icons/play.svg', import.meta.url).href;
 const FINISH = new URL('./assets/icons/flag.svg', import.meta.url).href;
+const MENU = new URL('./assets/icons/menu.svg', import.meta.url).href;
 
 /**
  * The ride's buttons: round, side by side at the bottom right, over the HUD. Finish ride is the
@@ -395,10 +396,10 @@ function ActivityScreenView({ ctx }: { readonly ctx: UiContext }) {
       />
       <Control
         buttonRef={finish}
-        label="Finish ride"
-        icon={FINISH}
+        label={ctx.hasScreen(DEBRIEFING) ? 'Menu' : 'Finish ride'}
+        icon={ctx.hasScreen(DEBRIEFING) ? MENU : FINISH}
         right={row.finish}
-        testId="finish-ride"
+        testId={ctx.hasScreen(DEBRIEFING) ? 'activity-menu' : 'finish-ride'}
         onPress={onFinish}
       />
       <div

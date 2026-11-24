@@ -18,19 +18,28 @@
     ],
     "events": {
       "subscribe": [
+        "activity.athlete",
         "activity.state-changed"
       ],
       "publish": [
-        "activity.finish-requested"
+        "activity.finish-requested",
+        "activity.workout-requested",
+        "activity.world-requested"
       ]
     },
     "state": [
       "app.language",
       "app.link",
+      "athlete.profile",
+      "data.source",
       "export.fit",
       "recording.ride",
+      "route.offer",
       "training.account",
-      "training.upload"
+      "training.calendar",
+      "training.library",
+      "training.upload",
+      "trash.item"
     ],
     "calls": [
       "recording.delete",

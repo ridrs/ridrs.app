@@ -502,6 +502,7 @@ export interface ActiveWorkoutStepInfo {
 export class WorkoutTargetTracker {
   private sessionId: string | undefined;
   private startedAt = 0;
+  private workoutKey: string | undefined;
   private segments: readonly TimelineSegment[] = [];
   private step: ActiveStep | undefined;
   private pausedAt: number | undefined;
@@ -517,6 +518,7 @@ export class WorkoutTargetTracker {
   activity(state: ActivityState): void {
     if (state.state === 'idle' || state.state === 'finished') {
       this.sessionId = undefined;
+      this.workoutKey = undefined;
       this.segments = [];
       this.step = undefined;
       this.pausedAt = undefined;
@@ -524,18 +526,24 @@ export class WorkoutTargetTracker {
       this.finishedAt = undefined;
       return;
     }
+    const nextKey = state.workout?.workout ? JSON.stringify(state.workout.workout) : undefined;
     if (state.sessionId !== this.sessionId) {
       this.sessionId = state.sessionId;
       this.startedAt = state.startedAt;
+      this.workoutKey = nextKey;
       this.segments = state.workout?.workout ? workoutTimeline(state.workout.workout).segments : [];
       this.step = undefined;
       this.pausedAt = undefined;
       this.pausedMs = 0;
       this.finishedAt = undefined;
-    } else if (!state.workout?.workout) {
-      this.segments = [];
-    } else if (this.segments.length === 0) {
-      this.segments = workoutTimeline(state.workout.workout).segments;
+      this.intensity = undefined;
+    } else if (nextKey !== this.workoutKey) {
+      this.workoutKey = nextKey;
+      this.segments = state.workout?.workout ? workoutTimeline(state.workout.workout).segments : [];
+      this.step = undefined;
+      this.pausedMs = 0;
+      this.finishedAt = undefined;
+      this.intensity = undefined;
     }
     if (state.state === 'paused') {
       this.pausedAt ??= state.pausedAt;
@@ -578,7 +586,9 @@ export class WorkoutTargetTracker {
       this.segments.length === 0 ||
       !this.step ||
       this.step.startedAt < this.startedAt ||
-      (this.finishedAt !== undefined && this.finishedAt >= this.startedAt)
+      (this.finishedAt !== undefined &&
+        this.finishedAt >= this.startedAt &&
+        this.finishedAt >= this.step.startedAt)
     ) {
       return { power: undefined, cadence: undefined, animating: false };
     }
@@ -620,7 +630,9 @@ export class WorkoutTargetTracker {
       this.segments.length === 0 ||
       !this.step ||
       this.step.startedAt < this.startedAt ||
-      (this.finishedAt !== undefined && this.finishedAt >= this.startedAt)
+      (this.finishedAt !== undefined &&
+        this.finishedAt >= this.startedAt &&
+        this.finishedAt >= this.step.startedAt)
     ) {
       return undefined;
     }

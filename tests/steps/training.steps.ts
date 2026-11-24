@@ -311,27 +311,34 @@ function planStructured(
   date: string,
   table: DataTable,
   description?: string,
+  append = false,
 ): void {
   const doc = workoutDoc(table);
-  intervals(world).events = [
-    {
-      id: nextEventId++,
-      start_date_local: `${date}T00:00:00`,
-      category: 'WORKOUT',
-      type: 'Ride',
-      name,
-      ...(description ? { description } : {}),
-      moving_time: doc.duration,
-      icu_training_load: 70,
-      workout_doc: { steps: doc.steps },
-    },
-  ];
+  const entry = {
+    id: nextEventId++,
+    start_date_local: `${date}T00:00:00`,
+    category: 'WORKOUT' as const,
+    type: 'Ride',
+    name,
+    ...(description ? { description } : {}),
+    moving_time: doc.duration,
+    icu_training_load: 70,
+    workout_doc: { steps: doc.steps },
+  };
+  intervals(world).events = append ? [...intervals(world).events, entry] : [entry];
 }
 
 Given(
   'intervals.icu plans {string} on {string} with the steps:',
   function (this: RidrsWorld, name: string, date: string, table: DataTable) {
     planStructured(this, name, date, table);
+  },
+);
+
+Given(
+  'intervals.icu also plans {string} on {string} with the steps:',
+  function (this: RidrsWorld, name: string, date: string, table: DataTable) {
+    planStructured(this, name, date, table, undefined, true);
   },
 );
 
@@ -792,18 +799,73 @@ Then('the debriefing shows {string}', async function (this: RidrsWorld, text: st
   await until(this, () => textOf(screen).includes(text), `"${text}" in "${textOf(screen)}"`);
 });
 
-Then(/^the debriefing offers (.+)$/, async function (this: RidrsWorld, list: string) {
-  const expected = [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? '');
-  const screen = await debriefing(this);
-  await until(
-    this,
-    () => {
-      const buttons = [...screen.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
-      return expected.every((label) => buttons.some((button) => textOf(button) === label));
-    },
-    `the buttons ${expected.join(', ')}`,
-  );
-});
+Then(
+  /^the debriefing offers (?!no |neither )(.+)$/,
+  async function (this: RidrsWorld, list: string) {
+    const expected = [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? '');
+    const screen = await debriefing(this);
+    await until(
+      this,
+      () => {
+        const buttons = [...screen.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+        return expected.every((label) => buttons.some((button) => textOf(button) === label));
+      },
+      `the buttons ${expected.join(', ')}`,
+    );
+  },
+);
+
+Then(
+  /^the debriefing offers (?:no|neither) (.+)$/,
+  async function (this: RidrsWorld, list: string) {
+    const forbidden = [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? '');
+    const screen = await debriefing(this);
+    await this.settle();
+    const buttons = [...screen.querySelectorAll<HTMLButtonElement>('button')].map(textOf);
+    for (const label of forbidden) {
+      assert.equal(
+        buttons.includes(label),
+        false,
+        `Did not expect button "${label}" among ${buttons.join(', ')}`,
+      );
+    }
+  },
+);
+
+Then(
+  'the {string} button in the debriefing is emphasized over the small {string} button',
+  async function (this: RidrsWorld, primaryLabel: string, secondaryLabel: string) {
+    const screen = await debriefing(this);
+    const buttons = [...screen.querySelectorAll<HTMLButtonElement>('button')];
+    const primary = buttons.find((button) => textOf(button) === primaryLabel);
+    const secondary = buttons.find((button) => textOf(button) === secondaryLabel);
+    assert.ok(primary, `No "${primaryLabel}" button`);
+    assert.ok(secondary, `No "${secondaryLabel}" button`);
+    assert.match(primary.className, /\bdb-save-hero\b/);
+    assert.match(secondary.className, /\bdb-delete-small\b/);
+  },
+);
+
+Then(
+  'the route choice {string} in the activity menu is disabled',
+  async function (this: RidrsWorld, label: string) {
+    const screen = await debriefing(this);
+    await until(
+      this,
+      () => {
+        const buttons = [
+          ...screen.querySelectorAll<HTMLButtonElement>('[data-picker="route"] button'),
+        ];
+        return buttons.some(
+          (button) =>
+            (button.getAttribute('aria-label') === label || textOf(button).includes(label)) &&
+            button.disabled,
+        );
+      },
+      `disabled route choice "${label}"`,
+    );
+  },
+);
 
 Given('intervals.icu cannot be reached for uploads', function (this: RidrsWorld) {
   intervals(this).uploadsReachable = false;
