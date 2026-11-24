@@ -35,7 +35,7 @@ async function main() {
   initRun(); initImport(); initMapData(); initElevation(); initAnalyse(); wireIncyclistEvents();
   initMapPanel(R.map); initVideoPanel(R.video);
   mountStart(R.views.start); mountTools(R.views.tools); mountMaps(R.views.maps); mountSettings(R.views.settings);
-  mountSetup(R.side, R.ws); mountRun(R.main, R.info); mountAnalyse(R.main, R.video, R.head); mountElevation(R.main, R.head); mountExport(R.main); const adjustHost = mountResult(R.head, R.timeline); mountRouteEditor(adjustHost); mountAnchors(adjustHost);
+  mountSetup(R.side, R.ws); mountRun(R.main, R.info); mountElevation(R.main); mountExport(R.main); const res = mountResult(R.head, R.timeline); mountAnalyse(R.main, R.video, R.head); mountRouteEditor(res.adjustHost); mountAnchors(res.anchorBarHost, res.anchorTrayHost, res.adjustHost);
   onShow("start", showStart); onShow("settings", showSettings); onShow("tools", () => void recheck());
   if (api.mock) { const m = await import("./mock/selfcheck"); m.mountSelfcheck(R.views.selfcheck); }
 

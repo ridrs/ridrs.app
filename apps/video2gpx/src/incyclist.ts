@@ -108,7 +108,7 @@ export function incyclistCard(): { el: HTMLElement; build(): void; update(): voi
     demBox.replaceChildren();
     if (!info) { demBox.append(el("span", { class: "muted small" }, "Prüfe Höhendaten …")); return; }
     const p = info.profile, ready = info.dem.ready;
-    const link = el("a", { href: routePath.project(projectId, "hoehe"), class: "small" }, "Höhe öffnen");
+    const link = el("a", { href: routePath.project(projectId, "ergebnis", "hoehe"), class: "small" }, "Höhe öffnen");
     if (p?.state === "current") demBox.append(el("div", { class: "row wrap small" }, toneIcon("ok"), el("span", {}, `Höhenprofil aktuell (${p.source ?? "Copernicus DEM GLO-30"})`), link));
     else {
       demBox.append(el("div", { class: "row wrap small" }, toneIcon("warn"), el("span", {}, p?.state === "stale" ? "Höhenprofil veraltet" : "Höhenprofil fehlt"), link),

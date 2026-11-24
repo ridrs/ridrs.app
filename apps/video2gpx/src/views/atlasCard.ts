@@ -44,7 +44,7 @@ export function atlasCard(): { el: HTMLElement; build(): void } {
           const cb = el("input", { type: "checkbox", checked: st.cuts_checked.includes(a), onchange: () => {
             st.cuts_checked = cb.checked ? [...new Set([...st.cuts_checked, a])] : st.cuts_checked.filter((x) => x !== a); persist(); render(); } });
           return el("label", { class: "check small" }, cb, ` Stück ${fmt(a)}–${fmt(b)} in der Analyse geprüft`);
-        }), el("a", { class: "small", href: routePath.project(S.cur!.app.id, "analyse") }, "Zur Analyse")));
+        }), el("a", { class: "small", href: routePath.project(S.cur!.app.id, "ergebnis", "analyse") }, "Zur Analyse")));
       }
     }
     if (it.id === "viewed") {
@@ -89,7 +89,7 @@ export function atlasCard(): { el: HTMLElement; build(): void } {
     jumpHint.replaceChildren(banner("warn",
       el("p", {}, el("b", {}, one ? "Sprung ohne erkannten Schnitt" : `${jumps.length} Sprünge ohne erkannten Schnitt`), ` bei ${at}. `,
         `video2gpx trägt ${one ? "dort einen Schnitt" : "dort jeweils einen Schnitt"} ein, damit ridrs Scenic die Datei annimmt. Im Video prüfen, ob dort wirklich geschnitten ist; sonst stimmt die Position an ${one ? "dieser Stelle" : "diesen Stellen"} nicht.`),
-      el("a", { class: "small", href: routePath.project(S.cur!.app.id, "analyse") }, "Zur Analyse")));
+      el("a", { class: "small", href: routePath.project(S.cur!.app.id, "ergebnis", "analyse") }, "Zur Analyse")));
   }
 
   async function write() {

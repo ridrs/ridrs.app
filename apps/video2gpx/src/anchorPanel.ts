@@ -1,4 +1,5 @@
-// "Ortsangaben" inside the collapsible "Route anpassen & korrigieren" panel of Ergebnis.
+// Always-available "Ort festlegen" toolbar action + compact anchor tray on Ergebnis (Übersicht, Höhe, Analyse),
+// plus advanced step-selective rerun inside the collapsible "Route anpassen & korrigieren" panel.
 import L from "leaflet";
 import { addAnchor, anchorReport, anchorReportDe, fmtT, normalizeAnchors, removeAnchor, rerunChoices, sameAnchors, type Anchor } from "./anchors";
 import { go, routePath } from "./app/router";
@@ -13,7 +14,8 @@ import { getPlayer } from "./videoPanel";
 
 const COLOR = "#ea580c";
 const MIN_DEG = 0.0002;
-let root: HTMLElement, list: HTMLElement, report: HTMLElement, drawBtn: HTMLButtonElement, rerunBtn: HTMLButtonElement, stepSel: HTMLSelectElement, stepBtn: HTMLButtonElement, hint: HTMLElement;
+let barEl: HTMLElement, trayEl: HTMLElement, advRoot: HTMLElement;
+let list: HTMLElement, report: HTMLElement, drawBtn: HTMLButtonElement, rerunBtn: HTMLButtonElement, stepSel: HTMLSelectElement, stepBtn: HTMLButtonElement, drawHint: HTMLElement;
 let layer: L.LayerGroup | null = null;
 let curT = 0;
 let drawing = false, startLL: L.LatLng | null = null, tmp: L.Rectangle | null = null, suppressClick = false;
@@ -33,22 +35,30 @@ async function setAnchors(a: Anchor[]) {
   render(); drawOnMap();
 }
 
-export function mountAnchors(container: HTMLElement) {
-  drawBtn = btn("Ort festlegen", () => toggleDraw(), { size: "sm", icon: "pin", attrs: { "aria-pressed": "false" } });
-  hint = el("p", { class: "small muted" }, "Video an eine bekannte Stelle spulen, „Ort festlegen“ klicken und einen Rahmen auf der Karte ziehen.");
-  list = el("ul", { class: "anchor-list stack-s", "aria-label": "Ortsangaben" });
-  report = el("div", {});
+export function mountAnchors(barHost: HTMLElement, trayHost: HTMLElement, advancedHost: HTMLElement) {
+  barEl = barHost;
+  trayEl = trayHost;
+
+  drawBtn = btn("Ort festlegen", () => toggleDraw(), { size: "sm", icon: "pin", attrs: { "aria-pressed": "false", title: "Video an eine bekannte Stelle spulen, klicken und einen Rahmen auf der Karte ziehen" } });
   rerunBtn = btn("Mit Ortsangaben neu berechnen", () => void rerun(null), { kind: "primary", size: "sm" });
+  rerunBtn.hidden = true;
+  barEl.append(drawBtn, rerunBtn);
+
+  drawHint = el("p", { class: "small muted", hidden: true }, "Video an die gewünschte Stelle spulen und einen Rahmen auf der Karte ziehen (Esc zum Abbrechen).");
+  list = el("ul", { class: "anchor-pills", "aria-label": "Ortsangaben" });
+  report = el("div", {});
+  trayEl.append(drawHint, list, report);
+
   stepSel = el("select", { "aria-label": "Ab welchem Schritt neu berechnen" }) as HTMLSelectElement;
   stepBtn = btn("Neu berechnen", () => void rerun((stepSel.value || null) as StepId | null), { size: "sm" });
   const advStep = disclosure("Erweitert: ab bestimmtem Schritt neu berechnen",
     el("div", { class: "row wrap small" }, el("label", {}, "Ab Schritt ", stepSel), stepBtn),
     el("p", { class: "help" }, "Schritte davor werden aus dem letzten Lauf übernommen und nicht neu gerechnet."));
-  root = el("section", { class: "anchors adjust-sec stack-s", "aria-label": "Ortsangaben" },
-    el("div", { class: "row wrap between" }, el("h2", { class: "label" }, "Ortsangaben"), el("div", { class: "row wrap" }, drawBtn, rerunBtn)),
-    hint, list, report, advStep);
-  container.append(root);
+  advRoot = el("section", { class: "anchors adjust-sec stack-s", "aria-label": "Erweiterte Neuberechnung" }, advStep);
+  advancedHost.append(advRoot);
+
   bus.on("time", (t: number) => { curT = t; if (drawing) setDrawLabel(); });
+  bus.on("stage", (s: string | null) => { if (s !== "ergebnis" && drawing) stopDraw(); });
   for (const ev of ["project", "result", "run", "runtick"]) bus.on(ev, () => { render(); if (ev !== "runtick") drawOnMap(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && drawing) stopDraw(); });
   queueMicrotask(() => initMap());
@@ -95,6 +105,7 @@ function startDraw() {
   map.getContainer().classList.add("drawing");
   drawBtn.setAttribute("aria-pressed", "true");
   setDrawLabel();
+  render();
 }
 function stopDraw() {
   const map = getMap();
@@ -104,6 +115,7 @@ function stopDraw() {
   map?.getContainer().classList.remove("drawing");
   drawBtn.setAttribute("aria-pressed", "false");
   setDrawLabel();
+  render();
 }
 
 function drawOnMap() {
@@ -123,17 +135,19 @@ function finished(): Partial<Record<StepId, boolean>> {
 }
 
 function render() {
-  if (!root) return;
+  if (!barEl) return;
   const a = anchors(), lk = locked(), app = S.cur?.app;
-  root.hidden = !app;
-  if (!app) return;
+  barEl.hidden = !app;
+  advRoot.hidden = !app;
+  if (!app) { trayEl.hidden = true; return; }
   if (lk && drawing) stopDraw();
   drawBtn.disabled = lk;
+  drawHint.hidden = !drawing;
   list.replaceChildren(...a.map((x, i) => {
     const coords = `${x.bbox[0].toFixed(4)}, ${x.bbox[1].toFixed(4)} – ${x.bbox[2].toFixed(4)}, ${x.bbox[3].toFixed(4)}`;
-    return el("li", { class: "row" },
-      btn(`${fmtT(x.t)}`, () => { seekTo(x.t); getMap()?.fitBounds([[x.bbox[0], x.bbox[1]], [x.bbox[2], x.bbox[3]]], { maxZoom: 17, padding: [60, 60] }); }, { size: "sm", attrs: { title: "Video zu dieser Zeit spulen und Rahmen zeigen", "aria-label": `Ortsangabe ${fmtT(x.t)}: Video hierhin spulen` } }),
-      el("span", { class: "small muted tnum", title: coords }, `Rahmen ${fmtSize(x.bbox)}`),
+    return el("li", { class: "anchor-pill" },
+      btn(`${fmtT(x.t)}`, () => { seekTo(x.t); getMap()?.fitBounds([[x.bbox[0], x.bbox[1]], [x.bbox[2], x.bbox[3]]], { maxZoom: 17, padding: [60, 60] }); }, { size: "sm", kind: "ghost", attrs: { title: "Video zu dieser Zeit spulen und Rahmen zeigen", "aria-label": `Ortsangabe ${fmtT(x.t)}: Video hierhin spulen` } }),
+      el("span", { class: "small muted tnum", title: coords }, fmtSize(x.bbox)),
       iconBtn("trash", `Ortsangabe ${fmtT(x.t)} löschen`, () => { if (!locked()) void setAnchors(removeAnchor(anchors(), i)); }, { disabled: lk }));
   }));
   list.hidden = !a.length;
@@ -143,6 +157,7 @@ function render() {
   const rep = anchorReport(S.result?.project?.steps?.route_search?.summary?.anchors ?? S.result?.project?.anchors);
   report.replaceChildren();
   if (rep) report.append(rep.dropped.length ? banner("warn", anchorReportDe(rep), ". Ein nicht erfüllbarer Rahmen passt zu keiner Route zusammen mit den anderen; bitte Zeit und Rahmen prüfen.") : el("p", { class: "small" }, anchorReportDe(rep) + "."));
+  trayEl.hidden = !drawing && !a.length && !rep;
 
   const ch = rerunChoices(finished());
   const key = ch.join(",");

@@ -1,6 +1,5 @@
-// Höhe: header + status + KPI summary + 1-click download CTA AT THE TOP (ws-head), synced video & map,
-// interactive elevation profile chart right below, then 2-column Auffällige Stellen + Quellen & Lizenzen.
-import { go, routePath } from "../app/router";
+// Höhe view (inside Ergebnis): status + KPI summary + 1-click download CTA, interactive elevation profile chart,
+// then 2-column Auffällige Stellen + Kennzahlen & Verfahren, sources table, and attribution.
 import { E, anythingMissing, cancelDownload, loadDem, loadDiag, loadElevation, missingBytes, startDownload } from "../elevation";
 import { ElevationChart, GRADE_TOKENS, DEFAULT_LAYERS, srcColour, type Layers } from "../elevationChart";
 import { GRADE_LABEL, de, maxGrade, steepStretches, topDifferences, viewFor, type Stretch } from "../elevationStats";
@@ -13,8 +12,8 @@ import { getPlayer } from "../videoPanel";
 import { token } from "../app/theme";
 
 const LAYER_KEY = "v2g.elevLayers";
-let root: HTMLElement, topBox: HTMLElement;
-let statusEl: HTMLElement, kpiStrip: HTMLElement, topDlWrap: HTMLElement, nextBtn: HTMLButtonElement;
+let root: HTMLElement;
+let statusEl: HTMLElement, kpiStrip: HTMLElement, topDlWrap: HTMLElement;
 let notes: HTMLElement, srcBox: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement, figBox: HTMLElement, stretchBox: HTMLElement, attrBox: HTMLElement;
 let zoomIn: HTMLButtonElement, zoomOut: HTMLButtonElement, zoomAll: HTMLButtonElement, rangeEl: HTMLElement, emptyEl: HTMLElement;
 let chart: ElevationChart;
@@ -28,24 +27,22 @@ function loadLayers() {
 }
 function saveLayers() { try { localStorage.setItem(LAYER_KEY, JSON.stringify(layers)); } catch { /* private mode */ } }
 
-export function mountElevation(mainEl: HTMLElement, headEl: HTMLElement) {
+export function mountElevation(mainEl: HTMLElement) {
   loadLayers();
-  root = el("div", { class: "elev-view", hidden: true });
+  root = el("div", { class: "elev-view", role: "tabpanel", "aria-labelledby": "res-tab-hoehe", hidden: true });
   statusEl = el("span", { class: "row small" });
   kpiStrip = el("div", { class: "row wrap elev-kpi-strip" });
   topDlWrap = el("div", { class: "row wrap" });
-  nextBtn = btn("Weiter: Export", () => S.cur && go(routePath.project(S.cur.app.id, "export")), { kind: "primary", icon: "chevron", attrs: { "data-primary": "" } });
 
-  // Header & key summary right at the TOP of the workspace!
+  // Compact status, KPIs & 1-click download bar at the top of the Höhe view
   topDlBar = progressBar("Höhendaten werden geladen", "thin");
   topDlText = el("span", { class: "small muted tnum", "aria-live": "polite" });
   topDlProg = el("div", { class: "stack-xs", hidden: true }, topDlBar.el, topDlText);
-  topBox = el("div", { class: "panel elev-top stack-s", hidden: true },
+  const topBox = el("div", { class: "panel elev-top stack-s" },
     el("div", { class: "row wrap between" },
-      el("div", { class: "row wrap" }, el("h1", { class: "elev-h1", tabIndex: -1 }, "Höhe"), statusEl, kpiStrip),
-      el("div", { class: "row wrap" }, topDlWrap, nextBtn)),
+      el("div", { class: "row wrap" }, el("h2", { class: "elev-h2" }, "Höhe"), statusEl, kpiStrip),
+      topDlWrap),
     topDlProg);
-  headEl.append(topBox);
 
   notes = el("div", { class: "stack-s" });
   srcBox = el("section", { class: "panel stack", "aria-labelledby": "elev-src-h" });
@@ -72,13 +69,13 @@ export function mountElevation(mainEl: HTMLElement, headEl: HTMLElement) {
   stretchBox = el("section", { class: "panel stack", "aria-labelledby": "elev-str-h" });
   attrBox = el("section", { class: "panel stack-s", "aria-labelledby": "elev-attr-h" });
 
-  // Chart FIRST right under video+map, then conspicuous stretches + figures, then sources table!
-  root.append(notes, chartBox, el("div", { class: "elev-bottom" }, stretchBox, figBox), srcBox, attrBox);
+  // Status bar + chart first right under video+map, then conspicuous stretches + figures, then sources table!
+  root.append(topBox, notes, chartBox, el("div", { class: "elev-bottom" }, stretchBox, figBox), srcBox, attrBox);
   mainEl.append(root);
 
-  bus.on("stage", (s: string | null) => {
-    const on = s === "hoehe";
-    root.hidden = !on; topBox.hidden = !on;
+  bus.on("stage", (s: string | null, sub: string | null) => {
+    const on = s === "ergebnis" && sub === "hoehe";
+    root.hidden = !on;
     if (on) void enter(); else { mapMarks.hover(null); mapMarks.stretch(null); }
   });
   bus.on("elevation", () => { if (!root.hidden) update(); });
@@ -148,7 +145,6 @@ function renderStatus() {
   } else if (d.running) {
     topDlWrap.append(btn("Download abbrechen", () => void cancelDownload(), { kind: "danger", size: "sm" }));
   }
-  nextBtn.className = `btn${missing && !offline && E.state === "missing" ? "" : " primary"}`;
 }
 
 function renderAll() {

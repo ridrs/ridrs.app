@@ -1,31 +1,44 @@
-// Ergebnis: clear verdict bar with right-sized next actions, synced video & map, clean timeline (no canvas-covering overlay!),
-// and a neatly organized collapsible "Route anpassen & korrigieren" panel for route dragging, intro-end and anchors.
-import { go, routePath } from "../app/router";
+// Ergebnis: unified page merging Übersicht, Höhe, and Analyse as 3 views under one verdict header,
+// with a view switcher and always-available "Ort festlegen" toolbar above synced video & map.
+import { analyseBusy, analyseReady } from "../analyse";
+import { RESULT_VIEWS, go, routePath, type ResultView } from "../app/router";
+import { RESULT_VIEW_LABEL, currentResultView } from "../app/shell";
 import { token } from "../app/theme";
+import { E, anythingMissing, elevationBusy, profileCurrent } from "../elevation";
 import { LEVEL_DE, LEVEL_TONE, VERDICT, VEHICLE_DE, gloss, reasonDe } from "../features/gloss";
 import { rideState, zAt } from "../ridePanel";
 import { S, bus, saveCur } from "../state";
 import type { ResultData } from "../types";
 import { banner, btn, chip, disclosure, iconBtn, statusRow, toneIcon } from "../ui/components";
-import { icon } from "../ui/icons";
+import { icon, type IconName } from "../ui/icons";
 import { CONF_COLORS, confClass, el, fmtBytes, fmtDur, fmtKm, pointAt } from "../util";
 import { getPlayer, togglePlay, videoDuration } from "../videoPanel";
 import { introChanged, introMmss, introParam } from "../intro";
 import { start } from "../features/run";
 import { isRouteEdited, normalizeEdit } from "../routeEdit";
-import { normalizeAnchors } from "../anchors";
 
 const CONF_DE = { high: "hoch", mid: "mittel", low: "gering", none: "außerhalb des erkannten Abschnitts" } as const;
+const VIEW_ICON: Record<ResultView, IconName> = { uebersicht: "route", hoehe: "mountain", analyse: "activity" };
 let head: HTMLElement, tl: HTMLElement;
 let vIcon: HTMLElement, vTitle: HTMLHeadingElement, vFacts: HTMLElement, vChips: HTMLElement, vReasons: HTMLElement, vAlert: HTMLElement;
 let exportBtn: HTMLButtonElement, analyseBtn: HTMLButtonElement;
+const tabBtns = {} as Record<ResultView, HTMLButtonElement>;
 let playBtn: HTMLButtonElement, introBtn: HTMLButtonElement, introSetBtn: HTMLButtonElement, introRerunBtn: HTMLButtonElement, introAutoBtn: HTMLButtonElement, introStatus: HTMLElement;
 let timeEl: HTMLElement, track: HTMLElement, canvas: HTMLCanvasElement, tip: HTMLElement, eleNote: HTMLElement, eleRange: HTMLElement, sigDisc: HTMLDetailsElement, sigSum: HTMLElement, sigBody: HTMLElement;
 let adjustDisc: HTMLDetailsElement, adjustSummary: HTMLElement, adjustForProject = "";
 let curT = 0;
 
-/** Mounts Ergebnis and returns the container inside the collapsible "Route anpassen & korrigieren" panel for routeEditor & anchorPanel. */
-export function mountResult(headEl: HTMLElement, tlEl: HTMLElement): HTMLElement {
+export interface ResultMounts {
+  /** Container inside the collapsible "Route anpassen & korrigieren" panel (Übersicht view) for routeEditor & advanced step rerun. */
+  adjustHost: HTMLElement;
+  /** Toolbar slot on the right of the view switcher (always visible in all 3 views) for "Ort festlegen" & rerun button. */
+  anchorBarHost: HTMLElement;
+  /** Compact tray below the toolbar (always visible in all 3 views when anchors exist or drawing is active). */
+  anchorTrayHost: HTMLElement;
+}
+
+/** Mounts Ergebnis and returns the host elements for routeEditor & anchorPanel. */
+export function mountResult(headEl: HTMLElement, tlEl: HTMLElement): ResultMounts {
   head = headEl; tl = tlEl;
   vIcon = el("span", { class: "tone" });
   vTitle = el("h1", { class: "verdict-h", tabIndex: -1 });
@@ -33,15 +46,51 @@ export function mountResult(headEl: HTMLElement, tlEl: HTMLElement): HTMLElement
   vChips = el("div", { class: "row wrap" });
   vReasons = el("div", { class: "small" });
   vAlert = el("div", {});
-  analyseBtn = btn("In Analyse prüfen", () => go(routePath.project(S.cur!.app.id, "analyse")), { icon: "activity" });
+  analyseBtn = btn("In Analyse prüfen", () => go(routePath.project(S.cur!.app.id, "ergebnis", "analyse")), { icon: "activity" });
   analyseBtn.hidden = true;
   exportBtn = btn("Weiter: Export", () => go(routePath.project(S.cur!.app.id, "export")), { kind: "primary", icon: "chevron", attrs: { "data-primary": "" } });
-  const resHead = el("div", { class: "res-head stack" },
+
+  // ---- 3-view switcher (Übersicht, Höhe, Analyse) + always-available "Ort festlegen" slot
+  const tablist = el("div", { class: "res-tabs", role: "tablist", "aria-label": "Ergebnis-Ansichten" });
+  RESULT_VIEWS.forEach((view, idx) => {
+    const b = el("button", {
+      type: "button",
+      class: "res-tab",
+      role: "tab",
+      id: `res-tab-${view}`,
+      "aria-selected": view === "uebersicht" ? "true" : "false",
+      tabIndex: view === "uebersicht" ? 0 : -1,
+      onclick: () => { if (S.cur) go(routePath.project(S.cur.app.id, "ergebnis", view)); },
+      onkeydown: (e: KeyboardEvent) => {
+        let next = -1;
+        if (e.key === "ArrowRight") next = (idx + 1) % RESULT_VIEWS.length;
+        else if (e.key === "ArrowLeft") next = (idx - 1 + RESULT_VIEWS.length) % RESULT_VIEWS.length;
+        else if (e.key === "Home") next = 0;
+        else if (e.key === "End") next = RESULT_VIEWS.length - 1;
+        if (next >= 0) {
+          e.preventDefault();
+          const v = RESULT_VIEWS[next];
+          tabBtns[v].focus();
+          if (S.cur) go(routePath.project(S.cur.app.id, "ergebnis", v));
+        }
+      },
+    }, icon(VIEW_ICON[view]), el("span", {}, RESULT_VIEW_LABEL[view]), el("span", { class: "res-tab-x" })) as HTMLButtonElement;
+    tabBtns[view] = b;
+    tablist.append(b);
+  });
+
+  const anchorBarHost = el("div", { class: "row wrap res-anchor-bar" });
+  const anchorTrayHost = el("div", { class: "res-anchor-tray", hidden: true });
+  const toolbar = el("div", { class: "res-toolbar row wrap between" }, tablist, anchorBarHost);
+
+  const resHead = el("div", { class: "res-head stack-s" },
     el("div", { class: "verdict" },
       vIcon,
       el("div", { class: "grow stack-xs" }, el("div", { class: "row wrap" }, vTitle, vChips), vFacts, vReasons),
       el("div", { class: "row wrap verdict-actions" }, analyseBtn, exportBtn)),
-    vAlert);
+    vAlert,
+    toolbar,
+    anchorTrayHost);
   head.append(resHead);
 
   // ---- Clean Timeline Panel
@@ -107,10 +156,11 @@ export function mountResult(headEl: HTMLElement, tlEl: HTMLElement): HTMLElement
   bus.on("time", (t: number) => { curT = t; drawSoon(); });
   bus.on("playstate", (p: boolean) => { playBtn.replaceChildren(icon(p ? "pause" : "play")); playBtn.setAttribute("aria-label", p ? "Anhalten" : "Abspielen"); playBtn.title = playBtn.getAttribute("aria-label")!; });
   for (const ev of ["result", "player", "profile", "project", "video-state", "run"]) bus.on(ev, () => { renderHead(); drawSoon(); });
+  for (const ev of ["elevation", "analyse"]) bus.on(ev, renderTabs);
   bus.on("stage", (s: string | null) => { if (s === "ergebnis") { renderHead(); drawSoon(); } });
   window.addEventListener("themechange", drawSoon);
   new ResizeObserver(drawSoon).observe(canvas);
-  return adjustHost;
+  return { adjustHost, anchorBarHost, anchorTrayHost };
 }
 
 function seek(t: number) {
@@ -151,11 +201,13 @@ function renderHead() {
   if (r.verdict === "no_route") vAlert.append(banner("bad", el("div", {}, "Keine verlässliche Route gefunden. Die App zeigt sie deshalb nicht an."),
     el("div", { class: "row wrap" }, S.showRoute ? null : btn("Route trotzdem anzeigen", () => { S.showRoute = true; bus.emit("result"); }, { size: "sm" }), btn("Hinweise ergänzen", () => go(routePath.project(cur.app.id, "einrichten")), { size: "sm" }))));
 
-  // Smart CTA priority: confident -> Export is primary; uncertain / no_route -> show Analyse right alongside
+  // Smart CTA priority: confident -> Export is primary; uncertain / no_route -> show Analyse shortcut unless already on Analyse
+  const sub = currentResultView();
   const needsCheck = r.verdict !== "confident";
-  analyseBtn.hidden = !needsCheck;
+  analyseBtn.hidden = !needsCheck || sub === "analyse";
   analyseBtn.className = `btn${r.verdict === "no_route" ? " primary" : ""}`;
-  exportBtn.className = `btn${r.verdict === "no_route" ? "" : " primary"}`;
+  exportBtn.className = `btn${r.verdict === "no_route" && sub !== "analyse" ? "" : " primary"}`;
+  renderTabs();
 
   // Intro & adjust panel summary
   const st = S.run.statuses;
@@ -169,9 +221,8 @@ function renderHead() {
   introStatus.textContent = manual != null ? `von Hand auf ${introMmss(manual)} gesetzt${pending ? " (noch nicht berechnet)" : ""}` : r.intro_end != null ? `automatisch bei ${fmtDur(r.intro_end)}` : "automatisch (kein Intro erkannt)";
 
   const edited = isRouteEdited(normalizeEdit(r.reroute));
-  const nAnchors = normalizeAnchors(cur.app.anchors).length;
-  const activeBits = [edited ? "Route angepasst" : null, nAnchors ? `${nAnchors} ${nAnchors === 1 ? "Ortsangabe" : "Ortsangaben"}` : null, manual != null ? `Intro ${introMmss(manual)}` : null].filter(Boolean);
-  adjustSummary.textContent = activeBits.length ? activeBits.join(" · ") : "Route ziehen · Ortsangaben · Intro-Ende";
+  const activeBits = [edited ? "Route angepasst" : null, manual != null ? `Intro ${introMmss(manual)}` : null].filter(Boolean);
+  adjustSummary.textContent = activeBits.length ? activeBits.join(" · ") : "Route ziehen · Intro-Ende · Erweitert";
   const projKey = `${cur.app.id}:${r.sig}`;
   if (adjustForProject !== projKey) {
     adjustForProject = projKey;
@@ -181,6 +232,26 @@ function renderHead() {
   sigSum.textContent = `Signale (${st.length})`;
   sigDisc.hidden = !st.length;
   sigBody.replaceChildren(...st.map((s) => { const g = gloss(s); return statusRow(LEVEL_TONE[s.level], g.label, `${LEVEL_DE[s.level]} · ${g.text}`); }));
+}
+
+function renderTabs() {
+  const sub = currentResultView();
+  for (const v of RESULT_VIEWS) {
+    const b = tabBtns[v];
+    const active = v === sub;
+    b.setAttribute("aria-selected", active ? "true" : "false");
+    b.tabIndex = active ? 0 : -1;
+    const x = b.querySelector<HTMLElement>(".res-tab-x")!;
+    const st = v === "hoehe"
+      ? (elevationBusy() ? "run" : E.state === "missing" || (E.dem && anythingMissing()) ? "warn" : profileCurrent() ? "done" : "")
+      : v === "analyse"
+        ? (analyseBusy() ? "run" : analyseReady() ? "done" : "")
+        : "";
+    if (x.dataset.state !== st) {
+      x.dataset.state = st;
+      x.replaceChildren(...(st === "run" ? [icon("spinner", "spin")] : st === "done" ? [icon("check")] : st === "warn" ? [icon("warning")] : []));
+    }
+  }
 }
 
 function chipsOf(r: ResultData): HTMLElement[] {
@@ -196,7 +267,7 @@ function drawSoon() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; dra
 
 function draw() {
   const r = S.result;
-  if (!r || tl.closest(".ws")?.getAttribute("data-stage") !== "ergebnis") return;
+  if (!r || tl.closest(".ws")?.getAttribute("data-stage") !== "ergebnis" || currentResultView() !== "uebersicht") return;
   const pts = r.points, d = videoDuration() || pts.at(-1)!.t;
   const { profile, note } = rideState();
   const p = pointAt(pts, curT), cls = confClass(p);
@@ -210,7 +281,7 @@ function draw() {
     const msg = note.text === "Höhendaten fehlen" && note.bytes ? `Höhendaten fehlen (${fmtBytes(note.bytes)}).` : note.extra && note.bytes ? `${note.text} (ca. ${fmtBytes(note.bytes)}).` : note.text;
     eleNote.replaceChildren(
       el("span", { class: "row" }, toneIcon(note.busy ? "run" : note.extra ? "info" : "warn"), el("span", {}, msg)),
-      !note.busy && S.cur ? btn("Höhendaten prüfen", () => go(routePath.project(S.cur!.app.id, "hoehe")), { size: "sm", icon: "mountain" }) : "");
+      !note.busy && S.cur ? btn("Höhendaten prüfen", () => go(routePath.project(S.cur!.app.id, "ergebnis", "hoehe")), { size: "sm", icon: "mountain" }) : "");
   }
   eleRange.textContent = profile ? `${Math.round(profile.min_m)}–${Math.round(profile.max_m)} m` : "";
 

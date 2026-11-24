@@ -222,7 +222,7 @@ function followToggle(): HTMLElement {
 function renderLegend() {
   legendEl.replaceChildren();
   const sw = (cls: string, color: string, label: string) => el("span", { class: "lg" }, el("i", { class: `sw ${cls}`, style: `--c:${color}` }), label);
-  const playback = curStage === "ergebnis" || curStage === "analyse" || curStage === "hoehe";
+  const playback = curStage === "ergebnis";
   if (playback) {
     legendEl.append(sw("line", CONF_COLORS.high, "Route"), sw("line", CONF_COLORS.mid, "mittel"), sw("line", CONF_COLORS.low, "gering"));
     if (S.hint) legendEl.append(sw("dash", HINT_COLOR, "Hinweis"));

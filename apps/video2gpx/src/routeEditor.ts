@@ -26,6 +26,7 @@ let dragMarker: L.Marker | null = null;
 let busy = false;
 let suppressClick = false;
 let stage: string | null = null;
+let subView: string | null = null;
 let hoverPt: RoutePoint | null = null;
 let pending: { x: number; y: number; origin: RoutePoint } | null = null;
 let draggingRoute = false;
@@ -33,9 +34,9 @@ let draggingRoute = false;
 const currentEdit = (): RouteEditState => normalizeEdit(S.result?.reroute);
 
 const onErgebnis = (): boolean => {
-  if (stage === "ergebnis") return true;
+  if (stage !== null) return stage === "ergebnis" && (subView === null || subView === "uebersicht");
   const r = currentRoute();
-  return r.view === "project" && r.stage === "ergebnis";
+  return r.view === "project" && r.stage === "ergebnis" && (!r.sub || r.sub === "uebersicht");
 };
 
 const canEdit = (): boolean => {
@@ -69,8 +70,9 @@ export function mountRouteEditor(container: HTMLElement) {
     resetBtn);
   container.prepend(barEl);
 
-  bus.on("stage", (s: string | null) => {
+  bus.on("stage", (s: string | null, sub: string | null) => {
     stage = s;
+    subView = sub ?? null;
     cancelRouteDrag();
     sync();
   });

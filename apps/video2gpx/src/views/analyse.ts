@@ -1,10 +1,9 @@
-// Analyse: focused diagnostic inspector — compact single-row overlay toolbar (explanation collapsed by default),
-// synced video + map, 5-lane timeline charts with concise hint + collapsible guide, weak stretches & figures.
+// Analyse view (inside Ergebnis): focused diagnostic inspector — compact single-row overlay toolbar,
+// 5-lane timeline charts with concise hint + collapsible guide, weak stretches & figures.
 import { A, loadSeries, overlayOn, requestFrame, setSwitch } from "../analyse";
 import { AnalyseChart, DEFAULT_LAYERS, type ChartLayers } from "../analyseChart";
 import { Overlay, COL, GAIN, shownBand } from "../analyseOverlay";
 import { de, fmtClock, viewFor } from "../analyseStats";
-import { go, routePath } from "../app/router";
 import { mapMarks } from "../mapPanel";
 import { S, bus } from "../state";
 import type { AnalyseStretch, InspectFrame } from "../types";
@@ -15,7 +14,7 @@ import { getPlayer } from "../videoPanel";
 
 const LAYER_KEY = "v2g.analyseLayers";
 const TICK_MS = 2500;
-let root: HTMLElement, busyEl: HTMLElement, nextBtn: HTMLButtonElement, notes: HTMLElement, ovBox: HTMLElement, frameInfo: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement;
+let root: HTMLElement, busyEl: HTMLElement, notes: HTMLElement, ovBox: HTMLElement, frameInfo: HTMLElement, chartBox: HTMLElement, legendEl: HTMLElement;
 let listBox: HTMLElement, figBox: HTMLElement, emptyEl: HTMLElement, rangeEl: HTMLElement;
 let zoomIn: HTMLButtonElement, zoomOut: HTMLButtonElement, zoomAll: HTMLButtonElement;
 let chart: AnalyseChart, overlay: Overlay;
@@ -30,8 +29,7 @@ function saveLayers() { try { localStorage.setItem(LAYER_KEY, JSON.stringify(lay
 export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl: HTMLElement) {
   loadLayers();
   overlay = new Overlay(videoHost);
-  root = el("div", { class: "an-view", hidden: true });
-  nextBtn = btn("Weiter: Export", () => S.cur && go(routePath.project(S.cur.app.id, "export")), { kind: "primary", icon: "chevron", attrs: { "data-primary": "" } });
+  root = el("div", { class: "an-view", role: "tabpanel", "aria-labelledby": "res-tab-analyse", hidden: true });
   notes = el("div", { class: "stack-s" });
   frameInfo = el("div", { class: "an-frameinfo small", "aria-live": "polite", hidden: true });
   busyEl = el("span", { class: "muted row small an-busy" }, icon("spinner", "spin"), "aktualisiert …");
@@ -42,22 +40,19 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
   };
   const dotSw = (...cols: string[]) => el("span", { class: "an-swatch", "aria-hidden": "true" }, ...cols.map((col) => el("i", { style: `background:${col}` })));
 
-  // Compact top bar: overlay switches + collapsible legend explanation (collapsed by default so video & map start high!)
+  // Compact overlay bar right above video+map when Analyse view is active
   const ovHelp = disclosure("Overlay-Legende",
     el("p", { class: "small muted" }, `Neuverfolgung für das aktuelle Bild (ca. 1 s, ändert kein Ergebnis). Bewegung: grün = Inlier, rot = verworfen, magenta = ignorierter Verkehr, Pfeil = Verschiebung (${GAIN.motion}-fach), gelb = Horizont. Rotation: Fernmerkmale über Horizont, cyan = Inlier, orange = verworfen, Pfeil = ${GAIN.rotation}-fach. Beim Abspielen alle ${TICK_MS / 1000} s aktualisiert.`));
 
   ovBox = el("section", { class: "panel stack-s an-ov", "aria-labelledby": "an-ov-h", hidden: true },
     el("div", { class: "row wrap between" },
       el("div", { class: "row wrap" },
-        el("h2", { id: "an-ov-h", class: "an-ov-h" }, "Analyse"),
+        el("h2", { id: "an-ov-h", class: "an-ov-h" }, "Video-Overlay"),
         sw("motion", "Bewegung", dotSw(COL.inlier, COL.outlier, COL.traffic, COL.ignored)),
         sw("rotation", "Rotation", dotSw(COL.farIn, COL.farOut)),
         busyEl),
-      el("div", { class: "row wrap" },
-        btn("Höhe", () => S.cur && go(routePath.project(S.cur.app.id, "hoehe")), { size: "sm", icon: "mountain" }),
-        nextBtn)),
-    frameInfo,
-    ovHelp);
+      ovHelp),
+    frameInfo);
 
   legendEl = el("div", { class: "elev-legend", role: "group", "aria-label": "Spuren der Diagramme" });
   rangeEl = el("span", { class: "small muted tnum" });
@@ -83,8 +78,8 @@ export function mountAnalyse(mainEl: HTMLElement, videoHost: HTMLElement, headEl
   mainEl.append(root);
   headEl.append(ovBox);
 
-  bus.on("stage", (s: string | null) => {
-    const on = s === "analyse";
+  bus.on("stage", (s: string | null, sub: string | null) => {
+    const on = s === "ergebnis" && sub === "analyse";
     root.hidden = !on; ovBox.hidden = !on;
     if (on) void enter(); else leave();
   });

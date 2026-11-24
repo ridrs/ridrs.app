@@ -1,4 +1,4 @@
-/* App frame: global bar, streamlined 4-step workflow bar + optional inspectors, workspace grid */
+/* App frame: global bar, 4-step workflow bar, workspace grid */
 .bar { position: sticky; top: 0; z-index: 1100; display: flex; align-items: center; gap: var(--sp-3); height: var(--bar-h); padding: 0 var(--sp-4); background: var(--c-surface); border-bottom: 1px solid var(--c-border); }
 .brand { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--c-text); text-decoration: none; letter-spacing: -.015em; font-size: 15px; }
 .brand:hover { color: var(--c-accent); }
@@ -15,8 +15,6 @@
 .stage-steps { list-style: none; display: flex; align-items: center; gap: 0; margin: 0; padding: 0; flex: none; }
 .stage-steps li { display: flex; align-items: center; }
 .stage-steps li + li::before { content: ""; width: 22px; height: 1px; background: var(--c-border); margin: 0 var(--sp-1); }
-.stage-tools { display: flex; align-items: center; gap: var(--sp-1); padding-left: var(--sp-3); border-left: 1px solid var(--c-border); flex: none; }
-.stage-tools-lbl { font: var(--t-label); text-transform: uppercase; letter-spacing: .04em; color: var(--c-text-2); margin-right: var(--sp-1); }
 .stage-link { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 11px; border-radius: var(--r-pill); color: var(--c-text); text-decoration: none; white-space: nowrap; font-size: 13.5px; transition: background .12s; }
 .stage-link:hover { background: var(--c-surface-2); }
 .stage-n { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; border-radius: 50%; border: 1.5px solid var(--c-border-strong); font: var(--t-small); font-weight: 650; }
@@ -24,9 +22,6 @@
 .stage-x[data-state="done"] { color: var(--c-ok); } .stage-x[data-state="run"] { color: var(--c-accent); } .stage-x[data-state="warn"] { color: var(--c-warn); }
 .stage-link[aria-current="step"] { background: var(--c-accent-bg); color: var(--c-accent); font-weight: 650; }
 .stage-link[aria-current="step"] .stage-n { background: var(--c-accent); border-color: var(--c-accent); color: var(--c-on-accent); }
-.stage-link.tool-link { border: 1px solid var(--c-border); background: var(--c-surface); }
-.stage-link.tool-link:hover { background: var(--c-surface-2); }
-.stage-link.tool-link[aria-current="step"] { border-color: var(--c-accent); background: var(--c-accent-bg); }
 .stage-link[aria-disabled="true"] { color: var(--c-text-2); opacity: .6; cursor: not-allowed; }
 .stage-link[aria-disabled="true"]:hover { background: none; }
 
@@ -49,29 +44,21 @@ main#main { flex: 1; min-height: 0; outline: none; }
 .ws[data-stage="berechnung"] { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-template-areas: "main map" "main info"; grid-template-rows: auto 1fr; }
 .ws[data-stage="berechnung"] :is(.ws-head, .ws-video, .ws-side, .ws-timeline) { display: none; }
 
-/* Stage 3: Ergebnis */
+/* Stage 3: Ergebnis — unified page with 3 views (Übersicht, Höhe, Analyse) */
 .ws[data-stage="ergebnis"] { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); grid-template-areas: "head head" "video map" "timeline timeline"; }
-.ws[data-stage="ergebnis"] :is(.ws-side, .ws-main, .ws-info) { display: none; }
-.ws[data-stage="ergebnis"] .ws-head > :not(.res-head) { display: none; }
-
-/* Inspector: Höhe — summary & download CTA on top, synced video+map, chart & details below */
-.ws[data-stage="hoehe"] { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); grid-template-areas: "head head" "video map" "main main"; }
-.ws[data-stage="hoehe"] :is(.ws-side, .ws-info, .ws-timeline) { display: none; }
-.ws[data-stage="hoehe"] .ws-head > :not(.elev-top) { display: none; }
-
-/* Inspector: Analyse */
-.ws[data-stage="analyse"] { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); grid-template-areas: "head head" "video map" "main main"; }
-.ws[data-stage="analyse"] :is(.ws-side, .ws-info, .ws-timeline) { display: none; }
-.ws[data-stage="analyse"] .ws-video { position: relative; }
-.ws[data-stage="analyse"] .ws-head > :not(.an-ov) { display: none; }
+.ws[data-stage="ergebnis"] :is(.ws-side, .ws-info) { display: none; }
+.ws[data-stage="ergebnis"] .ws-video { position: relative; }
+.ws[data-stage="ergebnis"]:not([data-sub="hoehe"]):not([data-sub="analyse"]) .ws-main { display: none; }
+.ws[data-stage="ergebnis"]:is([data-sub="hoehe"], [data-sub="analyse"]) { grid-template-areas: "head head" "video map" "main main"; }
+.ws[data-stage="ergebnis"]:is([data-sub="hoehe"], [data-sub="analyse"]) .ws-timeline { display: none; }
 
 /* Stage 4: Export */
 .ws[data-stage="export"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main"; max-width: 1120px; }
 .ws[data-stage="export"] :is(.ws-head, .ws-map, .ws-video, .ws-side, .ws-info, .ws-timeline) { display: none; }
 
-/* Equal-height video + map on Ergebnis, Analyse, Höhe */
-.ws:is([data-stage="ergebnis"], [data-stage="analyse"], [data-stage="hoehe"]) .ws-map { align-self: stretch; display: flex; flex-direction: column; }
-.ws:is([data-stage="ergebnis"], [data-stage="analyse"], [data-stage="hoehe"]) .ws-map .mapwrap { flex: 1 1 320px; aspect-ratio: auto; max-width: none; min-height: 320px; margin: 0; }
+/* Equal-height video + map on Ergebnis (all 3 views) */
+.ws[data-stage="ergebnis"] .ws-map { align-self: stretch; display: flex; flex-direction: column; }
+.ws[data-stage="ergebnis"] .ws-map .mapwrap { flex: 1 1 320px; aspect-ratio: auto; max-width: none; min-height: 320px; margin: 0; }
 
 /* Map heights per stage */
 .ws[data-stage="einrichten"] .ws-map .mapwrap { aspect-ratio: auto; max-width: none; height: clamp(440px, calc(100vh - 208px), 760px); margin: 0; }
@@ -87,10 +74,8 @@ main#main { flex: 1; min-height: 0; outline: none; }
   .ws[data-stage="einrichten"] .ws-map .mapwrap { height: 400px; }
   .ws[data-stage="berechnung"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "main" "map" "info"; }
   .ws[data-stage="ergebnis"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "video" "map" "timeline"; }
-  .ws[data-stage="hoehe"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "main" "video" "map"; }
-  .ws[data-stage="analyse"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "video" "main" "map"; }
-  .ws:is([data-stage="ergebnis"], [data-stage="analyse"], [data-stage="hoehe"]) .ws-map .mapwrap { flex: none; height: 340px; }
+  .ws[data-stage="ergebnis"]:is([data-sub="hoehe"], [data-sub="analyse"]) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "video" "map" "main"; }
+  .ws[data-stage="ergebnis"] .ws-map .mapwrap { flex: none; height: 340px; }
   .ws-side { position: static; max-height: none; }
-  .stage-tools-lbl { display: none; }
   .bar-link > span:not(.dot):not(.sr-only) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
