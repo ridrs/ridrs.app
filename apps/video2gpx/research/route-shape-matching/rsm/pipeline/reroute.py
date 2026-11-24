@@ -26,7 +26,7 @@ from rsm.fusion import rts
 from rsm.network.graph import NetGraph
 from rsm.refine.pathctx import Path as RoutePath
 
-from . import align as AL, config as C, cuts as K, odofail as OF, osm, steps_c as SC, steps_d as SD, tracks as T
+from . import align as AL, config as C, cuts as K, detours as DT, odofail as OF, osm, steps_c as SC, steps_d as SD, tracks as T
 from .common import Worker, data_dir, file_sig, jdump, jload, sha
 
 # All drivable streets plus paths, cycleways, tracks, footways and steps so the user can drag onto any street, bridge or path
@@ -679,6 +679,9 @@ def align_timeline(d: Path, path: RoutePath, orig_R, start_moved: bool, end_move
     spans = K.spans(st, tracks)
     fine = SC.fine_profile(csv)
     L_path = float(path.sg[-1])
+    # inserted shots between cuts stay at 0 km/h after a manual route change too (detours.py); detours are the editor's call on a drawn route
+    ins = SC.inserted_spans(d) if C.SKIP_ON else []
+    still, still_kind = DT.merge_spans(list(still) + ins, [DT.KIND["standstill"]] * len(still) + [DT.KIND["insert"]] * len(ins))
 
     al = _align_pieces_free(path.sg, path.xy, tracks, kappa, a_ang, gap_nom, start_moved, end_moved)
     kappa_eff = float(al["kappa_eff"]) if al is not None else kappa
@@ -772,7 +775,7 @@ def align_timeline(d: Path, path: RoutePath, orig_R, start_moved: bool, end_move
         still_s1=np.array([e_s.get(b, np.nan) for b in hi_s]),
         still_sd=np.array([e_sd.get(a, np.nan) for a in lo_s]),
         still_conf=np.array([e_conf.get(a, 0.0) for a in lo_s]),
-        in_still=in_still,
+        in_still=in_still, still_kind=np.array(still_kind, np.int8),
         sg=path.sg, xy=path.xy, oneway=oneway, tunnel=path.tunnel, bridge=bridge, crs=np.array(g.crs),
         **lane,
         gx_hz=np.array(gx_hz), gx_t=t_gx, gx_s=s_gx, gx_s_sd=sd_gx, gx_conf=conf_gx, gx_extrap=extrap_gx, gx_in_gap=in_gap_gx, gx_in_still=in_still_gx,

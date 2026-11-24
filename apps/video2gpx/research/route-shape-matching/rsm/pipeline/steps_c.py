@@ -18,7 +18,7 @@ from rsm.hmm import grid
 from rsm.hmm_cal import dp
 from rsm.refine import anchors as A, curves, pathctx, post
 
-from . import align as AL, anchors as AN, config as C, cuts as K, hints as HI, local as L, odofail as OF, tracks as T
+from . import align as AL, anchors as AN, config as C, cuts as K, detours as DT, hints as HI, local as L, odofail as OF, tracks as T
 from .common import Worker, jdump, jload
 from .steps_b import frame_masks, load_map
 
@@ -424,6 +424,15 @@ def _refine_vehicle(d: Path) -> str:
     return str(jload(d / "rotation" / "vehicle.json")["effective"])
 
 
+def inserted_spans(d: Path) -> list[tuple[float, float]]:
+    """inserted shots between scene cuts (rotation/cuts.json `inserted`, after a skipped intro): (t0, t1) of each, held at 0 km/h"""
+    f = d / "rotation" / "cuts.json"
+    if not f.exists():
+        return []
+    c = jload(f)
+    return [(float(x["t0"]), float(x["t1"])) for x in c.get("inserted") or [] if float(x["t1"]) > float(x["t0"])]
+
+
 def refine(d: Path, P: dict, W: Worker):
     out = d / "refine"
     out.mkdir(exist_ok=True)
@@ -537,6 +546,9 @@ def refine(d: Path, P: dict, W: Worker):
                 align_info["used"] = False
                 W.log("warn", f"dense heading alignment rejected: {dev.max():.0f} m away from the HMM route (limit {C.ALIGN_MAX_DEV_M:.0f} m)")
     prog(92.0, "fusion")
+    # inserted shots between cuts (detours.py): held at 0 km/h like a sure standstill; the spans of the fusion, the flags and the output from here on
+    ins = inserted_spans(d) if C.SKIP_ON else []
+    still, still_kind = DT.merge_spans(list(still) + ins, [DT.KIND["standstill"]] * len(still) + [DT.KIND["insert"]] * len(ins))
     edges = np.array(sorted({float(x) for sp in still for x in sp}), float)
     edges = edges[(edges >= t_all[0]) & (edges <= t_all[-1])] if len(edges) else edges
     t_fuse = np.unique(np.concatenate([t_all, edges]))
@@ -550,7 +562,6 @@ def refine(d: Path, P: dict, W: Worker):
     prior_dec = (local_info or {}).get("prior_decided") or []
     gap_spans = [(float(st.t[j - 1]), float(st.t[j])) for j in np.flatnonzero(st.gap) if j > 0]
     flags = lambda t: grid_flags(t, lo, hi, post_, prior_dec, (local_info or {}).get("kept_search") or [], gap_spans, spans, still)
-    conf, extrap, in_gap, in_still, in_prior = flags(t_all)
     # the GPX raster (C.GPX_HZ points per video second): the smoother is run a second time with these times as nodes, so the points between two seconds
     # follow the measured motion; the 1 s arrays above stay as they were (validation, benchmarks and the analysis stage read them per second)
     t_gx = np.arange(int(np.floor(dur)) * C.GPX_HZ + 1) / C.GPX_HZ
@@ -559,6 +570,56 @@ def refine(d: Path, P: dict, W: Worker):
         s_gx, sd_gx = fx["s"], fx["s_sd"]
     else:
         s_gx, sd_gx = fd["s"], fd["s_sd"]
+    lo_s, hi_s = (np.array([a for a, _ in still], float), np.array([b for _, b in still], float)) if still else (np.zeros(0), np.zeros(0))
+    e_s = dict(zip(edges.tolist(), fd_e["s"].tolist()))
+    e_sd = dict(zip(edges.tolist(), fd_e["s_sd"].tolist()))
+    sv = ctx.s_baseline(t_all[~((t_all < lo) | (t_all > hi))])
+    sh = np.abs(fd["s"][~((t_all < lo) | (t_all > hi))] - sv)
+    path = ctx.path
+    oi = np.clip(np.searchsorted(path.start, path.sg, side="right") - 1, 0, len(path.occ) - 1)
+    eo = np.asarray(path.occ)[oi]                                       # edge per path metre: cross-section tags for the lane model (gpx step, rsm.pipeline.lane)
+    per_m = dict(xy=path.xy, oneway=np.asarray(g.edge_oneway)[path.occ][oi], tunnel=path.tunnel, bridge=np.asarray(g.edge_bridge, bool)[path.occ][oi],
+                 highway=np.asarray(g.edge_highway).astype(str)[eo])
+    for k_, fill, dt in (("width", np.nan, np.float32), ("lanes", 0, np.int8), ("lanes_fwd", 0, np.int8), ("roundabout", False, bool), ("marked", -1, np.int8), ("cycle", 0, np.int8)):
+        a_ = getattr(g, "edge_" + k_, None)
+        per_m[k_] = np.asarray(a_, dt)[eo] if a_ is not None else np.full(len(eo), fill, dt)
+    sg_out = path.sg
+    # detours (detours.py): the path leaves a junction and comes back to it, the video turns round: cut out of the path, the position held at the junction
+    det = DT.find(g.edge_u, g.edge_v, path.occ, path.start, t_gx, s_gx, ctx.st.t, ctx.st.dth) if C.SKIP_ON else []
+    det = [x for x in det if not any(x["t0"] < b and x["t1"] > a for a, b in still)]     # never across a standstill or an insert
+    if det:
+        arcs = [(x["s0"], x["s1"]) for x in det]
+        sg_out, per_m, shifts = DT.excise(path.sg, per_m, arcs)
+        for x, sh_ in zip(det, shifts):
+            x["s0_out"] = float(DT.remap(np.array([x["s0"]]), arcs, shifts)[0])
+            x["shift_m"] = sh_
+        def hold(t_, s_):
+            s_ = DT.remap(s_, arcs, shifts)
+            for x in det:
+                s_ = np.where((t_ >= x["t0"]) & (t_ <= x["t1"]), x["s0_out"], s_)
+            return s_
+        fd = dict(fd, s=hold(t_all, fd["s"]))
+        s_gx = hold(t_gx, s_gx)
+        e_s = {k_: float(DT.remap(np.array([v_]), arcs, shifts)[0]) for k_, v_ in e_s.items()}
+        for x in det:
+            for te in (x["t0"], x["t1"]):
+                e_s[te] = x["s0_out"]
+                e_sd[te] = float(np.interp(te, t_gx, sd_gx))
+        still, still_kind = DT.merge_spans(list(still) + [(x["t0"], x["t1"]) for x in det], list(still_kind) + [DT.KIND["detour"]] * len(det))
+        edges = np.array(sorted(e_s), float)
+        lo_s, hi_s = np.array([a for a, _ in still], float), np.array([b for _, b in still], float)
+        W.log("info", "detours: " + "; ".join(f"{K.mmss(x['t0'])}-{K.mmss(x['t1'])} {x['length_m']:.0f} m out and back to the same junction, the video turns "
+                                               f"{x['odo_turn_deg']:.0f} deg" for x in det) + "; cut out of the route and held at 0 km/h")
+    skipped = [dict(kind=DT.KIND_NAME[k_], t0=float(a), t1=float(b)) for (a, b), k_ in zip(still, still_kind) if k_ != DT.KIND["standstill"]]
+    for x in skipped:
+        dx = next((y for y in det if abs(y["t0"] - x["t0"]) < 1e-6), None)
+        if dx is not None:
+            x.update(length_m=round(dx["length_m"], 1), odo_turn_deg=round(dx["odo_turn_deg"], 1))
+    if skipped:
+        W.status("skipped", "good", float(sum(x["t1"] - x["t0"] for x in skipped)), "parts of the video that are not part of the route are held at 0 km/h so that "
+                 "playback passes over them: " + ", ".join(f"{x['kind']} {K.mmss(x['t0'])}-{K.mmss(x['t1'])}" + (f" ({x['length_m']:.0f} m)" if "length_m" in x else "")
+                                                         for x in skipped[:8]) + (f" and {len(skipped) - 8} more" if len(skipped) > 8 else ""))
+    conf, extrap, in_gap, in_still, in_prior = flags(t_all)
     conf_gx, extrap_gx, in_gap_gx, in_still_gx, _ = flags(t_gx)
     prior_share = float(in_prior.sum() / max(int((~extrap).sum()), 1))
     if prior_dec:
@@ -566,33 +627,23 @@ def refine(d: Path, P: dict, W: Worker):
         W.status("parallel_street", "difficult", prior_share, "the video cannot tell two parallel streets apart; the main road was assumed: "
                  + "; ".join(f"{mmss(x['t0'])}-{mmss(x['t1'])} {x['name_with'] or 'unnamed road'} (alternative: {x['name_without'] or 'unnamed road'})" for x in prior_dec[:5])
                  + (f" and {len(prior_dec) - 5} more" if len(prior_dec) > 5 else ""))
-    lo_s, hi_s = (np.array([a for a, _ in still], float), np.array([b for _, b in still], float)) if still else (np.zeros(0), np.zeros(0))
-    e_s = dict(zip(edges.tolist(), fd_e["s"].tolist()))
-    e_sd = dict(zip(edges.tolist(), fd_e["s_sd"].tolist()))
     e_conf = np.where(np.isfinite(edges), np.interp(edges, post_["t"][okp], post_["p_vit"][okp]), 0.0) if len(edges) else np.zeros(0)
     e_c = dict(zip(edges.tolist(), e_conf.tolist()))
-    path = ctx.path
-    oi = np.clip(np.searchsorted(path.start, path.sg, side="right") - 1, 0, len(path.occ) - 1)
-    oneway = np.asarray(g.edge_oneway)[path.occ][oi]
-    sv = ctx.s_baseline(t_all[~extrap])
-    sh = np.abs(fd["s"][~extrap] - sv)
-    eo = np.asarray(path.occ)[oi]                                       # edge per path metre: cross-section tags for the lane model (gpx step, rsm.pipeline.lane)
-    lane = dict(highway=np.asarray(g.edge_highway).astype(str)[eo])
-    for k, fill, dt in (("width", np.nan, np.float32), ("lanes", 0, np.int8), ("lanes_fwd", 0, np.int8), ("roundabout", False, bool), ("marked", -1, np.int8), ("cycle", 0, np.int8)):
-        a = getattr(g, "edge_" + k, None)
-        lane[k] = np.asarray(a, dt)[eo] if a is not None else np.full(len(eo), fill, dt)
+    lane = {k_: per_m[k_] for k_ in ("highway", "width", "lanes", "lanes_fwd", "roundabout", "marked", "cycle")}
     still_out = dict(still_t0=lo_s, still_t1=hi_s, still_s0=np.array([e_s.get(a, np.nan) for a in lo_s]), still_s1=np.array([e_s.get(b, np.nan) for b in hi_s]),
-                     still_sd=np.array([e_sd.get(a, np.nan) for a in lo_s]), still_conf=np.array([e_c.get(a, 0.0) for a in lo_s]), in_still=in_still)
-    np.savez_compressed(out / "result.npz", t=t_all, s=fd["s"], s_sd=fd["s_sd"], conf=conf, extrap=extrap, in_gap=in_gap, **still_out, sg=path.sg, xy=path.xy, oneway=oneway, tunnel=path.tunnel,
-                        bridge=np.asarray(g.edge_bridge, bool)[path.occ][oi], crs=np.array(g.crs), **lane,
+                     still_sd=np.array([e_sd.get(a, np.nan) for a in lo_s]), still_conf=np.array([e_c.get(a, 0.0) for a in lo_s]), in_still=in_still,
+                     still_kind=np.array(still_kind, np.int8))
+    np.savez_compressed(out / "result.npz", t=t_all, s=fd["s"], s_sd=fd["s_sd"], conf=conf, extrap=extrap, in_gap=in_gap, **still_out, sg=sg_out, xy=per_m["xy"], oneway=per_m["oneway"], tunnel=per_m["tunnel"],
+                        bridge=per_m["bridge"], crs=np.array(g.crs), **lane,
                         gx_hz=np.array(C.GPX_HZ), gx_t=t_gx, gx_s=s_gx, gx_s_sd=sd_gx, gx_conf=conf_gx, gx_extrap=extrap_gx, gx_in_gap=in_gap_gx, gx_in_still=in_still_gx)
-    summ = dict(anchors_candidates=len(cand), anchors_gate_rejected=len(rej_g), anchors_merge_rejected=len(rej_m), anchors_used=len(ad), span_s=[lo, hi], path_km=float(path.length / 1000),
+    summ = dict(anchors_candidates=len(cand), anchors_gate_rejected=len(rej_g), anchors_merge_rejected=len(rej_m), anchors_used=len(ad), span_s=[lo, hi], path_km=float((sg_out[-1] - sg_out[0]) / 1000) if det else float(path.length / 1000),
                 n_points=int(len(t_all)), n_extrapolated=int(extrap.sum()), n_in_gap=int(in_gap.sum()), conf_mean=float(conf[~extrap].mean()) if (~extrap).any() else 0.0,
                 sd_m_quantiles=[float(x) for x in np.percentile(fd["s_sd"][~extrap], [10, 50, 90, 99])] if (~extrap).any() else None,
                 fused_vs_viterbi_abs_mean_m=float(sh.mean()), fused_vs_viterbi_p90_m=float(np.percentile(sh, 90)), seconds=time.time() - t0,
                 peak_rss_gb=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2 ** 30, local=local_info, local_used=bool(route.get("local")), align=align_info,
                 prior_decided=prior_dec, prior_decided_share=prior_share,
-                still=[[float(a), float(b)] for a, b in still], n_in_still=int(in_still.sum()), gpx_hz=int(C.GPX_HZ), n_gpx_points=int(len(t_gx)))
+                still=[[float(a), float(b)] for a, b in still], n_in_still=int(in_still.sum()), skipped=skipped,
+                detours=[{k_: (round(v_, 2) if isinstance(v_, float) else v_) for k_, v_ in x.items()} for x in det], gpx_hz=int(C.GPX_HZ), n_gpx_points=int(len(t_gx)))
     if spans:
         summ["cut_spans"] = [[float(x) for x in sp] for sp in spans]
     jdump(out / "summary.json", summ)

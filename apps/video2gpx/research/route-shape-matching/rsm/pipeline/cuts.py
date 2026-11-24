@@ -117,10 +117,12 @@ def _norm(x: np.ndarray) -> np.ndarray:
     return np.clip(128.0 + 40.0 * x, 0, 255).astype(np.uint8)
 
 
-def same_scene(a: np.ndarray, b: np.ndarray) -> dict:
+def same_scene(a: np.ndarray, b: np.ndarray, top: float | None = None) -> dict:
     """does frame b show the same scene as frame a? Corners of a tracked into b (LK, forward-backward), one similarity fitted by RANSAC.
-    -> {corners, inliers, share}: share = inliers / corners (0 when nothing fits)"""
+    top: only the upper part of the frames (that share of the rows). -> {corners, inliers, share}: share = inliers / corners (0 when nothing fits)"""
     from .vmsx import motion as M
+    if top is not None:
+        a, b = a[:max(8, int(len(a) * top))], b[:max(8, int(len(b) * top))]
     a, b = _norm(a), _norm(b)
     p0 = cv2.goodFeaturesToTrack(a, 400, 0.01, 8, blockSize=7)
     if p0 is None:
@@ -163,6 +165,34 @@ def check_same_scene(video: str, cut: dict, ffmpeg: str = "ffmpeg") -> dict | No
     j = max(i, j)
     r = same_scene(F[i], F[j + 1])
     return dict(t_before=round(t0 + i / fps, 3), t_after=round(t0 + (j + 1) / fps, 3), **r)
+
+
+def frame_at_cut(video: str, cut: dict, side: str, ffmpeg: str = "ffmpeg") -> np.ndarray | None:
+    """the grey frame just before the first jump of a cut (side "before") or just after its last jump ("after"), the jump being the largest frame
+    difference within +-CUT_SAME_WIN_S; None when nothing can be decoded"""
+    w = C.CUT_SAME_WIN_S
+    tc = float(cut.get("t_first" if side == "before" else "t_last", cut["t"]))
+    F, _fps = grey_frames(video, tc - w, tc + w, ffmpeg)
+    if len(F) < 2:
+        return None
+    i = int(np.argmax(np.abs(np.diff(F.astype(np.int16), axis=0)).mean(axis=(1, 2))))
+    return F[i] if side == "before" else F[i + 1]
+
+
+def resumed_pieces(video: str, cuts: list[dict], intro_end: float | None, ffmpeg: str = "ffmpeg") -> list[dict]:
+    """pieces between two consecutive cuts, CUT_MIN_PIECE_S..PANO_MAX_S long and after the intro, checked for an insert: does the road scene after the
+    second cut continue the one before the first (same_scene on the upper PANO_TOP of the frames)? -> [{t0, t1, share, resumed}] (rsm.pipeline.detours)"""
+    out = []
+    for ca, cb in zip(cuts[:-1], cuts[1:]):
+        a, b = float(ca["t"]), float(cb["t"])
+        if not (C.CUT_MIN_PIECE_S <= b - a <= C.PANO_MAX_S) or (intro_end is not None and a < intro_end):
+            continue
+        fa, fb = frame_at_cut(video, ca, "before", ffmpeg), frame_at_cut(video, cb, "after", ffmpeg)
+        if fa is None or fb is None:
+            continue
+        r = same_scene(fa, fb, top=C.PANO_TOP)
+        out.append(dict(t0=a, t1=b, share=r["share"], resumed=bool(r["share"] >= C.PANO_SAME_SHARE)))
+    return out
 
 
 def veto_same_scene(video: str, cuts: list[dict], ffmpeg: str = "ffmpeg") -> tuple[list[dict], list[dict]]:
@@ -567,10 +597,11 @@ def verify_transitions(video: str, classical_cuts: list[dict], extra_cands: list
     return dedup, rejected
 
 
-def plan(tracks: list[dict], cuts: list[dict], intro_user: float | None = None) -> tuple[list[dict], dict]:
+def plan(tracks: list[dict], cuts: list[dict], intro_user: float | None = None, resumed: list[tuple[float, float]] | None = None) -> tuple[list[dict], dict]:
     """-> (tracks to use, info). Tracks after a cut get cut_before = cut time; tracks of inserted shots and of the intro are dropped (see module doc).
     intro_user ("Intro-Ende hier setzen", --intro-end): the intro ends there instead of at the last early cut (also without cuts; a track across it is split
-    there, the piece after it starts without a jump). Without cuts and intro_user the input list is returned as it is."""
+    there, the piece after it starts without a jump). resumed: longer pieces (t0, t1) between two cuts after which the drive goes on where it was before
+    the first (resumed_pieces): inserted shots too. Without cuts and intro_user the input list is returned as it is."""
     times = [float(c["t"]) for c in cuts]
     info = dict(n_cuts=len(times), cut_times=times, intro_end=None, intro_source=None, inserted=[], dropped_tracks=0, split_tracks=0)
     if not times and intro_user is None:
@@ -589,7 +620,11 @@ def plan(tracks: list[dict], cuts: list[dict], intro_user: float | None = None) 
     info["intro_end"] = intro_end
     # pieces between consecutive cuts that are too short to be riding (inserted shots)
     short = [(a, b) for a, b in zip(times[:-1], times[1:]) if b - a < C.CUT_MIN_PIECE_S and (intro_end is None or a >= intro_end)]
-    info["inserted"] = [dict(t0=a, t1=b) for a, b in short]
+    kinds = ["short"] * len(short)
+    for a, b in resumed or []:
+        if (a, b) not in short and any(abs(a - x) < 1e-6 for x in times) and any(abs(b - x) < 1e-6 for x in times) and (intro_end is None or a >= intro_end):
+            short.append((float(a), float(b))); kinds.append("resumed")
+    info["inserted"] = sorted((dict(t0=a, t1=b, kind=k) for (a, b), k in zip(short, kinds)), key=lambda x: x["t0"])
     if intro_end is not None and not any(float(tr["t"][-1]) > intro_end for tr in tracks):
         info["intro_end"] = intro_end = info["intro_source"] = None   # nothing after the intro: the rule would leave no route; keep the tracks
         info["intro_rule_skipped"] = True

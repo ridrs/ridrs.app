@@ -112,7 +112,7 @@ def test_plan_jumps_inserted_shots_and_the_start_rule():
     cuts = [dict(t=x) for x in (12.0, 39.0, 600.0, 610.0, 900.0)]
     out, info = K.plan(tr, cuts)
     assert info["intro_end"] == 39.0
-    assert info["inserted"] == [dict(t0=600.0, t1=610.0)]
+    assert info["inserted"] == [dict(t0=600.0, t1=610.0, kind="short")]
     assert info["dropped_tracks"] == 3                       # two intro tracks, the inserted shot
     assert [float(x["t"][0]) for x in out] == [41.0, 611.0, 901.0]
     assert [x.get("cut_before") for x in out] == [None, 610.0, 900.0]
