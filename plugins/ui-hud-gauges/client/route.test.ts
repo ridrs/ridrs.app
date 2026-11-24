@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { fitPlaces, gradeColour, headingAt, indexAtDistance, measureTrack, profileOf, thin } from './route.ts';
+import {
+  fitPlaces,
+  gradeColour,
+  headingAt,
+  indexAtDistance,
+  locateOnTrack,
+  measureTrack,
+  profileOf,
+  thin,
+  trackOffset,
+} from './route.ts';
 
 const NORTH_THEN_EAST = [
   { latitude: 46.0, longitude: 7.0 },
@@ -122,5 +132,40 @@ describe('headingAt', () => {
       { latitude: 46, longitude: 7.01 },
     ];
     expect(headingAt(stationaryEnd, 2)).toBeCloseTo(90, 0);
+  });
+});
+
+describe('locateOnTrack and trackOffset', () => {
+  // Due north, a cut of the video after ~445 m: the next point lies ~1.78 km further on.
+  const CUT = measureTrack(
+    [46.0, 46.002, 46.004, 46.02, 46.022, 46.024].map((latitude) => ({ latitude, longitude: 7.0 })),
+  );
+  const OUT_AND_BACK = measureTrack(
+    [46.0, 46.002, 46.004, 46.002, 46.0].map((latitude) => ({ latitude, longitude: 7.0 })),
+  );
+
+  it('finds the rider near the place the odometer expects', () => {
+    expect(locateOnTrack(CUT, { latitude: 46.001, longitude: 7.0 }, 100)).toBeCloseTo(111.2, 0);
+  });
+
+  it('finds the rider beyond a cut, where the odometer does not reach', () => {
+    const after = locateOnTrack(CUT, { latitude: 46.021, longitude: 7.0 }, 556);
+    expect(after).toBeCloseTo((CUT[3]?.distance ?? 0) + 111.2, 0);
+  });
+
+  it('keeps to the leg of an out-and-back track that the odometer expects', () => {
+    const spot = { latitude: 46.001, longitude: 7.0 };
+    expect(locateOnTrack(OUT_AND_BACK, spot, 111)).toBeCloseTo(111.2, 0);
+    expect(locateOnTrack(OUT_AND_BACK, spot, 778)).toBeCloseTo(778.4, 0);
+  });
+
+  it('finds nothing off the track', () => {
+    expect(locateOnTrack(CUT, { latitude: 46.001, longitude: 7.01 }, 100)).toBeUndefined();
+  });
+
+  it('keeps the offset of the track to the odometer from the last place found', () => {
+    const offset = trackOffset(CUT, { distance: 556, latitude: 46.021, longitude: 7.0 }, 0);
+    expect(offset).toBeCloseTo((CUT[3]?.distance ?? 0) - 445, 0);
+    expect(trackOffset(CUT, { distance: 600, latitude: 46.001, longitude: 7.01 }, offset)).toBe(offset);
   });
 });

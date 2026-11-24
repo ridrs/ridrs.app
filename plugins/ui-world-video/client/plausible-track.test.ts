@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TrackPoint } from './library.ts';
 import { PLAUSIBLE, plausibleTrack } from './plausible-track.ts';
-import { buildTrack } from './track.ts';
+import { buildTrack, gradientAt } from './track.ts';
 
 /** m per degree of latitude, as the haversine distance has it. */
 const METRES_PER_DEGREE = (6_371_008.8 * Math.PI) / 180;
@@ -71,6 +71,18 @@ describe('plausibleTrack', () => {
     expect(repairs).toEqual([{ kind: 'jump', time: 15, metres: expect.closeTo(40, 6) }]);
     expect(track.points).toEqual(points);
     expect(track.length).toBeCloseTo(150, 6);
+  });
+
+  it('marks the elevation across a jump as a step, not a climb', () => {
+    const points = straight(30).map((p, t) => (t >= 15 ? { ...at(5 * t + 400, t), elevation: 160 } : p));
+    const { track } = plausibleTrack(points);
+    expect(track.steps?.[14]).toBeCloseTo(60, 6);
+    expect(track.steps?.filter((step) => step !== 0)).toHaveLength(1);
+    expect(gradientAt(track, track.distances[15] ?? 0)).toBeCloseTo(0, 9);
+  });
+
+  it('marks no steps without a jump', () => {
+    expect(plausibleTrack(straight(30)).track.steps).toBeUndefined();
   });
 
   it('holds to the limits of a bicycle or a camera motorbike', () => {

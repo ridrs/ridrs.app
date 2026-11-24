@@ -148,8 +148,9 @@ function dropImplausible(
  *    beyond them, further than `PLAUSIBLE.lateral` or `PLAUSIBLE.longitudinal` allow, is
  *    dropped (`spike`);
  * 3. a single segment far faster than its neighbours, which agree with each other, and not made
- *    up for by slow segments within `MAKE_UP` s, is a jump of the GPS: it counts with their
- *    speed (`jump`); the points stay where they are;
+ *    up for by slow segments within `MAKE_UP` s, is a jump of the GPS or a cut of the video: it
+ *    counts with their speed (`jump`); the points stay where they are, and the elevation across
+ *    it is a step (`Track.steps`), not a climb;
  * 4. a point whose distance lies off the steady progress between its neighbours further than
  *    `PLAUSIBLE.longitudinal` allows is dropped (`lag`): a run of fixes that lags behind and
  *    catches up is bridged.
@@ -210,6 +211,8 @@ export function plausibleTrack(points: readonly TrackPoint[]): PlausibleTrack {
     }
     return short;
   };
+  /** m the elevation steps across each jump, by the point after it. */
+  const jumps = new Map<number, number>();
   for (let k = 2; k < speeds.length - 2; k += 1) {
     const before = speeds[k - 1] as number;
     const after = speeds[k + 1] as number;
@@ -227,6 +230,7 @@ export function plausibleTrack(points: readonly TrackPoint[]): PlausibleTrack {
         continue;
       }
       repairs.push({ kind: 'jump', time: at(kept[k + 1] as number).time, metres: (lengths[k] as number) - length });
+      jumps.set(kept[k + 1] as number, at(kept[k + 1] as number).elevation - at(kept[k] as number).elevation);
       lengths[k] = length;
       speeds[k] = speed;
     }
@@ -250,8 +254,21 @@ export function plausibleTrack(points: readonly TrackPoint[]): PlausibleTrack {
 
   const final = alive.flatMap((isAlive, i) => (isAlive ? [i] : []));
   const distances = final.map(along);
+  // A jump lies within the segment of the kept points around it.
+  const steps = final.slice(1).map((i, j) => {
+    let step = 0;
+    for (const [after, rise] of jumps) {
+      if (after > (final[j] as number) && after <= i) step += rise;
+    }
+    return step;
+  });
   return {
-    track: { points: final.map(at), distances, length: distances.at(-1) ?? 0 },
+    track: {
+      points: final.map(at),
+      distances,
+      length: distances.at(-1) ?? 0,
+      ...(jumps.size > 0 ? { steps } : {}),
+    },
     repairs: repairs.sort((a, b) => a.time - b.time),
   };
 }

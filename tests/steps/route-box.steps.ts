@@ -134,6 +134,16 @@ Then(
 );
 
 Then(
+  'the route profile marks the rider at about {int} % of the route',
+  async function (this: RidrsWorld, percent: number) {
+    const profile = await within(await box(this)).findByTestId('route-profile');
+    await waitFor(() =>
+      assert.equal(Math.round(Number(profile.getAttribute('data-at')) * 100), percent),
+    );
+  },
+);
+
+Then(
   'the route box shows the gradient {string} {string}',
   async function (this: RidrsWorld, value: string, unit: string) {
     const gradient = await within(await box(this)).findByTestId('route-gradient');

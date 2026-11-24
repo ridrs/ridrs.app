@@ -12,10 +12,20 @@ import {
 import { besideControl, entryNamed, findControl, parseTrackPositions, type TrackPosition } from '@ridrs/ride';
 import { formatDecimal, localizeNumber, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { messages } from './i18n/index.ts';
 import { canDrawMap, LiveMap, MAP_ATTRIBUTION } from './live-map.tsx';
-import { fitPlaces, gradeColour, indexAtDistance, measureTrack, polyline, profileOf, thin } from './route.ts';
+import {
+  fitPlaces,
+  gradeColour,
+  indexAtDistance,
+  type MeasuredPlace,
+  measureTrack,
+  polyline,
+  profileOf,
+  thin,
+  trackOffset,
+} from './route.ts';
 
 const EN_DASH = '–';
 const WIDTH = 300;
@@ -73,6 +83,23 @@ function useTrack(offer: RouteOffer | undefined): TrackPosition[] | undefined {
     };
   }, [files]);
   return track;
+}
+
+/**
+ * m the route's track runs ahead of the odometer, from where the world puts the rider: a cut of
+ * the video skips road the track runs along and the odometer never counts. 0 before the first
+ * position, on a new track and when a new ride starts its odometer again.
+ */
+function useTrackOffset(track: readonly MeasuredPlace[] | undefined, position: WorldPosition | undefined): number {
+  const [offset, setOffset] = useState(0);
+  const last = useRef<{ track: readonly MeasuredPlace[]; distance: number }>(undefined);
+  useEffect(() => {
+    if (!track || !position) return;
+    const same = last.current?.track === track && position.distance >= last.current.distance;
+    setOffset((previous) => trackOffset(track, position, same ? previous : 0));
+    last.current = { track, distance: position.distance };
+  }, [track, position]);
+  return track && position ? offset : 0;
 }
 
 /**
@@ -233,6 +260,14 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
   useEffect(() => ctx.events.subscribe(physicsStateEvent, ({ payload }) => setState(payload)), [ctx]);
   useEffect(() => ctx.events.subscribe(worldPositionEvent, ({ payload }) => setPosition(payload)), [ctx]);
 
+  const measured = useMemo(() => (track ? measureTrack(track) : undefined), [track]);
+  const offset = useTrackOffset(measured, position);
+  // The maps and the profile measure along the track, cuts of the video included.
+  const placed = useMemo(
+    () => (position ? { ...position, distance: position.distance + offset } : undefined),
+    [position, offset],
+  );
+
   const percent = state ? state.road.gradient * 100 : undefined;
   const hasProfile = (offer?.sparkline?.length ?? 0) > 1;
 
@@ -258,8 +293,8 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
         pointerEvents: 'none',
       }}
     >
-      {track ? <RouteMap track={track} {...(position ? { position } : {})} /> : null}
-      {offer && hasProfile ? <RouteProfile offer={offer} {...(state ? { distance: state.distance } : {})} /> : null}
+      {track ? <RouteMap track={track} {...(placed ? { position: placed } : {})} /> : null}
+      {offer && hasProfile ? <RouteProfile offer={offer} {...(state ? { distance: state.distance + offset } : {})} /> : null}
       <div data-testid="route-gradient" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span
           style={{

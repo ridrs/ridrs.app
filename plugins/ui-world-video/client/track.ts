@@ -15,6 +15,11 @@ export interface Track {
   readonly distances: readonly number[];
   /** m from the first point to the last. */
   readonly length: number;
+  /**
+   * m the elevation steps from point `i` to the next across a jump: a cut of the video or of the
+   * GPS (ADR 0063), road no one rode. The gradient leaves it out. Absent without a jump.
+   */
+  readonly steps?: readonly number[];
 }
 
 /** Where on the route a distance lies: WGS 84 degrees, m above sea level, s into the video. */
@@ -98,9 +103,28 @@ export function placeAt(track: Track, distance: number): TrackPlace {
     : { latitude: a.latitude, longitude: a.longitude, elevation: a.elevation, time: a.time };
 }
 
+/** m the elevation steps between `from` and `to` across jumps of the track, linear within each. */
+function steppedBetween(track: Track, from: number, to: number): number {
+  const { steps, distances } = track;
+  if (!steps) {
+    return 0;
+  }
+  let stepped = 0;
+  for (let i = segmentAt(track, from); i < distances.length - 1 && (distances[i] ?? 0) < to; i += 1) {
+    const start = distances[i] ?? 0;
+    const end = distances[i + 1] ?? start;
+    const overlap = Math.min(to, end) - Math.max(from, start);
+    if (end > start && overlap > 0) {
+      stepped += ((steps[i] ?? 0) * overlap) / (end - start);
+    }
+  }
+  return stepped;
+}
+
 /**
  * The gradient at `distance`, rise over run across `GRADIENT_BASE` m centred on it (shorter at
- * the route's ends), within ±`MAX_GRADIENT`. Flat beyond the end.
+ * the route's ends), within ±`MAX_GRADIENT`; a step across a jump of the track does not rise.
+ * Flat beyond the end.
  */
 export function gradientAt(track: Track, distance: number): number {
   const from = Math.max(0, distance - GRADIENT_BASE / 2);
@@ -108,6 +132,6 @@ export function gradientAt(track: Track, distance: number): number {
   if (to - from < 1) {
     return 0;
   }
-  const rise = placeAt(track, to).elevation - placeAt(track, from).elevation;
+  const rise = placeAt(track, to).elevation - placeAt(track, from).elevation - steppedBetween(track, from, to);
   return Math.max(-MAX_GRADIENT, Math.min(MAX_GRADIENT, rise / (to - from)));
 }

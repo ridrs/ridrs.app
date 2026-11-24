@@ -24,6 +24,19 @@ const OUT_AND_BACK_POINTS = [
   [46.0, 7.0],
 ] as const;
 
+/**
+ * A track due north with a cut of the video after 445 m: the next point lies 1.78 km further on,
+ * a second later. The rider's odometer does not count the cut; the track's own distance does.
+ */
+const CUT_POINTS = [
+  [46.0, 7.0],
+  [46.002, 7.0],
+  [46.004, 7.0],
+  [46.02, 7.0],
+  [46.022, 7.0],
+  [46.024, 7.0],
+] as const;
+
 const gpxOf = (name: string, points: readonly (readonly [number, number])[]) =>
   `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="ridrs fixture" xmlns="http://www.topografix.com/GPX/1/1">
@@ -81,10 +94,30 @@ const outAndBackOffer: RouteOffer = {
   world: { landscape: 'fixture-route-box/landscape', route: 'out-and-back' },
 };
 
+const cutOffer: RouteOffer = {
+  id: 'fixture-route-box/cut',
+  kind: 'video',
+  title: 'Cut',
+  distance: 2669,
+  ascent: 50,
+  sparkline: [100, 110, 120, 130, 140, 150],
+  tags: {},
+  availability: {
+    state: 'ready',
+    files: {
+      'cut/cut.xml': file('application/xml', controlOf('Cut')),
+      'cut/video.mp4': 'data:video/mp4;base64,',
+      'cut/track.gpx': file('application/gpx+xml', gpxOf('Cut', CUT_POINTS)),
+    },
+  },
+  world: { landscape: 'fixture-route-box/landscape', route: 'cut' },
+};
+
 /** Downloaded video routes with tracks and elevations, for the route box scenarios. */
 export default definePlugin({
   start(ctx) {
     ctx.state.set(routeOfferState, offer.id, offer);
     ctx.state.set(routeOfferState, outAndBackOffer.id, outAndBackOffer);
+    ctx.state.set(routeOfferState, cutOffer.id, cutOffer);
   },
 });

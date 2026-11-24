@@ -39,6 +39,16 @@ Feature: A box at the top right shows the route being ridden
     When the world reports the rider at 46.00201, 7.0000 after 667 m
     Then the route map shows 4 points of the track as ridden
 
+  Scenario: After a cut of the video the map and the profile follow the rider, not the odometer
+    The odometer counts only what the rider rides; a cut of the video skips the road between its
+    two sides, which the route's track still runs along. Where the world puts the rider tells how
+    far along the track that is.
+    Given "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "cut"
+    When the world reports the rider at 46.0220, 7.0000 after 667 m
+    And the physics reports a road gradient of 2.0 % after 667 m
+    Then the route map shows 5 points of the track as ridden
+    And the route profile marks the rider at about 92 % of the route
+
   Scenario: The profile marks the rider along the route
     Given "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "hill"
     When the physics reports a road gradient of 4.5 % after 300 m
