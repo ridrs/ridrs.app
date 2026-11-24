@@ -3,27 +3,18 @@
 import type { CSSProperties } from 'react';
 
 /**
- * Shared cockpit surface language for the upper HUD panels (`ride-facts` and `route-box`), matching
- * the frosted dark glass of the bottom telemetry gauges (`gauge.tsx`) and `ui-widget-workout`.
+ * Flat, lean frosted glass sheet shared by the upper HUD panels (`ride-facts` and `route-box`),
+ * matching `ui-widget-workout`: one 12 px translucent surface with a single hairline edge and no
+ * nested boxes or inner bevels.
  */
 export const HUD_PANEL_GLASS: CSSProperties = {
-  borderRadius: 'var(--ridrs-radius-lg)',
-  backgroundColor: 'rgb(10 16 28 / .68)',
-  backgroundImage:
-    'linear-gradient(180deg, rgb(28 44 72 / .34) 0%, rgb(11 18 32 / .18) 44%, rgb(5 9 18 / .38) 100%)',
-  backdropFilter: 'blur(16px) saturate(145%)',
-  WebkitBackdropFilter: 'blur(16px) saturate(145%)',
-  boxShadow:
-    '0 18px 42px -10px rgb(0 0 0 / .58), inset 0 1px 0 rgb(255 255 255 / .2), inset 0 0 0 1px rgb(255 255 255 / .12)',
+  borderRadius: 'var(--ridrs-radius)',
+  backgroundColor: 'rgb(8 13 22 / .72)',
+  backdropFilter: 'blur(16px) saturate(140%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+  boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .1), 0 12px 28px -8px rgb(0 0 0 / .45)',
   color: 'var(--ridrs-text)',
   fontFamily: 'var(--ridrs-font-text)',
-};
-
-/** Recessed dark well inside a HUD glass panel for charts, elevation profiles and maps. */
-export const HUD_CHART_WELL: CSSProperties = {
-  borderRadius: 'var(--ridrs-radius-sm)',
-  backgroundColor: 'rgb(5 9 18 / .54)',
-  boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .08), inset 0 2px 6px rgb(0 0 0 / .35)',
 };
 
 /** Standard 11 px mono micro-label used uniformly across every HUD metric and header. */

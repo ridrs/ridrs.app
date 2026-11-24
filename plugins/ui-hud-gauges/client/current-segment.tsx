@@ -14,7 +14,7 @@ import {
 import type { TrackPosition } from '@ridrs/ride';
 import { formatDecimal, localizeNumber, type UiContext } from '@ridrs/ui-sdk';
 import { type CSSProperties, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { HUD_CHART_WELL, HUD_LABEL, HUD_UNIT } from './hud-style.ts';
+import { HUD_LABEL, HUD_UNIT } from './hud-style.ts';
 import type { Messages } from './i18n/en.ts';
 import {
   type ActiveWorkoutStepInfo,
@@ -39,10 +39,10 @@ import {
   WORKOUT_RING_SEGMENTS,
 } from './segment.ts';
 
-const PROFILE = { width: 320, height: 42 } as const;
-const RING_STROKE = 3;
-const RING_RADIUS = 18;
-const FALLBACK_RING_SIZE = { width: 360, height: 132 } as const;
+const PROFILE = { width: 320, height: 36 } as const;
+const RING_STROKE = 2.5;
+const RING_RADIUS = 14;
+const FALLBACK_RING_SIZE = { width: 356, height: 124 } as const;
 const EN_DASH = '–';
 
 const VALUE_SECONDARY: CSSProperties = {
@@ -175,27 +175,11 @@ function formatClimbDistance(meters: number, language: Language): string {
   return `${Math.round(meters)} m`;
 }
 
-/** Gaming KOM badge colour by climb category (HC / 1 coral-red, 2 / 3 amber, 4 cyan). */
-function climbBadgeStyle(category: RouteClimb['category']): CSSProperties {
-  if (category === 'HC' || category === '1') {
-    return {
-      background: 'rgb(255 90 110 / .24)',
-      boxShadow: 'inset 0 0 0 1px rgb(255 90 110 / .5)',
-      color: '#ff8a98',
-    };
-  }
-  if (category === '2' || category === '3') {
-    return {
-      background: 'rgb(255 182 46 / .2)',
-      boxShadow: 'inset 0 0 0 1px rgb(255 182 46 / .45)',
-      color: 'var(--ridrs-warn)',
-    };
-  }
-  return {
-    background: 'rgb(0 240 255 / .16)',
-    boxShadow: 'inset 0 0 0 1px rgb(0 240 255 / .38)',
-    color: 'var(--ridrs-info)',
-  };
+/** Flat typographic accent colour by climb category (HC / 1 coral-red, 2 / 3 amber, 4 cyan). */
+function climbCategoryColour(category: RouteClimb['category']): string {
+  if (category === 'HC' || category === '1') return '#ff7a8a';
+  if (category === '2' || category === '3') return 'var(--ridrs-warn)';
+  return 'var(--ridrs-info)';
 }
 
 /** Fine-segmented rounded-rectangle progress ring hugging the outer border of `ride-facts`. */
@@ -270,7 +254,7 @@ export function WorkoutProgressRing({
   );
 }
 
-/** Fine-grained local elevation profile inside a recessed dark well, shaded with a vertical gradient. */
+/** Frameless local elevation profile whose terrain dissolves cleanly into the glass via a vertical mask. */
 function LocalElevationProfile({
   profile,
   summitEdge,
@@ -278,41 +262,31 @@ function LocalElevationProfile({
   readonly profile: LocalProfile;
   readonly summitEdge: boolean;
 }) {
-  const shadeId = `seg-shade-${useId().replace(/[^A-Za-z0-9-]/g, '')}`;
+  const id = useId().replace(/[^A-Za-z0-9-]/g, '');
+  const fadeId = `seg-fade-${id}`;
+  const maskId = `seg-mask-${id}`;
   const riderShare = profile.rider.x / PROFILE.width;
-  const firstX = profile.line[0]?.x ?? 0;
-  const lastX = profile.line.at(-1)?.x ?? PROFILE.width;
-  const areaPoints = polyline([
-    { x: firstX, y: PROFILE.height },
-    ...profile.line,
-    { x: lastX, y: PROFILE.height },
-  ]);
 
   return (
-    <div style={{ ...HUD_CHART_WELL, padding: '4px 6px', overflow: 'hidden' }}>
-      <svg
-        data-testid="segment-profile"
-        {...(summitEdge ? { 'data-summit-edge': 'true' } : {})}
-        viewBox={`0 0 ${PROFILE.width} ${PROFILE.height}`}
-        width="100%"
-        height={PROFILE.height}
-        aria-hidden="true"
-        style={{ display: 'block' }}
-      >
-        <defs>
-          <linearGradient id={shadeId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#050912" stopOpacity={0} />
-            <stop offset="100%" stopColor="#050912" stopOpacity={0.68} />
-          </linearGradient>
-        </defs>
-        <line
-          x1={0}
-          y1={PROFILE.height * 0.5}
-          x2={PROFILE.width}
-          y2={PROFILE.height * 0.5}
-          stroke="rgb(255 255 255 / .07)"
-          strokeDasharray="2 4"
-        />
+    <svg
+      data-testid="segment-profile"
+      {...(summitEdge ? { 'data-summit-edge': 'true' } : {})}
+      viewBox={`0 0 ${PROFILE.width} ${PROFILE.height}`}
+      width="100%"
+      height={PROFILE.height}
+      aria-hidden="true"
+      style={{ display: 'block' }}
+    >
+      <defs>
+        <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={0.72} />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+        </linearGradient>
+        <mask id={maskId}>
+          <rect x={0} y={0} width={PROFILE.width} height={PROFILE.height} fill={`url(#${fadeId})`} />
+        </mask>
+      </defs>
+      <g mask={`url(#${maskId})`}>
         {profile.stretches.map((stretch) => (
           <polygon
             key={stretch.from}
@@ -320,52 +294,50 @@ function LocalElevationProfile({
             fill={stretch.colour}
             stroke={stretch.colour}
             strokeWidth={0.6}
-            opacity={stretch.to <= riderShare ? 0.94 : 0.6}
+            opacity={stretch.to <= riderShare ? 0.96 : 0.62}
           />
         ))}
-        <polygon points={areaPoints} fill={`url(#${shadeId})`} />
-        <polyline
-          points={polyline(profile.line)}
-          fill="none"
-          stroke="rgb(255 255 255 / .9)"
-          strokeWidth={1.6}
-          strokeLinejoin="round"
-        />
-        <line
-          x1={profile.rider.x}
-          y1={0}
-          x2={profile.rider.x}
-          y2={PROFILE.height}
-          stroke="var(--ridrs-accent)"
-          strokeWidth={1.5}
-        />
-        <circle cx={profile.rider.x} cy={profile.rider.y} r={6} fill="rgb(204 255 0 / .24)" />
-        <circle
-          cx={profile.rider.x}
-          cy={profile.rider.y}
-          r={3.5}
-          fill="var(--ridrs-accent)"
-          stroke="#07090e"
-          strokeWidth={1.6}
-        />
-        {summitEdge ? (
-          <g data-testid="summit-marker">
-            <line
-              x1={PROFILE.width - 2}
-              y1={0}
-              x2={PROFILE.width - 2}
-              y2={PROFILE.height}
-              stroke="var(--ridrs-info)"
-              strokeWidth={1.6}
-            />
-            <polygon
-              points={`${PROFILE.width - 2},1 ${PROFILE.width - 11},5 ${PROFILE.width - 2},9`}
-              fill="var(--ridrs-info)"
-            />
-          </g>
-        ) : null}
-      </svg>
-    </div>
+      </g>
+      <polyline
+        points={polyline(profile.line)}
+        fill="none"
+        stroke="rgb(255 255 255 / .9)"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <line
+        x1={profile.rider.x}
+        y1={0}
+        x2={profile.rider.x}
+        y2={PROFILE.height}
+        stroke="var(--ridrs-accent)"
+        strokeWidth={1.4}
+      />
+      <circle
+        cx={profile.rider.x}
+        cy={profile.rider.y}
+        r={3.2}
+        fill="var(--ridrs-accent)"
+        stroke="#080d16"
+        strokeWidth={1.5}
+      />
+      {summitEdge ? (
+        <g data-testid="summit-marker">
+          <line
+            x1={PROFILE.width - 2}
+            y1={0}
+            x2={PROFILE.width - 2}
+            y2={PROFILE.height}
+            stroke="var(--ridrs-info)"
+            strokeWidth={1.5}
+          />
+          <polygon
+            points={`${PROFILE.width - 2},1 ${PROFILE.width - 10},4.5 ${PROFILE.width - 2},8`}
+            fill="var(--ridrs-info)"
+          />
+        </g>
+      ) : null}
+    </svg>
   );
 }
 
@@ -384,20 +356,19 @@ function WorkoutSegment({
       ? formatDuration(Math.max(0, step.durationSeconds - step.elapsedSeconds))
       : formatDuration(step.elapsedSeconds);
   const total = step.durationSeconds !== undefined ? `/ ${formatDuration(step.durationSeconds)}` : undefined;
-  const divided: CSSProperties = { borderLeft: '1px solid rgb(255 255 255 / .08)', paddingLeft: 14 };
 
   return (
     <div
       style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-        columnGap: 12,
+        columnGap: 20,
         alignItems: 'start',
       }}
     >
       <div
         data-testid="segment-workout-time"
-        style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
       >
         <span data-testid="label" style={HUD_LABEL}>
           {text.step}
@@ -417,7 +388,7 @@ function WorkoutSegment({
       {power ? (
         <div
           data-testid="segment-workout-power"
-          style={{ ...divided, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
         >
           <span data-testid="label" style={{ ...HUD_LABEL, color: 'var(--ridrs-accent)' }}>
             {text.target}
@@ -439,7 +410,7 @@ function WorkoutSegment({
           </span>
         </div>
       ) : (
-        <div style={{ ...divided, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
           <span style={HUD_LABEL}>{text.target}</span>
           <span style={{ ...VALUE_SECONDARY, color: 'var(--ridrs-text-muted)' }}>{EN_DASH}</span>
         </div>
@@ -448,7 +419,7 @@ function WorkoutSegment({
       {cadence ? (
         <div
           data-testid="segment-workout-cadence"
-          style={{ ...divided, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
         >
           <span data-testid="label" style={HUD_LABEL}>
             {text.cadence}
@@ -463,7 +434,7 @@ function WorkoutSegment({
           </span>
         </div>
       ) : (
-        <div style={{ ...divided, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
           <span style={HUD_LABEL}>{text.cadence}</span>
           <span style={{ ...VALUE_SECONDARY, color: 'var(--ridrs-text-muted)' }}>{EN_DASH}</span>
         </div>
@@ -505,7 +476,7 @@ function GradientMetric({
   );
 }
 
-/** Summit segment: countdown pill left, peak + KOM badge right, climb-only profile, labelled grade + climb gain. */
+/** Summit segment: flat countdown left, peak + category right, frameless climb profile, labelled grade + climb gain. */
 function SummitSegment({
   active,
   profile,
@@ -530,7 +501,7 @@ function SummitSegment({
     <>
       <div
         data-testid="segment-summit-header"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}
+        style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}
       >
         <span
           data-testid="segment-countdown"
@@ -538,26 +509,20 @@ function SummitSegment({
             counting
               ? {
                   flexShrink: 0,
-                  padding: '2px 9px',
-                  borderRadius: 'var(--ridrs-radius-pill)',
-                  background: 'var(--ridrs-accent)',
-                  boxShadow: '0 0 12px rgb(204 255 0 / .38)',
                   fontFamily: 'var(--ridrs-font-display)',
                   fontStyle: 'italic',
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: 600,
+                  lineHeight: 1.1,
                   fontVariantNumeric: 'tabular-nums',
-                  color: 'var(--ridrs-on-accent)',
+                  color: 'var(--ridrs-accent)',
                 }
               : {
                   flexShrink: 0,
-                  padding: '2px 8px',
-                  borderRadius: 'var(--ridrs-radius-pill)',
-                  background: 'rgb(255 255 255 / .08)',
-                  boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .12)',
                   fontFamily: 'var(--ridrs-font-mono)',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 500,
+                  lineHeight: 1.1,
                   fontVariantNumeric: 'tabular-nums',
                   color: '#f1f5f9',
                 }
@@ -567,7 +532,7 @@ function SummitSegment({
         </span>
         <div
           data-testid="segment-summit-info"
-          style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}
+          style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0 }}
         >
           {active.climb.name ? (
             <span
@@ -587,15 +552,13 @@ function SummitSegment({
             data-testid="segment-climb-category"
             style={{
               flexShrink: 0,
-              padding: '2px 7px',
-              borderRadius: 5,
               fontFamily: 'var(--ridrs-font-display)',
               fontStyle: 'italic',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 600,
               letterSpacing: '.06em',
               textTransform: 'uppercase',
-              ...climbBadgeStyle(active.climb.category),
+              color: climbCategoryColour(active.climb.category),
             }}
           >
             {text.climbCategory(active.climb.category)}
@@ -634,7 +597,7 @@ function SummitSegment({
   );
 }
 
-/** Local route snippet: shaded profile well, labelled gradient and labelled local elevation. */
+/** Local route snippet: frameless profile, labelled gradient and labelled local elevation. */
 function LocalSnippetSegment({
   profile,
   gradePercent,
@@ -681,11 +644,12 @@ function LocalSnippetSegment({
 }
 
 /**
- * The context-aware "Current Segment" cockpit deck below TIME / DISTANCE / SPEED:
+ * The context-aware "Current Segment" section below TIME / DISTANCE / SPEED, sitting flat on the
+ * same glass surface (separated only by a 1 px hairline, with no nested boxes):
  * - Workout step: labelled step timer, target watts and target cadence aligned with the 3 columns.
- * - Summit / climb: countdown pill left, peak & KOM badge right, shaded climb-only profile, labelled
- *   gradient and climbed / total gain (`hm`).
- * - Local snippet: shaded local elevation profile, labelled gradient, and labelled elevation.
+ * - Summit / climb: flat countdown left, peak & category right, frameless climb-only profile,
+ *   labelled gradient and climbed / total gain (`hm`).
+ * - Local snippet: frameless local elevation profile, labelled gradient, and labelled elevation.
  * - Flat road (no workout step or climb): hidden completely.
  */
 export function CurrentSegmentView({
@@ -761,13 +725,11 @@ export function CurrentSegmentView({
       data-testid="current-segment"
       data-mode={mode}
       style={{
-        borderTop: '1px solid rgb(255 255 255 / .1)',
-        backgroundColor: 'rgb(5 9 18 / .44)',
-        padding: mode === 'workout' ? '9px 16px 11px' : '9px 14px 11px',
-        borderRadius: '0 0 var(--ridrs-radius-lg) var(--ridrs-radius-lg)',
+        borderTop: '1px solid rgb(255 255 255 / .08)',
+        padding: '9px 16px 10px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 7,
+        gap: 6,
       }}
     >
       {mode === 'workout' ? <WorkoutSegment workout={workout} text={text} /> : null}

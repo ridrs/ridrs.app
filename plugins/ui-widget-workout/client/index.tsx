@@ -201,19 +201,18 @@ function lengthText(step: StepView, text: Messages): string {
 const COMING = 5;
 
 /**
- * Shared frosted dark HUD cockpit look matching `ui-hud-gauges` (`HUD_PANEL_GLASS`):
- * 16 px outer radius (`--ridrs-radius-lg`), 11 px mono labels, tabular Sans values, Chakra Petch
- * italic gaming accents on zone badges and countdowns, and a single crisp readable text layer on
- * the active interval row.
+ * Flat, lean frosted HUD look matching `ui-hud-gauges` (`HUD_PANEL_GLASS`):
+ * one outer 11 px / 14 px padding grid, zero nested row cards or inner borders, a slim 2.5 px
+ * left zone bar per row, and a full-bleed flat highlight band for the active interval.
  */
 const WORKOUT_CSS = `
-.wk { box-sizing: border-box; display: flex; flex-direction: column; gap: 9px; padding: 11px 10px 10px;
+.wk { box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; padding: 11px 14px;
   color: var(--ridrs-text, #f1f5f9); font-family: var(--ridrs-font-text); font-variant-numeric: tabular-nums;
   line-height: 1.15; dynamic-range-limit: no-limit; }
 .wk-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .wk-kicker { font-family: var(--ridrs-font-mono); font-size: var(--ridrs-size-label, 11px); font-weight: 500;
   letter-spacing: .1em; text-transform: uppercase; color: var(--ridrs-info, #00f0ff); line-height: 1.15; }
-.wk-head { display: flex; flex-direction: column; gap: 4px; padding: 0 4px 2px; }
+.wk-head { display: flex; flex-direction: column; gap: 3px; padding: 0; }
 .wk-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .wk-step-group { display: inline-flex; align-items: baseline; gap: 6px; }
 .wk-pos { font-family: var(--ridrs-font-display, var(--ridrs-font-text)); font-style: italic; font-size: 14px;
@@ -221,47 +220,41 @@ const WORKOUT_CSS = `
 .wk-pos-of { font-size: 12px; font-weight: 500; color: var(--ridrs-text-muted, #b0bdd1); }
 .wk-total { display: inline-flex; align-items: center; gap: 5px; font-family: var(--ridrs-font-mono);
   font-size: 12px; font-weight: 500; color: var(--ridrs-text-muted, #b0bdd1); }
-.wk-total svg { width: 12px; height: 12px; opacity: .82; }
+.wk-total svg { width: 12px; height: 12px; opacity: .8; }
 .wk-heading { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 14px; font-weight: 500; line-height: 1.25; color: #f1f5f9; }
-.wk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.wk-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "zone len target";
-  align-items: center; column-gap: 10px; min-height: 30px; border-radius: var(--ridrs-radius-sm, 8px); overflow: hidden;
-  background: rgb(5 9 18 / .52); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07); font-size: 13px; font-weight: 500; }
-.wk-row[data-state="done"] { background: rgb(5 9 18 / .34); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .04);
-  opacity: .52; }
-.wk-row[data-state="done"] .wk-zone { background: color-mix(in srgb, var(--hue) 28%, rgb(15 23 42));
-  color: #e2e8f0; box-shadow: inset 3px 0 0 var(--lit); }
-.wk-zone { grid-area: zone; align-self: stretch; display: grid; place-items: center;
-  font-family: var(--ridrs-font-display, var(--ridrs-font-text)); font-style: italic; font-size: 12px; font-weight: 600;
-  letter-spacing: .03em; background: var(--lit); color: var(--ink); }
-.wk-zone:empty { background: linear-gradient(90deg, var(--lit) 0 3px, color-mix(in srgb, var(--hue) 18%, transparent) 3px); }
+.wk-list { list-style: none; margin: 0; padding: 3px 0; border-top: 1px solid rgb(255 255 255 / .08);
+  display: flex; flex-direction: column; gap: 2px; }
+.wk-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-areas: "zone len target";
+  align-items: center; column-gap: 8px; min-height: 25px; background: none; font-size: 13px; font-weight: 500; }
+.wk-row[data-state="done"] { opacity: .42; }
+.wk-zone { grid-area: zone; display: flex; align-items: center; min-height: 16px; padding-left: 6px;
+  border-left: 2.5px solid var(--lit); background: none;
+  font-family: var(--ridrs-font-display, var(--ridrs-font-text)); font-style: italic; font-size: 11px; font-weight: 600;
+  letter-spacing: .03em; color: color-mix(in oklab, var(--lit) 55%, #ffffff); }
+.wk-zone:empty { border-left-color: rgb(255 255 255 / .24); }
 .wk-len { grid-area: len; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--ridrs-text-muted, #b0bdd1); }
-.wk-target { grid-area: target; padding-right: 10px; white-space: nowrap; font-size: 14px; font-weight: 500;
-  color: #f1f5f9; }
+.wk-target { grid-area: target; white-space: nowrap; font-size: 13px; font-weight: 500; color: #e2e8f0; }
 /*
- * The active interval row: dark glass card accented in the step's zone, a single high-contrast
- * white text layer (never split across two colours), and a glowing Display-P3 progress bar along
- * its bottom edge.
+ * The active interval row: a flat full-bleed band across the panel (margin: 2px -14px), no
+ * rounded inner box, aligned to the exact outer 14 px grid (3 px border + 11 px pad = 14 px),
+ * with a crisp 2 px bottom progress line.
  */
-.wk-row[data-state="current"] { display: block; position: relative; overflow: visible; background: none; box-shadow: none; }
-.wk-cur { position: relative; border-radius: 10px; overflow: hidden;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 24%, rgb(14 22 38 / .94)) 0%, rgb(9 15 28 / .9) 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue) 56%, rgb(255 255 255 / .2)), 0 8px 20px -6px rgb(0 0 0 / .55); }
-.wk-wash { position: absolute; inset: 0 auto 0 36px; width: calc((100% - 36px) * var(--p, 0));
-  background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 22%, transparent), color-mix(in srgb, var(--hue) 8%, transparent));
-  transition: width 1s linear; pointer-events: none; }
-.wk-bar { position: absolute; left: 36px; bottom: 0; height: 3px; width: calc((100% - 36px) * var(--p, 0));
-  background: var(--lit); box-shadow: 0 0 10px var(--lit); transition: width 1s linear; pointer-events: none; }
-.wk-layer { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto;
-  grid-template-areas: "zone clock target" "zone detail target"; align-items: center; column-gap: 11px; row-gap: 2px;
-  min-height: 54px; color: #ffffff; }
-.wk-layer .wk-zone { font-size: 14px; }
-.wk-layer .wk-target { font-size: 20px; font-weight: 500; letter-spacing: -.015em; color: #ffffff; padding-right: 12px; }
+.wk-row[data-state="current"] { display: block; position: relative; background: none; }
+.wk-cur { position: relative; margin: 2px -14px; padding: 6px 14px 8px 11px; border-radius: 0;
+  border-left: 3px solid var(--lit);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 20%, transparent) 0%, transparent 92%); }
+.wk-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: calc(100% * var(--p, 0));
+  background: var(--lit); transition: width 1s linear; pointer-events: none; }
+.wk-layer { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-areas: "zone clock target" "zone detail target"; align-items: center; column-gap: 8px; row-gap: 2px;
+  color: #ffffff; }
+.wk-layer .wk-zone { border-left: 0; padding-left: 0; font-size: 13px; color: color-mix(in oklab, var(--lit) 65%, #ffffff); }
+.wk-layer .wk-target { font-size: 20px; font-weight: 500; letter-spacing: -.015em; color: #ffffff; }
 .wk-clock { grid-area: clock; align-self: end; position: relative; font-size: 20px; font-weight: 500;
-  letter-spacing: -.015em; line-height: 1.05; padding-top: 7px; color: #ffffff; }
-.wk-detail { grid-area: detail; align-self: start; padding-bottom: 8px; overflow: hidden; text-overflow: ellipsis;
+  letter-spacing: -.015em; line-height: 1.05; color: #ffffff; }
+.wk-detail { grid-area: detail; align-self: start; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--ridrs-text-muted, #b0bdd1); }
 .wk-detail .wk-len { color: inherit; }
 .wk-cad:not(:empty)::before { content: " · "; }
@@ -270,35 +263,33 @@ const WORKOUT_CSS = `
 .wk-countdown:empty { display: none; }
 .wk-cur[data-counting] .wk-left { visibility: hidden; }
 .wk-cur[data-counting] .wk-countdown { animation: wk-tick 1s ease-out infinite; transform-origin: left bottom; }
-@keyframes wk-tick { from { transform: scale(1.28); } to { transform: scale(1); } }
-/* A cue: for its time in the middle of the screen, a frosted cockpit banner with zone bar. */
+@keyframes wk-tick { from { transform: scale(1.25); } to { transform: scale(1); } }
+/* A cue: for its time in the middle of the screen, a flat frosted banner with zone edge. */
 .wk-cue { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); box-sizing: border-box;
   width: max-content; max-width: min(70%, 760px); pointer-events: none; text-align: center; }
 .wk-cue:empty { display: none; }
-.wk-cue-card { display: block; padding: 14px 28px 14px 32px; border-radius: var(--ridrs-radius-lg, 16px);
-  background-color: rgb(10 16 28 / .78);
-  background-image: linear-gradient(180deg, rgb(28 44 72 / .34) 0%, rgb(5 9 18 / .42) 100%);
-  backdrop-filter: blur(16px) saturate(145%); -webkit-backdrop-filter: blur(16px) saturate(145%);
+.wk-cue-card { display: block; padding: 13px 26px 13px 30px; border-radius: var(--ridrs-radius, 12px);
+  background-color: rgb(8 13 22 / .78);
+  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
   color: #ffffff;
-  box-shadow: inset 4px 0 0 var(--lit), inset 0 1px 0 rgb(255 255 255 / .2), inset 0 0 0 1px rgb(255 255 255 / .12), 0 20px 45px -12px rgb(0 0 0 / .65);
+  box-shadow: inset 3px 0 0 var(--lit), inset 0 0 0 1px rgb(255 255 255 / .1), 0 16px 36px -10px rgb(0 0 0 / .55);
   font-family: var(--ridrs-font-display, var(--ridrs-font-text)); font-style: italic; font-weight: 600;
   font-size: clamp(22px, 2.4vw, 34px); line-height: 1.2; text-wrap: balance;
   animation: wk-cue-in .28s ease-out; }
 @keyframes wk-cue-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .wk-cue-card { animation: none; }
-  .wk-wash, .wk-bar { transition: none; }
+  .wk-bar { transition: none; }
   .wk-cur[data-counting] .wk-countdown { animation: none; }
 }
-.wk-done { padding: 8px 6px; font-family: var(--ridrs-font-display, var(--ridrs-font-text)); font-style: italic;
+.wk-done { padding: 6px 0; border-top: 1px solid rgb(255 255 255 / .08);
+  font-family: var(--ridrs-font-display, var(--ridrs-font-text)); font-style: italic;
   font-size: 18px; font-weight: 600; color: var(--ridrs-accent, #ccff00); }
-/* The workout's intensity, below the last segment: quiet at 100 %, volt pill when adjusted. */
-.wk-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 4px 0;
-  border-top: 1px solid rgb(255 255 255 / .1); }
+/* The workout's intensity, below the last segment: flat text, volt when adjusted. */
+.wk-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0 0;
+  border-top: 1px solid rgb(255 255 255 / .08); }
 .wk-int-val { font-size: 13px; font-weight: 500; color: var(--ridrs-text-muted, #b0bdd1); }
-.wk-foot[data-changed] .wk-int-val { padding: 2px 8px; border-radius: var(--ridrs-radius-pill, 999px);
-  background: rgb(204 255 0 / .14); box-shadow: inset 0 0 0 1px rgb(204 255 0 / .38);
-  color: var(--ridrs-accent, #ccff00); }
+.wk-foot[data-changed] .wk-int-val { color: var(--ridrs-accent, #ccff00); }
 `;
 
 /** No zone (no FTP, heart rate, free ride): the gauges' neutral blue. */
@@ -325,7 +316,7 @@ interface Live {
   readonly countdown: number | undefined;
 }
 
-/** One segment: its zone, length and target; the current one also its cadence and bottom progress bar. */
+/** One segment: its zone, length and target; the current one also its cadence and bottom progress line. */
 function Row({
   step,
   state,
@@ -384,7 +375,6 @@ function Row({
               'aria-valuetext': text.left(clock(remaining)),
             })}
       >
-        <div className="wk-wash" aria-hidden="true" />
         <div className="wk-layer">
           <span className="wk-zone" data-part="zone">
             {zoneText}
@@ -487,17 +477,14 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
           // Top left, below the window's own buttons, which the Mac app has over the page.
           top: 'var(--ridrs-page-top, 40px)',
           left: 16,
-          width: 'clamp(268px, 21vw, 304px)',
+          width: 'clamp(260px, 20vw, 296px)',
           maxHeight: 'calc(100% - var(--ridrs-page-top, 40px) - 16px)',
           overflow: 'hidden',
-          borderRadius: 'var(--ridrs-radius-lg)',
-          backgroundColor: 'rgb(10 16 28 / .68)',
-          backgroundImage:
-            'linear-gradient(180deg, rgb(28 44 72 / .34) 0%, rgb(11 18 32 / .18) 44%, rgb(5 9 18 / .38) 100%)',
-          backdropFilter: 'blur(16px) saturate(145%)',
-          WebkitBackdropFilter: 'blur(16px) saturate(145%)',
-          boxShadow:
-            '0 18px 42px -10px rgb(0 0 0 / .58), inset 0 1px 0 rgb(255 255 255 / .2), inset 0 0 0 1px rgb(255 255 255 / .12)',
+          borderRadius: 'var(--ridrs-radius)',
+          backgroundColor: 'rgb(8 13 22 / .72)',
+          backdropFilter: 'blur(16px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+          boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .1), 0 12px 28px -8px rgb(0 0 0 / .45)',
           pointerEvents: 'none',
         }}
       >

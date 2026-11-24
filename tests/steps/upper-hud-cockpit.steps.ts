@@ -18,6 +18,16 @@ function alphas(value: string): number[] {
   );
 }
 
+function isFlatTransparent(bg: string): boolean {
+  const trimmed = bg.trim();
+  return (
+    trimmed === '' ||
+    trimmed === 'none' ||
+    trimmed === 'transparent' ||
+    trimmed === 'rgba(0, 0, 0, 0)'
+  );
+}
+
 function workoutFixture(name: string): Workout {
   return {
     format: 'ridrs-workout',
@@ -111,6 +121,80 @@ Then(
 );
 
 Then(
+  'the route box bleeds its map and profile edge-to-edge with zero outer padding and no inner rounded frames',
+  async function (this: RidrsWorld) {
+    const box = await within(ui(this)).findByTestId('route-box');
+    await waitFor(() => {
+      assert.ok(
+        box.style.padding === '0px' || box.style.padding === '0',
+        `Expected route-box padding to be 0, got "${box.style.padding}"`,
+      );
+      const map = within(box).getByTestId('route-map');
+      assert.ok(
+        map.style.borderRadius === '' ||
+          map.style.borderRadius === '0px' ||
+          map.style.borderRadius === '0',
+        `Expected route-map to have no inner border-radius, got "${map.style.borderRadius}"`,
+      );
+      const profile = within(box).getByTestId('route-profile');
+      assert.ok(
+        profile.style.padding === '' ||
+          profile.style.padding === '0px' ||
+          profile.style.padding === '0',
+        `Expected route-profile to have no inner padding, got "${profile.style.padding}"`,
+      );
+      assert.ok(
+        isFlatTransparent(profile.style.backgroundColor) &&
+          isFlatTransparent(profile.style.background),
+        `Expected route-profile to have no nested well background, got "${profile.style.backgroundColor || profile.style.background}"`,
+      );
+    });
+  },
+);
+
+Then(
+  'the workout HUD aligns its header, rows and footer on one padding grid without nested row boxes',
+  async function (this: RidrsWorld) {
+    const widget = await within(ui(this)).findByTestId('widget-workout');
+    await waitFor(() => {
+      const head = widget.querySelector<HTMLElement>('.wk-head');
+      const foot = widget.querySelector<HTMLElement>('.wk-foot');
+      const coming = widget.querySelector<HTMLElement>('.wk-row[data-state="coming"]');
+      const now = within(widget).getByTestId('workout-now');
+      assert.ok(head && foot && coming, 'Expected workout header, coming row and footer');
+      assert.equal(getComputedStyle(head).paddingLeft, '0px');
+      assert.equal(getComputedStyle(head).paddingRight, '0px');
+      assert.equal(getComputedStyle(foot).paddingLeft, '0px');
+      assert.equal(getComputedStyle(foot).paddingRight, '0px');
+      assert.ok(
+        isFlatTransparent(getComputedStyle(coming).backgroundColor),
+        `Expected coming row to have no nested box background, got "${getComputedStyle(coming).backgroundColor}"`,
+      );
+      const nowRadius = getComputedStyle(now).borderRadius;
+      assert.ok(
+        nowRadius === '' || nowRadius === '0px' || nowRadius === '0',
+        `Expected active workout row to have no nested rounded card radius, got "${nowRadius}"`,
+      );
+    });
+  },
+);
+
+Then(
+  'the central HUD segment section sits flat without a nested background fill',
+  async function (this: RidrsWorld) {
+    const card = await within(ui(this)).findByTestId('ride-facts');
+    await waitFor(() => {
+      const segment = within(card).getByTestId('current-segment');
+      assert.ok(
+        isFlatTransparent(segment.style.backgroundColor) &&
+          isFlatTransparent(segment.style.background),
+        `Expected current-segment to sit flat without background fill, got "${segment.style.backgroundColor || segment.style.background}"`,
+      );
+    });
+  },
+);
+
+Then(
   'the central HUD metric {string} carries the label {string}',
   async function (this: RidrsWorld, metricTestId: string, expectedLabel: string) {
     const card = await within(ui(this)).findByTestId('ride-facts');
@@ -172,39 +256,33 @@ Then(
 );
 
 Then(
-  'the central segment profile shades its terrain with a vertical gradient',
+  'the central segment profile sits directly in the segment section without a wrapper box and fades to transparent',
   async function (this: RidrsWorld) {
     const card = await within(ui(this)).findByTestId('ride-facts');
     await waitFor(() => {
-      const profile = within(card).getByTestId('segment-profile');
-      assert.ok(
-        profile.querySelector('defs linearGradient'),
-        'Expected a vertical linearGradient in segment-profile',
+      const segment = within(card).getByTestId('current-segment');
+      const profile = within(segment).getByTestId('segment-profile');
+      assert.equal(
+        profile.parentElement,
+        segment,
+        'Expected segment-profile SVG to sit directly in current-segment without a wrapper div box',
       );
+      const stops = [...profile.querySelectorAll('defs linearGradient stop')];
+      assert.ok(stops.length >= 2, 'Expected gradient stops in segment-profile');
+      assert.equal(stops.at(-1)?.getAttribute('stop-opacity'), '0');
     });
   },
 );
 
 Then(
-  'the route profile shades its terrain with a vertical gradient',
+  'the route profile fades its terrain to transparent and places the rider dot on the elevation curve',
   async function (this: RidrsWorld) {
     const box = await within(ui(this)).findByTestId('route-box');
     await waitFor(() => {
       const profile = within(box).getByTestId('route-profile');
-      assert.ok(
-        profile.querySelector('defs linearGradient'),
-        'Expected a vertical linearGradient in route-profile',
-      );
-    });
-  },
-);
-
-Then(
-  'the route profile places the rider dot on the elevation curve, not pinned to the top edge',
-  async function (this: RidrsWorld) {
-    const box = await within(ui(this)).findByTestId('route-box');
-    await waitFor(() => {
-      const profile = within(box).getByTestId('route-profile');
+      const stops = [...profile.querySelectorAll('defs linearGradient stop')];
+      assert.ok(stops.length >= 2, 'Expected gradient stops in route-profile');
+      assert.equal(stops.at(-1)?.getAttribute('stop-opacity'), '0');
       const dot = profile.querySelector('circle[data-testid="route-profile-rider"]');
       assert.ok(dot, 'Expected route-profile-rider circle on route profile');
       const cy = Number(dot.getAttribute('cy'));
@@ -214,15 +292,35 @@ Then(
 );
 
 Then(
-  'the route distance readout has its own dark backing capsule',
+  'the route distance readout is flat text without a backing capsule',
   async function (this: RidrsWorld) {
     const box = await within(ui(this)).findByTestId('route-box');
     await waitFor(() => {
       const dist = within(box).getByTestId('route-distance');
-      const bg = dist.style.backgroundColor || dist.style.background;
       assert.ok(
-        alphas(bg).some((alpha) => alpha >= 0.6 && alpha < 1),
-        `Expected dark translucent capsule backing on route-distance, got "${bg}"`,
+        isFlatTransparent(dist.style.backgroundColor) && isFlatTransparent(dist.style.background),
+        `Expected route-distance to have no capsule background, got "${dist.style.backgroundColor || dist.style.background}"`,
+      );
+    });
+  },
+);
+
+Then(
+  'the summit header items are flat text without pill backgrounds',
+  async function (this: RidrsWorld) {
+    const card = await within(ui(this)).findByTestId('ride-facts');
+    await waitFor(() => {
+      const countdown = within(card).getByTestId('segment-countdown');
+      const category = within(card).getByTestId('segment-climb-category');
+      assert.ok(
+        isFlatTransparent(countdown.style.backgroundColor) &&
+          isFlatTransparent(countdown.style.background),
+        `Expected segment-countdown to have no pill background, got "${countdown.style.backgroundColor || countdown.style.background}"`,
+      );
+      assert.ok(
+        isFlatTransparent(category.style.backgroundColor) &&
+          isFlatTransparent(category.style.background),
+        `Expected segment-climb-category to have no pill background, got "${category.style.backgroundColor || category.style.background}"`,
       );
     });
   },

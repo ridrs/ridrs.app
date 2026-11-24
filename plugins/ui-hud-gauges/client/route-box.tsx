@@ -12,7 +12,7 @@ import type { TrackPosition } from '@ridrs/ride';
 import { formatDecimal, localizeNumber, type UiContext } from '@ridrs/ui-sdk';
 import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useId, useMemo, useState } from 'react';
-import { HUD_CHART_WELL, HUD_LABEL, HUD_PANEL_GLASS } from './hud-style.ts';
+import { HUD_LABEL, HUD_PANEL_GLASS } from './hud-style.ts';
 import { messages } from './i18n/index.ts';
 import { canDrawMap, LiveMap, MAP_ATTRIBUTION } from './live-map.tsx';
 import { useRideRoute, useTrack, useTrackOffset } from './ride-route.ts';
@@ -27,11 +27,11 @@ import {
   thin,
 } from './route.ts';
 
-const WIDTH = 300;
-const MAP = { width: WIDTH - 20, height: 190, pad: 16 } as const;
+const WIDTH = 296;
+const MAP = { width: WIDTH, height: 186, pad: 16 } as const;
 /** What shows of the map once it leans back: the plane's foot stays, its top recedes. */
-const MAP_VIEW = 120;
-const PROFILE = { width: WIDTH - 32, height: 48 } as const;
+const MAP_VIEW = 116;
+const PROFILE = { width: WIDTH, height: 48 } as const;
 /** Points of the track the map draws at most: enough for its size, cheap to redraw. */
 const MAX_POINTS = 400;
 /** The lines of the map's ground grid. */
@@ -53,7 +53,7 @@ const SINGLE_LINE_TITLE = {
   textOverflow: 'ellipsis',
 } as const;
 
-/** A cockpit header scrim inside the map container: `ROUTE` micro-label + single-line route title. */
+/** A top scrim flush along the full-bleed map: `ROUTE` micro-label + single-line route title. */
 function MapTitleScrim({ label, title }: { readonly label: string; readonly title: string }) {
   return (
     <div
@@ -63,9 +63,9 @@ function MapTitleScrim({ label, title }: { readonly label: string; readonly titl
         display: 'flex',
         alignItems: 'center',
         gap: 7,
-        padding: '7px 10px 18px',
+        padding: '8px 12px 18px',
         background:
-          'linear-gradient(180deg, rgb(6 10 18 / .92) 0%, rgb(6 10 18 / .64) 64%, transparent 100%)',
+          'linear-gradient(180deg, rgb(8 13 22 / .88) 0%, rgb(8 13 22 / .54) 62%, transparent 100%)',
         pointerEvents: 'none',
       }}
     >
@@ -80,8 +80,8 @@ function MapTitleScrim({ label, title }: { readonly label: string; readonly titl
 }
 
 /**
- * The track alone, without a map: the whole track, the part ridden over it and the rider, on a
- * plane leaning back. Where no map can be drawn (no WebGL, offline).
+ * The track alone, without a map: full-bleed across the top of `route-box`, on a plane leaning
+ * back. Where no map can be drawn (no WebGL, offline).
  */
 function TrackMap({
   track,
@@ -108,25 +108,22 @@ function TrackMap({
         position: 'relative',
         height: MAP_VIEW,
         overflow: 'hidden',
-        borderRadius: 10,
-        background: 'radial-gradient(95% 85% at 50% 100%, rgb(36 62 102 / .5), rgb(5 9 18 / .72))',
-        boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .1)',
+        background: 'radial-gradient(95% 85% at 50% 100%, rgb(30 52 88 / .34), transparent)',
       }}
     >
       <div data-tilt="" style={{ transform: TILT, transformOrigin: '50% 100%', marginTop: MAP_VIEW - MAP.height }}>
         <svg viewBox={`0 0 ${MAP.width} ${MAP.height}`} width="100%" height={MAP.height} aria-hidden="true">
-          {/* A faint radar grid, so the plane reads as ground. */}
           {GRID_X.map((x) => (
-            <line key={`x${x}`} x1={x} y1={0} x2={x} y2={MAP.height} stroke="rgb(255 255 255 / .07)" />
+            <line key={`x${x}`} x1={x} y1={0} x2={x} y2={MAP.height} stroke="rgb(255 255 255 / .06)" />
           ))}
           {GRID_Y.map((y) => (
-            <line key={`y${y}`} x1={0} y1={y} x2={MAP.width} y2={y} stroke="rgb(255 255 255 / .07)" />
+            <line key={`y${y}`} x1={0} y1={y} x2={MAP.width} y2={y} stroke="rgb(255 255 255 / .06)" />
           ))}
           <polyline
             data-testid="route-track"
             points={polyline(points)}
             fill="none"
-            stroke="rgb(255 255 255 / .58)"
+            stroke="rgb(255 255 255 / .56)"
             strokeWidth={3}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -144,8 +141,8 @@ function TrackMap({
           ) : null}
           {rider ? (
             <g data-testid="route-rider">
-              <circle cx={rider.x} cy={rider.y} r={9} fill="rgb(204 255 0 / .26)" />
-              <circle cx={rider.x} cy={rider.y} r={5} fill="var(--ridrs-accent)" stroke="#07090e" strokeWidth={2} />
+              <circle cx={rider.x} cy={rider.y} r={8.5} fill="rgb(204 255 0 / .24)" />
+              <circle cx={rider.x} cy={rider.y} r={4.8} fill="var(--ridrs-accent)" stroke="#080d16" strokeWidth={2} />
             </g>
           ) : null}
         </svg>
@@ -155,12 +152,12 @@ function TrackMap({
   );
 }
 
-/** The live map's height in the box: a little taller than the track alone. */
-const LIVE_HEIGHT = 148;
+/** The live map's height in the box: full-bleed to the outer edges. */
+const LIVE_HEIGHT = 140;
 
 /**
  * The map of the route: a real map leaning back where the page can draw one (ADR 0097), else the
- * track alone. A map that fails to load hands over to the track for the rest of the ride.
+ * track alone, bleeding flush to the top, left and right edges of `route-box`.
  */
 function RouteMap({
   track,
@@ -184,9 +181,6 @@ function RouteMap({
         position: 'relative',
         height: LIVE_HEIGHT,
         overflow: 'hidden',
-        borderRadius: 10,
-        background: 'var(--ridrs-surface)',
-        boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .1)',
       }}
     >
       <LiveMap
@@ -199,14 +193,12 @@ function RouteMap({
       <span
         style={{
           position: 'absolute',
-          right: 5,
+          right: 8,
           bottom: 4,
-          padding: '1px 5px',
-          borderRadius: 4,
-          backgroundColor: 'rgb(5 9 18 / .58)',
           fontSize: 8,
-          lineHeight: 1.25,
-          color: 'rgb(255 255 255 / .68)',
+          lineHeight: 1.2,
+          color: 'rgb(255 255 255 / .62)',
+          textShadow: '0 1px 2px rgb(0 0 0 / .85)',
         }}
       >
         {MAP_ATTRIBUTION}
@@ -216,9 +208,9 @@ function RouteMap({
 }
 
 /**
- * The elevation profile inside a recessed dark well, shaded vertically like the central segment
- * profile, with the rider beacon riding directly on the elevation curve and the remaining/total
- * distance inside a dark frosted capsule so it never collides visually with the terrain line.
+ * Full-bleed elevation profile separated from the map by a single 1 px hairline: its grade-coloured
+ * terrain fades cleanly to transparent via an SVG mask, the rider dot rides on the elevation curve,
+ * and the remaining/total distance sits as flat text without a nested capsule.
  */
 function RouteProfile({
   offer,
@@ -229,7 +221,9 @@ function RouteProfile({
   readonly distance?: number;
   readonly language: Language;
 }) {
-  const shadeId = `route-shade-${useId().replace(/[^A-Za-z0-9-]/g, '')}`;
+  const id = useId().replace(/[^A-Za-z0-9-]/g, '');
+  const fadeId = `route-fade-${id}`;
+  const maskId = `route-mask-${id}`;
   const { stretches, line } = useMemo(
     () => profileOf(offer.sparkline ?? [], offer.distance, PROFILE.width, PROFILE.height),
     [offer],
@@ -243,19 +237,15 @@ function RouteProfile({
     offer.distance > 0
       ? `${localizeNumber(formatDecimal(Math.max(0, offer.distance - (distance ?? 0)) / 1000, 1), language)} / ${localizeNumber(formatDecimal(offer.distance / 1000, 1), language)} km`
       : undefined;
-  const firstX = line[0]?.x ?? 0;
-  const lastX = line.at(-1)?.x ?? PROFILE.width;
-  const areaPoints = polyline([{ x: firstX, y: PROFILE.height }, ...line, { x: lastX, y: PROFILE.height }]);
 
   return (
     <div
       data-testid="route-profile"
       {...(at === undefined ? {} : { 'data-at': String(at) })}
       style={{
-        ...HUD_CHART_WELL,
         position: 'relative',
-        padding: '5px 6px',
-        overflow: 'hidden',
+        height: PROFILE.height,
+        borderTop: '1px solid rgb(255 255 255 / .08)',
       }}
     >
       <svg
@@ -266,49 +256,44 @@ function RouteProfile({
         style={{ display: 'block' }}
       >
         <defs>
-          <linearGradient id={shadeId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#050912" stopOpacity={0} />
-            <stop offset="100%" stopColor="#050912" stopOpacity={0.68} />
+          <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity={0.72} />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
           </linearGradient>
+          <mask id={maskId}>
+            <rect x={0} y={0} width={PROFILE.width} height={PROFILE.height} fill={`url(#${fadeId})`} />
+          </mask>
         </defs>
-        <line
-          x1={0}
-          y1={PROFILE.height * 0.5}
-          x2={PROFILE.width}
-          y2={PROFILE.height * 0.5}
-          stroke="rgb(255 255 255 / .07)"
-          strokeDasharray="2 4"
-        />
-        {stretches.map((stretch) => (
-          <polygon
-            key={stretch.from}
-            points={stretch.polygon}
-            fill={stretch.colour}
-            stroke={stretch.colour}
-            strokeWidth={0.6}
-            opacity={at !== undefined && stretch.to <= at ? 0.94 : 0.56}
-          />
-        ))}
-        <polygon points={areaPoints} fill={`url(#${shadeId})`} />
+        <g mask={`url(#${maskId})`}>
+          {stretches.map((stretch) => (
+            <polygon
+              key={stretch.from}
+              points={stretch.polygon}
+              fill={stretch.colour}
+              stroke={stretch.colour}
+              strokeWidth={0.6}
+              opacity={at !== undefined && stretch.to <= at ? 0.95 : 0.56}
+            />
+          ))}
+        </g>
         <polyline
           points={polyline(line)}
           fill="none"
           stroke="rgb(255 255 255 / .88)"
-          strokeWidth={1.6}
+          strokeWidth={1.5}
           strokeLinejoin="round"
         />
         {x === undefined || riderY === undefined ? null : (
           <g>
-            <line x1={x} y1={0} x2={x} y2={PROFILE.height} stroke="var(--ridrs-accent)" strokeWidth={1.5} />
-            <circle cx={x} cy={riderY} r={6} fill="rgb(204 255 0 / .24)" />
+            <line x1={x} y1={0} x2={x} y2={PROFILE.height} stroke="var(--ridrs-accent)" strokeWidth={1.4} />
             <circle
               data-testid="route-profile-rider"
               cx={x}
               cy={riderY}
-              r={3.5}
+              r={3.2}
               fill="var(--ridrs-accent)"
-              stroke="#07090e"
-              strokeWidth={1.6}
+              stroke="#080d16"
+              strokeWidth={1.5}
             />
           </g>
         )}
@@ -319,20 +304,15 @@ function RouteProfile({
           data-align={align}
           style={{
             position: 'absolute',
-            right: 6,
+            right: 10,
             ...(align === 'top' ? { top: 5 } : { bottom: 5 }),
-            padding: '2px 8px',
-            borderRadius: 'var(--ridrs-radius-pill)',
-            backgroundColor: 'rgb(7 11 20 / .84)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
-            boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .14)',
             fontFamily: 'var(--ridrs-font-mono)',
             fontSize: 'var(--ridrs-size-label)',
             fontWeight: 500,
-            lineHeight: 1.25,
+            lineHeight: 1.2,
             fontVariantNumeric: 'tabular-nums',
             color: '#f1f5f9',
+            textShadow: '0 1px 4px rgb(8 13 22 / .95), 0 0 8px rgb(8 13 22 / .9)',
           }}
         >
           {distanceLabel}
@@ -343,10 +323,9 @@ function RouteProfile({
 }
 
 /**
- * The route navigator at the top right, drawn in the same frosted dark HUD glass as the gauges and
- * central telemetry: the tilted map with its labelled single-line route title along the top edge,
- * and below it the recessed shaded elevation profile with the remaining / total distance capsule.
- * Hidden on a free ride without a route.
+ * The route navigator at the top right, a flat full-bleed frosted sheet (`padding: 0`): the map
+ * bleeds to the top and side edges, and the elevation profile bleeds to the side and bottom edges
+ * beneath a 1 px hairline. Hidden on a free ride without a route.
  */
 export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
@@ -384,19 +363,19 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
         position: 'absolute',
         top: 16,
         right: 16,
-        width: 'clamp(284px, 22vw, 312px)',
+        width: WIDTH,
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        gap: 8,
-        padding: 10,
+        padding: 0,
+        overflow: 'hidden',
         pointerEvents: 'none',
       }}
     >
       {track ? (
         <RouteMap track={track} label={text.route} title={offer.title} {...(placed ? { position: placed } : {})} />
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '2px 4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 12px' }}>
           <span style={{ ...HUD_LABEL, flexShrink: 0 }}>{text.route}</span>
           <span data-testid="route-title" style={SINGLE_LINE_TITLE}>
             {offer.title}
@@ -410,15 +389,12 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
           data-testid="route-distance"
           style={{
             alignSelf: 'flex-end',
-            padding: '2px 8px',
-            borderRadius: 'var(--ridrs-radius-pill)',
-            backgroundColor: 'rgb(7 11 20 / .84)',
-            boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .14)',
+            padding: '0 12px 9px',
             fontFamily: 'var(--ridrs-font-mono)',
             fontSize: 'var(--ridrs-size-label)',
             fontWeight: 500,
             fontVariantNumeric: 'tabular-nums',
-            color: '#f1f5f9',
+            color: 'var(--ridrs-text-muted)',
           }}
         >
           {fallbackDistance}

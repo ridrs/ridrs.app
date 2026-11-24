@@ -341,26 +341,16 @@ function Fact({
   label,
   value,
   unit,
-  divided = false,
 }: {
   readonly kind: string;
   readonly label: string;
   readonly value: string;
   readonly unit?: string;
-  readonly divided?: boolean;
 }) {
   return (
     <div
       data-testid={`ride-${kind}`}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 3,
-        minWidth: 0,
-        ...(divided
-          ? { borderLeft: '1px solid rgb(255 255 255 / .08)', paddingLeft: 14 }
-          : {}),
-      }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
     >
       <span data-testid="label" style={HUD_LABEL}>
         {label}
@@ -390,11 +380,10 @@ function Fact({
 }
 
 /**
- * The ride at the top centre, a HUD cockpit deck drawn in the same frosted dark glass as the
- * gauges: the time ridden, the distance and the speed, from the physics, extended below with the
- * current segment (local elevation snippet, summit approach or active workout step) when relevant.
- * Dashes until the first physics state. The time stands at 0:00 until the ride rolls with the
- * rider's first pedal stroke.
+ * The ride at the top centre, a flat frosted HUD sheet: the time ridden, the distance and the
+ * speed, from the physics, extended below with the current segment (local elevation snippet, summit
+ * approach or active workout step) on the same surface. Dashes until the first physics state. The
+ * time stands at 0:00 until the ride rolls with the rider's first pedal stroke.
  */
 function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
@@ -427,7 +416,7 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
         top: 16,
         left: '50%',
         transform: 'translateX(-50%)',
-        width: 'clamp(340px, 27vw, 404px)',
+        width: 'clamp(336px, 26vw, 392px)',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
@@ -439,8 +428,8 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          columnGap: 12,
-          padding: '11px 16px 10px',
+          columnGap: 20,
+          padding: '10px 16px',
         }}
       >
         <Fact kind="time" label={text.time} value={state ? formatDuration(riddenSeconds(state)) : EN_DASH} />
@@ -449,14 +438,12 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
           label={text.distance}
           value={state ? number(state.distance / 1000, 2) : EN_DASH}
           unit="km"
-          divided
         />
         <Fact
           kind="speed"
           label={text.speed}
           value={state ? number(state.speed * 3.6, 1) : EN_DASH}
           unit="km/h"
-          divided
         />
       </div>
       <CurrentSegmentView
