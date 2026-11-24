@@ -186,4 +186,10 @@ export default {
   'difficulty.Easy': 'Makkelijk',
   'difficulty.Moderate': 'Gemiddeld',
   'difficulty.Hard': 'Zwaar',
+  'wish.add': 'Op het verlanglijstje',
+  'wish.added': 'Op het verlanglijstje ✓',
+  'wish.hint': 'Video en positie lopen nog niet precies synchroon. Video’s op het verlanglijstje synchroniseren we als volgende precies met video2gpx.',
+  'wish.votes': { one: 'tot nu toe {n} wens', other: 'tot nu toe {n} wensen' },
+  'wish.error': 'Dat is niet gelukt. Probeer het later opnieuw.',
+  'wish.limit': 'Je hebt vandaag al veel wensen doorgegeven. Probeer het morgen opnieuw.',
 };

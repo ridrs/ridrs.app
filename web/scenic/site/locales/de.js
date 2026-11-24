@@ -186,4 +186,10 @@ export default {
   'difficulty.Easy': 'Leicht',
   'difficulty.Moderate': 'Mittel',
   'difficulty.Hard': 'Schwer',
+  'wish.add': 'Auf die Wunschliste',
+  'wish.added': 'Auf der Wunschliste ✓',
+  'wish.hint': 'Video und Position laufen noch nicht genau synchron. Videos auf der Wunschliste gleichen wir als Nächstes mit video2gpx genau ab.',
+  'wish.votes': { one: 'bisher {n} Wunsch', other: 'bisher {n} Wünsche' },
+  'wish.error': 'Das hat nicht geklappt. Bitte später noch einmal versuchen.',
+  'wish.limit': 'Du hast heute schon viele Wünsche abgegeben. Bitte morgen wieder.',
 };

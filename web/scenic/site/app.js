@@ -43,6 +43,36 @@ const incyclistButton = (v) => (!v.incyclist ? '' : v.incyclist.package
   : v.incyclist.available
   ? `<a class="btn" href="${esc(v.incyclist.url)}" download title="${esc(t('incyclist.title'))}">${t('incyclist.label')}</a>`
   : `<button type="button" class="btn" disabled title="${esc(t('incyclist.disabled_title'))}">${t('incyclist.label')}</button>`);
+// Wishlist for video2gpx (src/wishlist.js): a YouTube video without a secured track can be wished for; the browser remembers
+// its own wishes (localStorage, a convenience only: the server counts one vote per visitor and day anyway).
+const WISH_KEY = 'ridrs-scenic.wishes';
+const myWishes = () => { try { return new Set(JSON.parse(localStorage.getItem(WISH_KEY) || '[]')); } catch { return new Set(); } };
+function rememberWish(id) {
+  try { const s = myWishes(); s.add(id); localStorage.setItem(WISH_KEY, JSON.stringify([...s].slice(-500))); } catch { /* storage blocked */ }
+}
+const wishBox = (v) => {
+  if (!v.wish?.refinable) return '';
+  const mine = myWishes().has(v.id);
+  return `<div class="wish-box"><p class="meta">${esc(t('wish.hint'))}</p>
+    <p class="row"><button type="button" class="btn" id="wish" data-url="${esc(v.wish.url)}" ${mine ? 'disabled' : ''}>${esc(t(mine ? 'wish.added' : 'wish.add'))}</button>
+      <span class="meta" id="wish-n">${v.wish.votes ? esc(t('wish.votes', { n: v.wish.votes })) : ''}</span></p></div>`;
+};
+async function sendWish(btn, id) {
+  btn.disabled = true;
+  const r = await fetch(btn.dataset.url, { method: 'POST' }).catch(() => null);
+  const data = await r?.json().catch(() => null);
+  if (current !== id) return;
+  if (r?.ok) {
+    rememberWish(id);
+    btn.textContent = t('wish.added');
+    const n = document.querySelector('#wish-n');
+    if (n) n.textContent = t('wish.votes', { n: data.votes });
+    return;
+  }
+  btn.disabled = false;
+  const n = document.querySelector('#wish-n');
+  if (n) n.textContent = t(r?.status === 429 ? 'wish.limit' : 'wish.error');
+}
 // What a ride (a video with a ride package) adds to the dialog: tour, difficulty, climbs, the size of the original download.
 const climbText = (c) => `${c.name ? `${esc(c.name)} – ` : ''}${esc(t('detail.climb', { cat: c.category, km: km1((c.end - c.start) / 1000), g: km1(c.grade) }))}`;
 const rideRows = (r) => !r ? '' : `${r.tour ? `<dt>${t('dt.tour')}</dt><dd>${esc(t('detail.tour', { name: r.tour.name, part: r.tour.part }))}</dd>` : ''}
@@ -479,10 +509,13 @@ async function openVideo(id, start = 0, { stack = null } = {}) {
     ${credits(v)}
     ${v.incyclist && !v.incyclist.available ? `<p class="meta">${t('incyclist.unavailable')}</p>`
       : v.incyclist?.warn ? `<p class="meta warn">${t('incyclist.warn')}</p>` : ''}
+    ${wishBox(v)}
     ${v.image && !v.ride ? `<figure class="preview"><img src="${esc(v.image.url)}" alt="${esc(t('detail.preview_alt'))}" loading="lazy"${v.image.width ? ` width="${v.image.width}" height="${v.image.height}"` : ''}>
       ${v.image.credit ? `<figcaption class="meta">${esc(v.image.credit)}</figcaption>` : ''}</figure>` : ''}
     ${v.route?.creator_links?.length ? `<p class="meta">${t('detail.creator_route')} ${v.route.creator_links.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener nofollow">${t('detail.link', { i: i + 1 })}</a>`).join(', ')}</p>` : ''}`;
   const slot = body.querySelector('#slot');
+  const wishBtn = body.querySelector('#wish');
+  if (wishBtn) wishBtn.addEventListener('click', () => sendWish(wishBtn, id));
   body.scrollTop = 0;
   fitSheet();
   if (v.ride) {

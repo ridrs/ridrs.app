@@ -23,6 +23,9 @@ const fmt = (s) => { if (s == null) return '–'; s = Math.max(0, s); const h = 
   return (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + `:${String(x).padStart(2, '0')}${d ? `,${d}` : ''}`; };
 const parseTime = (str) => { const p = String(str).trim().replace(',', '.').split(':').map(Number); if (p.some((x) => !Number.isFinite(x))) return null;
   return p.reduce((a, x) => a * 60 + x, 0); };
+// Wishlist (src/wishlist.js): marker in list and editor.
+const WISH_STATUS = { open: 'Wunschliste', done: 'Wunsch erledigt', dismissed: 'Wunsch abgelehnt' };
+const wishTag = (status, votes) => (!status ? '' : `<span class="tag ${status === 'open' ? 'wish' : ''}" title="${votes ? `${votes} Wünsche von Besuchern` : 'von der Redaktion eingereiht'}">${WISH_STATUS[status] ?? status}${votes ? ` · ${votes}` : ''}</span>`);
 const lvl = (l) => `<span class="lvl" style="--c:var(--l${l ?? 7})">${l ?? 7} · ${LEVELS[l ?? 7]}</span>`;
 
 async function api(method, path, body) {
@@ -44,7 +47,7 @@ const guard = (fn) => async (...a) => { try { await fn(...a); } catch (e) { cons
 let me = null, collectionsCache = [];
 
 
-// --- router: #videos, #v=<id>, #collections, #optout, #log ---
+// --- router: #videos, #v=<id>, #queue, #collections, #optout, #log ---
 const VIEW_KEY = 'ridrs-scenic.admin.view';
 let listState = { q: '', only: '', loc: '', offset: 0, view: (() => { try { return localStorage.getItem(VIEW_KEY) === 'map' ? 'map' : 'list'; } catch { return 'list'; } })(), camera: null };
 // Map of the video page (view "Karte"); removed when the page changes.
@@ -65,6 +68,7 @@ function route() {
   if (h.startsWith('v=')) { dropListMap(); return openVideo(h.slice(2)); }
   closeEditor();
   if (tab !== 'videos') dropListMap();
+  if (tab === 'queue') return renderQueue();
   if (tab === 'collections') return renderCollections();
   if (tab === 'optout') return renderOptout();
   if (tab === 'log') return renderLog();
@@ -81,7 +85,7 @@ async function renderList() {
       <select id="list-only" aria-label="Nur">
         <option value="">alle Videos</option><option value="site_published">veröffentlicht</option><option value="unpublished">nicht veröffentlicht</option><option value="pick">Editor's Pick</option><option value="stars">mit Sternen</option><option value="note">mit Notiz</option>
         <option value="hidden">ausgeblendet</option><option value="manual">von Hand geändert</option><option value="anchors">mit Ankern</option>
-        <option value="review">Stufe 2 (zu prüfen)</option><option value="noimage">Stufe 1–2 ohne Vorschaubild</option><option value="route">mit Route</option><option value="optout">Kanal mit Opt-out</option></select>
+        <option value="wish">auf der Wunschliste</option><option value="review">Stufe 2 (zu prüfen)</option><option value="noimage">Stufe 1–2 ohne Vorschaubild</option><option value="route">mit Route</option><option value="optout">Kanal mit Opt-out</option></select>
       <select id="list-loc" aria-label="Lokalisierungsstufe"><option value="">jede Stufe</option>${[1, 2, 3, 4, 5, 6].map((l) => `<option value="${l}">Stufe ≤ ${l}</option>`).join('')}</select>
       <span class="viewtoggle" role="group" aria-label="Ansicht"><button type="button" class="btn small" data-view="list">Liste</button><button type="button" class="btn small" data-view="map">Karte</button></span>
     </div><div class="wrap" id="list-body"></div>`;
@@ -112,7 +116,7 @@ async function loadList() {
     ${rows.map((r) => `<tr class="click" data-id="${r.video_id}" tabindex="0"><td><span class="t">${esc(r.title || r.video_id)}</span><br><span class="meta">${esc(r.channel || '')} · <span class="mono">${r.video_id}</span></span></td>
       <td>${esc(r.place || '')}${r.country ? ` (${esc(r.country)})` : ''}${r.distance_km ? `<br><span class="meta">${r.distance_km} km</span>` : ''}</td>
       <td>${lvl(r.loc_level)}${r.synced ? '<br><span class="tag hi">synchron</span>' : ''}${r.anchors ? ` <span class="tag">${r.anchors} Anker</span>` : ''}</td>
-      <td><span class="tags">${r.site_published ? '<span class="tag ok">öffentlich</span>' : ''}${r.stars ? `<span class="tag hi">${'★'.repeat(r.stars)}</span>` : ''}${r.editors_pick ? '<span class="tag hi">Pick</span>' : ''}${r.hidden ? '<span class="tag warn">ausgeblendet</span>' : ''}${r.optout ? '<span class="tag warn">Opt-out</span>' : ''}</span></td>
+      <td><span class="tags">${r.site_published ? '<span class="tag ok">öffentlich</span>' : ''}${r.stars ? `<span class="tag hi">${'★'.repeat(r.stars)}</span>` : ''}${r.editors_pick ? '<span class="tag hi">Pick</span>' : ''}${wishTag(r.wish_status, r.wish_votes)}${r.hidden ? '<span class="tag warn">ausgeblendet</span>' : ''}${r.optout ? '<span class="tag warn">Opt-out</span>' : ''}</span></td>
       <td class="mono">${fmt(r.duration_s)}</td><td class="mono">${num(r.view_count)}</td></tr>`).join('')}</tbody></table>
     ${!rows.length ? '<p class="meta">Nichts gefunden.</p>' : ''}
     <p class="row">${offset ? '<button class="btn small" data-page="-1">Zurück</button>' : ''}${more ? '<button class="btn small" data-page="1">Weiter</button>' : ''}
@@ -378,6 +382,7 @@ function renderSections() {
     ${D.hidden ? '<label class="chk"><input type="checkbox" id="f-hidden" checked> Ausgeblendet (sperrt das Video auch wenn veröffentlicht)</label>' : ''}
     <label class="field"><span>Notiz der Redaktion</span><textarea id="f-note" maxlength="2000">${esc(D.editor_note ?? '')}</textarea></label>
     <button type="button" class="btn btn-primary" id="save-ed">Speichern</button>
+    ${wishField(D)}
     <div class="field" style="margin-top:.6rem"><span>Sammlungen</span>
       ${collectionsCache.length ? collectionsCache.map((c) => `<label class="chk"><input type="checkbox" data-col="${c.collection_id}" ${D.collections.some((x) => x.collection_id === c.collection_id) ? 'checked' : ''}> ${esc(c.title)}</label>`).join('')
         : '<span class="meta">Noch keine Sammlung (<a href="#collections">anlegen</a>).</span>'}</div>
@@ -443,6 +448,31 @@ function renderSections() {
   bindSections();
 }
 
+// Wishlist field of the editor: state, votes and the queue actions.
+function wishField(D) {
+  const w = D.wish, refined = D.sync?.method === 'video2gpx' || (D.localization?.loc_level ?? 7) <= 2;
+  const when = (s) => esc((s ?? '').replace('T', ' ').slice(0, 16));
+  return `<div class="field" style="margin-top:.6rem"><span>Wunschliste (video2gpx)</span>
+    ${w ? `<p class="meta">${wishTag(w.status, w.votes)} ${w.votes ? `${w.votes} Wünsche, zuerst ${when(w.first_at)}, zuletzt ${when(w.last_at)}` : 'von der Redaktion eingereiht'}
+      ${w.priority != null ? ' · <span class="tag hi">vorgezogen</span>' : ''}${w.status_by ? `<br>Status von ${esc(w.status_by)}, ${when(w.status_at)}` : ''}
+      ${refined && w.status === 'open' ? '<br>Der Track ist schon mit video2gpx gesichert: der Wunsch zählt als erledigt.' : ''}</p>`
+      : `<p class="meta">Nicht auf der Wunschliste.${D.source !== 'youtube' ? ' Nur YouTube-Videos lassen sich mit video2gpx verfeinern.' : ''}</p>`}
+    <p class="row">${!w || w.status !== 'open' ? '<button type="button" class="btn small" data-wish="add">In die Warteschlange</button>' : `
+      <button type="button" class="btn small" data-wish="top">An die Spitze</button>
+      ${w.priority != null ? '<button type="button" class="btn small" data-wish="unpin">Vorrang aufheben</button>' : ''}
+      <button type="button" class="btn small" data-wish="done">Erledigt</button>
+      <button type="button" class="btn small danger" data-wish="dismissed">Ablehnen</button>`}
+      <a href="#queue" class="meta">Warteschlange</a></p></div>`;
+}
+/** One queue action (add, top, unpin, done, dismissed, open) for a video. */
+async function wishAction(id, act) {
+  if (act === 'add') await api('POST', 'queue', { video_id: id });
+  else if (act === 'top') await api('PATCH', `queue/${id}`, { top: true });
+  else if (act === 'unpin') await api('PATCH', `queue/${id}`, { priority: null });
+  else await api('PATCH', `queue/${id}`, { status: act });
+  toast({ add: 'In die Warteschlange gestellt', top: 'An der Spitze', unpin: 'Vorrang aufgehoben', done: 'Als erledigt markiert', dismissed: 'Abgelehnt', open: 'Wieder offen' }[act] ?? 'Gespeichert');
+}
+
 // video2gpx round trip (VIDEO2GPX-INTEGRATION.md steps A/B): job file out, result file in.
 const v2gUploaded = (D) => D.sync?.method === 'video2gpx' && D.sync.path?.startsWith('api/sync/');
 function v2gBox(D) {
@@ -466,6 +496,7 @@ function short(v) {
   if (v == null) return '–';
   if (typeof v !== 'object') return String(v);
   if ('value' in v) return v.value && typeof v.value === 'object' ? Object.values(v.value).join(', ') : String(v.value ?? '–');
+  if ('status' in v && 'priority' in v) return `${WISH_STATUS[v.status] ?? v.status}${v.priority != null ? ', vorgezogen' : ''}`;
   if ('route' in v) return v.route ? `${v.route.method} · ${v.route.distance_km} km` : 'keine Route';
   if ('sync' in v) return v.sync ? `${v.sync.method} · Stufe ${v.localization?.loc_level ?? '–'}` : 'kein Track';
   if ('localization' in v) return v.localization ? `Stufe ${v.localization.loc_level}` : '–';
@@ -475,7 +506,7 @@ function short(v) {
   if (v.image_id) return `${v.mime ?? ''} ${v.rights ?? ''}`;
   return JSON.stringify(v).slice(0, 80);
 }
-const ENTITY = { video: '', anchor: 'Anker', route: 'Route', localization: 'Prüfung', sync: 'Track', collection: 'Sammlung', collection_item: 'Sammlung', collection_order: 'Reihenfolge', optout: 'Opt-out', image: 'Bild' };
+const ENTITY = { wish: 'Wunschliste', video: '', anchor: 'Anker', route: 'Route', localization: 'Prüfung', sync: 'Track', collection: 'Sammlung', collection_item: 'Sammlung', collection_order: 'Reihenfolge', optout: 'Opt-out', image: 'Bild' };
 function logRows(rows) {
   if (!rows.length) return '<p class="meta">Noch keine Änderungen.</p>';
   return rows.map((e) => `<div class="logrow ${e.undone_by ? 'undone' : ''}"><div class="what"><b>${esc(ENTITY[e.entity] ?? e.entity)} ${esc(e.entity === 'anchor' ? fmt(+e.field) : e.field)}</b>
@@ -491,6 +522,7 @@ async function doUndo(id) {
 
 function bindSections() {
   const box = $('#sections'), D = ed.D;
+  box.querySelectorAll('[data-wish]').forEach((b) => { b.onclick = guard(async () => { await wishAction(D.id, b.dataset.wish); await refresh(); }); });
   box.querySelectorAll('#f-stars input').forEach((r) => r.addEventListener('change', () => {
     box.querySelectorAll('#f-stars label').forEach((l, i) => l.classList.toggle('on', i > 0 && i <= +r.value));
   }));
@@ -729,6 +761,39 @@ async function renderCollections() {
     card.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = guard(async () => { await api('DELETE', `collections/${cid}/items/${b.dataset.rm}`); await renderCollections(); }); });
     card.querySelector('[data-add]').onsubmit = guard(async (e) => { e.preventDefault(); await api('POST', `collections/${cid}/items`, { video_id: new FormData(e.target).get('video_id').trim() }); await renderCollections(); });
   });
+}
+
+// --- wishlist queue for video2gpx (src/wishlist.js) ---
+let queueAll = false;
+async function renderQueue() {
+  const rows = await api('GET', `queue${queueAll ? '?all=1' : ''}`);
+  const when = (s) => esc((s ?? '').slice(0, 10));
+  const state = (r) => r.refined ? '<span class="tag ok">Track gesichert</span>' : r.status === 'open' ? '' : `<span class="tag">${WISH_STATUS[r.status]}</span>`;
+  $('#view').innerHTML = `<div class="cols"><div class="col">
+    <p class="meta">Videos, die Besucher auf die Wunschliste gesetzt oder die Redaktion eingereiht hat, in der Reihenfolge, in der video2gpx sie verfeinern soll:
+      vorgezogene zuerst, dann nach Zahl der Wünsche, dann der älteste Wunsch. Ein Video, dessen Track video2gpx gesichert hat (Ergebnis hochgeladen, Stufe ≤ 2), fällt von selbst heraus.
+      Für Skripte: <a href="../api/admin/queue">api/admin/queue</a> (JSON mit Job-Datei je Video).</p>
+    <form class="row" id="queue-add"><input type="text" name="video_id" placeholder="Video-ID" required aria-label="Video-ID">
+      <button class="btn small">Einreihen</button>
+      <label class="chk"><input type="checkbox" id="queue-all" ${queueAll ? 'checked' : ''}> auch erledigte und abgelehnte</label></form>
+    <table class="adm"><thead><tr><th>#</th><th>Video</th><th>Stufe</th><th>Wünsche</th><th>seit</th><th></th></tr></thead><tbody>
+      ${rows.map((r) => `<tr data-id="${esc(r.video_id)}"><td class="mono">${r.position ?? '–'}</td>
+        <td><a href="#v=${esc(r.video_id)}" class="t">${esc(r.title || r.video_id)}</a><br><span class="meta">${esc(r.channel || '')} · ${esc(r.place || '')}${r.country ? ` (${esc(r.country)})` : ''} · <span class="mono">${esc(r.video_id)}</span>${r.distance_km ? ` · ${r.distance_km} km` : ''} · ${fmt(r.duration_s)}</span></td>
+        <td>${lvl(r.loc_level)}</td>
+        <td class="mono">${r.votes}${r.priority != null && r.position ? ' <span class="tag hi">vorgezogen</span>' : ''} ${state(r)}</td>
+        <td class="mono">${when(r.first_at)}</td>
+        <td><span class="row">${r.position ? `<button type="button" class="btn small" data-q="top" ${r.position === 1 ? 'disabled' : ''}>An die Spitze</button>
+          <a class="btn small" href="../api/admin/videos/${esc(r.video_id)}/video2gpx-job.json" download>Job-Datei</a>
+          <button type="button" class="btn small" data-q="done">Erledigt</button><button type="button" class="btn small danger" data-q="dismissed">Ablehnen</button>`
+          : r.status !== 'open' ? '<button type="button" class="btn small" data-q="open">Wieder öffnen</button>' : ''}</span></td></tr>`).join('')}</tbody></table>
+    ${rows.length ? '' : '<p class="meta">Die Warteschlange ist leer.</p>'}</div></div>`;
+  $('#queue-all').onchange = guard(async (e) => { queueAll = e.target.checked; await renderQueue(); });
+  $('#queue-add').onsubmit = guard(async (e) => { e.preventDefault(); await wishAction(new FormData(e.target).get('video_id').trim(), 'add'); await renderQueue(); });
+  $('#view').querySelectorAll('[data-q]').forEach((b) => { b.onclick = guard(async () => {
+    const id = b.closest('tr').dataset.id, act = b.dataset.q;
+    if (act === 'open') { await api('PATCH', `queue/${id}`, { status: 'open' }); toast('Wieder offen'); } else await wishAction(id, act);
+    await renderQueue();
+  }); });
 }
 
 // --- channel opt-out ---

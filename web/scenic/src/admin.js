@@ -6,6 +6,7 @@
 //
 // Fields the pipeline also writes (place, region, pin, country, route, localization, sync) get a row in
 // manual_field; scripts/import.mjs never overwrites those ("manual fields always win").
+import { wishHandler, queue, topPriority, WISH_STATUS, REFINED } from './wishlist.js';
 import { basePath, VIDEO_ID } from './base.js';
 import { FTS_INSERT } from './search-index.js';
 import { buildTrack, anchorLevel, evaluateReview, kmAlong, project, LOC_RULES, KEYS } from '../site/lib/route-sync.js';
@@ -184,6 +185,8 @@ const H = {
       return out;
     },
   },
+  // field = 'queue'; value = {status, priority} or null (src/wishlist.js)
+  wish: wishHandler,
   // field = channel id; value = {requested_at, note} or null
   optout: {
     async get(env, id, field) { const r = await env.DB.prepare('SELECT requested_at, note FROM channel_optout WHERE channel_id = ?1').bind(field).first(); return r ? { ...r } : null; },
@@ -407,7 +410,7 @@ async function videoDetail(env, id, origin) {
   const v = await env.DB.prepare(`SELECT v.*, c.name AS channel_name, (o.channel_id IS NOT NULL) AS channel_optout FROM video v
     LEFT JOIN channel c ON c.channel_id = v.channel_id LEFT JOIN channel_optout o ON o.channel_id = v.channel_id WHERE v.video_id = ?1`).bind(id).first();
   if (!v) throw new HttpError(404, 'Video nicht gefunden');
-  const [tech, route, loc, sync, anchors, manual, images, cols, log] = await env.DB.batch([
+  const [tech, route, loc, sync, anchors, manual, images, cols, log, wish] = await env.DB.batch([
     env.DB.prepare('SELECT max_height, max_width, fps, hdr FROM video_tech WHERE video_id = ?1').bind(id),
     env.DB.prepare('SELECT * FROM route WHERE video_id = ?1').bind(id),
     env.DB.prepare('SELECT * FROM localization WHERE video_id = ?1').bind(id),
@@ -417,6 +420,7 @@ async function videoDetail(env, id, origin) {
     env.DB.prepare('SELECT image_id, kind, mime, bytes, width, height, rights, credit, uploaded_by, uploaded_at, is_primary FROM video_image WHERE video_id = ?1 ORDER BY is_primary DESC, uploaded_at DESC').bind(id),
     env.DB.prepare('SELECT c.collection_id, c.title, i.position FROM collection_item i JOIN collection c USING (collection_id) WHERE i.video_id = ?1').bind(id),
     env.DB.prepare('SELECT id, entity, field, old, new, who, at, undo_of, undone_by FROM edit_log WHERE video_id = ?1 ORDER BY id DESC LIMIT 60').bind(id),
+    env.DB.prepare('SELECT votes, first_at, last_at, priority, status, status_by, status_at FROM wish WHERE video_id = ?1').bind(id),
   ]);
   const r = route.results[0], l = loc.results[0];
   const line = await routeLine(env, id, r, origin);
@@ -437,7 +441,7 @@ async function videoDetail(env, id, origin) {
     sync: sync.results[0] ?? null, anchors: anchorsOut,
     rules: { version: LOC_RULES.version, end_tolerance_km: routeKm ? LOC_RULES.endToleranceKm(routeKm) : null,
       need: routeKm ? Math.max(2, Math.ceil(routeKm / LOC_RULES.kmPerAnchor)) : null, review_max_dev_m: LOC_RULES.reviewMaxDevM, review_min_points: LOC_RULES.reviewMinPoints },
-    manual: manual.results, images: images.results, collections: cols.results,
+    manual: manual.results, images: images.results, collections: cols.results, source: v.source, wish: wish.results[0] ?? null,
     log: log.results.map((x) => ({ ...x, old: parse(x.old), new: parse(x.new) })),
   };
 }
@@ -453,7 +457,8 @@ async function listVideos(env, url) {
   if (loc) { binds.push(loc); where.push(`l.loc_level <= ?${binds.length}`); }
   const ONLY = { site_published: 'v.site_published = 1', unpublished: 'v.site_published = 0', hidden: 'v.hidden = 1', pick: 'v.editors_pick = 1', stars: 'v.stars IS NOT NULL', note: 'v.editor_note IS NOT NULL',
     manual: 'EXISTS (SELECT 1 FROM manual_field m WHERE m.video_id = v.video_id)', anchors: 'EXISTS (SELECT 1 FROM sync_anchor a WHERE a.video_id = v.video_id)',
-    review: 'l.loc_level = 2', route: 'r.video_id IS NOT NULL', optout: 'o.channel_id IS NOT NULL',
+    review: 'l.loc_level = 2', wish: `EXISTS (SELECT 1 FROM wish w LEFT JOIN route_sync s ON s.video_id = w.video_id LEFT JOIN localization l ON l.video_id = w.video_id
+      WHERE w.video_id = v.video_id AND w.status = 'open' AND NOT ${REFINED})`, route: 'r.video_id IS NOT NULL', optout: 'o.channel_id IS NOT NULL',
     // level 1 or 2 and no picture the public dialog could show: no uploaded image, no picture in a ride package (ridePicture in src/rides.js)
     noimage: `l.loc_level <= 2 AND NOT EXISTS (SELECT 1 FROM video_image i WHERE i.video_id = v.video_id)
       AND NOT EXISTS (SELECT 1 FROM ride_package p WHERE p.video_id = v.video_id AND (p.thumbnail IS NOT NULL OR p.overlay IS NOT NULL))` };
@@ -469,8 +474,9 @@ async function listVideos(env, url) {
   }
   const { results } = await env.DB.prepare(`SELECT v.video_id, v.title, c.name AS channel, v.place, v.country, v.duration_s, v.view_count, v.stars, v.editors_pick, v.hidden, v.site_published,
       l.loc_level, r.distance_km, (s.video_id IS NOT NULL) AS synced, (o.channel_id IS NOT NULL) AS optout,
-      (SELECT count(*) FROM sync_anchor a WHERE a.video_id = v.video_id) AS anchors
-    FROM video v LEFT JOIN channel c ON c.channel_id = v.channel_id LEFT JOIN localization l ON l.video_id = v.video_id
+      (SELECT count(*) FROM sync_anchor a WHERE a.video_id = v.video_id) AS anchors, w.votes AS wish_votes,
+      CASE WHEN w.status = 'open' AND ${REFINED} THEN 'done' ELSE w.status END AS wish_status
+    FROM video v LEFT JOIN wish w ON w.video_id = v.video_id LEFT JOIN channel c ON c.channel_id = v.channel_id LEFT JOIN localization l ON l.video_id = v.video_id
     LEFT JOIN route r ON r.video_id = v.video_id LEFT JOIN route_sync s ON s.video_id = v.video_id LEFT JOIN channel_optout o ON o.channel_id = v.channel_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY v.view_count DESC LIMIT 101 OFFSET ${offset}`).bind(...binds).all();
   return { rows: results.slice(0, 100), more: results.length > 100, offset };
@@ -705,7 +711,7 @@ async function optouts(env) {
 /** All manual data as ndjson, for scripts/pull_manual.mjs -> data/manual.json of the pipeline (concept 4.3). */
 async function exportManual(env) {
   const q = (sql) => env.DB.prepare(sql).all().then((r) => r.results);
-  const [videos, manual, routes, locs, anchors, syncs, cols, items, opt, imgs, log, loclog] = await Promise.all([
+  const [videos, manual, routes, locs, anchors, syncs, cols, items, opt, imgs, log, loclog, wishes] = await Promise.all([
     q(`SELECT video_id, stars, editors_pick, editor_note, hidden, site_published, place, region, lat, lon, position_exact, country, country_name FROM video
        WHERE stars IS NOT NULL OR editors_pick = 1 OR editor_note IS NOT NULL OR hidden = 1 OR site_published = 1 OR video_id IN (SELECT video_id FROM manual_field)`),
     q('SELECT video_id, field, who, at FROM manual_field'),
@@ -720,6 +726,7 @@ async function exportManual(env) {
     q('SELECT image_id, video_id, kind, r2_key, mime, bytes, width, height, rights, credit, uploaded_by, uploaded_at, is_primary FROM video_image'),
     q('SELECT * FROM edit_log ORDER BY id'),
     q('SELECT * FROM localization_log ORDER BY at'),
+    q('SELECT video_id, votes, first_at, last_at, priority, status, status_by, status_at FROM wish ORDER BY video_id'),
   ]);
   const fields = new Map();
   for (const m of manual) { if (!fields.has(m.video_id)) fields.set(m.video_id, []); fields.get(m.video_id).push(m.field); }
@@ -740,6 +747,7 @@ async function exportManual(env) {
   for (const i of imgs) lines.push({ type: 'image', ...i });
   for (const e of log) lines.push({ type: 'edit', ...e, old: parse(e.old), new: parse(e.new) });
   for (const e of loclog) lines.push({ type: 'localization_log', ...e });
+  for (const w of wishes) lines.push({ type: 'wish', ...w });
   return new Response(lines.map((x) => JSON.stringify(x)).join('\n') + '\n', { headers: { 'content-type': 'application/x-ndjson; charset=utf-8',
     'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'content-disposition': 'attachment; filename="manual.ndjson"' } });
 }
@@ -787,6 +795,28 @@ export async function handleAdmin(request, env, who, ctx) {
         'x-robots-tag': 'noindex, nofollow', 'content-disposition': `attachment; filename="${b}.v2g.json"` } });
     }
     if (c === 'video2gpx' && m === 'POST') return ajson(await uploadResult(env, who.email, b, request, origin));
+  }
+  // Wishlist queue for video2gpx (src/wishlist.js): GET the queue (?all=1 with done and dismissed), POST {video_id} to queue a
+  // video by hand, PATCH queue/<id> {status} or {top: true} (first in the queue) or {priority: null} (back to the order by votes).
+  if (a === 'queue') {
+    if (!b && m === 'GET') return ajson(await queue(env, { all: url.searchParams.get('all') === '1', origin }));
+    if (!b && m === 'POST') {
+      const vid = (await readJson(request)).video_id;
+      if (!ID.test(vid || '') || !(await env.DB.prepare('SELECT 1 FROM video WHERE video_id = ?1').bind(vid).first())) bad('Unbekannte Video-ID');
+      const cur = await H.wish.get(env, vid);
+      return ajson(await change(env, who.email, 'wish', vid, 'queue', { status: 'open', priority: cur?.status === 'open' ? cur.priority : null }, { old: cur }));
+    }
+    if (b && !c && m === 'PATCH') {
+      if (!ID.test(b)) bad('Ungültige Video-ID');
+      const cur = await H.wish.get(env, b);
+      if (!cur) throw new HttpError(404, 'Nicht auf der Wunschliste');
+      const body = await readJson(request), next = { ...cur };
+      if ('status' in body) { if (!WISH_STATUS.includes(body.status)) bad(`Status: ${WISH_STATUS.join(', ')}`); next.status = body.status; }
+      if (body.top) next.priority = await topPriority(env);
+      else if ('priority' in body) { if (body.priority !== null && !Number.isInteger(body.priority)) bad('Priorität: ganze Zahl oder null'); next.priority = body.priority; }
+      if (next.status !== 'open') next.priority = null;
+      return ajson(await change(env, who.email, 'wish', b, 'queue', next, { old: cur }));
+    }
   }
   if (a === 'osrm' && m === 'POST') return ajson(await osrmRoute((await readJson(request)).points));
   if (a === 'images' && b) {

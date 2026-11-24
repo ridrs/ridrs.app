@@ -186,4 +186,10 @@ export default {
   'difficulty.Easy': '易しい',
   'difficulty.Moderate': '普通',
   'difficulty.Hard': '難しい',
+  'wish.add': 'ウィッシュリストに追加',
+  'wish.added': 'ウィッシュリストに追加済み ✓',
+  'wish.hint': '動画と位置はまだ正確に同期していません。ウィッシュリストの動画から順に video2gpx で正確に同期します。',
+  'wish.votes': { other: 'これまでのリクエスト {n} 件' },
+  'wish.error': 'うまくいきませんでした。後でもう一度お試しください。',
+  'wish.limit': '今日はすでに多くのリクエストを送っています。明日もう一度お試しください。',
 };

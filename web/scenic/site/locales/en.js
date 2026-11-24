@@ -190,4 +190,10 @@ export default {
   'difficulty.Easy': 'Easy',
   'difficulty.Moderate': 'Moderate',
   'difficulty.Hard': 'Hard',
+  'wish.add': 'Add to wishlist',
+  'wish.added': 'On the wishlist ✓',
+  'wish.hint': 'The video and its position are not yet exactly in sync. Videos on the wishlist are the next we sync exactly with video2gpx.',
+  'wish.votes': { one: '{n} wish so far', other: '{n} wishes so far' },
+  'wish.error': 'That did not work. Please try again later.',
+  'wish.limit': 'You have made many wishes today. Please try again tomorrow.',
 };

@@ -186,4 +186,10 @@ export default {
   'difficulty.Easy': 'Fácil',
   'difficulty.Moderate': 'Média',
   'difficulty.Hard': 'Difícil',
+  'wish.add': 'Adicionar à lista de desejos',
+  'wish.added': 'Na lista de desejos ✓',
+  'wish.hint': 'O vídeo e a posição ainda não estão sincronizados com exatidão. Os vídeos da lista de desejos são os próximos que sincronizamos com o video2gpx.',
+  'wish.votes': { one: '{n} pedido até agora', other: '{n} pedidos até agora' },
+  'wish.error': 'Não funcionou. Tente novamente mais tarde.',
+  'wish.limit': 'Já fez muitos pedidos hoje. Tente novamente amanhã.',
 };

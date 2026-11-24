@@ -15,6 +15,7 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 | `src/rides.js` | Van Gestel rides: package without video (ZIP), ride catalog of the app |
 | `src/auth.js` | Cloudflare Access JWT check for the admin, local dev bypass |
 | `src/admin.js` | admin API: edits with `edit_log` and undo, anchors and sync tracks, Prüfmodus, route editing (OSRM), images (R2), collections, opt-out, export |
+| `src/wishlist.js` | wishlist for video2gpx: public vote (one per visitor, video and day, hashed, no IP stored, at most 30 a day), admin queue (order, top, done, dismissed), see [Wishlist](#wishlist-for-video2gpx) |
 | `src/video2gpx.js` | video2gpx round trip: job, validation of an uploaded result, route agreement (contract: [../VIDEO2GPX-INTEGRATION.md](../VIDEO2GPX-INTEGRATION.md) section 8) |
 | `src/incyclist.js`, `src/images.js` | Incyclist package (fflate), image type and size sniffing |
 | `site/admin/` | admin UI (`/admin`) |
@@ -128,7 +129,7 @@ Videos located only from the title (Lokalisierungsstufe 7) or pinned to the same
 ```bash
 python3 scripts/export_public.py     # in Ridrs/pov-atlas: refresh export/
 pnpm install                          # here, in web/scenic (own pnpm project, not part of the app workspace)
-pnpm migrate:local                    # once, and after new migrations (0005 phase-4 tables, 0006 publication, 0007 sources and rides)
+pnpm migrate:local                    # once, and after new migrations (0005 phase-4 tables, 0006 publication, 0007 sources and rides, 0009 wishlist)
 pnpm import                           # export/ -> local D1
 pnpm dev:site                         # build + ridrs.app and ridrs Scenic together: http://localhost:8787/ and /scenic/
 pnpm dev                              # ridrs Scenic alone: http://localhost:8788/scenic/
@@ -160,6 +161,7 @@ The public site shows only videos the editors published in the admin (`video.sit
 | Route | set start/via/end on the map and re-route via OSRM (`router.project-osrm.org`, car, at most 1 request/s), reverse, discard. Stored as a manual route (`manual_field` `route`, GPX served by `/api/videos/:id/route.gpx`); elevation and road shares of a re-routed route come back with the next pipeline run |
 | Anker | pause the video, „Anker setzen“ (key A), click the map: the anchor snaps to the route line (`sync_anchor`). The worker rebuilds the track (`sync_track`, served as `/api/sync/<id>.json`, `route_sync.method = anchors`) and the level |
 | video2gpx | „Job-Datei laden“ saves `<id>.v2g.json` for the desktop app video2gpx (also `GET /api/videos/<id>/video2gpx-job.json`, public). „video2gpx-Ergebnis hochladen“ takes its `<id>.scenic.json`: checked (id, time order, speed ≤ 252 km/h except at cuts, inside the job's frame, ≤ 1.5 MB / 4 h, checklist complete), stored as a manual sync track (`route_sync.method = video2gpx`, `/api/sync/<id>.json`), level 2 with the distance to the ridrs Scenic route; median over 50 m offers „Route aus video2gpx übernehmen“. Undo via Protokoll. Details: [../VIDEO2GPX-INTEGRATION.md](../VIDEO2GPX-INTEGRATION.md) section 8 |
+| Warteschlange | the wishlist as the video2gpx queue (tab „Warteschlange“, list filter „auf der Wunschliste“, tag in the list, field in the editor): „In die Warteschlange“, „An die Spitze“, „Erledigt“, „Ablehnen“, „Wieder öffnen“; logged and undoable. Details: [Wishlist](#wishlist-for-video2gpx) |
 | Prüfmodus | ≥ 10 check points (one per 3 min, up to 20, plus up to 6 hairpins); confirm (Enter), drag the orange pointer or mark the wrong road (F); passed = all on the right road and ≤ 25 m along it → level 1 with the track hash; failed → corrections become anchors (`source = review`) |
 | Bilder | JPG/PNG/WebP ≤ 10 MB, type checked from the bytes, rights and credit, main image, delete (R2 binding `IMAGES`, local in `.wrangler/state`) |
 | Kanäle | opt-out: the channel's videos disappear at once, the next import deletes their pipeline rows |
@@ -173,12 +175,21 @@ The public site shows only videos the editors published in the admin (`video.sit
 
 **Incyclist** (`GET /api/videos/:id/incyclist.zip`, button in the dialog): from Lokalisierungsstufe 3 (greyed out with a note below that, warning at 3). `<CC>_<Name>.xml`, `.gpx` (one point per video second, elevation from the track or the route profile by km, `<time>` from 2000-01-01T00:00:00Z counted from the start frame, `<ridrs:videoTime>` = video second), the main image if one exists (JPG preferred, else PNG/WebP as is), `LIESMICH.txt`; no video. `<start-frame>` = round(t_start × fps) + 1 as catalog-web reads it; without fps 30 is assumed and said in LIESMICH. Level 3 without a stored track: start, end and the speed model over the whole video. Cached 24 h under a key of track hash, route, image, fps and level.
 
+## Wishlist for video2gpx
+
+Visitors put a video on the wishlist in the dialog („Add to wishlist“); the editors work the list off as the queue of what video2gpx refines next (migration 0009, `src/wishlist.js`).
+
+- **Who can wish:** only for a visible YouTube video at Lokalisierungsstufe 3 or worse (`wish.refinable` in `/api/videos/:id`); a ride or a video with a secured track has no button. `POST /api/videos/:id/wish`, same origin only (403 otherwise).
+- **Counting:** one vote per visitor, video and day: `wish_vote.voter` is SHA-256 of day, IP address and the secret `WISH_SALT` (set it with `wrangler secret put WISH_SALT`; without it the hash has no secret part). Rows of earlier days are deleted with the next vote; no IP address is stored. At most 30 new wishes per visitor and day (429). The browser remembers its own wishes in `localStorage` only to show the button as done.
+- **Queue order:** „An die Spitze“ (`priority`, smaller first), then votes, then the oldest wish. Done and dismissed wishes leave the queue; a wish whose video got a video2gpx track (uploaded result or level ≤ 2) counts as done by itself. Votes after „Ablehnen“ still count but do not reopen the wish.
+- **For scripts:** `GET /api/admin/queue` (`?all=1` with the closed ones) gives the open queue in order, each row with `position` and `job` (the admin URL of its `video2gpx-job.json`); `POST /api/admin/queue {video_id}`, `PATCH /api/admin/queue/<id> {status | top | priority}`. The export (`/api/admin/export`) has a `wish` line per video. Not done yet: the runner (`video2gpx-yt.sh`) or the desktop app taking the next job from this queue.
+
 ## Deploy (not done yet)
 
 1. `npx wrangler login`
 2. `npx wrangler d1 create ridrs-scenic`, put the id into `wrangler.jsonc`
 3. `npx wrangler d1 migrations apply ridrs-scenic --remote`
-4. `npx wrangler secret put YOUTUBE_API_KEY`; `npx wrangler r2 bucket create ridrs-scenic-images`; Cloudflare Access application for `ridrs.app/scenic/admin*` and `ridrs.app/scenic/api/admin/*`, its AUD and the team domain into `vars`
+4. `npx wrangler secret put YOUTUBE_API_KEY`; `npx wrangler secret put WISH_SALT` (any long random string); `npx wrangler r2 bucket create ridrs-scenic-images`; Cloudflare Access application for `ridrs.app/scenic/admin*` and `ridrs.app/scenic/api/admin/*`, its AUD and the team domain into `vars`
 5. `node scripts/import.mjs --remote`, then `pnpm publish:initial --remote` (once: publishes the start set, see below), then `pnpm build && npx wrangler deploy`
 
 Before going public: have `site/impressum.html` and `site/datenschutz.html` (German and English) checked.

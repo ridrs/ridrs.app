@@ -7,6 +7,7 @@
 //   GET /api/videos/:id/route.gpx       GPX of a manually edited route
 //   GET /api/videos/:id/incyclist.zip   Incyclist package without video (concept 4.7), from Lokalisierungsstufe 3
 //   GET /api/videos/:id/video2gpx-job.json  job for the desktop app video2gpx (VIDEO2GPX-INTEGRATION.md 8.1; nothing secret in it)
+//   POST /api/videos/:id/wish           put a video on the wishlist for video2gpx (src/wishlist.js), same-origin only
 //   GET /api/images/:imageId            preview image (R2) of a visible video
 //   GET /api/videos/:id/package.zip     a ride's package without its video (Van Gestel, src/rides.js)
 //   GET /api/ride/v1/catalog.json       the rides for the ridrs app (ridrs_app docs/formats/scenic-ride-catalog-v1.md)
@@ -24,6 +25,7 @@ import { handleAdmin, HttpError, ajson, routeLine, loadTrack, loadJob } from './
 import { buildIncyclistZip, MIN_LEVEL } from './incyclist.js';
 import { buildTrack } from '../site/lib/route-sync.js';
 import { routeLines } from './route-lines.js';
+import { vote } from './wishlist.js';
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
 const VISIBLE = "v.site_published = 1 AND v.hidden = 0 AND (v.status IS NULL OR v.status = 'public') AND NOT EXISTS (SELECT 1 FROM channel_optout o WHERE o.channel_id = v.channel_id)";
@@ -69,7 +71,7 @@ async function video(env, id) {
       s.license_id, s.license_name, s.license_url FROM video v
     LEFT JOIN channel c ON c.channel_id = v.channel_id LEFT JOIN source s ON s.source_id = v.source WHERE v.video_id = ?1 AND ${VISIBLE}`).bind(id).first();
   if (!v) return json({ error: 'not found' }, { status: 404 });
-  const [tech, route, sync, loc, roads, img, pkg] = await env.DB.batch([
+  const [tech, route, sync, loc, roads, img, pkg, wish] = await env.DB.batch([
     env.DB.prepare('SELECT * FROM video_tech WHERE video_id = ?1').bind(id),
     env.DB.prepare('SELECT * FROM route WHERE video_id = ?1').bind(id),
     env.DB.prepare('SELECT * FROM route_sync WHERE video_id = ?1').bind(id),
@@ -77,6 +79,7 @@ async function video(env, id) {
     env.DB.prepare('SELECT dim, value, share FROM route_road WHERE video_id = ?1 ORDER BY share DESC').bind(id),
     env.DB.prepare('SELECT image_id, width, height, rights, credit FROM video_image WHERE video_id = ?1 ORDER BY is_primary DESC, uploaded_at DESC LIMIT 1').bind(id),
     env.DB.prepare('SELECT * FROM ride_package WHERE video_id = ?1').bind(id),
+    env.DB.prepare('SELECT votes FROM wish WHERE video_id = ?1').bind(id),
   ]);
   const level = loc.results[0]?.loc_level ?? 7, im = img.results[0], p = pkg.results[0];
   // A ride of a source with one author (Van Gestel): its page instead of YouTube, its picture, its package instead of a generated one.
@@ -110,6 +113,8 @@ async function video(env, id) {
     // Incyclist package (concept 4.7): from level 3 on; level 3 with a warning. A ride has its original package (without video).
     incyclist: p ? { available: true, level, warn: false, url: `api/videos/${id}/package.zip`, package: true }
       : { available: level <= MIN_LEVEL && !!(sync.results[0] || r), level, warn: level === MIN_LEVEL, url: `api/videos/${id}/incyclist.zip` },
+    // Wishlist for video2gpx (src/wishlist.js): only a YouTube video without a secured track can be refined.
+    wish: { refinable: v.source === 'youtube' && level > 2, votes: wish.results[0]?.votes ?? 0, url: `api/videos/${id}/wish` },
   });
 }
 
@@ -357,6 +362,13 @@ export default {
         if (!who) return forbidden(false);
         if (!sameOriginWrite(request)) return ajson({ error: 'cross-site request' }, 403);
         return await handleAdmin(request, env, who, ctx);
+      }
+      let w = /^\/api\/videos\/([\w-]+)\/wish$/.exec(p);
+      if (w && request.method === 'POST') {
+        if (!ID.test(w[1])) return json({ error: 'bad id' }, { status: 400 });
+        if (!sameOriginWrite(request)) return json({ error: 'cross-site request' }, { status: 403, maxAge: 0 });
+        const res = await vote(env, request, w[1], VISIBLE);
+        return json(res.body, { status: res.status, maxAge: 0 });
       }
       if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'method not allowed' }, { status: 405 });
       if (p === '/api/points') return await points(env);

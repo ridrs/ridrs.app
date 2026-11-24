@@ -186,4 +186,10 @@ export default {
   'difficulty.Easy': 'Łatwa',
   'difficulty.Moderate': 'Średnia',
   'difficulty.Hard': 'Trudna',
+  'wish.add': 'Dodaj do listy życzeń',
+  'wish.added': 'Na liście życzeń ✓',
+  'wish.hint': 'Wideo i pozycja nie są jeszcze dokładnie zsynchronizowane. Filmy z listy życzeń synchronizujemy dokładnie z video2gpx w pierwszej kolejności.',
+  'wish.votes': { one: 'dotąd {n} życzenie', few: 'dotąd {n} życzenia', many: 'dotąd {n} życzeń', other: 'dotąd {n} życzenia' },
+  'wish.error': 'Nie udało się. Spróbuj ponownie później.',
+  'wish.limit': 'Masz już dziś wiele życzeń. Spróbuj ponownie jutro.',
 };

@@ -186,4 +186,10 @@ export default {
   'difficulty.Easy': '쉬움',
   'difficulty.Moderate': '보통',
   'difficulty.Hard': '어려움',
+  'wish.add': '위시리스트에 추가',
+  'wish.added': '위시리스트에 있음 ✓',
+  'wish.hint': '영상과 위치가 아직 정확히 동기화되지 않았습니다. 위시리스트의 영상부터 video2gpx로 정확히 동기화합니다.',
+  'wish.votes': { other: '지금까지 요청 {n}건' },
+  'wish.error': '실패했습니다. 나중에 다시 시도해 주세요.',
+  'wish.limit': '오늘 이미 많은 요청을 보냈습니다. 내일 다시 시도해 주세요.',
 };
