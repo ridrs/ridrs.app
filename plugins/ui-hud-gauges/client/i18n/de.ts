@@ -10,8 +10,11 @@ export const de: Messages = {
   distance: 'Distanz',
   speed: 'Geschwindigkeit',
   gradient: 'Steigung',
+  elevation: 'Höhe',
   cadence: 'Trittfrequenz',
   average: 'Ø',
   gear: 'Gang',
   zone: (zone: number) => `Zone ${zone}`,
+  climbCategory: (category) => (category === 'HC' ? 'HC' : `Kat. ${category}`),
+  secondsShort: (seconds) => `${seconds} s`,
 };

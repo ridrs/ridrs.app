@@ -204,6 +204,33 @@ export function gradeColour(percent: number): string {
   return (GRADE_COLOURS.find(({ below }) => percent < below) ?? GRADE_COLOURS[5]).colour;
 }
 
+/**
+ * The colour of a gradient readout on a dark HUD card: matches `gradeColour` up to 8 %, and lifts
+ * the darkest crimson/purple bands so steep climbs stay readable from trainer distance.
+ */
+export function gradeTextColour(percent: number): string {
+  if (percent < 8) return gradeColour(percent);
+  return percent < 10 ? '#e05263' : '#c084fc';
+}
+
+/**
+ * Where to place the right-aligned remaining/total distance inside a profile of `width` × `height`:
+ * top-right when the elevation line stays in the lower half of the right side (open sky above),
+ * bottom-right when the line climbs into the upper half (open filled terrain below).
+ */
+export function distanceLabelAlign(
+  line: readonly Point[],
+  width: number,
+  height: number,
+): 'top' | 'bottom' {
+  const zoneStart = width * 0.55;
+  const rightPoints = line.filter((point) => point.x >= zoneStart);
+  const sample = rightPoints.length > 0 ? rightPoints : line;
+  if (sample.length === 0) return 'top';
+  const highestY = Math.min(...sample.map((point) => point.y));
+  return highestY >= height * 0.48 ? 'top' : 'bottom';
+}
+
 /** One stretch of the profile: its outline in the drawing and its colour. */
 export interface ProfileStretch {
   readonly polygon: string;

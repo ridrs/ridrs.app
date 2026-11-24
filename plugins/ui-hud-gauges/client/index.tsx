@@ -17,8 +17,12 @@ import {
   type PhysicsState,
   physicsStateEvent,
   rideScreenshotCaptureState,
+  type TerrainPreview,
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
+  type WorldPosition,
+  worldPositionEvent,
+  worldTerrainPreviewEvent,
   workoutFinishedEvent,
   workoutIntensityChangedEvent,
   workoutStepChangedEvent,
@@ -27,8 +31,10 @@ import { formatDecimal, localizeNumber, type UiComponent, type UiContext } from 
 import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { CurrentSegmentView, useWorkoutSegment, WorkoutProgressRing } from './current-segment.tsx';
 import { Gauge } from './gauge.tsx';
 import { messages } from './i18n/index.ts';
+import { useRideRoute, useTrack } from './ride-route.ts';
 import { RouteBoxView } from './route-box.tsx';
 import {
   cadenceScale,
@@ -371,18 +377,33 @@ function Fact({
 
 /**
  * The ride at the top centre, a HUD element of its own drawn like a ride card: the time ridden,
- * the distance and the speed, from the physics. Dashes until the first physics state. The time
- * stands at 0:00 until the ride rolls with the rider's first pedal stroke.
+ * the distance and the speed, from the physics, extended below with the current segment (local
+ * elevation snippet, summit approach or active workout step) when relevant. Dashes until the first
+ * physics state. The time stands at 0:00 until the ride rolls with the rider's first pedal stroke.
  */
 function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
   const language = useLanguage(ctx);
+  const athlete = useAthlete(ctx);
+  const offer = useRideRoute(ctx);
+  const track = useTrack(offer);
+  const workout = useWorkoutSegment(ctx, athlete.ftp);
   const [state, setState] = useState<PhysicsState>();
+  const [position, setPosition] = useState<WorldPosition>();
+  const [terrainPreview, setTerrainPreview] = useState<TerrainPreview>();
+  const cardRef = useRef<HTMLElement>(null);
+
   useEffect(() => ctx.events.subscribe(physicsStateEvent, ({ payload }) => setState(payload)), [ctx]);
+  useEffect(() => ctx.events.subscribe(worldPositionEvent, ({ payload }) => setPosition(payload)), [ctx]);
+  useEffect(
+    () => ctx.events.subscribe(worldTerrainPreviewEvent, ({ payload }) => setTerrainPreview(payload)),
+    [ctx],
+  );
   const number = (value: number, decimals: number) => localizeNumber(formatDecimal(value, decimals), language);
 
   return (
     <section
+      ref={cardRef}
       data-testid="ride-facts"
       aria-label={[text.time, text.distance, text.speed].join(', ')}
       style={{
@@ -391,8 +412,7 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
-        gap: 20,
-        padding: '10px 18px',
+        flexDirection: 'column',
         borderRadius: 'var(--ridrs-radius-lg)',
         background: 'var(--ridrs-card)',
         boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
@@ -401,14 +421,34 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
         pointerEvents: 'none',
       }}
     >
-      <Fact kind="time" label={text.time} value={state ? formatDuration(riddenSeconds(state)) : EN_DASH} />
-      <Fact
-        kind="distance"
-        label={text.distance}
-        value={state ? number(state.distance / 1000, 2) : EN_DASH}
-        unit="km"
+      {workout.step ? <WorkoutProgressRing hostRef={cardRef} progress={workout.step.progress} /> : null}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(80px, 1fr))',
+          gap: 20,
+          padding: '10px 18px',
+        }}
+      >
+        <Fact kind="time" label={text.time} value={state ? formatDuration(riddenSeconds(state)) : EN_DASH} />
+        <Fact
+          kind="distance"
+          label={text.distance}
+          value={state ? number(state.distance / 1000, 2) : EN_DASH}
+          unit="km"
+        />
+        <Fact kind="speed" label={text.speed} value={state ? number(state.speed * 3.6, 1) : EN_DASH} unit="km/h" />
+      </div>
+      <CurrentSegmentView
+        workout={workout}
+        offer={offer}
+        track={track}
+        state={state}
+        position={position}
+        terrainPreview={terrainPreview}
+        language={language}
+        text={text}
       />
-      <Fact kind="speed" label={text.speed} value={state ? number(state.speed * 3.6, 1) : EN_DASH} unit="km/h" />
     </section>
   );
 }

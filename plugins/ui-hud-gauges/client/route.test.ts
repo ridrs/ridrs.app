@@ -2,8 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  distanceLabelAlign,
   fitPlaces,
   gradeColour,
+  gradeTextColour,
   headingAt,
   indexAtDistance,
   locateOnTrack,
@@ -80,6 +82,24 @@ describe('profileOf', () => {
 
   it('has nothing to draw without two elevations', () => {
     expect(profileOf([100], 1000, 200, 50).stretches).toEqual([]);
+  });
+});
+
+describe('distanceLabelAlign', () => {
+  it('aligns bottom when the route climbs high toward the end, top when it finishes low', () => {
+    const highEnd = profileOf([100, 105, 115, 130, 145], 2000, 276, 52).line;
+    const lowEnd = profileOf([100, 120, 140, 115, 100], 2000, 276, 52).line;
+    expect(distanceLabelAlign(highEnd, 276, 52)).toBe('bottom');
+    expect(distanceLabelAlign(lowEnd, 276, 52)).toBe('top');
+  });
+});
+
+describe('gradeTextColour', () => {
+  it('matches gradeColour below 8 % and lifts steep dark bands for legibility', () => {
+    expect(gradeTextColour(1)).toBe(gradeColour(1));
+    expect(gradeTextColour(5)).toBe(gradeColour(5));
+    expect(gradeTextColour(8.5)).not.toBe(gradeColour(8.5));
+    expect(gradeTextColour(12)).not.toBe(gradeColour(12));
   });
 });
 

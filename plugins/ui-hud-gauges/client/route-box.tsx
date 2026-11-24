@@ -1,33 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
-  activityStateChangedEvent,
+  type Language,
   type PhysicsState,
   physicsStateEvent,
   type RouteOffer,
-  routeOfferState,
   type WorldPosition,
   worldPositionEvent,
 } from '@ridrs/contracts';
-import { besideControl, entryNamed, findControl, parseTrackPositions, type TrackPosition } from '@ridrs/ride';
+import type { TrackPosition } from '@ridrs/ride';
 import { formatDecimal, localizeNumber, type UiContext } from '@ridrs/ui-sdk';
-import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
+import { useEffect, useMemo, useState } from 'react';
 import { messages } from './i18n/index.ts';
 import { canDrawMap, LiveMap, MAP_ATTRIBUTION } from './live-map.tsx';
-import {
-  fitPlaces,
-  gradeColour,
-  indexAtDistance,
-  type MeasuredPlace,
-  measureTrack,
-  polyline,
-  profileOf,
-  thin,
-  trackOffset,
-} from './route.ts';
+import { useRideRoute, useTrack, useTrackOffset } from './ride-route.ts';
+import { distanceLabelAlign, fitPlaces, indexAtDistance, measureTrack, polyline, profileOf, thin } from './route.ts';
 
-const EN_DASH = '–';
 const WIDTH = 300;
 const MAP = { width: WIDTH - 24, height: 190, pad: 16 } as const;
 /** What shows of the map once it leans back: the plane's foot stays, its top recedes. */
@@ -41,72 +30,51 @@ const GRID_Y = [0, 1, 2, 3, 4].map((i) => (i * MAP.height) / 4);
 /** How much the map leans back, as if seen from above and behind. */
 const TILT = 'perspective(420px) rotateX(38deg)';
 
-/** The route of the ride: the offer whose world route the running ride rides; none for a free ride. */
-function useRideRoute(ctx: UiContext): RouteOffer | undefined {
-  const [route, setRoute] = useState<string>();
-  useEffect(
-    () =>
-      ctx.events.subscribe(activityStateChangedEvent, ({ payload }) =>
-        setRoute(payload.state === 'idle' ? undefined : payload.world?.route),
-      ),
-    [ctx],
+const SINGLE_LINE_TITLE = {
+  display: 'block',
+  width: '100%',
+  fontSize: 'var(--ridrs-size-small)',
+  fontWeight: 500,
+  lineHeight: 1.3,
+  color: 'var(--ridrs-text)',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+} as const;
+
+/** A single-line route title laid onto a subtle top scrim inside the map container. */
+function MapTitleScrim({ title }: { readonly title: string }) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: '0 0 auto 0',
+        padding: '6px 10px 16px',
+        background:
+          'linear-gradient(180deg, rgb(11 18 32 / .86) 0%, rgb(11 18 32 / .48) 65%, transparent 100%)',
+        pointerEvents: 'none',
+      }}
+    >
+      <span data-testid="route-title" style={SINGLE_LINE_TITLE}>
+        {title}
+      </span>
+    </div>
   );
-  const offers = useStateEntries(ctx, routeOfferState);
-  return route === undefined ? undefined : [...offers.values()].find((offer) => offer.world?.route === route);
-}
-
-/**
- * Where the route's GPX track runs, read from its ride package (ADR 0094) as the video world
- * reads it: the control file names the track. None while it loads, and none when the route is not
- * on the device or its package has no track.
- */
-function useTrack(offer: RouteOffer | undefined): TrackPosition[] | undefined {
-  const files = offer?.availability.state === 'ready' ? offer.availability.files : undefined;
-  const [track, setTrack] = useState<TrackPosition[]>();
-  useEffect(() => {
-    setTrack(undefined);
-    if (!files) return undefined;
-    let current = true;
-    const paths = Object.keys(files);
-    const read = async (path: string) => new Uint8Array(await (await fetch(files[path] ?? '')).arrayBuffer());
-    (async () => {
-      const found = await findControl(paths, read);
-      const gpx = found ? entryNamed(paths, besideControl(found.path, found.control.gpx)) : undefined;
-      if (!gpx) return;
-      const positions = parseTrackPositions(new TextDecoder().decode(await read(gpx)));
-      if (current && positions.length > 1) setTrack(positions);
-    })().catch(() => {
-      // A track that cannot be read leaves the map out; the rest of the box stays.
-    });
-    return () => {
-      current = false;
-    };
-  }, [files]);
-  return track;
-}
-
-/**
- * m the route's track runs ahead of the odometer, from where the world puts the rider: a cut of
- * the video skips road the track runs along and the odometer never counts. 0 before the first
- * position, on a new track and when a new ride starts its odometer again.
- */
-function useTrackOffset(track: readonly MeasuredPlace[] | undefined, position: WorldPosition | undefined): number {
-  const [offset, setOffset] = useState(0);
-  const last = useRef<{ track: readonly MeasuredPlace[]; distance: number }>(undefined);
-  useEffect(() => {
-    if (!track || !position) return;
-    const same = last.current?.track === track && position.distance >= last.current.distance;
-    setOffset((previous) => trackOffset(track, position, same ? previous : 0));
-    last.current = { track, distance: position.distance };
-  }, [track, position]);
-  return track && position ? offset : 0;
 }
 
 /**
  * The track alone, without a map: the whole track, the part ridden over it and the rider, on a
  * plane leaning back. Where no map can be drawn (no WebGL, offline).
  */
-function TrackMap({ track, position }: { readonly track: TrackPosition[]; readonly position?: WorldPosition }) {
+function TrackMap({
+  track,
+  title,
+  position,
+}: {
+  readonly track: TrackPosition[];
+  readonly title: string;
+  readonly position?: WorldPosition;
+}) {
   const shown = useMemo(() => thin(measureTrack(track), MAX_POINTS), [track]);
   const project = useMemo(() => fitPlaces(shown, MAP.width, MAP.height, MAP.pad), [shown]);
   const points = useMemo(() => shown.map(project), [shown, project]);
@@ -118,6 +86,7 @@ function TrackMap({ track, position }: { readonly track: TrackPosition[]; readon
       data-testid="route-map"
       data-map="track"
       style={{
+        position: 'relative',
         height: MAP_VIEW,
         overflow: 'hidden',
         borderRadius: 'var(--ridrs-radius)',
@@ -161,6 +130,7 @@ function TrackMap({ track, position }: { readonly track: TrackPosition[]; readon
           ) : null}
         </svg>
       </div>
+      <MapTitleScrim title={title} />
     </div>
   );
 }
@@ -172,10 +142,18 @@ const LIVE_HEIGHT = 150;
  * The map of the route: a real map leaning back where the page can draw one (ADR 0097), else the
  * track alone. A map that fails to load hands over to the track for the rest of the ride.
  */
-function RouteMap({ track, position }: { readonly track: TrackPosition[]; readonly position?: WorldPosition }) {
+function RouteMap({
+  track,
+  title,
+  position,
+}: {
+  readonly track: TrackPosition[];
+  readonly title: string;
+  readonly position?: WorldPosition;
+}) {
   const [failed, setFailed] = useState(false);
   const live = useMemo(() => canDrawMap(), []);
-  if (!live || failed) return <TrackMap track={track} {...(position ? { position } : {})} />;
+  if (!live || failed) return <TrackMap track={track} title={title} {...(position ? { position } : {})} />;
   return (
     <div
       data-testid="route-map"
@@ -188,6 +166,7 @@ function RouteMap({ track, position }: { readonly track: TrackPosition[]; readon
         height={LIVE_HEIGHT}
         onFail={() => setFailed(true)}
       />
+      <MapTitleScrim title={title} />
       <span
         style={{
           position: 'absolute',
@@ -205,50 +184,91 @@ function RouteMap({ track, position }: { readonly track: TrackPosition[]; readon
   );
 }
 
-/** The elevation profile, coloured by gradient, the part ridden full and the rest faint. */
-function RouteProfile({ offer, distance }: { readonly offer: RouteOffer; readonly distance?: number }) {
+/**
+ * The elevation profile, coloured by gradient, the part ridden full and the rest faint, with the
+ * remaining and total distance tucked into its upper or lower right corner so it avoids the line.
+ */
+function RouteProfile({
+  offer,
+  distance,
+  language,
+}: {
+  readonly offer: RouteOffer;
+  readonly distance?: number;
+  readonly language: Language;
+}) {
   const { stretches, line } = useMemo(
     () => profileOf(offer.sparkline ?? [], offer.distance, PROFILE.width, PROFILE.height),
     [offer],
   );
-  const at = distance === undefined || offer.distance <= 0 ? undefined : Math.min(Math.max(distance / offer.distance, 0), 1);
+  const at =
+    distance === undefined || offer.distance <= 0 ? undefined : Math.min(Math.max(distance / offer.distance, 0), 1);
   const x = at === undefined ? undefined : at * PROFILE.width;
+  const align = useMemo(() => distanceLabelAlign(line, PROFILE.width, PROFILE.height), [line]);
+  const distanceLabel =
+    offer.distance > 0
+      ? `${localizeNumber(formatDecimal(Math.max(0, offer.distance - (distance ?? 0)) / 1000, 1), language)} / ${localizeNumber(formatDecimal(offer.distance / 1000, 1), language)} km`
+      : undefined;
+
   return (
-    <svg
+    <div
       data-testid="route-profile"
       {...(at === undefined ? {} : { 'data-at': String(at) })}
-      viewBox={`0 0 ${PROFILE.width} ${PROFILE.height}`}
-      width="100%"
-      height={PROFILE.height}
-      aria-hidden="true"
-      style={{ display: 'block' }}
+      style={{ position: 'relative', height: PROFILE.height }}
     >
-      {stretches.map((stretch) => (
-        <polygon
-          key={stretch.from}
-          points={stretch.polygon}
-          fill={stretch.colour}
-          // Its own colour round the edge closes the hairline seams between neighbours.
-          stroke={stretch.colour}
-          strokeWidth={0.6}
-          opacity={at !== undefined && stretch.to <= at ? 0.95 : 0.55}
-        />
-      ))}
-      <polyline points={polyline(line)} fill="none" stroke="rgb(255 255 255 / .8)" strokeWidth={1.5} />
-      {x === undefined ? null : (
-        <g>
-          <line x1={x} y1={0} x2={x} y2={PROFILE.height} stroke="var(--ridrs-accent)" strokeWidth={1.5} />
-          <circle cx={x} cy={4} r={3.5} fill="var(--ridrs-accent)" />
-        </g>
-      )}
-    </svg>
+      <svg
+        viewBox={`0 0 ${PROFILE.width} ${PROFILE.height}`}
+        width="100%"
+        height={PROFILE.height}
+        aria-hidden="true"
+        style={{ display: 'block' }}
+      >
+        {stretches.map((stretch) => (
+          <polygon
+            key={stretch.from}
+            points={stretch.polygon}
+            fill={stretch.colour}
+            // Its own colour round the edge closes the hairline seams between neighbours.
+            stroke={stretch.colour}
+            strokeWidth={0.6}
+            opacity={at !== undefined && stretch.to <= at ? 0.95 : 0.55}
+          />
+        ))}
+        <polyline points={polyline(line)} fill="none" stroke="rgb(255 255 255 / .8)" strokeWidth={1.5} />
+        {x === undefined ? null : (
+          <g>
+            <line x1={x} y1={0} x2={x} y2={PROFILE.height} stroke="var(--ridrs-accent)" strokeWidth={1.5} />
+            <circle cx={x} cy={4} r={3.5} fill="var(--ridrs-accent)" />
+          </g>
+        )}
+      </svg>
+      {distanceLabel ? (
+        <span
+          data-testid="route-distance"
+          data-align={align}
+          style={{
+            position: 'absolute',
+            right: 2,
+            ...(align === 'top' ? { top: 1 } : { bottom: 1 }),
+            fontFamily: 'var(--ridrs-font-mono)',
+            fontSize: 'var(--ridrs-size-label)',
+            fontWeight: 500,
+            fontVariantNumeric: 'tabular-nums',
+            color: 'var(--ridrs-text)',
+            textShadow: '0 1px 3px rgb(7 9 14 / .95)',
+          }}
+        >
+          {distanceLabel}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
 /**
- * The route at the top right, a HUD element drawn like a ride card: first the map of the route,
- * tilted, then its elevation profile, then the current gradient. A ride without a route shows the
- * gradient only; the map needs the route's track, the profile its elevations.
+ * The route at the top right, a HUD element drawn like a ride card: the tilted map with the
+ * route's single-line title along its top edge, and below it the whole-route elevation profile
+ * with the remaining / total distance tucked inside. Hidden on a free ride without a route.
  */
 export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
@@ -268,13 +288,19 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
     [position, offset],
   );
 
-  const percent = state ? state.road.gradient * 100 : undefined;
-  const hasProfile = (offer?.sparkline?.length ?? 0) > 1;
+  if (!offer) return null;
+
+  const hasProfile = (offer.sparkline?.length ?? 0) > 1;
+  const trackDistance = state ? state.distance + offset : undefined;
+  const fallbackDistance =
+    !hasProfile && offer.distance > 0
+      ? `${localizeNumber(formatDecimal(Math.max(0, offer.distance - (trackDistance ?? 0)) / 1000, 1), language)} / ${localizeNumber(formatDecimal(offer.distance / 1000, 1), language)} km`
+      : undefined;
 
   return (
     <section
       data-testid="route-box"
-      aria-label={offer?.title ?? text.gradient}
+      aria-label={offer.title ?? text.gradient}
       style={{
         position: 'absolute',
         top: 16,
@@ -293,37 +319,30 @@ export function RouteBoxView({ ctx }: { readonly ctx: UiContext }) {
         pointerEvents: 'none',
       }}
     >
-      {track ? <RouteMap track={track} {...(placed ? { position: placed } : {})} /> : null}
-      {offer && hasProfile ? <RouteProfile offer={offer} {...(state ? { distance: state.distance + offset } : {})} /> : null}
-      <div data-testid="route-gradient" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+      {track ? (
+        <RouteMap track={track} title={offer.title} {...(placed ? { position: placed } : {})} />
+      ) : (
+        <span data-testid="route-title" style={SINGLE_LINE_TITLE}>
+          {offer.title}
+        </span>
+      )}
+      {hasProfile ? (
+        <RouteProfile offer={offer} language={language} {...(trackDistance !== undefined ? { distance: trackDistance } : {})} />
+      ) : fallbackDistance ? (
         <span
+          data-testid="route-distance"
           style={{
+            alignSelf: 'flex-end',
             fontFamily: 'var(--ridrs-font-mono)',
             fontSize: 'var(--ridrs-size-label)',
             fontWeight: 500,
-            letterSpacing: '.12em',
-            textTransform: 'uppercase',
-            color: 'var(--ridrs-info)',
-          }}
-        >
-          {text.gradient}
-        </span>
-        <span
-          data-testid="value"
-          style={{
-            marginLeft: 'auto',
-            fontSize: 'var(--ridrs-size-value)',
-            fontWeight: 500,
             fontVariantNumeric: 'tabular-nums',
-            color: percent === undefined ? 'var(--ridrs-text)' : gradeColour(percent),
+            color: 'var(--ridrs-text-muted)',
           }}
         >
-          {percent === undefined ? EN_DASH : localizeNumber(formatDecimal(percent, 1), language)}
+          {fallbackDistance}
         </span>
-        <span data-testid="unit" style={{ fontSize: 'var(--ridrs-size-small)', fontWeight: 500, color: 'var(--ridrs-text-muted)' }}>
-          %
-        </span>
-      </div>
+      ) : null}
     </section>
   );
 }

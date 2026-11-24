@@ -82,6 +82,48 @@ Then(
   },
 );
 
+Then('the route box is not shown', async function (this: RidrsWorld) {
+  await this.settle();
+  await waitFor(() =>
+    assert.ok(within(ui(this)).queryByTestId('route-box') === null, 'Expected no route box'),
+  );
+});
+
+Then(
+  'the route map shows the single-line title {string} at its top',
+  async function (this: RidrsWorld, expected: string) {
+    const map = await within(await box(this)).findByTestId('route-map');
+    await waitFor(() => {
+      const title = within(map).getByTestId('route-title');
+      assert.equal(title.textContent, expected);
+      assert.equal(title.style.whiteSpace, 'nowrap');
+      assert.equal(title.style.textOverflow, 'ellipsis');
+    });
+  },
+);
+
+Then(
+  'the route profile shows the distance {string}',
+  async function (this: RidrsWorld, expected: string) {
+    const profile = await within(await box(this)).findByTestId('route-profile');
+    await waitFor(() => {
+      const dist = within(profile).getByTestId('route-distance');
+      assert.equal(dist.textContent, expected);
+    });
+  },
+);
+
+Then(
+  'the route profile aligns its distance at the {string}',
+  async function (this: RidrsWorld, align: string) {
+    const profile = await within(await box(this)).findByTestId('route-profile');
+    await waitFor(() => {
+      const dist = within(profile).getByTestId('route-distance');
+      assert.equal(dist.dataset.align, align);
+    });
+  },
+);
+
 Then(
   'the route map draws a track of {int} points',
   async function (this: RidrsWorld, count: number) {
@@ -132,7 +174,6 @@ Then(
     await waitFor(() => assert.equal(profile.getAttribute('data-at'), String(percent / 100)));
   },
 );
-
 Then(
   'the route profile marks the rider at about {int} % of the route',
   async function (this: RidrsWorld, percent: number) {
@@ -140,16 +181,5 @@ Then(
     await waitFor(() =>
       assert.equal(Math.round(Number(profile.getAttribute('data-at')) * 100), percent),
     );
-  },
-);
-
-Then(
-  'the route box shows the gradient {string} {string}',
-  async function (this: RidrsWorld, value: string, unit: string) {
-    const gradient = await within(await box(this)).findByTestId('route-gradient');
-    await waitFor(() => {
-      assert.equal(within(gradient).getByTestId('value').textContent, value);
-      assert.equal(within(gradient).getByTestId('unit').textContent, unit);
-    });
   },
 );

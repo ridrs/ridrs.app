@@ -8,6 +8,7 @@ export const en = {
   distance: 'Distance',
   speed: 'Speed',
   gradient: 'Gradient',
+  elevation: 'Elev',
   cadence: 'Cadence',
   /** Before the average of the ride. */
   average: 'avg',
@@ -15,6 +16,11 @@ export const en = {
   gear: 'Gear',
   /** The name of a zone the profile leaves unnamed. */
   zone: (zone: number) => `Zone ${zone}`,
+  /** Climb category badge in the summit segment. */
+  climbCategory: (category: 'HC' | '1' | '2' | '3' | '4') =>
+    category === 'HC' ? 'HC' : `Cat ${category}`,
+  /** Countdown to summit, e.g. `7 s`. */
+  secondsShort: (seconds: number) => `${seconds} s`,
 };
 
 export type Messages = typeof en;

@@ -37,11 +37,15 @@ const CUT_POINTS = [
   [46.024, 7.0],
 ] as const;
 
-const gpxOf = (name: string, points: readonly (readonly [number, number])[]) =>
+const gpxOf = (
+  name: string,
+  points: readonly (readonly [number, number])[],
+  elevations?: readonly number[],
+) =>
   `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="ridrs fixture" xmlns="http://www.topografix.com/GPX/1/1">
   <trk><name>${name}</name><trkseg>
-${points.map(([lat, lon], i) => `    <trkpt lat="${lat}" lon="${lon}"><ele>${100 + i * 10}</ele><time>2026-01-01T00:0${i}:00Z</time></trkpt>`).join('\n')}
+${points.map(([lat, lon], i) => `    <trkpt lat="${lat}" lon="${lon}"><ele>${elevations?.[i] ?? 100 + i * 10}</ele><time>2026-01-01T00:${String(i).padStart(2, '0')}:00Z</time></trkpt>`).join('\n')}
   </trkseg></trk>
 </gpx>`;
 
@@ -113,11 +117,74 @@ const cutOffer: RouteOffer = {
   world: { landscape: 'fixture-route-box/landscape', route: 'cut' },
 };
 
+const flatOffer: RouteOffer = {
+  id: 'fixture-route-box/flat',
+  kind: 'video',
+  title: 'Flat Valley',
+  distance: 1200,
+  ascent: 0,
+  sparkline: [100, 100, 100, 100, 100],
+  tags: {},
+  availability: {
+    state: 'ready',
+    files: {
+      'flat/flat.xml': file('application/xml', controlOf('Flat Valley')),
+      'flat/video.mp4': 'data:video/mp4;base64,',
+      'flat/track.gpx': file(
+        'application/gpx+xml',
+        gpxOf('Flat Valley', POINTS, [100, 100, 100, 100, 100]),
+      ),
+    },
+  },
+  world: { landscape: 'fixture-route-box/landscape', route: 'flat' },
+};
+
+/** 16 points north ~100 m apart (1500 m): flat to 200 m, climb 100->180 m to 1000 m, descent to 130 m. */
+const PASS_POINTS = Array.from({ length: 16 }, (_, i) => [46.0 + i * 0.0009, 7.0] as const);
+const PASS_ELEVATIONS = [
+  100, 100, 100, 110, 120, 130, 140, 150, 160, 170, 180, 170, 160, 150, 140, 130,
+] as const;
+
+const passOffer: RouteOffer = {
+  id: 'fixture-route-box/pass',
+  kind: 'video',
+  title: 'Verdon Gorge Drive | Route des Crêtes · Verdon to Castellane',
+  distance: 1500,
+  ascent: 80,
+  sparkline: [...PASS_ELEVATIONS],
+  climbs: [
+    {
+      category: '2',
+      start: 200,
+      end: 1000,
+      gain: 80,
+      grade: 10,
+      summit: 180,
+      name: 'Route des Crêtes',
+    },
+  ],
+  tags: {},
+  availability: {
+    state: 'ready',
+    files: {
+      'pass/pass.xml': file('application/xml', controlOf('Route des Crêtes')),
+      'pass/video.mp4': 'data:video/mp4;base64,',
+      'pass/track.gpx': file(
+        'application/gpx+xml',
+        gpxOf('Route des Crêtes', PASS_POINTS, PASS_ELEVATIONS),
+      ),
+    },
+  },
+  world: { landscape: 'fixture-route-box/landscape', route: 'pass' },
+};
+
 /** Downloaded video routes with tracks and elevations, for the route box scenarios. */
 export default definePlugin({
   start(ctx) {
     ctx.state.set(routeOfferState, offer.id, offer);
     ctx.state.set(routeOfferState, outAndBackOffer.id, outAndBackOffer);
     ctx.state.set(routeOfferState, cutOffer.id, cutOffer);
+    ctx.state.set(routeOfferState, flatOffer.id, flatOffer);
+    ctx.state.set(routeOfferState, passOffer.id, passOffer);
   },
 });

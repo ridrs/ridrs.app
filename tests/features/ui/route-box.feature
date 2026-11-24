@@ -1,13 +1,14 @@
 @ui
 Feature: A box at the top right shows the route being ridden
   `ui-hud-gauges` adds a HUD element at the top right for the route of the ride: first its map,
-  tilted a little as if seen from above and behind, with the track and where the rider is; below
-  it the elevation profile with the part ridden and where the rider is along it; and the current
-  gradient of the road. The map is a real map where the page can draw one (ADR 0097): OpenFreeMap's
-  tiles, leaning back, the camera following the rider. Where it cannot (no WebGL, as in these
-  headless scenarios, or offline), the map is the GPX track of the route's ride package (ADR 0094)
-  alone, on a plane leaning back. The profile draws the route offer's elevations. A ride without a route, or a route without a track or
-  elevations, shows only what it has; the gradient comes from the physics in every ride.
+  tilted a little as if seen from above and behind, with the track, where the rider is, and the
+  route's single-line title along the map's top edge; below it the elevation profile with the part
+  ridden, where the rider is along it, and the remaining and total distance placed top or bottom
+  aligned so it does not collide with the elevation line. The map is a real map where the page can
+  draw one (ADR 0097): OpenFreeMap's tiles, leaning back, the camera following the rider. Where it
+  cannot (no WebGL, as in these headless scenarios, or offline), the map is the GPX track of the
+  route's ride package (ADR 0094) alone, on a plane leaning back. The profile draws the route
+  offer's elevations. A ride without a route hides the route box.
 
   Background:
     Given the ridrs plugins "activity-session, ui-main-screen, ui-tile-ride-start, ui-activity-screen, ui-hud-gauges" together with a test device plugin "test-device"
@@ -15,10 +16,12 @@ Feature: A box at the top right shows the route being ridden
     And the host has started
     And the ridrs UI is shown
 
-  Scenario: The route box sits at the top right and shows the map first, then the profile and the gradient
+  Scenario: The route box sits at the top right and shows the map with its single-line title, then the profile with distance
     When "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "hill"
     Then the route box sits at the top right
-    And the route box shows, in this order, "map, profile, gradient"
+    And the route box shows, in this order, "map, profile"
+    And the route map shows the single-line title "Hill" at its top
+    And the route profile shows the distance "1.2 / 1.2 km"
 
   Scenario: Without a map renderer the map draws the whole track alone, tilted
     When "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "hill"
@@ -49,16 +52,20 @@ Feature: A box at the top right shows the route being ridden
     Then the route map shows 5 points of the track as ridden
     And the route profile marks the rider at about 92 % of the route
 
-  Scenario: The profile marks the rider along the route
+  Scenario: The profile marks the rider along the route and updates the remaining distance
     Given "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "hill"
     When the physics reports a road gradient of 4.5 % after 300 m
     Then the route profile marks the rider at 25 % of the route
-    And the route box shows the gradient "4.5" "%"
+    And the route profile shows the distance "0.9 / 1.2 km"
 
-  Scenario: Before the first physics state the gradient is a dash
+  Scenario: The distance inside the profile aligns bottom when the route ends high
     When "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "hill"
-    Then the route box shows the gradient "–" "%"
+    Then the route profile aligns its distance at the "bottom"
 
-  Scenario: A ride without a route shows the gradient only
+  Scenario: The distance inside the profile aligns top when the route ends low
+    When "test-device" asks to start a ride on the landscape "fixture-route-box/landscape" along the route "out-and-back"
+    Then the route profile aligns its distance at the "top"
+
+  Scenario: A ride without a route hides the route box
     When I press "Start ride"
-    Then the route box shows, in this order, "gradient"
+    Then the route box is not shown

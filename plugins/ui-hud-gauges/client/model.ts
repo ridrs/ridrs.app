@@ -486,9 +486,18 @@ function sameTarget(a: GaugeTarget | undefined, b: GaugeTarget | undefined): boo
   return Math.round(a.low) === Math.round(b.low) && Math.round(a.high) === Math.round(b.high);
 }
 
+export interface ActiveWorkoutStepInfo {
+  readonly index: number;
+  readonly elapsedSeconds: number;
+  readonly durationSeconds: number | undefined;
+  readonly progress: number;
+  readonly running: boolean;
+}
+
 /**
  * Follows the ride's active workout and its steps, returning the power and cadence targets to draw
- * on the gauges at `now` and whether a step transition or ramp is still moving.
+ * on the gauges at `now`, the active step's timing and progress, and whether a step transition or
+ * ramp is still moving.
  */
 export class WorkoutTargetTracker {
   private sessionId: string | undefined;
@@ -602,5 +611,37 @@ export class WorkoutTargetTracker {
       segment.duration.kind === 'time' &&
       elapsedMs < segment.durationSeconds * 1000;
     return { power, cadence, animating: powerMoving || cadenceMoving || rampMoving };
+  }
+
+  /** Timing and progress of the active workout step at `now`; none when no workout step runs. */
+  stepAt(now: number): ActiveWorkoutStepInfo | undefined {
+    if (
+      !this.sessionId ||
+      this.segments.length === 0 ||
+      !this.step ||
+      this.step.startedAt < this.startedAt ||
+      (this.finishedAt !== undefined && this.finishedAt >= this.startedAt)
+    ) {
+      return undefined;
+    }
+    const segment = this.segments[this.step.index];
+    if (!segment) {
+      return undefined;
+    }
+    const clock = this.pausedAt ?? now;
+    const elapsedMs = Math.max(0, clock - this.step.startedAt - this.pausedMs);
+    const durationSeconds = segment.duration.kind === 'time' ? segment.durationSeconds : undefined;
+    const elapsedSeconds = Math.floor(elapsedMs / 1000);
+    const progress =
+      durationSeconds !== undefined && durationSeconds > 0
+        ? Math.min(Math.max(elapsedMs / (durationSeconds * 1000), 0), 1)
+        : 0;
+    return {
+      index: this.step.index,
+      elapsedSeconds,
+      durationSeconds,
+      progress,
+      running: this.pausedAt === undefined,
+    };
   }
 }

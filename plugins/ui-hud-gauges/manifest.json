@@ -48,6 +48,7 @@
         "activity.athlete",
         "physics.state",
         "world.position",
+        "world.terrain-preview",
         "drivetrain.gear-changed",
         "trainer.target-power",
         "workout.step-changed",

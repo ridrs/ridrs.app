@@ -8,8 +8,8 @@ import {
   uiTerrainObservedEvent,
 } from '@ridrs/contracts';
 import { createPhysicsPresentation } from '@ridrs/presentation';
-import { localizeNumber, type UiComponent, type UiContext } from '@ridrs/ui-sdk';
-import { useLanguage, useMessages } from '@ridrs/ui-sdk/react';
+import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
+import { useMessages } from '@ridrs/ui-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type FrameDecoder, FramePlayer } from './frame-player.ts';
@@ -318,7 +318,6 @@ function VideoWorld({
   readonly video: VideoSource;
 }) {
   const text = useMessages(ctx, messages);
-  const language = useLanguage(ctx);
   const { canvas, hdrCanvas, hdr, finished, intro, skipIntro } = useVideoWorld(ctx, route, track, videoTime, video);
   const shown = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } as const;
   return (
@@ -338,9 +337,6 @@ function VideoWorld({
         height={video.height}
         style={{ ...shown, display: hdr ? 'block' : 'none' }}
       />
-      <div style={{ ...OVERLAY, top: 16 }}>
-        {route.title} · {text.km(localizeNumber((track.length / 1000).toFixed(1), language))}
-      </div>
       {intro ? (
         <>
           <style>{SKIP_INTRO_CSS}</style>
