@@ -304,7 +304,8 @@ def _deg(lat, lon, up=False):
 
 
 class Wcs(Source):
-    """OGC WCS 2.0.1 GetCoverage of one block as GeoTIFF (GeoServer, MapServer); extra: coverage, axes, params"""
+    """OGC WCS 2.0.1 GetCoverage of one block as GeoTIFF (GeoServer, MapServer); extra: coverage, axes, params,
+    nodata (values the service uses for 'no data' without declaring them, set to NaN before anything else)"""
 
     def get_block(self, key, d):
         x0, y0, x1, y1 = self.bbox(key)
@@ -318,6 +319,8 @@ class Wcs(Source):
             raise OSError(f"{self.name} {key}: not a GeoTIFF: {b[:160].decode('latin-1', 'replace')}")
         T = Tiff(BytesSource(b, key), clamp=True)
         z = T.window(0, 0, T.H, T.W)
+        for v in self.extra.get("nodata", ()):
+            z = np.where(z == v, np.nan, z).astype(np.float32)
         f = int(round(self.res_m / T.dx))
         if f > 1:
             z = block_mean(z, f)
@@ -511,6 +514,25 @@ _reg(TileTif(
     coverage=[(5.86, 50.32, 7.9, 52.53), (7.9, 51.0, 9.46, 52.53), (7.9, 50.7, 8.3, 51.0)], est_block_bytes=2_400_000, epsg=25832, block_m=1000.0,
     url="https://www.opengeodata.nrw.de/produkte/geobasis/hm/dgm1_tiff/dgm1_tiff/", extra=dict(url=_nw_url),
     note="the first use downloads the tile index (about 3.6 MB)"))
+
+# Spain: IGN MDT05 (PNOA-LiDAR) from the INSPIRE WCS, whole metres (Int16). Outside its area and on the sea the service answers 0, not
+# nodata: 0 becomes NaN, so a block across the French or Portuguese border never pulls the road to 0 m (a coastal pixel at exactly 0 m
+# is lost too; the estimator falls back to Copernicus there). Mainland and Balearics in one ETRS89 / UTM 30N mosaic, Canaries in REGCAN95 / UTM 28N.
+_ES = dict(kind="dtm", res_m=5.0, sigma_m=0.8, dsm=False, offsets=(-6, -3, 0, 3, 6), licence="CC BY 4.0 (IGN licence, Orden FOM/2807/2015)",
+           attribution="Obra derivada de MDT05 CC-BY 4.0 scne.es (c) Instituto Geografico Nacional", status="verified", est_block_bytes=150_000,
+           url="https://servicios.idee.es/wcs-inspire/mdt", block_m=2500.0)
+_ES_PARAMS = [("GEOTIFF:COMPRESSION", "DEFLATE")]
+_reg(Wcs(
+    name="es_mdt05", title="MDT05 Spain (IGN, PNOA-LiDAR)", region="Spain (mainland, Balearic Islands)", epsg=25830,
+    coverage=[(-9.35, 41.80, -1.80, 43.80),                     # Galicia, Asturias, Cantabria, Basque Country (and a strip of northern Portugal)
+              (-7.60, 35.95, 3.35, 41.85),                       # the centre and south down to Tarifa, east to the Mediterranean
+              (-1.80, 41.80, 3.35, 42.90), (-1.80, 42.90, -1.30, 43.35),    # Aragon, Catalonia, Navarre up to the Pyrenees
+              (1.10, 38.60, 4.40, 40.15)],                       # Balearic Islands
+    extra=dict(coverage="Elevacion25830_5", axes=("x", "y"), nodata=(0.0,), params=_ES_PARAMS), **_ES))
+_reg(Wcs(
+    name="es_mdt05_canarias", title="MDT05 Canary Islands (IGN, PNOA-LiDAR)", region="Canary Islands", epsg=4083,
+    coverage=[(-18.20, 27.60, -13.30, 29.45)],
+    extra=dict(coverage="Elevacion4083_5", axes=("x", "y"), nodata=(0.0,), params=_ES_PARAMS), **_ES))
 
 # known open candidates that are NOT implemented (listed in docs/ELEVATION_STRATEGY.md): Slovenia (ARSO LiDAR), Trentino (PAT LiDAR, ASC zips),
 # Lower Saxony, Baden-Wuerttemberg, Saxony, Thuringia, Brandenburg, Saxony-Anhalt, Rhineland-Palatinate, Schleswig-Holstein, Mecklenburg-Vorpommern.

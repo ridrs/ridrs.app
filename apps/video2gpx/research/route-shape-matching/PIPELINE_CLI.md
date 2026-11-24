@@ -274,7 +274,7 @@ An edited video (cuts into other places, inserted title shots or close-ups) is n
   - `<block>.none` = the provider has no data there. Server errors leave no marker; the block is retried.
 - **Registry** (`rsm/pipeline/demsrc.py`, `SOURCES`):
   - `cop_flm` (mask), `nasadem` (fill);
-  - `fr_rgealti`, `it_tinitaly`, `it_bz_dtm`, `ch_swissalti3d`, `at_als_dtm`, `de_by_dgm1`, `de_he_dgm1`, `de_nw_dgm1` (terrain models);
+  - `fr_rgealti`, `it_tinitaly`, `it_bz_dtm`, `ch_swissalti3d`, `at_als_dtm`, `de_by_dgm1`, `de_he_dgm1`, `de_nw_dgm1`, `es_mdt05`, `es_mdt05_canarias` (terrain models);
   - `aw3d30` (unverified terms, disabled).
 
   Enabled are all `verified` sources with `enabled=True`. `RSM_DEM_SOURCES=a,b` or `--sources` narrows the set (for tests and comparisons).

@@ -206,6 +206,34 @@ def test_registry_licences_and_defaults():
     assert "aw3d30" not in on and S.SOURCES["aw3d30"].status == "unverified"                  # unverified terms: never on by default
     for s in S.SOURCES.values():
         assert s.licence and s.attribution and "NC" not in s.licence
+    assert {"es_mdt05", "es_mdt05_canarias"} <= on
+
+
+@pytest.mark.parametrize("name,lon,lat,inside", [("es_mdt05", 2.90, 39.83, True), ("es_mdt05", -3.70, 40.42, True), ("es_mdt05", 1.20, 43.60, False),
+                                                 ("es_mdt05", -9.10, 38.72, False), ("es_mdt05_canarias", -16.50, 28.27, True), ("es_mdt05_canarias", 2.90, 39.83, False)])
+def test_spanish_coverage_boxes(name, lon, lat, inside):
+    """Mallorca and Madrid in the mainland mosaic, Toulouse and Lisbon not; Tenerife only in the Canary mosaic"""
+    assert bool(S.SOURCES[name].covers([lon], [lat])[0]) is inside
+
+
+def test_wcs_undeclared_nodata_value_becomes_nan_and_an_all_zero_block_is_none(tmp_path, monkeypatch):
+    """the IGN WCS answers 0 outside Spain and on the sea, without a nodata tag"""
+    src = S.Wcs(name="fake_wcs", title="fake", kind="dtm", region="test", res_m=5.0, sigma_m=0.8, dsm=False, offsets=(0,), licence="test",
+                attribution="fake", status="verified", coverage=[(-10, 35, 5, 44)], est_block_bytes=1000, url="https://example.invalid/wcs",
+                epsg=25830, block_m=50.0, extra=dict(coverage="c", axes=("x", "y"), nodata=(0.0,)))
+    a = np.full((12, 12), 400, np.int16); a[:, :5] = 0                                       # the west part outside the area
+    tifs = {}
+    for k, arr in (("half", a), ("sea", np.zeros((12, 12), np.int16))):
+        write_tiff(tmp_path / f"{k}.tif", arr, 999_995.0, 4_400_055.0, 5.0, epsg=25830, block=16)
+        tifs[k] = (tmp_path / f"{k}.tif").read_bytes()
+    cur = {}
+    monkeypatch.setattr(S, "http_get", lambda url, *a_, **k_: tifs[cur["k"]])
+    cur["k"] = "half"
+    z, *_ = src.get_block("20000_88000", tmp_path)
+    assert np.isnan(z[:, :5]).all() and (z[:, 5:] == 400).all()
+    cur["k"] = "sea"
+    src.fetch(tmp_path, "20000_88001")
+    assert src.state(tmp_path, "20000_88001") == "none"
 
 
 # ------------------------------------------------------------------ estimator

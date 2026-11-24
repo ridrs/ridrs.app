@@ -114,7 +114,7 @@ function build(getBbox: () => Bbox | null, autoSearch: boolean, inDialog: boolea
 
   const localSec = el("section", { class: "stack" }, el("h2", {}, "Lokale Karten (.osm.pbf)"), list, el("div", {}, add));
   const geoSec = el("section", { class: "stack" }, el("h2", {}, "Von Geofabrik laden"), bboxLine, el("div", {}, findBtn), status, offer, dlBox, dlMsg);
-  const demHelp = el("p", { class: "help" }, "Copernicus DEM GLO-30 © DLR/Airbus/EU/ESA sowie nationale/regionale Geländemodelle (IGN, INGV, Südtirol, swisstopo, BEV, Bayern, Hessen, NRW, NASADEM).");
+  const demHelp = el("p", { class: "help" }, "Copernicus DEM GLO-30 © DLR/Airbus/EU/ESA sowie nationale/regionale Geländemodelle (IGN Frankreich, IGN Spanien, INGV, Südtirol, swisstopo, BEV, Bayern, Hessen, NRW, NASADEM).");
   const demSec = inDialog
     ? disclosure("Gespeicherte Höhendaten", demList, demHelp)
     : el("section", { class: "stack" }, el("h2", {}, "Höhendaten"), demList, demHelp);

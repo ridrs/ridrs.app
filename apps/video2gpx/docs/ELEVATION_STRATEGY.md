@@ -46,8 +46,9 @@ Evaluation scripts and data (git-ignored) are in `research/route-shape-matching/
   - Switzerland: swissALTI3D.
   - Austria: BEV ALS DTM.
   - Germany: DGM1 for Bavaria, Hesse and North Rhine-Westphalia.
+  - Spain: IGN MDT05 (mainland, Balearic Islands, Canary Islands; added 24 Nov 2026).
 
-  Validated against a reference: France (16 routes), Italy / TINITALY (Amalfi only), Hesse (3 routes). Fetched and sampled but **without a reference route**: Switzerland, Austria, South Tyrol, NRW and Bavaria. The one Bavarian track is not a usable reference (§5.3).
+  Validated against a reference: France (16 routes), Italy / TINITALY (Amalfi only), Hesse (3 routes). Fetched and sampled but **without a reference route**: Switzerland, Austria, South Tyrol, NRW, Bavaria and Spain. The one Bavarian track is not a usable reference (§5.3).
 - **Campania re-check:** there is still no open LiDAR DTM. The national geoportal lists only a 2 m LiDAR *surface* model (last return), with no open download found. A DNS failure blocked the INSPIRE record itself. TINITALY via its WCS stays the best open source for Amalfi.
 
 ## 2. Sources
@@ -81,6 +82,19 @@ All sources below are free of charge, need no login and ask no terms to be accep
 | `de_by_dgm1` | Bavaria, 1 m (stored at 2 m), LiDAR | `download1.bayernwolke.de/a/dgm/dgm1/<E>_<N>.tif`, 1 km tiles, LZW, about 2.4 MB | **CC BY 4.0**: field `produkt_lizenz` of the LDBV open-data catalogue (`opengeodata_datensaetze.json`) | "DGM1 © Bayerische Vermessungsverwaltung – www.geodaten.bayern.de, CC BY 4.0" | verified | **no usable reference** (§5.3). The Bavaria project was fetched and profiled end-to-end; smoke test in Munich |
 | `de_he_dgm1` | Hesse, DGM1 served at 2 m, LiDAR | HVBG INSPIRE WCS `inspire-hessen.de/raster/dgm1/ows`, coverage `he_dgm1_2`, 1 km blocks, uncompressed, 1 MB per block | **dl-de/zero-2-0** (the WCS capabilities `Fees` field; the open-data portal says the same) | "DGM1 © HVBG, dl-de/zero-2-0" | verified | 3 Marburg routes (barometric) |
 | `de_nw_dgm1` | NRW, 1 m (stored at 2 m), LiDAR | `opengeodata.nrw.de/…/dgm1_tiff/` with its `index.json` (3.6 MB, once), 1 km tiles, LZW, about 2.4 MB | dl-de/zero-2-0 (open.nrw metadata; Geobasis NRW: "ohne Einschränkungen") | "DGM1 © Geobasis NRW, dl-de/zero-2-0" | verified | **no reference route**; smoke test in the Sauerland |
+
+**Spain**
+
+| Name | Coverage, resolution, type | Access, cache block, size [meas] | Licence (checked where) | Attribution | Status | Validated |
+|---|---|---|---|---|---|---|
+| `es_mdt05` | mainland Spain and the Balearic Islands, 5 m, DTM from PNOA-LiDAR (first coverage) | IGN INSPIRE WCS 2.0.1 `servicios.idee.es/wcs-inspire/mdt` (MapServer), coverage `Elevacion25830_5` (one ETRS89 / UTM 30N mosaic, also for zones 29 and 31), 2.5 km blocks, Int16 (whole metres), DEFLATE, 70–210 KB per block (Mallorca: 23 blocks, 3.7 MB, 22 s) | **CC BY 4.0**: the IGN licence (`ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf`, Orden FOM/2807/2015) says using IGN data means accepting CC BY 4.0; the WCS capabilities give `AccessConstraints` "CC BY 4.0 scne.es" and `Fees` "No se aplican condiciones". Commercial use and derived works allowed; no limit on automated access found | derived work: "Obra derivada de MDT05 CC-BY 4.0 scne.es" (licence §4; the credit must be visible with the data) | verified | **no reference route**; Mallorca (Serra de Tramuntana) fetched and profiled end-to-end |
+| `es_mdt05_canarias` | Canary Islands, 5 m, as above | same WCS, coverage `Elevacion4083_5` (REGCAN95 / UTM 28N) | as above | as above | verified | **no reference route**; smoke test on the Tenerife ridge west of Izaña (2 blocks, 0.3 MB, 2159–2286 m, plausible) |
+
+- **0 means no data.** The service answers 0, not a declared nodata value, outside Spain (France, Portugal, measured at Perpignan, Pau and Guarda) and on the sea. `Wcs` takes `extra["nodata"]`, so 0 becomes NaN: a block across the Pyrenees border never pulls the road to 0 m, and an all-sea block becomes a `.none` marker (about 3 KB). A coastal pixel at exactly 0 m is lost too; there the estimator uses Copernicus.
+- **Whole metres.** The WCS serves Int16, a quantisation error of ±0.5 m (std 0.29 m) that the bilinear interpolation and the profile filter smooth out. σ is 0.8 m (IGN France 0.7 m), offsets ±3 and ±6 m as for RGE ALTI.
+- **MDT02** (2 m, second PNOA-LiDAR coverage) is not in the WCS (it lists MDT05, MDT25, MDT200, MDT500 and MDT1000 only); it is a per-sheet download from the CNIG download centre. Not implemented.
+- Andorra answers with data in the same mosaic (980–2103 m at 1.52 E, 42.51 N) and is inside the coverage boxes.
+- Datum: heights are orthometric (Alicante). The measured mode against Copernicus on the Mallorca route was +0.6 m.
 
 **Listed, not implemented** (no time in this session; all would need their own fetcher and a reference route):
 - **Slovenia:** ARSO LiDAR, 1 km ASCII tiles; licence not checked.
@@ -228,7 +242,7 @@ Bumps of about 100 m are still mostly removed by every variant. The DEMs' own er
 2. **Italy (TINITALY):** Amalfi only, against Strava, which is not ground truth. No second Italian route.
 3. **Bavaria:** the only track found is `DE_Haustrails.gpx` (RoomSports, 2016). It is an MTB ride on forest trails: the GPS positions lie metres off the trails, and the track sits 10 m above DGM1 with a std of 6.9 m. Every strategy scores 17–25 m on it, so it says nothing about the DEM. It is reported apart (`summary.md`) and left out of all means.
 4. **Hesse:** 3 routes around Marburg. The Wetterhöhe and Rimberg routes are partly in forest.
-5. **Switzerland, Austria, South Tyrol, NRW: no reference route.**
+5. **Switzerland, Austria, South Tyrol, NRW, Spain: no reference route.**
    - These are LiDAR terrain models of the same kind as IGN and Hesse, so the same σ was assumed.
    - Only the download, reading, georeferencing and plausible heights were checked: Gotthard and Bavaria end-to-end, plus 2–5 km smoke segments.
    - A video with GPS, or a barometric track, from these regions would close the gap.
@@ -250,7 +264,8 @@ Bumps of about 100 m are still mostly removed by every variant. The DEMs' own er
 
 ## 7. Open
 
-- Reference routes for CH, AT, South Tyrol, NRW and Bavaria. A second Italian route.
+- Reference routes for CH, AT, South Tyrol, NRW, Bavaria and Spain.
+- The `at_als_dtm` coverage boxes are coarse: they plan 243 blocks (all empty) for an Italian Dolomites route south of the border. Each becomes a `.none` marker after one request, but the plan overstates the download. A second Italian route.
 - A fetcher for Slovenia, Trentino and the other open German Länder (§2).
 - AW3D30: read and check the JAXA terms. If they allow it, enable it as a second fill (DEM_STUDY: Amalfi km 20–45 8.5 → 6.0 m with the mean of the two fills).
 - Profiles computed before this change are reused until the result or the extra data change. A changed pipeline hash does not invalidate them yet.
