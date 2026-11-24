@@ -14,6 +14,7 @@
     "test": "pnpm test:unit && pnpm test:bdd",
     "generate:licenses": "tsx scripts/generate-licenses.ts",
     "check:video-routes": "tsx scripts/check-video-routes.ts",
+    "report:refinement": "NODE_OPTIONS=--max-old-space-size=1024 tsx scripts/refinement-report.ts",
     "fetch:video-catalog": "tsx scripts/fetch-video-catalog.ts",
     "workouts:convert": "tsx scripts/convert-workouts.ts",
     "debug:app": "node scripts/debug-app.mjs",
