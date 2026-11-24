@@ -80,7 +80,10 @@ function headers(write) {
   return h;
 }
 async function api(method, path, body) {
-  const res = await fetch(`${BASE}/api/admin/${path}`, { method, headers: headers(method !== 'GET'), body: body == null ? undefined : typeof body === 'string' ? body : JSON.stringify(body) });
+  const res = await fetch(`${BASE}/api/admin/${path}`, { method, headers: headers(method !== 'GET'), redirect: 'manual', body: body == null ? undefined : typeof body === 'string' ? body : JSON.stringify(body) });
+  // Access answers a token it does not accept with a redirect to its login page (an HTML page with status 200 if followed).
+  if (res.status >= 300 && res.status < 400 || /text\/html/.test(res.headers.get('content-type') ?? ''))
+    die(`${method} ${path}: Cloudflare Access did not accept the service token (HTTP ${res.status} → login page). Check that the /api/admin application has a policy with action "Service Auth" that includes this token.`);
   const text = await res.text();
   let data; try { data = JSON.parse(text); } catch { data = text; }
   if (!res.ok) { const e = new Error(`${method} ${path}: HTTP ${res.status} ${typeof data === 'object' ? data.error ?? '' : String(data).slice(0, 200)}`); e.status = res.status; e.data = data; throw e; }
