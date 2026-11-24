@@ -9,8 +9,9 @@
 //   node scenic.mjs publish <id>                 site_published = true (refused for hidden videos and opted-out channels)
 //   node scenic.mjs state   <id> <status> [note] record the outcome in _wishlist/state.json (picked|running|published|rejected|failed|skipped)
 //
-// Server: SCENIC_BASE (default http://localhost:8788/scenic, the local `pnpm dev`; production https://ridrs.app/scenic).
-// Production auth (Cloudflare Access): CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET (service token allowed by the /api/admin policy)
+// Server: always the online Scenic https://ridrs.app/scenic and its live database (user decision 2026-11-24): the local
+// `pnpm dev` database has no wishes. There is no override to localhost.
+// Auth (Cloudflare Access): CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET (service token allowed by the /api/admin policy)
 // or CF_ACCESS_TOKEN (`cloudflared access token -app=…`), as scripts/pull_manual.mjs of the Scenic.
 //
 // The payload is built by the app's own code (apps/video2gpx/src/atlas.ts: qcChecks, buildPayload) and checked by the Scenic's own
@@ -31,7 +32,7 @@ const RIDRS = process.env.V2G_RIDRS ? resolve(process.env.V2G_RIDRS) : (() => {
 })();
 const RUNS = join(RIDRS, 'video2gpx-runs');
 const RUNNER = join(RIDRS, 'ridrs_app-worktrees/video2gpx-runner');
-const BASE = (process.env.SCENIC_BASE || 'http://localhost:8788/scenic').replace(/\/$/, '');
+const BASE = 'https://ridrs.app/scenic';
 const STATE = join(RUNS, '_wishlist/state.json');
 const MAX_DURATION_S = 4 * 3600; // the Scenic takes at most 14,400 points
 const ID = /^[\w-]{11}$/;
@@ -45,6 +46,8 @@ const out = (x) => console.log(JSON.stringify(x, null, 2));
 const dir = (id) => { const d = join(RUNS, id, 'scenic'); mkdirSync(d, { recursive: true }); return d; };
 
 function headers(write) {
+  if (!process.env.CF_ACCESS_CLIENT_ID && !process.env.CF_ACCESS_TOKEN)
+    die(`no Cloudflare Access credentials for ${BASE}: set CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET or CF_ACCESS_TOKEN`);
   const h = { accept: 'application/json' };
   if (process.env.CF_ACCESS_CLIENT_ID) {
     h['CF-Access-Client-Id'] = process.env.CF_ACCESS_CLIENT_ID;
@@ -217,6 +220,6 @@ try {
   else if (cmd === 'state') { needId(); if (!rest[0]) die('status missing'); setState(id, rest[0], rest.slice(1).join(' ') || null); out(loadState()[id]); }
   else die('usage: scenic.mjs pick|prepare|payload|upload|publish|state …');
 } catch (e) {
-  if (e.cause?.code === 'ECONNREFUSED') die(`no Scenic server at ${BASE}: start it (web/scenic: pnpm dev) or set SCENIC_BASE`);
+  if (e.cause?.code === 'ECONNREFUSED') die(`Scenic not reachable at ${BASE}: check the network and stop; do not fall back to a local server`);
   die(e.data ? `${e.message}\n${JSON.stringify(e.data)}` : e.message);
 }

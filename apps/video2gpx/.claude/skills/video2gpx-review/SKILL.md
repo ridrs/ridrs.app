@@ -227,11 +227,11 @@ then votes, then oldest wish). This mode works that queue off by itself. The Sce
 builds the payload with the app's own `qcChecks`/`buildPayload` (`apps/video2gpx/src/atlas.ts`) and checks it with the Scenic's own
 `validateResult` (`web/scenic/src/video2gpx.js`), so it follows the contract of `pov-atlas/VIDEO2GPX-INTEGRATION.md` section 8 exactly.
 
-**Server.** `SCENIC_BASE` selects it; the default is the local dev server `http://localhost:8788/scenic` (`pnpm dev` in
-`ridrs_app/web/scenic`, admin via `ADMIN_DEV_EMAIL` in `.dev.vars`). Production is `https://ridrs.app/scenic` behind Cloudflare Access:
-it needs `CF_ACCESS_CLIENT_ID` + `CF_ACCESS_CLIENT_SECRET` (a service token the /api/admin policy allows) or `CF_ACCESS_TOKEN`. Ask the
-user for the token; never look for it in files. If the server is not reachable, say so and stop: do not start the dev server for a
-production run. Tell the user at the start which server this run writes to.
+**Server.** Always the online Scenic `https://ridrs.app/scenic` with its live database; never the local dev server (its database
+has no wishes) and there is no override. It sits behind Cloudflare Access: `scenic.mjs` needs `CF_ACCESS_CLIENT_ID` +
+`CF_ACCESS_CLIENT_SECRET` (a service token the /api/admin policy allows) or `CF_ACCESS_TOKEN` in the environment. If they are missing,
+ask the user for them; never look for them in files. If the server is not reachable, say so and stop: do not start a local dev server
+as a fallback. Every upload and publish in this mode is live on ridrs.app.
 
 One video per invocation, unless the user asks for more ("die nächsten 3"); then one after the other, never in parallel (heavy jobs).
 
@@ -309,7 +309,7 @@ node $S/scenic.mjs publish <id>        # PATCH site_published = true (refused fo
 node $S/scenic.mjs state <id> published
 ```
 
-The upload is logged in the Scenic `edit_log` (undoable there) with the token's or dev identity. The wish counts as done by itself
+The upload is logged in the Scenic `edit_log` (undoable there) with the token's identity. The wish counts as done by itself
 once the track is a video2gpx track; do not change its status. If the upload is refused, record `state <id> failed "<server message>"`
 and report the message; do not retry with an override.
 
