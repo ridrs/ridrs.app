@@ -241,6 +241,28 @@ export interface ProfileStretch {
 }
 
 /**
+ * Linearly interpolates the vertical coordinate `y` on a monotonically increasing `x` polyline at
+ * horizontal position `x`, clamped at the ends. Keeps the rider dot riding on the elevation curve.
+ */
+export function profileYAt(line: readonly Point[], x: number): number | undefined {
+  if (line.length === 0) return undefined;
+  const first = line[0] as Point;
+  const last = line.at(-1) as Point;
+  if (x <= first.x) return first.y;
+  if (x >= last.x) return last.y;
+  for (let i = 0; i < line.length - 1; i += 1) {
+    const a = line[i] as Point;
+    const b = line[i + 1] as Point;
+    if (x >= a.x && x <= b.x) {
+      const span = b.x - a.x;
+      if (span <= 0) return a.y;
+      return a.y + ((x - a.x) / span) * (b.y - a.y);
+    }
+  }
+  return last.y;
+}
+
+/**
  * The elevation profile of a route `distance` m long from its evenly spaced elevations, as
  * stretches between neighbouring samples in a `width` × `height` drawing, each coloured by its
  * gradient; and the line along their tops.

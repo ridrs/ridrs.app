@@ -25,6 +25,8 @@ export const en = {
   segmentsLabel: 'Segments',
   /** "5/10" read out. */
   positionLabel: (at: number, of: number) => `Segment ${at} of ${of}`,
+  /** Short HUD header label before "5/10". */
+  step: 'Step',
   totalLeft: 'Time left in the workout',
   /** The footer: the workout's intensity, changed with plus and minus. */
   intensity: 'Intensity',

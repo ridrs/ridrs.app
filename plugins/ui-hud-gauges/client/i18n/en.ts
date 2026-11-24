@@ -9,6 +9,10 @@ export const en = {
   speed: 'Speed',
   gradient: 'Gradient',
   elevation: 'Elev',
+  climb: 'Climb',
+  route: 'Route',
+  step: 'Step',
+  target: 'Target',
   cadence: 'Cadence',
   /** Before the average of the ride. */
   average: 'avg',

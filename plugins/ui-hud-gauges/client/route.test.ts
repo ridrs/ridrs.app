@@ -11,6 +11,7 @@ import {
   locateOnTrack,
   measureTrack,
   profileOf,
+  profileYAt,
   thin,
   trackOffset,
 } from './route.ts';
@@ -82,6 +83,15 @@ describe('profileOf', () => {
 
   it('has nothing to draw without two elevations', () => {
     expect(profileOf([100], 1000, 200, 50).stretches).toEqual([]);
+  });
+
+  it('interpolates the rider vertical position along the profile curve', () => {
+    const { line } = profileOf([100, 140, 180], 2000, 200, 50);
+    const startY = profileYAt(line, 0) ?? 0;
+    const midY = profileYAt(line, 50) ?? 0;
+    const endY = profileYAt(line, 200) ?? 0;
+    expect(startY).toBeGreaterThan(midY);
+    expect(midY).toBeGreaterThan(endY);
   });
 });
 

@@ -33,6 +33,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CurrentSegmentView, useWorkoutSegment, WorkoutProgressRing } from './current-segment.tsx';
 import { Gauge } from './gauge.tsx';
+import { HUD_LABEL, HUD_PANEL_GLASS, HUD_UNIT } from './hud-style.ts';
 import { messages } from './i18n/index.ts';
 import { useRideRoute, useTrack } from './ride-route.ts';
 import { RouteBoxView } from './route-box.tsx';
@@ -334,39 +335,52 @@ const STEP_MS = 10;
 /** s ridden: the steps since the ride began to roll; 0 while it waits for the rider. */
 const riddenSeconds = (state: PhysicsState) => ((state.step - (state.timeFromStep ?? 0)) * STEP_MS) / 1000;
 
-const FACT_LABEL = {
-  fontFamily: 'var(--ridrs-font-mono)',
-  fontSize: 'var(--ridrs-size-label)',
-  fontWeight: 500,
-  letterSpacing: '.12em',
-  textTransform: 'uppercase',
-  color: 'var(--ridrs-info)',
-} as const;
-
 /** One value of the ride: its name above, the number large, the unit beside it. */
 function Fact({
   kind,
   label,
   value,
   unit,
+  divided = false,
 }: {
   readonly kind: string;
   readonly label: string;
   readonly value: string;
   readonly unit?: string;
+  readonly divided?: boolean;
 }) {
   return (
-    <div data-testid={`ride-${kind}`} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 80 }}>
-      <span style={FACT_LABEL}>{label}</span>
+    <div
+      data-testid={`ride-${kind}`}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+        minWidth: 0,
+        ...(divided
+          ? { borderLeft: '1px solid rgb(255 255 255 / .08)', paddingLeft: 14 }
+          : {}),
+      }}
+    >
+      <span data-testid="label" style={HUD_LABEL}>
+        {label}
+      </span>
       <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
         <span
           data-testid="value"
-          style={{ fontSize: 30, fontWeight: 500, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}
+          style={{
+            fontSize: 'var(--ridrs-size-value)',
+            fontWeight: 500,
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '-.02em',
+            lineHeight: 1.08,
+            color: '#ffffff',
+          }}
         >
           {value}
         </span>
         {unit === undefined ? null : (
-          <span data-testid="unit" style={{ fontSize: 13, fontWeight: 500, color: 'var(--ridrs-text-muted)' }}>
+          <span data-testid="unit" style={HUD_UNIT}>
             {unit}
           </span>
         )}
@@ -376,10 +390,11 @@ function Fact({
 }
 
 /**
- * The ride at the top centre, a HUD element of its own drawn like a ride card: the time ridden,
- * the distance and the speed, from the physics, extended below with the current segment (local
- * elevation snippet, summit approach or active workout step) when relevant. Dashes until the first
- * physics state. The time stands at 0:00 until the ride rolls with the rider's first pedal stroke.
+ * The ride at the top centre, a HUD cockpit deck drawn in the same frosted dark glass as the
+ * gauges: the time ridden, the distance and the speed, from the physics, extended below with the
+ * current segment (local elevation snippet, summit approach or active workout step) when relevant.
+ * Dashes until the first physics state. The time stands at 0:00 until the ride rolls with the
+ * rider's first pedal stroke.
  */
 function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
@@ -407,17 +422,15 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
       data-testid="ride-facts"
       aria-label={[text.time, text.distance, text.speed].join(', ')}
       style={{
+        ...HUD_PANEL_GLASS,
         position: 'absolute',
         top: 16,
         left: '50%',
         transform: 'translateX(-50%)',
+        width: 'clamp(340px, 27vw, 404px)',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: 'var(--ridrs-radius-lg)',
-        background: 'var(--ridrs-card)',
-        boxShadow: 'var(--ridrs-edge), var(--ridrs-shadow)',
-        color: 'var(--ridrs-text)',
-        fontFamily: 'var(--ridrs-font-text)',
         pointerEvents: 'none',
       }}
     >
@@ -425,9 +438,9 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(80px, 1fr))',
-          gap: 20,
-          padding: '10px 18px',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          columnGap: 12,
+          padding: '11px 16px 10px',
         }}
       >
         <Fact kind="time" label={text.time} value={state ? formatDuration(riddenSeconds(state)) : EN_DASH} />
@@ -436,8 +449,15 @@ function RideFactsView({ ctx }: { readonly ctx: UiContext }) {
           label={text.distance}
           value={state ? number(state.distance / 1000, 2) : EN_DASH}
           unit="km"
+          divided
         />
-        <Fact kind="speed" label={text.speed} value={state ? number(state.speed * 3.6, 1) : EN_DASH} unit="km/h" />
+        <Fact
+          kind="speed"
+          label={text.speed}
+          value={state ? number(state.speed * 3.6, 1) : EN_DASH}
+          unit="km/h"
+          divided
+        />
       </div>
       <CurrentSegmentView
         workout={workout}
