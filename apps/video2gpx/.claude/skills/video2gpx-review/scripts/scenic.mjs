@@ -11,8 +11,8 @@
 //
 // Server: always the online Scenic https://ridrs.app/scenic and its live database (user decision 2026-11-24): the local
 // `pnpm dev` database has no wishes. There is no override to localhost.
-// Auth (Cloudflare Access): CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET (service token allowed by the /api/admin policy)
-// or CF_ACCESS_TOKEN (`cloudflared access token -app=…`), as scripts/pull_manual.mjs of the Scenic.
+// Auth (Cloudflare Access): the service token "video2gpx-review" from the macOS keychain (see KEYCHAIN below), or from the
+// environment: CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET, or CF_ACCESS_TOKEN (`cloudflared access token -app=…`).
 //
 // The payload is built by the app's own code (apps/video2gpx/src/atlas.ts: qcChecks, buildPayload) and checked by the Scenic's own
 // validateResult (web/scenic/src/video2gpx.js), both imported from the ridrs_app checkout, so the contract (VIDEO2GPX-INTEGRATION.md
@@ -45,15 +45,35 @@ const readJ = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const out = (x) => console.log(JSON.stringify(x, null, 2));
 const dir = (id) => { const d = join(RUNS, id, 'scenic'); mkdirSync(d, { recursive: true }); return d; };
 
-function headers(write) {
-  if (!process.env.CF_ACCESS_CLIENT_ID && !process.env.CF_ACCESS_TOKEN)
-    die(`no Cloudflare Access credentials for ${BASE}: set CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET or CF_ACCESS_TOKEN`);
-  const h = { accept: 'application/json' };
-  if (process.env.CF_ACCESS_CLIENT_ID) {
-    h['CF-Access-Client-Id'] = process.env.CF_ACCESS_CLIENT_ID;
-    h['CF-Access-Client-Secret'] = process.env.CF_ACCESS_CLIENT_SECRET ?? '';
+// The service token "video2gpx-review" lives in the macOS keychain (services KEYCHAIN.id / KEYCHAIN.secret), put there by the user
+// with `security add-generic-password -a video2gpx-review -s <service> -w`. The environment variables win when set.
+const KEYCHAIN = { id: 'ridrs-scenic-cf-access-client-id', secret: 'ridrs-scenic-cf-access-client-secret' };
+function keychain(service) {
+  try { return execFileSync('security', ['find-generic-password', '-s', service, '-w'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null; }
+  catch { return null; }
+}
+let creds;
+function credentials() {
+  if (creds) return creds;
+  const env = process.env;
+  if (env.CF_ACCESS_CLIENT_ID) creds = { id: env.CF_ACCESS_CLIENT_ID, secret: env.CF_ACCESS_CLIENT_SECRET ?? '' };
+  else if (env.CF_ACCESS_TOKEN) creds = { token: env.CF_ACCESS_TOKEN };
+  else {
+    const id = keychain(KEYCHAIN.id), secret = id && keychain(KEYCHAIN.secret);
+    if (id && secret) creds = { id, secret };
   }
-  if (process.env.CF_ACCESS_TOKEN) h['cf-access-token'] = process.env.CF_ACCESS_TOKEN;
+  if (!creds) die(`no Cloudflare Access credentials for ${BASE}: put the service token in the keychain (${KEYCHAIN.id}, ${KEYCHAIN.secret}) or set CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET or CF_ACCESS_TOKEN`);
+  return creds;
+}
+
+function headers(write) {
+  const c = credentials();
+  const h = { accept: 'application/json' };
+  if (c.id) {
+    h['CF-Access-Client-Id'] = c.id;
+    h['CF-Access-Client-Secret'] = c.secret;
+  }
+  if (c.token) h['cf-access-token'] = c.token;
   // The CSRF guard (src/auth.js sameOriginWrite) wants this site's own Origin on writes. It protects browsers that carry the
   // Access cookie; this client carries none, so it states the origin it writes to.
   if (write) { h.origin = new URL(BASE).origin; h['content-type'] = 'application/json'; }

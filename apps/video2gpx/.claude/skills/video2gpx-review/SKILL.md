@@ -228,9 +228,12 @@ builds the payload with the app's own `qcChecks`/`buildPayload` (`apps/video2gpx
 `validateResult` (`web/scenic/src/video2gpx.js`), so it follows the contract of `pov-atlas/VIDEO2GPX-INTEGRATION.md` section 8 exactly.
 
 **Server.** Always the online Scenic `https://ridrs.app/scenic` with its live database; never the local dev server (its database
-has no wishes) and there is no override. It sits behind Cloudflare Access: `scenic.mjs` needs `CF_ACCESS_CLIENT_ID` +
-`CF_ACCESS_CLIENT_SECRET` (a service token the /api/admin policy allows) or `CF_ACCESS_TOKEN` in the environment. If they are missing,
-ask the user for them; never look for them in files. If the server is not reachable, say so and stop: do not start a local dev server
+has no wishes) and there is no override. It sits behind Cloudflare Access. `scenic.mjs` signs in with the service token
+`video2gpx-review` (Zero Trust → Service Auth; the /api/admin application has a *Service Auth* policy for it). It reads the token
+itself from the macOS keychain, services `ridrs-scenic-cf-access-client-id` and `ridrs-scenic-cf-access-client-secret`;
+`CF_ACCESS_CLIENT_ID` + `CF_ACCESS_CLIENT_SECRET` or `CF_ACCESS_TOKEN` in the environment take precedence. Never print, copy or
+store the token anywhere else, and never look for it in files. If the script reports missing credentials, ask the user to put
+the token in the keychain; a 403 means the token expired or the Access policy does not allow it. If the server is not reachable, say so and stop: do not start a local dev server
 as a fallback. Every upload and publish in this mode is live on ridrs.app.
 
 One video per invocation, unless the user asks for more ("die nächsten 3"); then one after the other, never in parallel (heavy jobs).
