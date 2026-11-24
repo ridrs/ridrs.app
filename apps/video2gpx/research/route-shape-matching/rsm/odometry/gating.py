@@ -18,6 +18,21 @@ frame pairs, not seconds):
   spike       speed more than 0.35 |median| + 2e-4 from the 31-pair running median of the usable speeds
   neg_speed   rel_speed <= -1e-4 (vms requires > -1e-4)
   excluded    before `exclude_before_s` (e.g. a title or map intro the caller knows about)
+  false_stop  the speed (1 s running median of the clean pairs) falls below `stop_rel` (0.2) x the `stop_ref_pct` (75th) percentile of
+              the `stop_ref_s` (30 s) around it (widened by `stop_widen_s`, 2 s, on both sides)
+              while the picture keeps changing: the 1 s running median of the frame difference stays above `stop_diff_rel` (0.9) x the
+              video's median (2026-11-24). On a pass road with a drop-off the road area of a curve shows the far valley side below the
+              horizon; those points barely move, the ground-plane fit takes them at rms 0.1 px and reads 2-6 % of the speed for 2-8 s
+              (Furka 0eEylPLoqMA 25:48-25:55, 26:02-26:07: the path stood still and then caught up at 20-27 m/s, 40-60 m behind). A real
+              stop changes the picture far less: 1-40 % of the median frame difference at the red lights of Monaco (0Jlebs29SOc) and the
+              stop sign in Realp (up to 80 % while pulling away), 70-270 % in the Furka curves. Only at speed: the 30 s reference must be at
+              least `stop_ref_min` (0.7) x the video's median speed, because a crawl with a crossing cyclist or pedestrian also changes the
+              picture (Monaco 39:45, 1:04:31) and a vehicle at walking pace can stop within a second; one at cruising speed cannot drop to a
+              fifth of it within the 1 s window. Left over on Monaco: 0.4 % of the pairs, pulling away from a stop with crossing traffic;
+              there the distance is bridged from the stop to the moving speed, about the real ramp.
+              A false stop does not split the segments and keeps its measured yaw (the rotation of the picture is right, only the distance
+              is wrong): `heading.integrate` fills only its distance from the neighbours. Splitting dropped the clean 6 s between two false
+              stops in a Furka hairpin (33:13 and 33:21) as a too-short section and turned the whole hairpin into a gap.
 
 Segments: an unusable run of pairs SPLITS the stream when it contains a cut pair, or when it lasts at least `max_gap_s`
 (max_gap_s = 0: every unusable pair splits = strict), or when the CSV time jumps by more than 1.5 pair intervals.
@@ -31,12 +46,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 import numpy as np
-from scipy.ndimage import median_filter
+from scipy.ndimage import maximum_filter1d, median_filter, percentile_filter
 
 from .vms_csv import Pairs
 
-NO_FIT, HIGH_RMS, CUT, SPIKE, NEG_SPEED, EXCLUDED = 1, 2, 4, 8, 16, 32
-REASONS = {"cut": CUT, "no_fit": NO_FIT, "high_rms": HIGH_RMS, "spike": SPIKE, "neg_speed": NEG_SPEED, "excluded": EXCLUDED}  # display priority
+NO_FIT, HIGH_RMS, CUT, SPIKE, NEG_SPEED, EXCLUDED, FALSE_STOP = 1, 2, 4, 8, 16, 32, 64
+REASONS = {"cut": CUT, "no_fit": NO_FIT, "high_rms": HIGH_RMS, "spike": SPIKE, "neg_speed": NEG_SPEED, "excluded": EXCLUDED,
+           "false_stop": FALSE_STOP}  # display priority
 
 
 @dataclass(frozen=True)
@@ -56,6 +72,13 @@ class GateParams:
     cut_median_window: int = 61
     cut_halfwidth: int = 7
     neg_speed: float = -1e-4
+    stop_rel: float = 0.2
+    stop_ref_s: float = 30.0
+    stop_ref_pct: float = 75.0
+    stop_diff_rel: float = 0.9
+    stop_ref_min: float = 0.7
+    stop_win_s: float = 1.0
+    stop_widen_s: float = 2.0
     max_gap_s: float = 0.5
     min_segment_s: float = 10.0
     exclude_before_s: float = 0.0
@@ -96,6 +119,29 @@ def rms_limit(rms_px: np.ndarray, inliers: np.ndarray, gp: GateParams = GatePara
     return float(max(gp.max_rms_px, gp.max_rms_rel * np.median(r))) if len(r) else float(gp.max_rms_px)
 
 
+def _false_stop(p: Pairs, v: np.ndarray, diff: np.ndarray, gp: GateParams) -> np.ndarray:
+    """pairs whose speed collapses while the picture keeps changing (see `false_stop` in the module doc)"""
+    n = len(v)
+    if gp.stop_rel <= 0 or n == 0 or not np.isfinite(v).any():
+        return np.zeros(n, bool)
+    dt = float(p.dt) if np.isfinite(p.dt) and p.dt > 0 else 1.0
+    win = max(1, int(round(gp.stop_win_s / dt))) | 1
+    ref_win = max(win, int(round(gp.stop_ref_s / dt))) | 1
+    v1 = _nan_running_median(v, win)
+    vf = v.copy()  # the reference: a high percentile, so that two collapses in one window (Furka 25:48 and 26:01) cannot pull it down
+    good = np.isfinite(vf)
+    vf[~good] = np.interp(np.flatnonzero(~good), np.flatnonzero(good), vf[good])
+    ref = percentile_filter(vf, gp.stop_ref_pct, size=ref_win, mode="nearest")
+    d1 = median_filter(diff, size=win, mode="nearest")
+    dmed = float(np.median(diff)) if n else 0.0
+    vmed = float(np.nanmedian(v))
+    hit = (v1 < gp.stop_rel * ref) & (ref > gp.stop_ref_min * vmed) & (vmed > 0) & (d1 > gp.stop_diff_rel * dmed) & (dmed > 0)
+    # widened by `stop_widen_s` on both sides: the edges of a collapse are half road, half valley side (Furka 25:48: 2-3 m/s against 12; the
+    # frame difference passes its limit only a second after the speed collapsed) and would otherwise be the only speeds left to fill it with
+    w = max(1, int(round(gp.stop_widen_s / dt)))
+    return maximum_filter1d(hit.astype(np.int8), size=2 * w + 1, mode="constant") > 0
+
+
 def pair_flags(p: Pairs, gp: GateParams = GateParams()) -> np.ndarray:
     """Per pair a bit mask of the reasons it is unusable (0 = usable)."""
     v = p.rel_speed
@@ -110,8 +156,9 @@ def pair_flags(p: Pairs, gp: GateParams = GateParams()) -> np.ndarray:
     spike = fitted & ~rms_bad & (np.abs(vv - med) > gp.spike_rel * np.abs(med) + gp.spike_abs)
     neg = fitted & (v <= gp.neg_speed)
     excl = p.time < gp.exclude_before_s
+    stop = _false_stop(p, np.where(fitted & ~rms_bad & ~neg, v, np.nan), diff, gp) & fitted
     flags = (np.where(~fitted, NO_FIT, 0) | np.where(rms_bad, HIGH_RMS, 0) | np.where(cut, CUT, 0)
-             | np.where(spike, SPIKE, 0) | np.where(neg, NEG_SPEED, 0) | np.where(excl, EXCLUDED, 0))
+             | np.where(spike, SPIKE, 0) | np.where(neg, NEG_SPEED, 0) | np.where(excl, EXCLUDED, 0) | np.where(stop, FALSE_STOP, 0))
     return flags.astype(np.int32)
 
 
@@ -135,7 +182,7 @@ def _traffic(fl: np.ndarray, v: np.ndarray, a: int, b: int, side: int, vmed: flo
 def build_segments(p: Pairs, flags: np.ndarray, gp: GateParams = GateParams()) -> list[Segment]:
     """All sections between splits (usable and too short), in time order."""
     n, dt = len(p), p.dt
-    bad = flags != 0
+    bad = (flags & ~FALSE_STOP) != 0  # a false stop never splits: its yaw is measured, only its distance is filled (heading.integrate)
     breaker = np.zeros(n, bool)
     v = np.where(bad, np.nan, p.rel_speed)
     vmed = float(np.nanmedian(v)) if np.isfinite(v).any() else np.nan
@@ -154,7 +201,7 @@ def build_segments(p: Pairs, flags: np.ndarray, gp: GateParams = GateParams()) -
             if len(good) == 0:
                 continue
             i0, i1 = c + int(good[0]), c + int(good[-1]) + 1
-            n_br = int(bad[i0:i1].sum())
+            n_br = int((flags[i0:i1] != 0).sum())
             t0, t1 = float(p.time[i0] - dt / 2), float(p.time[i1 - 1] + dt / 2)
             usable = (t1 - t0) >= gp.min_segment_s
             segs.append(Segment(i0, i1, t0, t1, n_br, usable, "" if usable else "too_short"))

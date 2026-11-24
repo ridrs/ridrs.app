@@ -313,3 +313,48 @@ def test_rms_gate_follows_the_videos_own_fit_quality(tmp_path):
     assert [(s.i0, s.i1) for s in segs] == [(0, 1000)] and segs[0].n_bridged == 50
     clean = load_pairs(write_csv(tmp_path / "b.csv", 1000))
     assert rms_limit(clean.rms_px, clean.inliers, gp) == gp.max_rms_px            # a clean video (0.2 px) keeps the absolute 0.8 px gate (A17)
+
+
+def test_false_stop_while_the_picture_moves(tmp_path):
+    """a speed collapse to 4 % for 3 s at cruising speed while the frame difference stays normal is a false stop (far valley side below the
+    horizon in a curve, Furka 0eEylPLoqMA 25:48); the same collapse with a still picture is a real stop and stays usable"""
+    from rsm.odometry.gating import FALSE_STOP
+    n = int(60 / DT)
+    a, b = int(30 / DT), int(33 / DT)
+
+    def moving(rows):
+        for r in rows[a:b]:
+            r["rel_speed"] *= 0.04
+            r["rms_px"] = 0.1
+    p = load_pairs(write_csv(tmp_path / "a.csv", n, mutate=moving))
+    fl = pair_flags(p, GateParams())
+    hit = (fl & FALSE_STOP) != 0
+    assert hit[a - 10:b + 10].all() and not hit[:a - 110].any() and not hit[b + 110:].any()  # widened by 2 s
+    segs = build_segments(p, fl)
+    assert len(segs) == 1 and segs[0].usable  # bridged, not split: the yaw of the collapse is kept, only its distance is filled
+    from rsm.odometry import integrate
+    tr = integrate(p, segs[0], fl, F)
+    v = np.diff(tr.s) / DT
+    assert v[a:b].min() > 0.9 * v[:a - 60].mean()  # the distance through the collapse is the neighbours' speed, not 4 %
+
+    def still(rows):
+        moving(rows)
+        for r in rows[a - 25:b + 25]:
+            r["diff"] = 0.1
+    p = load_pairs(write_csv(tmp_path / "b.csv", n, mutate=still))
+    assert not (pair_flags(p, GateParams()) & FALSE_STOP).any()
+
+
+def test_false_stop_needs_cruising_speed(tmp_path):
+    """at walking pace (here a fifth of the video median for 20 s) a stop within a second is possible: not flagged"""
+    from rsm.odometry.gating import FALSE_STOP
+    n = int(120 / DT)
+    a, b = int(60 / DT), int(63 / DT)
+
+    def crawl(rows):
+        for r in rows[int(45 / DT):int(80 / DT)]:
+            r["rel_speed"] *= 0.2
+        for r in rows[a:b]:
+            r["rel_speed"] *= 0.04
+    p = load_pairs(write_csv(tmp_path / "a.csv", n, mutate=crawl))
+    assert not (pair_flags(p, GateParams()) & FALSE_STOP).any()
