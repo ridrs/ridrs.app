@@ -7,7 +7,7 @@
 //   node scenic.mjs payload <id>                 <id>/scenic/<id>.scenic.json from run/ + review/, checked like the server checks it
 //   node scenic.mjs upload  <id>                 POST the payload (Lokalisierungsstufe 2), response in <id>/scenic/upload.json
 //   node scenic.mjs publish <id>                 site_published = true (refused for hidden videos and opted-out channels)
-//   node scenic.mjs state   <id> <status> [note] record the outcome in _wishlist/state.json (picked|running|published|rejected|failed|skipped)
+//   node scenic.mjs state   <id> <status> [note] record the outcome in _wishlist/state.json (picked|running|published|rejected|fix_pending|failed|skipped)
 //
 // Server: always the online Scenic https://ridrs.app/scenic and its live database (user decision 2026-11-24): the local
 // `pnpm dev` database has no wishes. There is no override to localhost.

@@ -53,7 +53,11 @@ Paths used below:
 - **Long runs go in the background.** Start them with `run_in_background` and wait for the notification. A full run takes about 10–20 min
   per hour of video (motion is the bulk), and it waits for any other heavy job first.
 - **Read only on code:** do not edit the runner worktree (`ridrs_app-worktrees/video2gpx-runner`). It is the frozen reference that makes
-  results comparable. Fixes belong in a separate worktree. This skill only recommends them; implement one only if the user asks.
+  results comparable. Fixes belong in a separate dev worktree. In a plain review this skill only recommends them (implement one only if
+  the user asks); after a **failed Scenic gate** (wishlist mode, W4) it implements the fix itself, as described in *W4b*.
+- **Fixes never land on their own.** A fix is a branch in its own worktree, validated by the snippet suite. Committing on that branch is
+  part of the work; merging into `main`, pushing, re-freezing the runner and uploading a result made with unmerged code wait for the user's
+  yes.
 - **Video material stays local.** Frames, snippets and the report contain third-party video. Do not upload them, do not publish an
   Artifact with them, and do not send them to web services. The report is a local Markdown file. The one thing that leaves the machine
   is the track payload `<id>.scenic.json` (video seconds, coordinates, QC results, no image), and only to ridrs Scenic in wishlist mode.
@@ -299,8 +303,44 @@ It writes the payload only when all of these hold:
 
 Route agreement with the Scenic route is shown, not blocking (the Scenic route can be the wrong one).
 
-**Not good enough (exit 2):** record `state <id> rejected "<main problem>"`. Do not upload. Then do steps 4–6 as for any review (root
-causes, tests, `REPORT.md`): a failed wish is exactly the material the test suite needs. Leave the wish open in the Scenic.
+**Not good enough (exit 2):** record `state <id> rejected "<main problem>"`. Do not upload. Then do steps 4–5 as for any review (root
+causes, tests): a failed wish is exactly the material the test suite needs. Leave the wish open in the Scenic. Then go on with **W4b**:
+the goal of a rejection is a pipeline that passes the gate honestly, not only a report.
+
+### W4b. Fix the root cause in the pipeline
+
+Do this for every gate problem whose cause lies in the pipeline. Causes outside it are reported, not fixed: a wrong or missing OSM road
+(`map.missing_road`), a video that is not a drive (intro/outro only, drone shots), a missing map extract, a Scenic-side refusal.
+
+1. **Pin the root cause with a counterfactual.** Name the first wrong step (`references/causes.md`) and prove the cause by changing only
+   that one value or rule on the run's own data, read-only against the runner code (e.g. re-gate the motion pairs with another limit,
+   re-score with another weight). Measure the effect on this video **and on every other run in `video2gpx-runs/`** (the counter-cases):
+   a change that helps here and hurts there is not the fix. Write the numbers into `REPORT.md`.
+2. **Check what is already known.** Read `docs/DECISIONS.md`, `docs/HISTORY.md`, `FINDINGS.md` and the config comment of the value. Check
+   whether `main` already differs from the runner there (`git log <runner-commit>..main -- <file>`, `git diff`): the fix may exist, or a
+   newer decision may forbid the obvious one. Then the work is to re-run on `main`, not to write new code.
+3. **Make a failing test first.** The `error` test from step 5 (snippet, or the seeded full case when the snippet does not reproduce) must
+   FAIL on the runner. Without a failing test there is nothing to fix against.
+4. **Implement in a dev worktree.** `git worktree add -b fix/video2gpx-<short> ../ridrs_app-worktrees/v2g-<short> main` from the ridrs_app
+   checkout, link its research `.venv` to the main checkout's venv, and change only what the cause needs. Explain the new value in its
+   config comment or docstring with the measured numbers (this video and the counter-cases), and add a unit test under `tests/`.
+   Add the decision to `docs/DECISIONS.md` when it changes a documented rule.
+5. **Validate in minutes, then in full.**
+   - `run_tests.py --rsm <fix worktree>/… --only <new tests> --seed <baseline-tag> --from-step <first step the change touches>`: the
+     error test must turn FIXED;
+   - the whole suite against the fix: no REGRESSION;
+   - the pytest suite of the research package (`.venv/bin/python -m pytest -q tests`) in the fix worktree;
+   - a full run of the video with the fix (`video2gpx-yt.sh <id> <options> --runner v2g-<short> --out-root video2gpx-runs/_dev/v2g-<short>`,
+     in the background), then steps 2–3 and W3 on that run (the spot ids differ: judge them anew), then `scenic.mjs payload` on it.
+   If the fix does not get the video through the gate, measure the next cause and repeat from 1, at most three rounds; then stop and
+   report what is left.
+6. **Never pass the gate by loosening it.** The fix goes into the pipeline (motion, rotation, map, search, refine, confidence), never into
+   the gate thresholds, the QC checks or `scenic.mjs`, and never by judging a spot more kindly. An honest `uncertain` that stays
+   uncertain is a valid end.
+7. **Hand over.** Commit on the fix branch (`fix(video2gpx): …`). Report in the chat: cause, change, numbers before/after on this video
+   and the counter-cases, test results, and the gate result of the fixed run. Ask the user before merging into `main` and re-freezing
+   (`python -m rsm.pipeline freeze`); after the merge, re-run the video with `--runner video2gpx-app --update` and only then do W5. Record
+   `state <id> fix_pending "<branch>"` while the fix waits for the merge.
 
 ### W5. Upload and publish
 
@@ -325,7 +365,8 @@ In the chat:
 - which server, which video (title, link `<base>/#v=<id>`), its queue position and votes;
 - the outcome: published (points, km, coverage, mean confidence, level 2) or rejected / skipped / failed with the reason;
 - what the frame check showed (start, turn, end, number of spots and their verdicts);
-- for a rejection: the top causes and the new tests, with the path to `REPORT.md`;
+- for a rejection: the top causes and the new tests, with the path to `REPORT.md`, and the fix from W4b (branch, before/after, gate
+  result of the fixed run) or why the cause is outside the pipeline;
 - open editor decisions: route offer, maps to download for skipped wishes.
 
 A short `review/REPORT.md` is enough for a published video (what was checked, the spot table, the payload numbers).
