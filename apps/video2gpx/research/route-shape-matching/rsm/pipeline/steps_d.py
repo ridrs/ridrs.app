@@ -10,7 +10,7 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 
-from . import VERSION, config as C, lane as LN, offset as O, verdict as V
+from . import VERSION, config as C, detours as DT, lane as LN, offset as O, verdict as V
 from .common import Worker, code_hash, frozen_info, jdump, jload
 from .traffic import traffic_side
 
@@ -46,11 +46,14 @@ def fmt(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def still_state(R, n: int) -> tuple[np.ndarray, list[tuple[float, float, float, float, float, float]]]:
-    """(per point: inside a sure standstill, [(t0, t1, s0, s1, sd, conf)]) from refine/result.npz; old results have none"""
+def still_state(R, n: int) -> tuple[np.ndarray, list[tuple[float, float, float, float, float, float, int]]]:
+    """(per point: inside a sure standstill, [(t0, t1, s0, s1, sd, conf, kind)]) from refine/result.npz; old results have none. kind (detours.KIND):
+    0 a standstill of the camera, 1 an inserted shot, 2 a detour (both held at 0 km/h so that playback passes over them); results before it: 0"""
     if "in_still" not in R.files:
         return np.zeros(n, bool), []
-    return R["in_still"].astype(bool), [tuple(float(x) for x in r) for r in zip(R["still_t0"], R["still_t1"], R["still_s0"], R["still_s1"], R["still_sd"], R["still_conf"])]
+    kind = R["still_kind"] if "still_kind" in R.files else np.zeros(len(R["still_t0"]), np.int8)
+    return R["in_still"].astype(bool), [tuple(float(x) for x in r[:6]) + (int(r[6]),)
+                                        for r in zip(R["still_t0"], R["still_t1"], R["still_s0"], R["still_s1"], R["still_sd"], R["still_conf"], kind)]
 
 
 def out_grid(R) -> dict:
@@ -155,7 +158,7 @@ def write_gpx(path: Path, pts: list[dict], start: datetime, meta: dict) -> None:
     row = lambda p: (f'<trkpt lat="{p["lat"]:.7f}" lon="{p["lon"]:.7f}"><time>{fmt(start + timedelta(seconds=round(p["t"], 3)))}</time>'
                      f'<extensions><rsm:confidence>{p["confidence"]:.3f}</rsm:confidence><rsm:in_gap>{int(p["in_gap"])}</rsm:in_gap><rsm:extrapolated>{int(p["extrapolated"])}</rsm:extrapolated>'
                      + (f'<rsm:state>{p["motion_state"]}</rsm:state>' if "motion_state" in p else "") + (f'<rsm:edge>{p["edge"]}</rsm:edge>' if "edge" in p else "")
-                     + '</extensions></trkpt>')
+                     + (f'<rsm:skip>{p["kind"]}</rsm:skip>' if "kind" in p else "") + '</extensions></trkpt>')
     # one <trkseg> per piece between scene cuts (GPX: a new segment where the track is not continuous); a video without cuts has exactly one, as before
     segs = _segments(pts, (meta.get("cuts") or {}).get("breaks"))
     body = "\n</trkseg><trkseg>\n".join("\n".join(row(p) for p in sg) for sg in segs)
@@ -221,13 +224,14 @@ def gpx_step(d: Path, P: dict, W: Worker):
     gpts = points_of(gx["t"], gx["s"], gx["conf"], gx["in_gap"], gx["extrap"], gx["s_sd"], gx["in_still"])
     # sure standstills: one extra point at the exact start and end (sub-second video time), so the GPX stands still exactly when the video does
     stills = []
-    for t0, t1, s0, _s1, sdv, cv in still:
+    for t0, t1, s0, _s1, sdv, cv, kd in still:
         if not np.isfinite(s0):
             continue
         ex_, ey_ = np.interp(s0, sg, PL[:, 0]), np.interp(s0, sg, PL[:, 1])
         elon, elat = tr.transform(ex_, ey_)
         stills.append(dict(t0=round(float(t0), 3), t1=round(float(t1), 3), lat=round(float(elat), 7), lon=round(float(elon), 7), heading=round(float(np.interp(s0, sg, comp)), 1),
-                           confidence=round(float(cv), 4), sd_m=round(float(sdv), 1), arc_m=round(float(s0), 1), offset_m=round(float(np.interp(s0, sg, dl)), 2), line_source=layer))
+                           confidence=round(float(cv), 4), sd_m=round(float(sdv), 1), arc_m=round(float(s0), 1), offset_m=round(float(np.interp(s0, sg, dl)), 2), line_source=layer,
+                           **({} if kd == 0 else dict(kind=DT.KIND_NAME.get(kd, "standstill")))))
     cp = cut_plan(d)
     pts, gpts = apply_cut_plan(pts, cp), apply_cut_plan(gpts, cp)
     if cp and cp.get("intro_end") is not None:
@@ -244,7 +248,7 @@ def gpx_step(d: Path, P: dict, W: Worker):
                                           f"arc_m = distance along the centre line; offset_m = lateral offset applied (+ = right of travel); line_source = fixed (constant offset) or model (lane model, "
                                           f"not measured); offset_sd_m = its typical uncertainty; motion_state = driving, standstill (a SURE standstill: the camera stands, the "
                                           f"position is held) or gap (the distance is estimated, not measured). standstills = the sure standstills with their exact start and "
-                                          f"end (t0, t1, video seconds); route.gpx carries an extra point at each (rsm:edge). gpx_points = the same fields on the fixed GPX raster "
+                                          f"end (t0, t1, video seconds); route.gpx carries an extra point at each (rsm:edge). kind = insert (a shot cut into the drive) or detour (out and back to the same junction): not part of the route, held at 0 km/h so that playback passes over it (rsm:skip); no kind = the camera stands. gpx_points = the same fields on the fixed GPX raster "
                                           f"(gpx_hz points per video second, the smoother evaluated at each raster time), the points of route.gpx without the standstill edges."
                                           + ("" if not cp else f" The video is edited: {len(cp['times'])} scene cuts (cuts.times, video seconds); the position jumps at each "
                                              f"(a new GPX track segment starts at cuts.breaks)" + ("" if cp.get("intro_end") is None else

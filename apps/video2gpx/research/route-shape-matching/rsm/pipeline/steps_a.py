@@ -260,8 +260,12 @@ def scene_cuts(d: Path, out: Path, tracks: list[dict], ta, tb, ok, n_inl, W: Wor
         for c in rejected:
             W.log("info", f"scene cut candidate at {K.mmss(c['t'])} rejected: the frames before and after show the same scene "
                   f"({100 * c['same']['share']:.0f} % of the points fit, limit {100 * C.CUT_SAME_SHARE:.0f} %; a flash or an exposure jump)")
-    tracks, info = K.plan(tracks, cuts, intro_user=intro_user)
-    jdump(out / "cuts.json", dict(version=K.VERSION, cuts=cuts, rejected=rejected, candidates=cands, transition_candidates=extra, **info,
+    resume = []
+    if C.SKIP_ON and video and len(cuts) >= 2:       # longer inserted shots (panorama, drone): the drive goes on after them where it was before them
+        early = [float(c["t"]) for c in cuts if float(c["t"]) < C.CUT_INTRO_S]
+        resume = K.resumed_pieces(video, cuts, intro_user if intro_user is not None else (max(early) if early else None), ffmpeg_bin())
+    tracks, info = K.plan(tracks, cuts, intro_user=intro_user, resumed=[(x["t0"], x["t1"]) for x in resume if x["resumed"]])
+    jdump(out / "cuts.json", dict(version=K.VERSION, cuts=cuts, rejected=rejected, candidates=cands, transition_candidates=extra, resume_checks=resume, **info,
                                   params=dict(impulse=C.CUT_IMPULSE, strong_impulse=C.CUT_STRONG_IMPULSE, strong_factor=C.CUT_STRONG_FACTOR, strong_min_diff=C.CUT_STRONG_MIN_DIFF, strong_around=C.CUT_STRONG_AROUND, strong_nb_share=C.CUT_STRONG_NB_SHARE, inl_share=C.CUT_INL_SHARE, merge_s=C.CUT_MERGE_S, min_piece_s=C.CUT_MIN_PIECE_S, intro_s=C.CUT_INTRO_S,
                                               jump_m=C.CUT_JUMP_M, same_on=C.CUT_SAME_ON, same_share=C.CUT_SAME_SHARE, same_win_s=C.CUT_SAME_WIN_S, trans_on=C.CUT_TRANS_ON)))
     if info["intro_end"] is not None and info["intro_source"] == "user":
@@ -275,7 +279,7 @@ def scene_cuts(d: Path, out: Path, tracks: list[dict], ta, tb, ok, n_inl, W: Wor
     ins = info["inserted"]
     W.status("scene_cuts", "difficult", len(cuts), f"the video is edited: {len(cuts)} cuts (at " + ", ".join(K.mmss(c["t"]) for c in cuts[:8])
              + (f" and {len(cuts) - 8} more" if len(cuts) > 8 else "") + "); the route jumps there instead of riding through"
-             + (f"; {len(ins)} inserted shots between cuts dropped (" + ", ".join(f"{K.mmss(x['t0'])}-{K.mmss(x['t1'])}" for x in ins[:5]) + ")" if ins else ""))
+             + (f"; {len(ins)} inserted shots between cuts held at 0 km/h (" + ", ".join(f"{K.mmss(x['t0'])}-{K.mmss(x['t1'])}" for x in ins[:5]) + ")" if ins else ""))
     if info["intro_end"] is not None and info["intro_source"] == "cuts":
         W.status("intro_skipped", "good", info["intro_end"], f"intro up to {K.mmss(info['intro_end'])} skipped: the route starts after the last cut of the first "
                  f"{C.CUT_INTRO_S / 60:.0f} minutes")

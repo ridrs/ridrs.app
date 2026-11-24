@@ -389,6 +389,20 @@ STILL_MIN_S = 1.0            # spans shorter than this are dropped
 STILL_EDGE_S = 2.0           # every window within this of a candidate run's ends is tested; inside a longer run one window every STILL_SAMPLE_S
 STILL_SAMPLE_S = 5.0
 
+# --- skipped spans (detours.py): parts of the video that are not part of the route are held at 0 km/h (written as sure standstills with a kind), so a
+# player that follows the GPX passes over them. PROVISIONAL: checked on six videos (Dolomites, Mallorca x2, Formentor, Digne, 0Jlebs29SOc) without labels.
+SKIP_ON = True
+DETOUR_MIN_M = 50.0          # detour: the decoded path comes back to the junction it left after at least this many metres of road ...
+DETOUR_MAX_M = 3000.0        # ... and at most this many
+DETOUR_MIN_S = 8.0           # ... within this many video seconds ...
+DETOUR_MAX_S = 300.0         # ... up to "a few minutes"
+DETOUR_ODO_TURN_DEG = 120.0  # and the odometry heading itself turns round by at least this much inside it (decoder wiggles into side roads: 10-75 deg)
+PANO_MAX_S = 120.0           # insert: a piece between two cuts up to this long whose road scene after the second cut continues the one before the first
+PANO_SAME_SHARE = 0.3        # ... "continues": at least this share of the corners in the upper PANO_TOP part of the frames fit one similarity
+                             # (measured: two frames of a drive 1 frame apart 0.58-0.96, 3 frames 0.41-0.95, 0.6 s 0.05-0.83; the 26 real cut pairs of
+                             # three videos and frames 60 s apart: 0.0. So a shot cut into the drive without dropping driving time is found; with seconds dropped, not)
+PANO_TOP = 0.6               # (the lower part holds the bonnet / handlebar, which matches any two frames of the same camera)
+
 # --- speed (2026-11-16): the motion step spreads its frame pairs over resources.policy() workers (<= MAX_WORKERS) in chunks of vmsx.motion.CHUNK_S with one
 # ffmpeg seek each; motion.csv is byte-identical (overlap frames checked by hash, sequential fallback). Not part of the motion hash: same result.
 # Col de la Cayolle, 98 min 1080p50 AV1: 1429 s sequential, 640 s with 4 workers (2.2x).

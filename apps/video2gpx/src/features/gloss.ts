@@ -44,7 +44,7 @@ export function gloss(s: StatusInfo): { label: string; text: string } {
       return { label: "Kalibrierungswahl", text: (/physically implausible/.test(s.message) ? "Der höchste Punkt der Kalibrierung ist physikalisch unmöglich und wurde verworfen. " : "") + (s.level === "good" ? `${Math.round(v ?? 0)} Kalibrierungen geprüft; die plausibelste ergibt eine sichere Route` : `${Math.round(v ?? 0)} Kalibrierungen geprüft; keine ist eindeutig besser: Route unsicher`) };
     case "scene_cuts": {
       const ins = s.message.match(/; (\d+) inserted shots/)?.[1];
-      return { label: "Schnitte", text: `Das Video ist geschnitten: ${Math.round(v ?? 0)} Schnitte; die Route springt dort, statt durchzufahren` + (ins ? `; ${ins} eingefügte Szenen (Titel, Nahaufnahmen) nicht verwendet` : "") };
+      return { label: "Schnitte", text: `Das Video ist geschnitten: ${Math.round(v ?? 0)} Schnitte; die Route springt dort, statt durchzufahren` + (ins ? `; ${ins} eingefügte Szenen (Titel, Nahaufnahmen, Panorama) bei 0 km/h übersprungen` : "") };
     }
     case "cut_jump": {
       const jumps = [...s.message.matchAll(/(\d+:\d\d) \(([\d.]+ (?:km|m))\)/g)].map((m) => `${m[1]} (${m[2].replace(".", ",")})`).join(", ");
@@ -70,6 +70,11 @@ export function gloss(s: StatusInfo): { label: string; text: string } {
     case "standstill": {
       const spans = [...s.message.matchAll(/(\d+:\d\d)-(\d+:\d\d)/g)].map((m) => `${m[1]}–${m[2]}`).join(", ");
       return { label: "Stillstand", text: `Die Kamera steht, obwohl sich im Bild etwas bewegt (vorbeifahrender Verkehr)${spans ? ` (${spans})` : ""}; die Position bleibt dort fest` };
+    }
+    case "skipped": {
+      const spans = [...s.message.matchAll(/(detour|insert) (\d+:\d\d)-(\d+:\d\d)(?: \((\d+) m\))?/g)]
+        .map((m) => `${m[1] === "detour" ? "Abstecher" : "Einschub"} ${m[2]}–${m[3]}${m[4] ? ` (${m[4]} m)` : ""}`).join(", ");
+      return { label: "Übersprungen", text: `Teile des Videos gehören nicht zur Route und stehen bei 0 km/h, damit die Wiedergabe über sie hinweggeht${spans ? `: ${spans}` : ""}` };
     }
     case "bike_paths":
       if (/only roads are searched/.test(s.message)) return { label: "Radwege", text: "Suchgebiet zu groß für Radwege: nur Straßen werden durchsucht; ein kleineres Gebiet oder ein Streckenhinweis behält die Wege" };
