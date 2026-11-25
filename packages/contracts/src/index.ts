@@ -459,6 +459,16 @@ export {
   rideScreenshotService,
 } from './recording.ts';
 export {
+  type VideoInterpolated,
+  type VideoInterpolation,
+  type VideoInterpolator,
+  type VideoRefinement,
+  videoInterpolatorCapability,
+  videoRefinementSchema,
+  videoRefinementState,
+  videoRefineService,
+} from './refine.ts';
+export {
   type RouteDownload,
   type RouteDownloader,
   type RouteDownloadOption,
@@ -479,6 +489,7 @@ export {
   routeImportState,
   routeOfferSchema,
   routeOfferState,
+  routeRefreshService,
   routeRemoveService,
 } from './route.ts';
 export {

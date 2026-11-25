@@ -41,7 +41,8 @@
     "state": [
       "app.language",
       "route.offer",
-      "route.import"
+      "route.import",
+      "video.refinement"
     ],
     "calls": [
       "route.download-options",
@@ -49,7 +50,8 @@
       "route.cancel",
       "route.remove",
       "route.import",
-      "ride.briefing-set"
+      "ride.briefing-set",
+      "video.refine"
     ],
     "uses": [
       "ui.route-profile"

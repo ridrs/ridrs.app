@@ -72,6 +72,7 @@ export function packageDownloader(services: DownloadServices): RouteDownloader {
         fetch: (id) => downloads.fetch(id),
         cancel: (id) => downloads.cancel(id),
         remove: (id) => downloads.remove(id),
+        refresh: (id) => downloads.refresh(id),
       };
     },
   };

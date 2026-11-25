@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import type { TrackPoint } from './library.ts';
-import { buildTrack, GRADIENT_BASE, gradientAt, haversine, MAX_GRADIENT, placeAt } from './track.ts';
+import type { TrackPoint } from './route-track.ts';
+import {
+  buildTrack,
+  GRADIENT_BASE,
+  gradientAt,
+  haversine,
+  MAX_GRADIENT,
+  placeAt,
+} from './route-track.ts';
 
 /** 0.001° of latitude: about 111.2 m on the meridian. */
 const STEP = 0.001;

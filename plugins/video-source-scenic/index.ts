@@ -10,6 +10,7 @@ import {
   routeDownloadOptionsService,
   routeFetchService,
   routeOfferState,
+  routeRefreshService,
   routeRemoveService,
   storageAppFilesCapability,
 } from '@ridrs/contracts';
@@ -91,6 +92,10 @@ export default definePlugin({
     });
     ctx.services.provide(routeCancelService, ({ key }) => {
       routes.get(key)?.cancel(key);
+      return {};
+    });
+    ctx.services.provide(routeRefreshService, async ({ key }) => {
+      await routes.get(key)?.refresh?.(key);
       return {};
     });
     ctx.services.provide(routeRemoveService, async ({ key }) => {

@@ -23,6 +23,7 @@
       "route.download-options",
       "route.fetch",
       "route.cancel",
+      "route.refresh",
       "route.remove"
     ]
   }

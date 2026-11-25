@@ -99,6 +99,7 @@ import {
   routeImportService,
   routeImportState,
   routeOfferState,
+  routeRefreshService,
   routeRemoveService,
   type ServiceDefinition,
   type StateDefinition,
@@ -133,6 +134,9 @@ import {
   trashRestoreService,
   uiPositionObservedEvent,
   uiTerrainObservedEvent,
+  videoInterpolatorCapability,
+  videoRefinementState,
+  videoRefineService,
   workoutFinishedEvent,
   workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
@@ -167,6 +171,8 @@ const PLUGINS_FOR_OTHER_RUNTIMES = [
   'data-archive-tauri',
   // Programs of the device through the app's Rust commands (ADR 0106); headless has the Node provider.
   'process-run-tauri',
+  // In-between frames by the app's own program on a Mac (ADR 0110); headless computes none.
+  'video-interpolate-tauri',
   // The system's open dialog for own video packages; the headless app has none.
   'data-pick-tauri',
   // Files dragged onto the window (ADR 0093); the headless app has no window.
@@ -199,6 +205,7 @@ const CAPABILITIES: readonly CapabilityContract[] = [
   storageAppFilesCapability,
   spatialTerrainCapability,
   storageMediaCapability,
+  videoInterpolatorCapability,
   dataFetchCapability,
   dataArchiveCapability,
   dataPictureCapability,
@@ -215,6 +222,7 @@ const STATES: readonly StateDefinition[] = [
   dataSourceState,
   athleteProfileState,
   routeOfferState,
+  videoRefinementState,
   pluginsState,
   fileDropState,
   routeImportState,
@@ -256,6 +264,8 @@ const SERVICES: readonly ServiceDefinition[] = [
   recordingDeleteService,
   rideScreenshotService,
   routeRemoveService,
+  routeRefreshService,
+  videoRefineService,
   fileDropCancelService,
   fileDropImportService,
   routeImportPreviewService,

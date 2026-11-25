@@ -5,7 +5,10 @@
  * and the GPX track it names (ADR 0094).
  */
 
+import type { TrackPoint } from '@ridrs/ride';
 import { besideControl, entryNamed, findControl, parseRefinement, REFINE_FILE, REFINE_FOLDER } from '@ridrs/ride';
+
+export type { TrackPoint } from '@ridrs/ride';
 
 /** A video route. */
 export interface VideoRoute {
@@ -32,13 +35,6 @@ export interface RefinedPart {
   readonly url: string;
 }
 
-/** A point of the GPX track: degrees, m above sea level and s since the track's first point. */
-export interface TrackPoint {
-  readonly latitude: number;
-  readonly longitude: number;
-  readonly elevation: number;
-  readonly time: number;
-}
 
 /** The entities XML knows itself; the control files also use HTML's, such as `&auml;`. */
 const XML_ENTITIES = new Set(['amp', 'lt', 'gt', 'quot', 'apos']);

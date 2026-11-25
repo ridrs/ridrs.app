@@ -13,6 +13,9 @@ import {
   routeOfferState,
   routeProfileCapability,
   routeRemoveService,
+  type VideoRefinement,
+  videoRefineService,
+  videoRefinementState,
   DRAG_ROUTE,
   setDragged,
 } from '@ridrs/contracts';
@@ -239,6 +242,37 @@ function downloadState(offer: RouteOffer, text: Messages): string | undefined {
     case 'ready':
       return undefined;
   }
+}
+
+/**
+ * How far a downloaded route's in-between frames are (ADR 0110): none while there is nothing to
+ * say, such as on a device that cannot compute them or a route that needs none.
+ */
+function refinementState(refinement: VideoRefinement | undefined, text: Messages): string | undefined {
+  switch (refinement?.status) {
+    case 'waiting':
+      return text.refinementWaiting;
+    case 'refining':
+      return text.refinementRefining(Math.floor(refinement.progress * 100));
+    case 'done':
+      return refinement.stretches > 0 ? text.refinementDone : undefined;
+    case 'skipped':
+      return refinement.reason === CANCELLED ? text.refinementCancelled : undefined;
+    case 'failed':
+      return text.refinementFailed(refinement.reason);
+    default:
+      return undefined;
+  }
+}
+
+/** The reason `video-refine` gives for a refinement the rider cancelled. */
+const CANCELLED = 'The refinement was cancelled';
+
+/** The refinement of the route `id`, as `video-refine` says it (app state `video.refinement`). */
+function useRefinement(ctx: UiContext, id: string): VideoRefinement | undefined {
+  const [refinement, setRefinement] = useState<VideoRefinement>();
+  useEffect(() => ctx.state.watch(videoRefinementState, ({ entries }) => setRefinement(entries.get(id))), [ctx, id]);
+  return refinement;
 }
 
 const minutes = (offer: RouteOffer, text: Messages) =>
@@ -574,7 +608,11 @@ function RouteDetails({
     setRefusal(undefined);
     run().catch((error: unknown) => setRefusal(reasonOf(error)));
   };
-  const state = refusal ?? downloadState(offer, text);
+  const refinement = useRefinement(ctx, offer.id);
+  const state = refusal ?? downloadState(offer, text) ?? refinementState(refinement, text);
+  const refining = refinement?.status === 'waiting' || refinement?.status === 'refining';
+  const refinable =
+    (refinement?.status === 'skipped' && refinement.reason === CANCELLED) || refinement?.status === 'failed';
   const duration = minutes(offer, text);
   const level = offer.tags.level;
   return (
@@ -630,6 +668,24 @@ function RouteDetails({
             </button>
           ) : null}
           <FavouriteToggle ctx={ctx} offer={offer} label={text.favourite} />
+          {availability.state === 'ready' && refining ? (
+            <button
+              type="button"
+              className="pv-button"
+              onClick={() => call(() => ctx.call(videoRefineService, { key: offer.id, action: 'cancel' }))}
+            >
+              {text.cancelRefinement}
+            </button>
+          ) : null}
+          {availability.state === 'ready' && refinable ? (
+            <button
+              type="button"
+              className="pv-button"
+              onClick={() => call(() => ctx.call(videoRefineService, { key: offer.id, action: 'start' }))}
+            >
+              {text.startRefinement}
+            </button>
+          ) : null}
           {availability.state === 'ready' && availability.removable ? (
             <button
               type="button"

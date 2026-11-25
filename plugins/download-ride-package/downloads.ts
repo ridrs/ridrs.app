@@ -304,6 +304,14 @@ export class VideoDownloads {
     });
   }
 
+  /** Reads the files of a route on the device anew (ADR 0110): after its refinement added some. */
+  async refresh(id: string): Promise<void> {
+    const { media } = this.services;
+    if (!media || this.availability(id).state !== 'ready') return;
+    const found = await this.ready(media, id);
+    if (found) this.set(id, found);
+  }
+
   private async ready(media: MediaFiles, id: string): Promise<Availability | undefined> {
     const folder = folderOf(id);
     const entries = await media.entries(folder);

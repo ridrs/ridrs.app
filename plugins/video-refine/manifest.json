@@ -1,0 +1,31 @@
+{
+  "id": "video-refine",
+  "name": "In-between frames for downloaded video routes",
+  "version": "0.1.0",
+  "types": [
+    "storage"
+  ],
+  "provides": [],
+  "requires": [],
+  "optionalRequires": [
+    "storage.media",
+    "video.interpolate"
+  ],
+  "entry": "index.ts",
+  "state": {
+    "owns": [
+      "video.refinement"
+    ],
+    "watches": [
+      "route.offer"
+    ]
+  },
+  "services": {
+    "provides": [
+      "video.refine"
+    ],
+    "calls": [
+      "route.refresh"
+    ]
+  }
+}

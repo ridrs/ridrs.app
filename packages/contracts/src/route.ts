@@ -174,6 +174,16 @@ export const routeCancelService = defineService('route.cancel', {
   keyedBy: routeOfferState,
 });
 
+/**
+ * Reads the files of a downloaded offer on the device anew and offers them (ADR 0110): after
+ * files were added to its folder, such as its refined stretches.
+ */
+export const routeRefreshService = defineService('route.refresh', {
+  request: routeKeyRequest,
+  response: z.object({}).strict(),
+  keyedBy: routeOfferState,
+});
+
 /** Removes a downloaded offer from the device; answered once it is gone. */
 export const routeRemoveService = defineService('route.remove', {
   request: routeKeyRequest,
@@ -307,6 +317,8 @@ export interface RouteDownloads {
   fetch(id: string, option?: string): Promise<void>;
   cancel(id: string): void;
   remove(id: string): Promise<void>;
+  /** Reads the files of a route on the device anew (ADR 0110); a downloader without it offers them from the next start on. */
+  refresh?(id: string): Promise<void>;
 }
 
 /** A downloader of routes of some kinds of download (ADR 0105); a source opens one per downloader. */

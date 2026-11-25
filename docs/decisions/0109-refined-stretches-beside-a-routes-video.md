@@ -2,7 +2,7 @@
 
 # ADR 0109: Refined Stretches beside a Route's Video
 
-Status: proposed on 2026-11-25 (plan `video-zwischenframes.md`, phase 2). Extends [ADR 0094](0094-video-routes-stored-as-ride-packages.md) and [ADR 0061](0061-video-frames-chosen-by-the-render-clock.md).
+Status: proposed on 2026-11-25 (plan `video-zwischenframes.md`, phase 2); the stretches' codec amended by ADR 0110 the same day. Extends [ADR 0094](0094-video-routes-stored-as-ride-packages.md) and [ADR 0061](0061-video-frames-chosen-by-the-render-clock.md).
 
 ## Context
 
@@ -12,7 +12,7 @@ The computed frames must reach the frame player without changing the package: a 
 
 ## Decision
 
-- **Each refined stretch is a video of its own** below `refine/` in the route's folder, encoded with the route video's codec. Its time 0 is the stretch's `from` in the video's time. It holds the video's frames of the stretch and the in-between frames, `factor` frames per frame of the video. It begins with a keyframe.
+- **Each refined stretch is a video of its own** below `refine/` in the route's folder, as H.264 ([ADR 0110](0110-refining-a-route-after-its-download.md): VideoToolbox encodes no AV1, and every platform's WebCodecs decodes H.264). Its time 0 is the stretch's `from` in the video's time. It holds the video's frames of the stretch and the in-between frames, `factor` frames per frame of the video. It begins with a keyframe.
 - **`refine/refine.json` lists them:**
 
   ```json

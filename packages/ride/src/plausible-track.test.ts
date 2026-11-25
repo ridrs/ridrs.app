@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import type { TrackPoint } from './library.ts';
 import { PLAUSIBLE, plausibleTrack } from './plausible-track.ts';
-import { buildTrack, gradientAt } from './track.ts';
+import type { TrackPoint } from './route-track.ts';
+import { buildTrack, gradientAt } from './route-track.ts';
 
 /** m per degree of latitude, as the haversine distance has it. */
 const METRES_PER_DEGREE = (6_371_008.8 * Math.PI) / 180;
@@ -29,7 +29,11 @@ describe('plausibleTrack', () => {
   });
 
   it('keeps a camera that stands still', () => {
-    const points = [...straight(20), ...Array.from({ length: 10 }, (_, i) => at(100, 21 + i)), at(105, 31)];
+    const points = [
+      ...straight(20),
+      ...Array.from({ length: 10 }, (_, i) => at(100, 21 + i)),
+      at(105, 31),
+    ];
     expect(plausibleTrack(points).repairs).toEqual([]);
   });
 
@@ -74,7 +78,9 @@ describe('plausibleTrack', () => {
   });
 
   it('marks the elevation across a jump as a step, not a climb', () => {
-    const points = straight(30).map((p, t) => (t >= 15 ? { ...at(5 * t + 400, t), elevation: 160 } : p));
+    const points = straight(30).map((p, t) =>
+      t >= 15 ? { ...at(5 * t + 400, t), elevation: 160 } : p,
+    );
     const { track } = plausibleTrack(points);
     expect(track.steps?.[14]).toBeCloseTo(60, 6);
     expect(track.steps?.filter((step) => step !== 0)).toHaveLength(1);

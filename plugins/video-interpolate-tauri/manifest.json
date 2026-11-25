@@ -1,0 +1,9 @@
+{
+  "id": "video-interpolate-tauri",
+  "name": "In-between frames on the Mac (Tauri)",
+  "version": "0.1.0",
+  "types": ["storage"],
+  "provides": ["video.interpolate"],
+  "requires": [],
+  "entry": "index.ts"
+}
