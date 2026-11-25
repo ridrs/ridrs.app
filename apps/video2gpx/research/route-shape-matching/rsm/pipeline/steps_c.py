@@ -345,9 +345,7 @@ def gated_anchors(v: Video):
 def build_ctx(g, E, st, tracks, route: dict):
     k = route["kappa"]
     h = route.get("h", C.H * k)
-    tt = route["step_t"]
-    idx = np.clip(np.searchsorted(st.t, tt - 0.01), 0, st.T - 1)
-    assert np.allclose(st.t[idx], tt, atol=0.01), "stored route and rebuilt steps differ"
+    idx = pathctx.step_index(st.t, route["step_t"])
     ok = np.zeros(st.T, bool)
     ok[idx] = True
     cell_edge, cell_off = pathctx.cell_layout(g, E, h)

@@ -21,6 +21,18 @@ def cell_layout(g: NetGraph, edges: np.ndarray | None, h: float):
     return edges[ce], (ci + 0.5) * (L / n)[ce]
 
 
+def step_index(st_t: np.ndarray, step_t, atol: float = 0.01) -> np.ndarray:
+    """Indices into the step times st_t of a stored route's step times (rsm.pipeline.steps_b.decode_route, rsm.hmm.route.decode). Those carry a tie-break of
+    1e-6 s x the route step number, removed here first: it reaches the tolerance atol at 10,000 steps, and a longer route (the local pass of a 2 h video
+    with 15 m steps) then matched the next step and failed."""
+    tt = np.asarray(step_t, float)
+    tt = tt - 1e-6 * np.arange(len(tt))
+    idx = np.clip(np.searchsorted(st_t, tt - atol), 0, len(st_t) - 1)
+    if not np.allclose(st_t[idx], tt, atol=atol, rtol=0.0):
+        raise AssertionError("stored route and rebuilt steps differ")
+    return idx
+
+
 def _connect(g: NetGraph, out, e_from: int, e_to: int, depth: int = 5) -> list[int] | None:
     """shortest chain of edges strictly between e_from and e_to (BFS by length), [] if adjacent, None if not reachable"""
     tgt = int(g.edge_u[e_to])

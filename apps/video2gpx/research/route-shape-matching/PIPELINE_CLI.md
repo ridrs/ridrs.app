@@ -165,6 +165,8 @@ If no route fits the corridor, the search route is kept and the `local_pass` sta
 
 There are no new CLI options. The refine checkpoint hash includes the LOCAL_* config and the pbf.
 
+Long routes (fix 2026-11-25): the stored step times carry a tie-break of 1e-6 s × the step number (`decode_route`). Refine matched them back to the steps with a fixed 0.01 s tolerance, so a local pass with more than 10,000 steps (about 150 km at 15 m, e.g. a 2 h 20 min Death Ride video) failed with `stored route and rebuilt steps differ`. `pathctx.step_index` removes the tie-break before matching.
+
 ## Standstills and dense heading alignment (refine step, from code hash f109940ba15f1ee2)
 
 **Measured gaps.** A gap between two vms tracks whose pairs are at least `GAP_MEASURED_SHARE` (70 %) well fitted gets its measured vms distance. Without it, the gap is filled with the mean speed. This is used in the local pass.

@@ -1653,3 +1653,18 @@ def test_align_mode_from_params_or_config_default():
     assert AL.meas_mode({}) == C.ALIGN_MEAS_MODE == "posterior"
     assert AL.meas_mode({"align_mode": "turns"}) == "turns"
     assert AL.meas_mode({"align_mode": "bogus"}) == C.ALIGN_MEAS_MODE
+
+
+def test_stored_route_steps_match_beyond_10000_steps():
+    """decode_route adds a 1e-6 s x n tie-break to the step times; past 10,000 steps it exceeded the 0.01 s tolerance of build_ctx and refine failed with
+    'stored route and rebuilt steps differ' (Death Ride 2025 video: 11,906 steps of 15 m in the local pass). pathctx.step_index removes it first."""
+    from types import SimpleNamespace
+    from rsm.refine import pathctx
+    t = np.cumsum(np.full(12_500, 0.7))
+    cells = np.arange(len(t))
+    cells[::7] = -1                                                       # steps without a cell (gaps) are not in the stored route
+    step_t, _ = steps_b.decode_route(None, SimpleNamespace(t=t), cells)
+    assert len(step_t) > 10_000
+    np.testing.assert_array_equal(pathctx.step_index(t, step_t), np.flatnonzero(cells >= 0))
+    with pytest.raises(AssertionError, match="stored route and rebuilt steps differ"):
+        pathctx.step_index(t, step_t + 0.3)                               # steps that really differ still fail

@@ -44,11 +44,8 @@ def build_ctx(name: str, with_post: bool = True) -> pathctx.RouteCtx:
     g, E, h, sm, st, tracks, r, dpm = _setup(name)
     rt = r["route"]
     ok = np.zeros(st.T, bool)
-    # valid steps: those of the stored route (times match st.t[ok] up to the 1e-6 tie-break)
-    tt = rt.step_t
-    idx = np.searchsorted(st.t, tt - 0.01)
-    idx = np.clip(idx, 0, st.T - 1)
-    assert np.allclose(st.t[idx], tt, atol=0.01), "stored route and rebuilt steps differ"
+    # valid steps: those of the stored route (times match st.t[ok] up to the 1e-6 tie-break, removed by step_index)
+    idx = pathctx.step_index(st.t, rt.step_t)
     ok[idx] = True
     cell_edge, cell_off = pathctx.cell_layout(g, E, h)
     c = rt.step_cell
