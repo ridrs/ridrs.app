@@ -21,6 +21,7 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 | `src/video2gpx.js` | video2gpx round trip: job, validation of an uploaded result, route agreement (contract: [../VIDEO2GPX-INTEGRATION.md](../VIDEO2GPX-INTEGRATION.md) section 8) |
 | `src/incyclist.js`, `src/images.js` | Incyclist package (fflate), image type and size sniffing |
 | `site/admin/` | admin UI (`/admin`) |
+| `site/route.js`, `site/route-deck.js`, `site/lib/route-play.js` | public route dialog (`#r=<id>&k=<km>`, a click on a route line or its legend entry; [ROUTE-PLAYER-PLAN.md](ROUTE-PLAYER-PLAN.md)): whole elevation profile, coverage bar, play/pause and ±100 m/±1 km, the map pointer, profile and bar seek. One clock over the route: an assigned video plays in sync (its synced track projected onto the route), a gap is a black box on the speed model (1×/4×/16×). Two stacked YouTube players: the next video is buffered 30 s ahead and started its measured latency before the boundary; the picture changes only once it plays (no black frame). API `GET /api/tracks/:id` (`publicTrack` in `src/tracks.js`): only visible, embeddable, synced assignments play, the rest are gaps |
 | `site/lib/route-sync.js` | route geometry, speed model, anchor track, level rules, Prüfmodus (shared by worker and admin, unit-tested) |
 | `scripts/pull_manual.mjs` | admin export → `../data/manual.json` |
 | `migrations/` | D1 schema (phase 1 subset of the concept's data model) |

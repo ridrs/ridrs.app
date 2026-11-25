@@ -165,3 +165,36 @@ test('route editor API: detail, candidates, assignments with validation and log,
   await call('DELETE', `tracks/${t.track_id}`);
   assert.equal(env.DB.raw.prepare('SELECT count(*) AS n FROM track_video').get().n, 0);
 });
+
+test('public route: published only; plays visible, embeddable, synced videos with both times, the rest become merged gaps from km 0', async () => {
+  const { default: worker } = await import('../src/worker.js');
+  const env = { DB: makeD1(), BASE_PATH: '/scenic', ASSETS: { fetch: async () => new Response('index') } };
+  env.DB.raw.exec(`INSERT INTO channel (channel_id, name) VALUES ('UCaaaaaaaaaaaaaaaaaaaaaa', 'Kanal');
+    INSERT INTO video (video_id, channel_id, title, duration_s, embeddable, site_published) VALUES
+      ('AAAAAAAAAAA', 'UCaaaaaaaaaaaaaaaaaaaaaa', 'A', 600, 1, 1), ('BBBBBBBBBBB', NULL, 'B no embed', 900, 0, 1),
+      ('CCCCCCCCCCC', NULL, 'C hidden', 900, 1, 0), ('DDDDDDDDDDD', NULL, 'D', 900, 1, 1), ('EEEEEEEEEEE', NULL, 'E no sync', 900, 1, 1);
+    INSERT INTO localization (video_id, loc_level, loc_key) VALUES ('AAAAAAAAAAA', 2, 'anchored');
+    INSERT INTO route_sync (video_id, method, path) VALUES ('AAAAAAAAAAA', 'video2gpx', 'sync/AAAAAAAAAAA.json'), ('BBBBBBBBBBB', 'anchors', 'api/sync/BBBBBBBBBBB.json'),
+      ('CCCCCCCCCCC', 'anchors', 'x'), ('DDDDDDDDDDD', 'video2gpx', 'sync/DDDDDDDDDDD.json');`);
+  const line = JSON.stringify([pts.filter((_, i) => i % 100 === 0)]);
+  const ins = (pub) => env.DB.raw.prepare(`INSERT INTO track (name, color, published, line, distance_km, profile, created_at, updated_at)
+    VALUES ('R', '#d6336c', ?, ?, 10, '[[0,100],[10,200]]', 'x', 'x')`).run(pub, line).lastInsertRowid;
+  const id = Number(ins(1)), draft = Number(ins(0));
+  const seg = env.DB.raw.prepare('INSERT INTO track_video (track_id, from_km, video_id, t_from_s, t_to_s) VALUES (?, ?, ?, ?, ?)');
+  seg.run(id, 1, 'AAAAAAAAAAA', 10, 100); seg.run(id, 3, 'BBBBBBBBBBB', 5, 50); seg.run(id, 4, 'CCCCCCCCCCC', 5, 50);
+  seg.run(id, 5, 'EEEEEEEEEEE', null, null); seg.run(id, 6, 'DDDDDDDDDDD', 20, 80); seg.run(id, 8, 'DDDDDDDDDDD', 90, null);
+  const get = (p) => worker.fetch(new Request(`https://x.example/scenic/${p}`), env, null);
+  assert.equal((await get(`api/tracks/${draft}`)).status, 404);
+  assert.equal((await get('api/tracks/999')).status, 404);
+  const r = await get(`api/tracks/${id}`);
+  assert.equal(r.status, 200);
+  const t = await r.json();
+  assert.ok(Math.abs(t.km - 10) < 0.05);
+  assert.deepEqual(t.profile, [[0, 100], [10, 200]]);
+  assert.deepEqual(t.segments.map((s) => [s.from_km, s.video_id]), [[0, null], [1, 'AAAAAAAAAAA'], [3, null], [6, 'DDDDDDDDDDD'], [8, null]]);
+  assert.deepEqual(t.segments[1], { from_km: 1, video_id: 'AAAAAAAAAAA', t_from_s: 10, t_to_s: 100 });
+  assert.deepEqual(t.videos.map((v) => [v.id, v.playable]).sort(), [['AAAAAAAAAAA', true], ['BBBBBBBBBBB', false], ['DDDDDDDDDDD', true], ['EEEEEEEEEEE', false]]);
+  const a = t.videos.find((v) => v.id === 'AAAAAAAAAAA');
+  assert.deepEqual(a.sync, { method: 'video2gpx', path: 'sync/AAAAAAAAAAA.json' });
+  assert.equal(a.channel, 'Kanal'); assert.equal(a.loc_level, 2);
+});

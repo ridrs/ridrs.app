@@ -2,6 +2,8 @@
 
 # Route player plan (website, public)
 
+Status 2026-11-25: implemented on branch `feat/scenic-route-player` (from `feat/scenic-route-editor`); the open questions below were decided as proposed. Not checked yet: a real iPhone, and the admin editor (step 6) still has its own player logic.
+
 Goal: a published GPX route (table `track`) opens in the same left dialog as a video. The dialog shows the whole elevation profile and plays the route from start to end. Where an editor assigned a video (table `track_video`, admin route editor), that video plays in sync with a pointer on the route; where none is assigned, the video slot is a black box and the pointer moves on by itself. Dragging the pointer on the map (and clicking or dragging on the profile) seeks, as it does for videos.
 
 ## What exists (branch `feat/scenic-route-editor`, deployed, not merged into `main`)

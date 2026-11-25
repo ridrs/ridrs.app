@@ -190,6 +190,45 @@ export async function publicTracks(env) {
     properties: { id: r.track_id, name: r.name, description: r.description, color: r.color, km: r.distance_km } })) };
 }
 
+/**
+ * One published route for the public route dialog (site/route.js): line, profile and the video assignments the public page can play.
+ * An assignment plays only with a visible (`visible`: the worker's SQL condition on alias v), embeddable video that has a synced track
+ * and video seconds at both ends; every other one becomes a gap (video_id null), and neighbouring gaps are merged. The segments start
+ * at km 0 (a gap before the first assignment). `videos` lists every visible assigned video, playable or not, for the dialog's list.
+ * Null when the route does not exist or is not published.
+ */
+export async function publicTrack(env, id, visible) {
+  if (!/^\d+$/.test(String(id))) return null;
+  const t = await env.DB.prepare('SELECT track_id, name, description, color, line, profile, distance_km FROM track WHERE track_id = ?1 AND published = 1')
+    .bind(+id).first();
+  if (!t) return null;
+  const line = parse(t.line) ?? [];
+  const segs = await assignments(env, t.track_id);
+  const ids = [...new Set(segs.map((s) => s.video_id).filter(Boolean))];
+  const { results } = ids.length ? await env.DB.prepare(`SELECT v.video_id, v.title, c.name AS channel, v.duration_s, v.embeddable, l.loc_level,
+      s.path AS sync_path, s.method AS sync_method
+    FROM video v LEFT JOIN channel c ON c.channel_id = v.channel_id LEFT JOIN localization l ON l.video_id = v.video_id
+    LEFT JOIN route_sync s ON s.video_id = v.video_id
+    WHERE v.video_id IN (SELECT value FROM json_each(?1)) AND ${visible}`).bind(JSON.stringify(ids)).all() : { results: [] };
+  const videos = results.map((v) => ({ id: v.video_id, title: v.title, channel: v.channel, duration_s: v.duration_s, embeddable: !!v.embeddable,
+    loc_level: v.loc_level ?? 7, sync: v.sync_method ? { method: v.sync_method, path: v.sync_path } : null }));
+  const byId = new Map(videos.map((v) => [v.id, v]));
+  const playable = (s) => { const v = byId.get(s.video_id); return !!(v?.embeddable && v.sync && s.t_from_s != null && s.t_to_s != null && s.t_to_s > s.t_from_s); };
+  const out = [];
+  for (const s of segs) {
+    const x = playable(s) ? { from_km: s.from_km, video_id: s.video_id, t_from_s: s.t_from_s, t_to_s: s.t_to_s }
+      : { from_km: s.from_km, video_id: null, t_from_s: null, t_to_s: null };
+    if (!x.video_id && out.length && !out.at(-1).video_id) continue;
+    out.push(x);
+  }
+  if (!out.length || out[0].from_km > 0) out.unshift({ from_km: 0, video_id: null, t_from_s: null, t_to_s: null });
+  if (out.length > 1 && !out[0].video_id && !out[1].video_id) out.splice(1, 1);
+  const used = new Set(segs.map((s) => s.video_id));
+  return { id: t.track_id, name: t.name, description: t.description, color: t.color, line, profile: parse(t.profile),
+    km: trackKm(line), distance_km: t.distance_km, segments: out,
+    videos: videos.filter((v) => used.has(v.id)).map((v) => ({ ...v, playable: out.some((s) => s.video_id === v.id) })) };
+}
+
 // --- route editor (site/admin/route-editor.js) ---
 
 const VIDEO_META = `SELECT v.video_id, v.title, c.name AS channel, v.duration_s, v.embeddable, v.site_published, v.hidden, v.source, v.status,

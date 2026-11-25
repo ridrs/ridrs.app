@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ridrs Scenic front end: full-screen map, search mask top centre (with suggestions and filters),
 // and a dialog on the left with the YouTube video and the route information. No route list.
-import { Map as MapGL, NavigationControl, LngLatBounds, Marker, Popup } from './vendor/maplibre-gl/maplibre-gl.mjs';
+import { Map as MapGL, NavigationControl, LngLatBounds, Marker } from './vendor/maplibre-gl/maplibre-gl.mjs';
 import { mountPlayer } from './player.js';
 import { prepare, compute, fromQuery, toQuery, ROADS, roadName, flag } from './filters.js';
 import { mountPanel } from './panel.js';
+import { openRoute } from './route.js';
 import { decodeLine } from './lib/lines.js';
 import { initI18n, t, num as fmtNum, date, countryName, regionName, getLang, translateDom, mountLangMenu } from './i18n.js';
 
@@ -122,7 +123,8 @@ const climbMarks = (climbs, X, Y) => climbs.map((c) => {
   const label = climbText(c);
   return `<span class="climb-mark" role="img" title="${label}" aria-label="${label}" style="left:${((X(c.end / 1000) / PW) * 100).toFixed(2)}%;top:${((Y(c.summit) / PH) * 100).toFixed(2)}%">${esc(c.category)}</span>`;
 }).join('');
-function mountProfile(box, p, line, climbs = []) {
+// onSeek(km, total): a click or drag on the chart seeks (the route dialog); without it the chart only shows the position on hover.
+function mountProfile(box, p, line, climbs = [], { onSeek = null } = {}) {
   const { kmMax, X, Y, svg } = profileSvg(p);
   // Summits beyond the chart (a climb measured on another track) are left out rather than drawn at its edge.
   const shown = climbs.filter((c) => c.end / 1000 <= kmMax * 1.01);
@@ -140,6 +142,14 @@ function mountProfile(box, p, line, climbs = []) {
     if (line) hoverDot(pointAtKm(line, (k / kmMax) * lineKm(line)));
   });
   el.addEventListener('pointerleave', () => { hov.setAttribute('visibility', 'hidden'); read.textContent = ''; hoverDot(null); });
+  if (onSeek) {
+    el.classList.add('seekable');
+    let down = false;
+    el.addEventListener('pointerdown', (ev) => { down = true; el.setPointerCapture(ev.pointerId); onSeek(kmOf(ev), kmMax, false); });
+    el.addEventListener('pointermove', (ev) => { if (down) onSeek(kmOf(ev), kmMax, false); });
+    const up = (ev) => { if (!down) return; down = false; onSeek(kmOf(ev), kmMax, true); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  }
   return { // video position (km along the synced track, scaled to the route length)
     at(km, total) { const k = total ? (km / total) * kmMax : km, x = X(Math.min(kmMax, k)).toFixed(1);
       cur.setAttribute('x1', x); cur.setAttribute('x2', x); cur.setAttribute('visibility', 'visible'); },
@@ -252,8 +262,7 @@ function bindLayerEvents() {
   });
   map.on('click', 'tracks-hit', (e) => {
     if (map.queryRenderedFeatures(e.point, { layers: ['video', 'clusters'] }).length) return; // the point wins
-    const p = e.features[0].properties;
-    new Popup({ maxWidth: '280px', className: 'track-tip' }).setLngLat(e.lngLat).setHTML(`<b>${esc(p.name)}</b>${p.km ? ` · ${num(p.km)} km` : ''}${p.description ? `<br>${esc(p.description)}` : ''}`).addTo(map);
+    openRouteDialog(+e.features[0].properties.id);
   });
   const setHover = (id) => {
     if (hoverId != null && map.getSource('lines')) map.setFeatureState({ source: 'lines', id: hoverId }, { hover: false });
@@ -293,10 +302,7 @@ async function loadTracks() {
     `<button type="button" class="lvl track-key" style="--c:${esc(f.properties.color)}" data-track="${f.properties.id}">${esc(f.properties.name)}</button>`).join('') : '';
   box.onclick = (e) => {
     const f = data.features.find((x) => String(x.properties.id) === e.target.closest('[data-track]')?.dataset.track);
-    if (!f) return;
-    const lines = f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates;
-    const b = new LngLatBounds(); for (const l of lines) for (const c of l) b.extend(c);
-    map.fitBounds(b, { padding: padding(), maxZoom: 13, duration: 600 });
+    if (f) openRouteDialog(+f.properties.id);
   };
 }
 
@@ -469,7 +475,7 @@ function openStack(key, move = true) {
   const vs = [...(stacks.get(key) ?? [])].sort((a, b) => (a.loc ?? 7) - (b.loc ?? 7) || (b.views ?? 0) - (a.views ?? 0));
   if (!vs.length) { openStackKey = null; return; }
   if (vs.length === 1) { openVideo(vs[0].id); return; }
-  player?.destroy(); player = null; profileCtl = null; hoverDot(null); current = null; drawRoute(null, false);
+  player?.destroy(); player = null; profileCtl = null; hoverDot(null); current = null; closeRoute(); drawRoute(null, false);
   openStackKey = key;
   if (location.hash) history.pushState(null, '', location.pathname + location.search);
   const v0 = vs[0], rough = vs.every((v) => (v.loc ?? 7) >= 7);
@@ -486,17 +492,21 @@ function openStack(key, move = true) {
   if (move) map.easeTo({ center: [v0.lon, v0.lat], zoom: Math.max(map.getZoom(), 9), padding: padding() });
 }
 $('#detail-body').addEventListener('click', (e) => {
+  const r = e.target.closest('button.back-route');
+  if (r) { openRouteDialog(+r.dataset.r, +r.dataset.km || 0); return; }
   const b = e.target.closest('.stack button[data-id], button.back');
   if (!b) return;
   if (b.classList.contains('back')) openStack(b.dataset.k, false);
   else openVideo(b.dataset.id, 0, { stack: openStackKey });
 });
 
-async function openVideo(id, start = 0, { stack = null } = {}) {
+async function openVideo(id, start = 0, { stack = null, route = null } = {}) {
   if (current === id && !start) return;
   current = id;
   openStackKey = null;
-  const back = stack && stacks.get(stack)?.length > 1
+  closeRoute();
+  const back = route ? `<button type="button" class="link back back-route" data-r="${route.id}" data-km="${route.km.toFixed(3)}">← ${esc(t('route.back', { name: route.name }))}</button>`
+    : stack && stacks.get(stack)?.length > 1
     ? `<button type="button" class="link back" data-k="${esc(stack)}">← ${t('stack.title', { n: stacks.get(stack).length })}</button>` : '';
   const hash = `#v=${id}${start ? `&t=${Math.floor(start)}` : ''}`;
   if (location.hash !== hash) history.pushState(null, '', hash);
@@ -570,7 +580,26 @@ async function openVideo(id, start = 0, { stack = null } = {}) {
   else { drawRoute(null); map.easeTo({ center: [v.lon, v.lat], zoom: Math.max(map.getZoom(), v.position_exact ? 11 : 7), padding: padding() }); }
 }
 
+// --- route dialog (site/route.js): a published route with its profile, played with its assigned videos ---
+let routeCtl = null, routeOpen = null, routeToken = null;
+function closeRoute() { routeCtl?.destroy(); routeCtl = null; routeOpen = null; routeToken = null; }
+async function openRouteDialog(id, km = 0) {
+  if (routeOpen === id && routeCtl) return;
+  player?.destroy(); player = null; profileCtl = null; hoverDot(null); current = null; openStackKey = null;
+  closeRoute();
+  const token = {}; routeOpen = id; routeToken = token;
+  const hash = `#r=${id}${km > 0.05 ? `&k=${km.toFixed(2)}` : ''}`;
+  if (new URLSearchParams(location.hash.slice(1)).get('r') !== String(id)) history.pushState(null, '', hash);
+  if (!dialog.open) dialog.show();
+  document.body.classList.add('detail-open');
+  const ctl = await openRoute({ map, body: $('#detail-body'), dialog, mountProfile, drawRoute, padding, fitSheet, lvlTag,
+    openVideo: (vid, start, o) => openVideo(vid, start, o), isCurrent: () => routeToken === token }, id, km);
+  if (routeToken !== token) { ctl?.destroy(); return; }
+  routeCtl = ctl;
+}
+
 function closeVideo() {
+  closeRoute();
   player?.destroy(); player = null; current = null; profileCtl = null; hoverDot(null); openStackKey = null;
   drawRoute(null);
   if (dialog.open) dialog.close();
@@ -582,8 +611,10 @@ function closeVideo() {
 
 function fromHash() {
   const p = new URLSearchParams(location.hash.slice(1));
-  const id = p.get('v');
-  if (id) openVideo(id, +p.get('t') || 0); else if (current) closeVideo();
+  const id = p.get('v'), rid = p.get('r');
+  if (id) openVideo(id, +p.get('t') || 0);
+  else if (rid && /^\d+$/.test(rid)) openRouteDialog(+rid, +p.get('k') || 0);
+  else if (current || routeOpen) closeVideo();
   else if (openStackKey && dialog.open) closeVideo();
 }
 

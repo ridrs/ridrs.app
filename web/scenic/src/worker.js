@@ -9,6 +9,7 @@
 //   GET /api/videos/:id/video2gpx-job.json  job for the desktop app video2gpx (VIDEO2GPX-INTEGRATION.md 8.1; nothing secret in it)
 //   POST /api/videos/:id/wish           put a video on the wishlist for video2gpx (src/wishlist.js), same-origin only
 //   GET /api/tracks                     GeoJSON of the routes uploaded as GPX in the admin and published (src/tracks.js)
+//   GET /api/tracks/:id                 one published route with profile and its playable video assignments (route dialog)
 //   GET /api/images/:imageId            preview image (R2) of a visible video
 //   GET /api/videos/:id/package.zip     a ride's package without its video (Van Gestel, src/rides.js)
 //   GET /api/ride/v1/catalog.json       the rides for the ridrs app (ridrs_app docs/formats/scenic-ride-catalog-v1.md)
@@ -27,7 +28,7 @@ import { buildIncyclistZip, MIN_LEVEL } from './incyclist.js';
 import { buildTrack } from '../site/lib/route-sync.js';
 import { routeLines } from './route-lines.js';
 import { vote } from './wishlist.js';
-import { publicTracks } from './tracks.js';
+import { publicTracks, publicTrack } from './tracks.js';
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
 const VISIBLE = "v.site_published = 1 AND v.hidden = 0 AND (v.status IS NULL OR v.status = 'public') AND NOT EXISTS (SELECT 1 FROM channel_optout o WHERE o.channel_id = v.channel_id)";
@@ -365,7 +366,7 @@ export default {
         if (!sameOriginWrite(request)) return ajson({ error: 'cross-site request' }, 403);
         return await handleAdmin(request, env, who, ctx);
       }
-      let w = /^\/api\/videos\/([\w-]+)\/wish$/.exec(p);
+      let m0, w = /^\/api\/videos\/([\w-]+)\/wish$/.exec(p);
       if (w && request.method === 'POST') {
         if (!ID.test(w[1])) return json({ error: 'bad id' }, { status: 400 });
         if (!sameOriginWrite(request)) return json({ error: 'cross-site request' }, { status: 403, maxAge: 0 });
@@ -375,6 +376,7 @@ export default {
       if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'method not allowed' }, { status: 405 });
       if (p === '/api/points') return await points(env);
       if (p === '/api/tracks') return json(await publicTracks(env), { maxAge: 120 });
+      if ((m0 = /^\/api\/tracks\/(\d+)$/.exec(p))) { const t = await publicTrack(env, m0[1], VISIBLE); return t ? json(t) : json({ error: 'not found' }, { status: 404 }); }
       if (p === '/api/search') return await search(env, url.searchParams.get('q'));
       let m = /^\/api\/videos\/([\w-]+)$/.exec(p);
       if (m) return await video(env, m[1]);
