@@ -139,6 +139,10 @@ export async function openRouteEditor(id, d) {
   r.cov = r.cov.filter((c) => c.intervals.length).sort((a, b) => b.km - a.km);
   side.querySelector('#rte-auto').disabled = !r.cov.length;
   renderProfile(); renderSegs(); renderCands(); drawCands();
+  // Video times are computed on save; an assignment saved before its video was synced has none, and the route player shows it as a
+  // gap. Fill them in now (same assignment, only the times).
+  const missing = r.times.some((t) => t.video_id && r.meta.get(t.video_id)?.synced && (t.t_from_s == null || t.t_to_s == null));
+  if (missing) await d.guard(() => save(r.segs, 'Videozeiten nachgerechnet'))();
 }
 
 const $view = () => document.getElementById('view');
