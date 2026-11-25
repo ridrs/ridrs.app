@@ -46,6 +46,8 @@ else { fail("usage: ridrs-refine --video <path> --from <s> --to <s> --factor <n>
 let unsupported = "This device cannot compute in-between frames: frame rate conversion needs macOS 15.4 on Apple silicon"
 
 if #available(macOS 15.4, *) {
+    // VP9 (YouTube's HLS formats, VP9 in MP4): its decoder ships with macOS but is loaded only on request.
+    VTRegisterSupplementalVideoDecoderIfAvailable(kCMVideoCodecType_VP9)
     run()
 } else {
     fail(unsupported)
