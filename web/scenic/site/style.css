@@ -279,6 +279,12 @@ body.page { overflow: auto; background: radial-gradient(70rem 32rem at 75% -12re
 #legend summary::after { content: "+"; color: var(--muted); }
 #legend[open] summary::after { content: "–"; }
 #legend-items { display: grid; gap: .15rem; margin-top: .3rem; }
+#legend-tracks { display: grid; gap: .15rem; margin-top: .45rem; padding-top: .35rem; border-top: 1px solid var(--border); }
+#legend-tracks[hidden] { display: none; }
+#legend .track-key { background: none; border: 0; padding: 0; font: inherit; font-size: .78rem; cursor: pointer; text-align: left; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }
+#legend .track-key::before { width: 1rem; height: .25rem; border-radius: 2px; }
+#legend .track-key:hover { color: var(--text); }
+.track-tip .maplibregl-popup-content { padding: .4rem .65rem; font-size: .82rem; color: #0d121c; }
 /* Medium widths (and next to the open dialog): the count sits right above the credits, the legend beside both */
 @media (max-width: 1150px) and (min-width: 761px) {
   #bottombar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "sum leg" "foot leg"; grid-template-rows: 1fr auto; }

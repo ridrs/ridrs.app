@@ -20,6 +20,7 @@ export default {
   'foot.language': '言語',
   'legend.title': '位置精度',
   'legend.lines': '線：ルート（ズーム 5 以上）',
+  'legend.tracks': '編集部のルート',
   'notice.load_failed': 'データを読み込めませんでした。',
   'common.all': 'すべて',
 

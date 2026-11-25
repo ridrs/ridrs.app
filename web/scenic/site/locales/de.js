@@ -20,6 +20,7 @@ export default {
   'foot.language': 'Sprache',
   'legend.title': 'Lokalisierung',
   'legend.lines': 'Linien: Routen, ab Zoom 5',
+  'legend.tracks': 'Routen der Redaktion',
   'notice.load_failed': 'Die Daten konnten nicht geladen werden.',
   'common.all': 'alle',
 

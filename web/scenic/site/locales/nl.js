@@ -20,6 +20,7 @@ export default {
   'foot.language': 'Taal',
   'legend.title': 'Lokalisatie',
   'legend.lines': 'Lijnen: routes, vanaf zoom 5',
+  'legend.tracks': 'Routes van de redactie',
   'notice.load_failed': 'De gegevens konden niet worden geladen.',
   'common.all': 'alle',
 

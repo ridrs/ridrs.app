@@ -20,6 +20,7 @@ export default {
   'foot.language': 'Lingua',
   'legend.title': 'Localizzazione',
   'legend.lines': 'Linee: percorsi, dallo zoom 5',
+  'legend.tracks': 'Percorsi della redazione',
   'notice.load_failed': 'Non è stato possibile caricare i dati.',
   'common.all': 'tutti',
 

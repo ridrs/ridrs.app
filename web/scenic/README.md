@@ -15,6 +15,7 @@ Cloudflare Worker with static assets and D1, as planned in [../CLOUDFLARE-KONZEP
 | `src/rides.js` | Van Gestel rides: package without video (ZIP), ride catalog of the app |
 | `src/auth.js` | Cloudflare Access JWT check for the admin, local dev bypass |
 | `src/admin.js` | admin API: edits with `edit_log` and undo, anchors and sync tracks, Prüfmodus, route editing (OSRM), images (R2), collections, opt-out, export |
+| `src/tracks.js` | routes uploaded as GPX in the admin (tab „Routen“, not tied to a video, migration 0010): parse, simplify to ≤ 4000 points, admin CRUD, public `GET /api/tracks` (GeoJSON of the published ones, drawn in their own colour with a legend entry) |
 | `src/wishlist.js` | wishlist for video2gpx: public vote (one per visitor, video and day, hashed, no IP stored, at most 30 a day), admin queue (order, top, done, dismissed), see [Wishlist](#wishlist-for-video2gpx) |
 | `src/video2gpx.js` | video2gpx round trip: job, validation of an uploaded result, route agreement (contract: [../VIDEO2GPX-INTEGRATION.md](../VIDEO2GPX-INTEGRATION.md) section 8) |
 | `src/incyclist.js`, `src/images.js` | Incyclist package (fflate), image type and size sniffing |

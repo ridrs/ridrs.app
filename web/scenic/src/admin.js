@@ -12,6 +12,7 @@ import { FTS_INSERT } from './search-index.js';
 import { buildTrack, anchorLevel, evaluateReview, kmAlong, project, LOC_RULES, KEYS } from '../site/lib/route-sync.js';
 import { sniffImage, contentId, MAX_IMAGE_BYTES, RIGHTS } from './images.js';
 import { routeLines } from './route-lines.js';
+import { tracksAdmin } from './tracks.js';
 import { buildJob, validateResult, resultMeta, routeAgreement, uploadLevel, MAX_RESULT_BYTES, ROUTE_OFFER_M } from './video2gpx.js';
 
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
@@ -711,7 +712,7 @@ async function optouts(env) {
 /** All manual data as ndjson, for scripts/pull_manual.mjs -> data/manual.json of the pipeline (concept 4.3). */
 async function exportManual(env) {
   const q = (sql) => env.DB.prepare(sql).all().then((r) => r.results);
-  const [videos, manual, routes, locs, anchors, syncs, cols, items, opt, imgs, log, loclog, wishes] = await Promise.all([
+  const [videos, manual, routes, locs, anchors, syncs, cols, items, opt, imgs, log, loclog, wishes, tracks] = await Promise.all([
     q(`SELECT video_id, stars, editors_pick, editor_note, hidden, site_published, place, region, lat, lon, position_exact, country, country_name FROM video
        WHERE stars IS NOT NULL OR editors_pick = 1 OR editor_note IS NOT NULL OR hidden = 1 OR site_published = 1 OR video_id IN (SELECT video_id FROM manual_field)`),
     q('SELECT video_id, field, who, at FROM manual_field'),
@@ -727,6 +728,7 @@ async function exportManual(env) {
     q('SELECT * FROM edit_log ORDER BY id'),
     q('SELECT * FROM localization_log ORDER BY at'),
     q('SELECT video_id, votes, first_at, last_at, priority, status, status_by, status_at FROM wish ORDER BY video_id'),
+    q('SELECT * FROM track ORDER BY track_id'),
   ]);
   const fields = new Map();
   for (const m of manual) { if (!fields.has(m.video_id)) fields.set(m.video_id, []); fields.get(m.video_id).push(m.field); }
@@ -748,6 +750,7 @@ async function exportManual(env) {
   for (const e of log) lines.push({ type: 'edit', ...e, old: parse(e.old), new: parse(e.new) });
   for (const e of loclog) lines.push({ type: 'localization_log', ...e });
   for (const w of wishes) lines.push({ type: 'wish', ...w });
+  for (const t of tracks) lines.push({ type: 'track', ...t, published: !!t.published, line: parse(t.line) });
   return new Response(lines.map((x) => JSON.stringify(x)).join('\n') + '\n', { headers: { 'content-type': 'application/x-ndjson; charset=utf-8',
     'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'content-disposition': 'attachment; filename="manual.ndjson"' } });
 }
@@ -833,6 +836,8 @@ export async function handleAdmin(request, env, who, ctx) {
     if (!b && m === 'GET') return ajson(await collections(env));
     return ajson(await collectionWrite(env, who.email, m, parts.slice(1), m === 'DELETE' ? {} : await readJson(request)));
   }
+  // Routes uploaded as GPX (src/tracks.js): GET and POST tracks, PATCH and DELETE tracks/<id>.
+  if (a === 'tracks' && !c) return ajson(await tracksAdmin(env, who.email, m, b ?? null, request, (status, msg) => { throw new HttpError(status, msg); }));
   if (a === 'optout') {
     if (!b && m === 'GET') return ajson(await optouts(env));
     if (!b && m === 'POST') {

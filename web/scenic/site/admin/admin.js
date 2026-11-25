@@ -47,7 +47,7 @@ const guard = (fn) => async (...a) => { try { await fn(...a); } catch (e) { cons
 let me = null, collectionsCache = [];
 
 
-// --- router: #videos, #v=<id>, #queue, #collections, #optout, #log ---
+// --- router: #videos, #v=<id>, #queue, #collections, #tracks, #optout, #log ---
 const VIEW_KEY = 'ridrs-scenic.admin.view';
 let listState = { q: '', only: '', loc: '', offset: 0, view: (() => { try { return localStorage.getItem(VIEW_KEY) === 'map' ? 'map' : 'list'; } catch { return 'list'; } })(), camera: null };
 // Map of the video page (view "Karte"); removed when the page changes.
@@ -65,11 +65,13 @@ function route() {
   const h = location.hash.slice(1);
   const tab = h.startsWith('v=') ? 'videos' : (h || 'videos');
   for (const a of document.querySelectorAll('.tabs a')) { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+  if (tab !== 'tracks') dropTracksMap();
   if (h.startsWith('v=')) { dropListMap(); return openVideo(h.slice(2)); }
   closeEditor();
   if (tab !== 'videos') dropListMap();
   if (tab === 'queue') return renderQueue();
   if (tab === 'collections') return renderCollections();
+  if (tab === 'tracks') return renderTracks();
   if (tab === 'optout') return renderOptout();
   if (tab === 'log') return renderLog();
   return renderList();
@@ -506,13 +508,13 @@ function short(v) {
   if (v.image_id) return `${v.mime ?? ''} ${v.rights ?? ''}`;
   return JSON.stringify(v).slice(0, 80);
 }
-const ENTITY = { wish: 'Wunschliste', video: '', anchor: 'Anker', route: 'Route', localization: 'Prüfung', sync: 'Track', collection: 'Sammlung', collection_item: 'Sammlung', collection_order: 'Reihenfolge', optout: 'Opt-out', image: 'Bild' };
+const ENTITY = { wish: 'Wunschliste', video: '', anchor: 'Anker', route: 'Route', localization: 'Prüfung', sync: 'Track', collection: 'Sammlung', collection_item: 'Sammlung', collection_order: 'Reihenfolge', optout: 'Opt-out', image: 'Bild', track: 'Route (GPX)' };
 function logRows(rows) {
   if (!rows.length) return '<p class="meta">Noch keine Änderungen.</p>';
-  return rows.map((e) => `<div class="logrow ${e.undone_by ? 'undone' : ''}"><div class="what"><b>${esc(ENTITY[e.entity] ?? e.entity)} ${esc(e.entity === 'anchor' ? fmt(+e.field) : e.field)}</b>
+  return rows.map((e) => `<div class="logrow ${e.undone_by ? 'undone' : ''}"><div class="what"><b>${esc(ENTITY[e.entity] ?? e.entity)} ${esc(e.entity === 'anchor' ? fmt(+e.field) : e.entity === 'track' ? `#${e.field}` : e.field)}</b>
     ${e.title && !ed ? ` · <a href="#v=${e.video_id}">${esc(e.title)}</a>` : ''}: ${esc(short(e.old))} → ${esc(short(e.new))}
     <br><span class="meta">${esc(e.who)} · ${esc(e.at.replace('T', ' ').slice(0, 16))}${e.undo_of ? ` · Rücknahme von #${e.undo_of}` : ''}${e.undone_by ? ` · zurückgenommen (#${e.undone_by})` : ''}</span></div>
-    <div>${!e.undone_by && e.entity !== 'image' ? `<button type="button" class="btn small" data-undo="${e.id}">Zurücknehmen</button>` : ''}</div></div>`).join('');
+    <div>${!e.undone_by && e.entity !== 'image' && e.entity !== 'track' ? `<button type="button" class="btn small" data-undo="${e.id}">Zurücknehmen</button>` : ''}</div></div>`).join('');
 }
 async function doUndo(id) {
   await api('POST', `log/${id}/undo`);
@@ -794,6 +796,75 @@ async function renderQueue() {
     if (act === 'open') { await api('PATCH', `queue/${id}`, { status: 'open' }); toast('Wieder offen'); } else await wishAction(id, act);
     await renderQueue();
   }); });
+}
+
+// --- routes uploaded as GPX (src/tracks.js): not tied to a video, drawn on the public map in their own colour ---
+const TRACK_COLOR = '#d6336c';
+let tracksMap = null, tracksCache = [];
+function dropTracksMap() { if (tracksMap) { tracksMap.remove(); tracksMap = null; } }
+const trackGeo = (t) => ({ type: 'Feature', id: t.track_id, properties: { id: t.track_id, color: t.color, pub: t.published ? 1 : 0, name: t.name },
+  geometry: t.line.length === 1 ? { type: 'LineString', coordinates: t.line[0] } : { type: 'MultiLineString', coordinates: t.line } });
+const trackBounds = (list) => { const b = new LngLatBounds(); for (const t of list) for (const s of t.line) for (const c of s) b.extend(c); return b; };
+function fitTracks(list) { if (tracksMap && list.some((t) => t.line.length)) tracksMap.fitBounds(trackBounds(list), { padding: 50, maxZoom: 13, duration: 500 }); }
+function setTrackData() { tracksMap?.getSource('tracks')?.setData({ type: 'FeatureCollection', features: tracksCache.map(trackGeo) }); }
+
+async function renderTracks() {
+  tracksCache = await api('GET', 'tracks');
+  if (!tracksMap) {
+    $('#view').innerHTML = `<div class="ed"><div class="ed-side" id="tracks-side"></div><div class="ed-map"><div id="amap"></div></div></div>`;
+    const map = tracksMap = new MapGL({ container: 'amap', style: STYLE, center: [10, 45], zoom: 3.2, attributionControl: false });
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    map.on('load', () => {
+      map.addSource('tracks', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'tracks-casing', type: 'line', source: 'tracks', layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': ['case', ['==', ['get', 'pub'], 1], 0.9, 0.5] } });
+      map.addLayer({ id: 'tracks', type: 'line', source: 'tracks', layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-opacity': ['case', ['==', ['get', 'pub'], 1], 1, 0.55] } });
+      map.on('click', 'tracks', (e) => { document.querySelector(`[data-tid="${e.features[0].properties.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+      map.on('mouseenter', 'tracks', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'tracks', () => { map.getCanvas().style.cursor = ''; });
+      setTrackData(); fitTracks(tracksCache);
+    });
+  } else { setTrackData(); }
+  const side = $('#tracks-side');
+  side.innerHTML = `<h1>Routen</h1>
+    <p class="meta">GPX-Tracks ohne Video, z. B. geplante Fahrten oder bekannte Anstiege. Veröffentlichte Routen zeigt die öffentliche Karte in ihrer Farbe.</p>
+    <form class="card" id="track-new"><h2>GPX hochladen</h2>
+      <label class="field"><span>Datei</span><input type="file" name="file" accept=".gpx,application/gpx+xml" required></label>
+      <label class="field"><span>Name (leer = Name aus der GPX-Datei)</span><input type="text" name="name" maxlength="200"></label>
+      <label class="field"><span>Beschreibung</span><textarea name="description" maxlength="2000"></textarea></label>
+      <div class="row"><label class="row">Farbe <input type="color" name="color" value="${TRACK_COLOR}"></label>
+        <label class="chk"><input type="checkbox" name="published" value="1" checked> veröffentlichen</label>
+        <button class="btn btn-primary">Hochladen</button></div></form>
+    <div class="card"><h2>${tracksCache.length} ${tracksCache.length === 1 ? 'Route' : 'Routen'}</h2>
+      ${tracksCache.length ? tracksCache.map((t) => `<form class="track ${t.published ? '' : 'draft'}" data-tid="${t.track_id}">
+        <div class="row"><input type="color" name="color" value="${esc(t.color)}" aria-label="Farbe"><input type="text" name="name" value="${esc(t.name)}" class="grow" maxlength="200" aria-label="Name" required></div>
+        <textarea name="description" placeholder="Beschreibung" maxlength="2000" aria-label="Beschreibung">${esc(t.description || '')}</textarea>
+        <div class="row"><label class="chk publish"><input type="checkbox" name="published" ${t.published ? 'checked' : ''}> veröffentlicht</label>
+          <span class="meta mono">${(t.distance_km ?? 0).toLocaleString('de-DE', { maximumFractionDigits: 1 })} km · ${num(t.line.reduce((n, s) => n + s.length, 0))} / ${num(t.points_in)} Punkte</span></div>
+        <div class="meta">${esc(t.file_name || '')} · ${esc(t.created_by || '')} · ${esc((t.created_at || '').slice(0, 10))}</div>
+        <div class="row"><button class="btn small">Speichern</button><button type="button" class="btn small" data-zoom>Auf Karte zeigen</button>
+          <button type="button" class="btn small danger" data-del>Löschen</button></div></form>`).join('') : '<p class="meta">Noch keine Route.</p>'}</div>`;
+  $('#track-new').onsubmit = guard(async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target); f.set('published', e.target.published.checked ? '1' : '0');
+    const btn = e.target.querySelector('button'); btn.disabled = true;
+    try { const t = await api('POST', 'tracks', f); toast(`„${t.name}“ hochgeladen · ${t.distance_km.toLocaleString('de-DE', { maximumFractionDigits: 1 })} km`);
+      await renderTracks(); fitTracks(tracksCache.filter((x) => x.track_id === t.track_id)); } finally { btn.disabled = false; }
+  });
+  side.querySelectorAll('form.track').forEach((form) => {
+    const id = +form.dataset.tid, t = tracksCache.find((x) => x.track_id === id);
+    const save = guard(async (patch, msg = 'Gespeichert') => { await api('PATCH', `tracks/${id}`, patch); toast(msg); await renderTracks(); });
+    form.onsubmit = (e) => { e.preventDefault(); save({ name: form.name.value, description: form.description.value, color: form.color.value, published: form.published.checked }); };
+    form.published.onchange = () => save({ published: form.published.checked }, form.published.checked ? 'Veröffentlicht' : 'Nicht mehr öffentlich');
+    form.color.onchange = () => save({ color: form.color.value }, 'Farbe gespeichert');
+    form.color.oninput = () => { t.color = form.color.value; setTrackData(); };
+    form.querySelector('[data-zoom]').onclick = () => fitTracks([t]);
+    form.querySelector('[data-del]').onclick = guard(async () => {
+      if (!confirm(`Route „${t.name}“ löschen? Das lässt sich nicht zurücknehmen.`)) return;
+      await api('DELETE', `tracks/${id}`); toast('Route gelöscht'); await renderTracks();
+    });
+  });
 }
 
 // --- channel opt-out ---

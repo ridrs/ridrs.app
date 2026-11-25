@@ -20,6 +20,7 @@ export default {
   'foot.language': 'Język',
   'legend.title': 'Lokalizacja',
   'legend.lines': 'Linie: trasy, od powiększenia 5',
+  'legend.tracks': 'Trasy redakcji',
   'notice.load_failed': 'Nie udało się wczytać danych.',
   'common.all': 'wszystkie',
 

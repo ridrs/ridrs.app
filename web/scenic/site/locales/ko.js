@@ -20,6 +20,7 @@ export default {
   'foot.language': '언어',
   'legend.title': '위치 정확도',
   'legend.lines': '선: 경로 (줌 5부터)',
+  'legend.tracks': '편집부 경로',
   'notice.load_failed': '데이터를 불러올 수 없습니다.',
   'common.all': '전체',
 

@@ -22,6 +22,7 @@ export default {
   'foot.language': 'Language',
   'legend.title': 'Localization',
   'legend.lines': 'Lines: routes, from zoom 5',
+  'legend.tracks': 'Editors’ routes',
   'notice.load_failed': 'The data could not be loaded.',
   'common.all': 'all',
 

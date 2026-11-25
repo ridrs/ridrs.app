@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ridrs Scenic front end: full-screen map, search mask top centre (with suggestions and filters),
 // and a dialog on the left with the YouTube video and the route information. No route list.
-import { Map as MapGL, NavigationControl, LngLatBounds, Marker } from './vendor/maplibre-gl/maplibre-gl.mjs';
+import { Map as MapGL, NavigationControl, LngLatBounds, Marker, Popup } from './vendor/maplibre-gl/maplibre-gl.mjs';
 import { mountPlayer } from './player.js';
 import { prepare, compute, fromQuery, toQuery, ROADS, roadName, flag } from './filters.js';
 import { mountPanel } from './panel.js';
@@ -183,6 +183,7 @@ function localizeLabels() {
 if (narrow()) $('#legend').open = false;
 // The legend is static: filled at once, not only after the map has loaded.
 $('#legend-items').innerHTML = Object.keys(LEVELS).map((l) => lvlTag(+l)).join('') + `<span class="meta">${t('legend.lines')}</span>`;
+$('#legend-items').insertAdjacentHTML('afterend', '<div id="legend-tracks" hidden></div>');
 // Keep routes clear of the dialog (left on wide screens, bottom sheet on narrow ones).
 // The top edge follows the search mask, which grows with the chip rows.
 const padding = () => {
@@ -222,6 +223,13 @@ function addLayers() {
         10, ['case', ['boolean', ['feature-state', 'hover'], false], 5, 2.2], 14, ['case', ['boolean', ['feature-state', 'hover'], false], 7, 3.5]] } }, 'clusters');
   // Invisible, wider twin for hover and click: thin lines are hard to hit.
   map.addLayer({ id: 'lines-hit', type: 'line', source: 'lines', minzoom: 5, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 12 } }, 'clusters');
+  // Routes uploaded as GPX in the admin (GET api/tracks, src/tracks.js): above the video lines, each in its own colour, at every zoom.
+  map.addSource('tracks', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, tolerance: 0.5 });
+  map.addLayer({ id: 'tracks-casing', type: 'line', source: 'tracks', layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': css('--map-casing'), 'line-opacity': 0.85, 'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.5, 10, 6, 14, 8] } }, 'clusters');
+  map.addLayer({ id: 'tracks', type: 'line', source: 'tracks', layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 3, 2, 10, 3.5, 14, 5] } }, 'clusters');
+  map.addLayer({ id: 'tracks-hit', type: 'line', source: 'tracks', paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 14 } }, 'clusters');
   map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'route-casing', type: 'line', source: 'route', paint: { 'line-color': css('--map-casing'), 'line-width': 8 }, layout: { 'line-join': 'round', 'line-cap': 'round' } });
   map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': css('--map-route'), 'line-width': 4 }, layout: { 'line-join': 'round', 'line-cap': 'round' } });
@@ -242,6 +250,11 @@ function bindLayerEvents() {
     if (map.queryRenderedFeatures(e.point, { layers: ['video', 'clusters'] }).length) return; // the point wins
     openVideo(e.features[0].properties.id);
   });
+  map.on('click', 'tracks-hit', (e) => {
+    if (map.queryRenderedFeatures(e.point, { layers: ['video', 'clusters'] }).length) return; // the point wins
+    const p = e.features[0].properties;
+    new Popup({ maxWidth: '280px', className: 'track-tip' }).setLngLat(e.lngLat).setHTML(`<b>${esc(p.name)}</b>${p.km ? ` · ${num(p.km)} km` : ''}${p.description ? `<br>${esc(p.description)}` : ''}`).addTo(map);
+  });
   const setHover = (id) => {
     if (hoverId != null && map.getSource('lines')) map.setFeatureState({ source: 'lines', id: hoverId }, { hover: false });
     hoverId = id;
@@ -249,7 +262,7 @@ function bindLayerEvents() {
   };
   map.on('mousemove', 'lines-hit', (e) => setHover(e.features[0].id));
   map.on('mouseleave', 'lines-hit', () => setHover(null));
-  for (const l of ['clusters', 'video', 'lines-hit']) {
+  for (const l of ['clusters', 'video', 'lines-hit', 'tracks-hit']) {
     map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; });
   }
@@ -266,6 +279,25 @@ function setLines() {
   hoverId = null;
   map.getSource('lines').setData({ type: 'FeatureCollection', features: mapped.filter((v) => lineGeo.has(v.id)).map((v) => ({ type: 'Feature',
     geometry: { type: 'LineString', coordinates: lineGeo.get(v.id) }, properties: { id: v.id, loc: v.loc ?? 7 } })) });
+}
+
+// Published GPX routes of the editors (api/tracks): drawn and named in the legend in their colour.
+async function loadTracks() {
+  const r = await fetch('api/tracks');
+  if (!r.ok) return;
+  const data = await r.json();
+  map.getSource('tracks')?.setData(data);
+  const box = $('#legend-tracks');
+  box.hidden = !data.features.length;
+  box.innerHTML = data.features.length ? `<span class="meta">${t('legend.tracks')}</span>` + data.features.map((f) =>
+    `<button type="button" class="lvl track-key" style="--c:${esc(f.properties.color)}" data-track="${f.properties.id}">${esc(f.properties.name)}</button>`).join('') : '';
+  box.onclick = (e) => {
+    const f = data.features.find((x) => String(x.properties.id) === e.target.closest('[data-track]')?.dataset.track);
+    if (!f) return;
+    const lines = f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    const b = new LngLatBounds(); for (const l of lines) for (const c of l) b.extend(c);
+    map.fitBounds(b, { padding: padding(), maxZoom: 13, duration: 600 });
+  };
 }
 
 function drawRoute(line, fit = true) {
@@ -595,6 +627,7 @@ try {
   applyFilters();
   fromHash();
   loadLines().catch((err) => console.warn('lines.json', err));
+  loadTracks().catch((err) => console.warn('api/tracks', err));
 } catch (err) {
   console.error(err);
   $('#notice').hidden = false;
