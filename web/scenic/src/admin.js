@@ -12,7 +12,7 @@ import { FTS_INSERT } from './search-index.js';
 import { buildTrack, anchorLevel, evaluateReview, kmAlong, project, LOC_RULES, KEYS } from '../site/lib/route-sync.js';
 import { sniffImage, contentId, MAX_IMAGE_BYTES, RIGHTS } from './images.js';
 import { routeLines } from './route-lines.js';
-import { tracksAdmin } from './tracks.js';
+import { tracksAdmin, trackSub } from './tracks.js';
 import { buildJob, validateResult, resultMeta, routeAgreement, uploadLevel, MAX_RESULT_BYTES, ROUTE_OFFER_M } from './video2gpx.js';
 
 export class HttpError extends Error { constructor(status, message, extra) { super(message); this.status = status; if (extra) this.extra = extra; } }
@@ -839,8 +839,10 @@ export async function handleAdmin(request, env, who, ctx) {
     if (!b && m === 'GET') return ajson(await collections(env));
     return ajson(await collectionWrite(env, who.email, m, parts.slice(1), m === 'DELETE' ? {} : await readJson(request)));
   }
-  // Routes uploaded as GPX (src/tracks.js): GET and POST tracks, PATCH and DELETE tracks/<id>.
+  // Routes uploaded as GPX (src/tracks.js): GET and POST tracks, GET, PATCH and DELETE tracks/<id>.
   if (a === 'tracks' && !c) return ajson(await tracksAdmin(env, who.email, m, b ?? null, request, (status, msg) => { throw new HttpError(status, msg); }));
+  // Route editor (site/admin/route-editor.js): tracks/<id>/videos (PUT), tracks/<id>/candidates and tracks/<id>/elevation (POST).
+  if (a === 'tracks' && b && c && !d) return ajson(await trackSub(env, who.email, m, b, c, request, (status, msg) => { throw new HttpError(status, msg); }));
   if (a === 'optout') {
     if (!b && m === 'GET') return ajson(await optouts(env));
     if (!b && m === 'POST') {

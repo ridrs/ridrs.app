@@ -10,6 +10,7 @@ import { mountPlayer } from '../player.js';
 import { setLocale } from '../i18n.js';
 import de from '../locales/de.js';
 import { kmAlong, project, trackAt, checkPoints, evaluateReview, LOC_RULES } from '../lib/route-sync.js';
+import { openRouteEditor, closeRouteEditor } from './route-editor.js';
 setLocale('de', de);
 
 const STYLE = 'https://tiles.openfreemap.org/styles/positron'; // light map, dark interface (as the public page)
@@ -47,7 +48,7 @@ const guard = (fn) => async (...a) => { try { await fn(...a); } catch (e) { cons
 let me = null, collectionsCache = [];
 
 
-// --- router: #videos, #v=<id>, #queue, #collections, #tracks, #optout, #log ---
+// --- router: #videos, #v=<id>, #queue, #collections, #tracks, #t=<route id> (route editor), #optout, #log ---
 const VIEW_KEY = 'ridrs-scenic.admin.view';
 let listState = { q: '', only: '', loc: '', offset: 0, view: (() => { try { return localStorage.getItem(VIEW_KEY) === 'map' ? 'map' : 'list'; } catch { return 'list'; } })(), camera: null };
 // Map of the video page (view "Karte"); removed when the page changes.
@@ -63,9 +64,11 @@ function dropListMap() {
 }
 function route() {
   const h = location.hash.slice(1);
-  const tab = h.startsWith('v=') ? 'videos' : (h || 'videos');
+  const tab = h.startsWith('v=') ? 'videos' : h.startsWith('t=') ? 'tracks' : (h || 'videos');
   for (const a of document.querySelectorAll('.tabs a')) { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
   if (tab !== 'tracks') dropTracksMap();
+  if (!h.startsWith('t=')) closeRouteEditor();
+  if (h.startsWith('t=')) { closeEditor(); dropListMap(); dropTracksMap(); return openRouteEditor(+h.slice(2), { api, toast, guard, esc, fmt, lvl, STYLE }); }
   if (h.startsWith('v=')) { dropListMap(); return openVideo(h.slice(2)); }
   closeEditor();
   if (tab !== 'videos') dropListMap();
@@ -524,13 +527,13 @@ function short(v) {
   if (v.image_id) return `${v.mime ?? ''} ${v.rights ?? ''}`;
   return JSON.stringify(v).slice(0, 80);
 }
-const ENTITY = { wish: 'Wunschliste', video: '', anchor: 'Anker', route: 'Route', localization: 'Prüfung', sync: 'Track', collection: 'Sammlung', collection_item: 'Sammlung', collection_order: 'Reihenfolge', optout: 'Opt-out', image: 'Bild', track: 'Route (GPX)' };
+const ENTITY = { wish: 'Wunschliste', video: '', anchor: 'Anker', route: 'Route', localization: 'Prüfung', sync: 'Track', collection: 'Sammlung', collection_item: 'Sammlung', collection_order: 'Reihenfolge', optout: 'Opt-out', image: 'Bild', track: 'Route (GPX)', track_video: 'Route (Videos)' };
 function logRows(rows) {
   if (!rows.length) return '<p class="meta">Noch keine Änderungen.</p>';
-  return rows.map((e) => `<div class="logrow ${e.undone_by ? 'undone' : ''}"><div class="what"><b>${esc(ENTITY[e.entity] ?? e.entity)} ${esc(e.entity === 'anchor' ? fmt(+e.field) : e.entity === 'track' ? `#${e.field}` : e.field)}</b>
+  return rows.map((e) => `<div class="logrow ${e.undone_by ? 'undone' : ''}"><div class="what"><b>${esc(ENTITY[e.entity] ?? e.entity)} ${esc(e.entity === 'anchor' ? fmt(+e.field) : e.entity === 'track' || e.entity === 'track_video' ? `#${e.field}` : e.field)}</b>
     ${e.title && !ed ? ` · <a href="#v=${e.video_id}">${esc(e.title)}</a>` : ''}: ${esc(short(e.old))} → ${esc(short(e.new))}
     <br><span class="meta">${esc(e.who)} · ${esc(e.at.replace('T', ' ').slice(0, 16))}${e.undo_of ? ` · Rücknahme von #${e.undo_of}` : ''}${e.undone_by ? ` · zurückgenommen (#${e.undone_by})` : ''}</span></div>
-    <div>${!e.undone_by && e.entity !== 'image' && e.entity !== 'track' ? `<button type="button" class="btn small" data-undo="${e.id}">Zurücknehmen</button>` : ''}</div></div>`).join('');
+    <div>${!e.undone_by && e.entity !== 'image' && e.entity !== 'track' && e.entity !== 'track_video' ? `<button type="button" class="btn small" data-undo="${e.id}">Zurücknehmen</button>` : ''}</div></div>`).join('');
 }
 async function doUndo(id) {
   await api('POST', `log/${id}/undo`);
@@ -865,7 +868,8 @@ async function renderTracks() {
         <div class="row"><label class="chk publish"><input type="checkbox" name="published" ${t.published ? 'checked' : ''}> veröffentlicht</label>
           <span class="meta mono">${(t.distance_km ?? 0).toLocaleString('de-DE', { maximumFractionDigits: 1 })} km · ${num(t.line.reduce((n, s) => n + s.length, 0))} / ${num(t.points_in)} Punkte</span></div>
         <div class="meta">${esc(t.file_name || '')} · ${esc(t.created_by || '')} · ${esc((t.created_at || '').slice(0, 10))}</div>
-        <div class="row"><button class="btn small">Speichern</button><button type="button" class="btn small" data-zoom>Auf Karte zeigen</button>
+        <div class="row"><a class="btn small btn-primary" href="#t=${t.track_id}">Videos zuordnen${t.videos ? ` (${t.videos})` : ''}</a>
+          <button class="btn small">Speichern</button><button type="button" class="btn small" data-zoom>Auf Karte zeigen</button>
           <button type="button" class="btn small danger" data-del>Löschen</button></div></form>`).join('') : '<p class="meta">Noch keine Route.</p>'}</div>`;
   $('#track-new').onsubmit = guard(async (e) => {
     e.preventDefault();

@@ -83,3 +83,85 @@ test('admin: upload, list, edit, publish, delete; public GeoJSON has published o
   assert.equal((await call('GET', 'tracks')).length, 0);
   assert.equal((await call('DELETE', `tracks/${t.track_id}`)).status, 404);
 });
+
+// --- route editor (migration 0011) ---
+import { profileOf, trackKm } from '../src/tracks.js';
+
+test('parseGpx keeps <ele>; profileOf scales km onto the stored line and caps the points', () => {
+  const g = parseGpx(gpx(seg(pts)));
+  assert.equal(g.segments[0][0].length, 3);
+  assert.equal(g.segments[0][0][2], 1000);
+  const climbPts = pts.map(([lo, la], i) => [lo, la, 500 + i]);
+  const prof = profileOf([climbPts], simplify([climbPts]), 100);
+  assert.ok(prof.length <= 100);
+  assert.ok(Math.abs(prof.at(-1)[0] - trackKm(simplify([climbPts]))) < 0.1);
+  assert.ok(prof[0][1] < 510 && prof.at(-1)[1] > 1390);
+  assert.equal(profileOf([pts], simplify([pts])), null, 'no heights, no profile');
+});
+
+test('route editor API: detail, candidates, assignments with validation and log, elevation lookup, delete', async () => {
+  const env = { DB: makeD1() };
+  env.DB.raw.exec(`INSERT INTO channel (channel_id, name) VALUES ('UCaaaaaaaaaaaaaaaaaaaaaa', 'Kanal');
+    INSERT INTO video (video_id, channel_id, title, duration_s, embeddable) VALUES ('AAAAAAAAAAA', 'UCaaaaaaaaaaaaaaaaaaaaaa', 'Video A', 600, 1), ('BBBBBBBBBBB', NULL, 'Video B', 900, 0);
+    INSERT INTO localization (video_id, loc_level, loc_key) VALUES ('AAAAAAAAAAA', 2, 'anchored');
+    INSERT INTO route_sync (video_id, method, path) VALUES ('AAAAAAAAAAA', 'video2gpx', 'sync/AAAAAAAAAAA.json');`);
+  const call = async (method, path, body) => {
+    const init = { method };
+    if (body instanceof FormData) init.body = body;
+    else if (body) { init.body = JSON.stringify(body); init.headers = { 'content-type': 'application/json' }; }
+    const res = await handleAdmin(new Request(`http://localhost:8788/api/admin/${path}`, init), env, WHO, null).catch((err) => {
+      if (err instanceof HttpError) return new Response(JSON.stringify({ error: err.message, status: err.status }), { status: err.status });
+      throw err;
+    });
+    return res.json();
+  };
+  const f = new FormData(); f.set('file', new File([gpx(seg(pts))], 'a.gpx'));
+  const t = await call('POST', 'tracks', f);
+  assert.equal(t.has_profile, true);
+  assert.equal(t.ele_source, 'gpx');
+
+  let d = await call('GET', `tracks/${t.track_id}`);
+  assert.ok(Math.abs(d.km - 10) < 0.05);
+  assert.ok(d.profile.length >= 2);
+  assert.deepEqual(d.segments, []);
+  const list = await call('GET', 'tracks');
+  assert.equal(list[0].profile, undefined);
+  assert.equal(list[0].has_profile, true);
+
+  const meta = await call('POST', `tracks/${t.track_id}/candidates`, { ids: ['AAAAAAAAAAA', 'BBBBBBBBBBB', 'nope', 'CCCCCCCCCCC'] });
+  const a = meta.find((m) => m.video_id === 'AAAAAAAAAAA');
+  assert.equal(meta.length, 2);
+  assert.equal(a.channel, 'Kanal'); assert.equal(a.synced, true); assert.equal(a.loc_level, 2); assert.equal(a.embeddable, true);
+
+  assert.equal((await call('PUT', `tracks/${t.track_id}/videos`, { segments: [{ from_km: 0, video_id: 'CCCCCCCCCCC' }] })).status, 400);
+  assert.equal((await call('PUT', `tracks/${t.track_id}/videos`, { segments: [{ from_km: 3, video_id: 'AAAAAAAAAAA' }, { from_km: 1, video_id: null }] })).status, 400);
+  assert.equal((await call('PUT', `tracks/${t.track_id}/videos`, { segments: [{ from_km: 99, video_id: 'AAAAAAAAAAA' }] })).status, 400);
+  const put = await call('PUT', `tracks/${t.track_id}/videos`, { segments: [
+    { from_km: 0, video_id: 'AAAAAAAAAAA', t_from_s: 12.34, t_to_s: 300 }, { from_km: 4.5, video_id: 'BBBBBBBBBBB' }, { from_km: 8, video_id: null }] });
+  assert.equal(put.segments.length, 3);
+  d = await call('GET', `tracks/${t.track_id}`);
+  assert.deepEqual(d.segments[0], { from_km: 0, video_id: 'AAAAAAAAAAA', t_from_s: 12.3, t_to_s: 300 });
+  assert.deepEqual(d.videos.map((v) => v.video_id).sort(), ['AAAAAAAAAAA', 'BBBBBBBBBBB']);
+  assert.equal((await call('GET', 'tracks'))[0].videos, 2);
+  const log = await call('GET', 'log');
+  assert.equal(log[0].entity, 'track_video');
+  assert.deepEqual(log[0].new, [[0, 'AAAAAAAAAAA'], [4.5, 'BBBBBBBBBBB'], [8, null]]);
+
+  // elevation lookup for a GPX without heights (fetch stubbed)
+  const real = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async (u) => { urls.push(String(u)); const n = new URL(u).searchParams.get('latitude').split(',').length;
+    return new Response(JSON.stringify({ elevation: Array.from({ length: n }, (_, i) => 200 + i) })); };
+  try {
+    const e = await call('POST', `tracks/${t.track_id}/elevation`, {});
+    assert.equal(e.ele_source, 'open_meteo');
+    assert.ok(e.profile.length >= 101 && e.profile.length <= 102, String(e.profile.length));
+    assert.equal(urls.length, 2);
+    assert.ok(urls[0].startsWith('https://api.open-meteo.com/v1/elevation?latitude='));
+    globalThis.fetch = async () => new Response('{}', { status: 500 });
+    assert.equal((await call('POST', `tracks/${t.track_id}/elevation`, {})).status, 502);
+  } finally { globalThis.fetch = real; }
+
+  await call('DELETE', `tracks/${t.track_id}`);
+  assert.equal(env.DB.raw.prepare('SELECT count(*) AS n FROM track_video').get().n, 0);
+});
