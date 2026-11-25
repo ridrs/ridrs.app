@@ -86,16 +86,26 @@ func run() {
     let processor = VTFrameProcessor()
     do { try processor.startSession(configuration: configuration) } catch { fail("Frame rate conversion did not start: \(error)") }
 
-    // The reader reaches a little beyond `to` for the frame after the stretch's last.
+    // The samples are read from the keyframe at or before `from`, which the decoder needs first,
+    // and a little beyond `to`, for the frame after the stretch's last.
+    var readFrom = max(0, from - 10)
+    if track.canProvideSampleCursors,
+       let cursor = track.makeSampleCursor(presentationTimeStamp: CMTime(seconds: from, preferredTimescale: 90_000)) {
+        var steps = 0
+        while !cursor.currentSampleSyncInfo.sampleIsFullSync.boolValue, steps < 10_000, cursor.stepInDecodeOrder(byCount: -1) == -1 {
+            steps += 1
+        }
+        if cursor.currentSampleSyncInfo.sampleIsFullSync.boolValue { readFrom = min(from, cursor.presentationTimeStamp.seconds) }
+    }
     let reader: AVAssetReader
     do { reader = try AVAssetReader(asset: asset) } catch { fail("The video cannot be read: \(error)") }
     reader.timeRange = CMTimeRange(
-        start: CMTime(seconds: from, preferredTimescale: 90_000),
+        start: CMTime(seconds: readFrom, preferredTimescale: 90_000),
         end: CMTime(seconds: to + 1, preferredTimescale: 90_000))
-    let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-        kCVPixelBufferIOSurfacePropertiesKey as String: [:] as [String: Any],
-    ])
+    // The samples as they are stored: decoded below by a session of our own, which leaves out a
+    // frame it cannot decode where AVAssetReader's own decoding would stop the whole read (the
+    // 3-byte "show existing frame" units of libaom's AV1 do that).
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
     output.alwaysCopiesSampleData = false
     reader.add(output)
     guard reader.startReading() else { fail("The video cannot be read: \(reader.error.map { "\($0)" } ?? "unknown")") }
@@ -169,6 +179,55 @@ func run() {
         }
     }
 
+    // MARK: decoding
+
+    var decoder: VTDecompressionSession?
+    var decoderFormat: CMFormatDescription?
+    /// Decoded frames not yet taken, in the order they came; taken in the order of their time.
+    var decoded: [(time: Double, pixels: CVPixelBuffer)] = []
+    var undecodable = 0
+    /// Frames held back before the earliest is taken: enough for B-frames to come in.
+    let reorder = 8
+
+    func decode(_ sample: CMSampleBuffer) {
+        guard let format = CMSampleBufferGetFormatDescription(sample), CMSampleBufferGetNumSamples(sample) > 0 else { return }
+        if let session = decoder, let known = decoderFormat, !CMFormatDescriptionEqual(known, otherFormatDescription: format),
+           !VTDecompressionSessionCanAcceptFormatDescription(session, formatDescription: format) {
+            VTDecompressionSessionWaitForAsynchronousFrames(session)
+            VTDecompressionSessionInvalidate(session)
+            decoder = nil
+        }
+        if decoder == nil {
+            var made: VTDecompressionSession?
+            let attributes: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:] as [String: Any],
+            ]
+            let status = VTDecompressionSessionCreate(
+                allocator: nil, formatDescription: format, decoderSpecification: nil,
+                imageBufferAttributes: attributes as CFDictionary, outputCallback: nil, decompressionSessionOut: &made)
+            guard status == noErr, let made else { fail("This Mac cannot decode the video (\(status))") }
+            decoder = made
+            decoderFormat = format
+        }
+        var info = VTDecodeInfoFlags()
+        let status = VTDecompressionSessionDecodeFrame(decoder!, sampleBuffer: sample, flags: [], infoFlagsOut: &info) { status, _, image, time, _ in
+            if status == noErr, let image, time.isValid {
+                decoded.append((time: time.seconds, pixels: image))
+            } else if status != noErr {
+                undecodable += 1
+            }
+        }
+        if status != noErr { undecodable += 1 }
+    }
+
+    /// The decoded frame with the earliest time, once enough are held back, or at the end any.
+    func nextFrame(atEnd: Bool) -> (time: Double, pixels: CVPixelBuffer)? {
+        guard decoded.count > (atEnd ? 0 : reorder) else { return nil }
+        let earliest = decoded.indices.min { decoded[$0].time < decoded[$1].time }!
+        return decoded.remove(at: earliest)
+    }
+
     // MARK: the frames
 
     let destinations = (1..<factor).map { _ in buffer(configuration.destinationPixelBufferAttributes, format: half) }
@@ -179,10 +238,24 @@ func run() {
     var frames = 0
     var shownProgress = -1
 
-    while let sample = output.copyNextSampleBuffer() {
-        guard let pixels = CMSampleBufferGetImageBuffer(sample) else { continue }
-        let time = CMSampleBufferGetPresentationTimeStamp(sample).seconds
-        if time < from - 1e-6 { continue }
+    var ended = false
+    var lastTaken = -Double.infinity
+    frames: while true {
+        if !ended, let sample = output.copyNextSampleBuffer() {
+            decode(sample)
+        } else if !ended {
+            ended = true
+            if let session = decoder { VTDecompressionSessionWaitForAsynchronousFrames(session) }
+        }
+        guard let next = nextFrame(atEnd: ended) else {
+            if ended { break frames }
+            continue
+        }
+        let time = next.time
+        let pixels = next.pixels
+        // A frame late from the reordering, or one shown twice, is left out.
+        if time < from - 1e-6 || time <= lastTaken + 1e-6 { continue }
+        lastTaken = time
         let current = (time: time, pixels: pixels, half: toHalf(pixels))
         if let before = previous {
             let base = first ?? before.time
@@ -218,9 +291,13 @@ func run() {
         }
         if time >= to - 1e-6 {
             after = time
-            break
+            break frames
         }
         previous = current
+    }
+    if reader.status == .failed && after == nil {
+        // A read that failed before `to`: the stretch ends with the last frame it has.
+        FileHandle.standardError.write("The video could be read only to \(previous?.time ?? from) s: \(reader.error?.localizedDescription ?? "unknown")\n".data(using: .utf8)!)
     }
     if after == nil, let last = previous {
         // The video ends before `to`: its last frame closes the stretch.
@@ -231,6 +308,7 @@ func run() {
         after = last.time
     }
     reader.cancelReading()
+    if let session = decoder { VTDecompressionSessionInvalidate(session) }
     processor.endSession()
     guard let start = first, let end = after else { fail("The video has no frames from \(from) s on") }
 
@@ -238,5 +316,5 @@ func run() {
     writer.finishWriting { semaphore.signal() }
     semaphore.wait()
     guard writer.status == .completed else { fail("The stretch cannot be written: \(writer.error.map { "\($0)" } ?? "unknown")") }
-    say("{\"from\":\(start),\"to\":\(end),\"frames\":\(frames)}")
+    say("{\"from\":\(start),\"to\":\(end),\"frames\":\(frames),\"undecodable\":\(undecodable)}")
 }

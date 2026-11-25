@@ -69,6 +69,17 @@ Given('the simulated downloads serve packages with a stored video', function (th
   downloads(this).storedVideo = true;
 });
 
+Given('the simulated downloads serve a track that climbs twice', function (this: RidrsWorld) {
+  downloads(this).twoClimbs = true;
+});
+
+Given(
+  'the simulated downloads serve packages whose video is {string}',
+  function (this: RidrsWorld, video: string) {
+    downloads(this).video = video;
+  },
+);
+
 Given('the simulated downloads stop halfway', function (this: RidrsWorld) {
   downloads(this).stopHalfway = true;
 });

@@ -38,6 +38,8 @@ class Skip extends Error {}
 
 const CANCELLED = 'The refinement was cancelled';
 const NO_INTERPOLATOR = 'This device cannot compute in-between frames';
+const NO_WEBM =
+  "WebM and Matroska videos get no in-between frames yet: the Mac's media frameworks cannot read them";
 
 /** A stretch's file by its planned time and factor: the same plan finds the same file. */
 export const stretchFile = (stretch: RefinedStretch) =>
@@ -171,6 +173,7 @@ export class Refiner {
     const video = entries.find((entry) => entry.path === videoPath);
     if (!video || videoPath === undefined) throw new Skip('The route has no video');
     if (video.stored !== undefined) throw new Skip('Its video lies in route.ride');
+    if (/\.(webm|mkv)$/i.test(videoPath)) throw new Skip(NO_WEBM);
     const gpxPath = entryNamed(paths, besideControl(found.path, control.gpx)) as string;
 
     const { track, repairs } = plausibleTrack(parseTimedTrack(decode(await read(gpxPath))));
@@ -201,6 +204,8 @@ export class Refiner {
       }
     };
     progress(0);
+    /** Why the stretches that could not be computed failed; they are left out, the video plays there. */
+    const failures: unknown[] = [];
     for (const stretch of plan.stretches) {
       const file = stretchFile(stretch);
       const kept = before.find((segment) => segment.file === file && paths.includes(`${REFINE_FOLDER}/${file}`));
@@ -209,8 +214,9 @@ export class Refiner {
       } else {
         const target = `${folder}/${REFINE_FOLDER}/${file}`;
         const part = `${target}.part`;
+        let made: { from: number; to: number } | undefined;
         try {
-          const made = await interpolator.interpolate(
+          made = await interpolator.interpolate(
             { video: `${folder}/${videoPath}`, from: stretch.from, to: stretch.to, factor: stretch.factor, target: part },
             (share) => progress(share * (stretch.to - stretch.from)),
             signal,
@@ -218,8 +224,20 @@ export class Refiner {
           signal.throwIfAborted();
           await media.move(part, target);
           done.push({ from: made.from, to: made.to, factor: stretch.factor, file });
+        } catch (error) {
+          // Cancelled or a ride began: the whole refinement stops. Any other failure leaves this
+          // stretch out, and the next one is computed.
+          signal.throwIfAborted();
+          if (error instanceof Error && error.message.startsWith(NO_INTERPOLATOR)) throw error;
+          failures.push(error);
+          this.deps.warn(`video-refine: "${key}" ${stretch.from}–${stretch.to} s left out`, error);
         } finally {
           await media.remove(part);
+        }
+        if (!made) {
+          finished += stretch.to - stretch.from;
+          progress(0);
+          continue;
         }
         await this.write(folder, control.video, done);
         await this.deps.refresh(key).catch((error: unknown) => this.deps.warn(`video-refine: "${key}" not offered anew`, error));
@@ -227,6 +245,8 @@ export class Refiner {
       finished += stretch.to - stretch.from;
       progress(0);
     }
+    // Not one stretch could be computed: the refinement failed, for the reason of the first.
+    if (done.length === 0 && failures.length > 0) throw failures[0];
     // The stretches the plan no longer has go.
     for (const segment of before) {
       if (!done.some((kept) => kept.file === segment.file)) await media.remove(`${folder}/${REFINE_FOLDER}/${segment.file}`);

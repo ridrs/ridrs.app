@@ -14,11 +14,15 @@ const TEST_PATTERN = resolve(
   '../../plugins/ui-world-video/client/fixtures/test-pattern.mp4',
 );
 
-/** A GPX track of a minute: 5 m/s northwards, 0.2 m up every second. */
-export function gpx(): string {
+/**
+ * A GPX track of a minute: 5 m/s northwards, 0.2 m up every second; with `twoClimbs`, flat from
+ * 20 s to 40 s between two such climbs.
+ */
+export function gpx(twoClimbs = false): string {
+  const rise = (i: number) => (twoClimbs ? Math.min(i, 20) + Math.max(0, i - 40) : i) * 0.2;
   const points = Array.from({ length: 61 }, (_, i) => {
     const time = new Date(Date.UTC(2022, 11, 28, 9, 0, i)).toISOString();
-    return `<trkpt lat="${(44.66 + (i * 5) / 111_195).toFixed(6)}" lon="5.42"><ele>${(433 + i * 0.2).toFixed(1)}</ele><time>${time}</time></trkpt>`;
+    return `<trkpt lat="${(44.66 + (i * 5) / 111_195).toFixed(6)}" lon="5.42"><ele>${(433 + rise(i)).toFixed(1)}</ele><time>${time}</time></trkpt>`;
   });
   return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>${points.join('')}</trkseg></trk></gpx>`;
 }
@@ -34,11 +38,14 @@ function utf16be(text: string): Uint8Array {
   return bytes;
 }
 
-/** The control file, titled `title`, or without a title when it is `null`. */
-const control = (title: string | null) => `<?xml version="1.0" encoding="utf-16" standalone="yes"?>
+/** The control file, titled `title`, or without a title when it is `null`, naming the video `video`. */
+const control = (
+  title: string | null,
+  video = 'FR_Test.mp4',
+) => `<?xml version="1.0" encoding="utf-16" standalone="yes"?>
 <gpx-import>
   <name>FR_Col_de_Test</name>
-${title === null ? '' : `  <title>${title}</title>\n`}  <video-file-path>FR_Test.mp4</video-file-path>
+${title === null ? '' : `  <title>${title}</title>\n`}  <video-file-path>${video}</video-file-path>
   <gpx-file-path>FR_Test.gpx</gpx-file-path>
   <framerate>25.0</framerate>
   <start-frame>1</start-frame>
@@ -54,11 +61,14 @@ ${title === null ? '' : `  <title>${title}</title>\n`}  <video-file-path>FR_Test
  * A small Incyclist package: video, GPX track and control file in one ZIP, as the sources ship
  * them. Its control file is titled `title`, or names no title when it is `null`.
  */
-export async function incyclistPackage(title: string | null = 'Test route'): Promise<Uint8Array> {
+export async function incyclistPackage(
+  title: string | null = 'Test route',
+  { twoClimbs = false, video = 'FR_Test.mp4' }: { twoClimbs?: boolean; video?: string } = {},
+): Promise<Uint8Array> {
   const zip = new ZipWriter(new Uint8ArrayWriter());
-  await zip.add('FR_Test.mp4', new Uint8ArrayReader(new Uint8Array(await readFile(TEST_PATTERN))));
-  await zip.add('FR_Test.gpx', new Uint8ArrayReader(new TextEncoder().encode(gpx())));
-  await zip.add('FR_Test.xml', new Uint8ArrayReader(utf16be(control(title))));
+  await zip.add(video, new Uint8ArrayReader(new Uint8Array(await readFile(TEST_PATTERN))));
+  await zip.add('FR_Test.gpx', new Uint8ArrayReader(new TextEncoder().encode(gpx(twoClimbs))));
+  await zip.add('FR_Test.xml', new Uint8ArrayReader(utf16be(control(title, video))));
   return zip.close();
 }
 
@@ -72,6 +82,10 @@ export class SimulatedDownloads {
   stopHalfway = false;
   /** Whether the packages hold their video stored, not compressed, as video2gpx writes them. */
   storedVideo = false;
+  /** Whether the packages' track climbs twice, flat in between (two refined stretches, ADR 0110). */
+  twoClimbs = false;
+  /** The name of the packages' video, e.g. a WebM one. */
+  video = 'FR_Test.mp4';
   readonly requested: string[] = [];
   private release: (() => void) | undefined;
 
@@ -86,9 +100,11 @@ export class SimulatedDownloads {
       if (this.failure) {
         throw new Error(this.failure);
       }
-      const bytes = this.storedVideo
-        ? await withStoredVideo(await incyclistPackage())
-        : await incyclistPackage();
+      const made = await incyclistPackage('Test route', {
+        twoClimbs: this.twoClimbs,
+        video: this.video,
+      });
+      const bytes = this.storedVideo ? await withStoredVideo(made) : made;
       if (this.stopHalfway) {
         onProgress?.({ received: Math.round(bytes.length / 2), size: bytes.length });
         await new Promise<void>((done, fail) => {

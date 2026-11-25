@@ -78,3 +78,20 @@ Feature: A downloaded route is refined with in-between frames
     When the UI bridge calls "route.fetch" with '{"key":"video-source-scenic/vg-col-de-pennes","option":"package"}'
     Then the refinement of "video-source-scenic/vg-col-de-pennes" is skipped because "This device cannot compute in-between frames"
     And the route offer "video-source-scenic/vg-col-de-pennes" is "ready"
+
+  Scenario: A stretch that cannot be computed is left out, the others are computed
+    # The track climbs twice: each climb is a stretch of 4 frames per frame and one of 2 beside it.
+    Given the simulated downloads serve a track that climbs twice
+    And the test interpolator fails with "The video could not be decoded" for the stretches after 30 s
+    And the host has started
+    When the UI bridge calls "route.fetch" with '{"key":"video-source-scenic/vg-col-de-pennes","option":"package"}'
+    Then the refinement of "video-source-scenic/vg-col-de-pennes" is done with 2 stretches
+    And the test interpolator was asked for 4 stretches
+    And the route "video-source-scenic/vg-col-de-pennes" has 2 refined stretches
+
+  Scenario: A WebM video gets no in-between frames yet
+    Given the simulated downloads serve packages whose video is "FR_Test.webm"
+    And the host has started
+    When the UI bridge calls "route.fetch" with '{"key":"video-source-scenic/vg-col-de-pennes","option":"package"}'
+    Then the refinement of "video-source-scenic/vg-col-de-pennes" is skipped because "WebM and Matroska videos get no in-between frames yet: the Mac's media frameworks cannot read them"
+    And the route offer "video-source-scenic/vg-col-de-pennes" is "ready"

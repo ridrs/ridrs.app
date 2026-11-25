@@ -22,7 +22,8 @@ The `objc2-video-toolbox`, `objc2-av-foundation` and `objc2-core-video` crates (
 
 - **`ridrs-refine`, a Swift program in the app's bundle** (`apps/native/src-tauri/helpers/`, built by `build.rs` with `swiftc` on macOS, shipped as an external binary of the bundle). It computes one stretch per call:
   - **Input:** the video's absolute path, `from`, `to`, `factor`, and the output path.
-  - **Work:** `AVAssetReader` decodes the video from the first frame at or after `from` to `to`. `VTFrameProcessor` computes `factor − 1` frames between each pair. `AVAssetWriter` writes the video's frames and the in-between frames as H.264 to the output, its first frame a keyframe at time 0.
+  - **Work:** `AVAssetReader` reads the video's samples as they are stored, from the keyframe at or before `from` (found with an `AVSampleCursor`) to `to`. A `VTDecompressionSession` of the program decodes them, in the order of their time. `VTFrameProcessor` computes `factor − 1` frames between each pair from the first frame at or after `from`. `AVAssetWriter` writes the video's frames and the in-between frames as H.264 to the output, its first frame a keyframe at time 0.
+  - **Why it decodes on its own (2026-11-25):** the first run in the app found that AVAssetReader's own decoding stops for good with "Cannot Decode" (-12137) in every AV1 video of Van Gestel, after reading from a time that is not a keyframe. The 3-byte "show existing frame" units of libaom's AV1 are the likely trigger. Read from the keyframe and decoded by its own session, the same stretches come out whole. A frame that does not decode is left out, so the stretch goes on.
   - **Output:** progress lines and a last line with the stretch's actual `from` and `to` (the times of its first frame and of the frame after its last) on stdout, as JSON. It exits with 0, or with 1 and a reason on stderr.
 - **The stretches are H.264**, not the route video's codec as ADR 0109 said. VideoToolbox encodes H.264 and HEVC but not AV1, the codec of the Van Gestel videos, and every platform's WebCodecs decodes H.264.
 - **The capability `video.interpolate`** (single, `@ridrs/contracts`) computes one stretch from media paths, with progress and an `AbortSignal`, and answers the actual times.
@@ -32,6 +33,8 @@ The `objc2-video-toolbox`, `objc2-av-foundation` and `objc2-core-video` crates (
   - It watches `route.offer`, and refines each ready video route whose folder `videos/<offer id>` has a control file, a track and its video as a file of its own. A video stored in `route.ride` is skipped with the reason.
   - It plans with `planRefinement` at 100 W.
   - It computes the stretches one route and one stretch at a time. Each goes to `refine/<name>.part` and is moved to its name once whole.
+  - A stretch that cannot be computed is left out, and the video plays there. The refinement failed only when not one stretch could be computed.
+  - A WebM or Matroska video is skipped with the reason: AVFoundation cannot read either container. The routes of the YouTube downloader are of this kind.
   - After each stretch it writes `refine/refine.json` with the stretches done so far, so a cancelled or interrupted refinement keeps them and goes on from there.
   - A refinement whose stretches equal the plan's is done; otherwise the stretches that differ are computed again and those no longer planned are removed.
   - Its state `video.refinement`, by offer id, says `waiting`, `refining` with its progress, `done`, `skipped` or `failed` with the reason.

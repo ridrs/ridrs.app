@@ -17,6 +17,8 @@ const SEGMENT = resolve(
  */
 export class TestInterpolator {
   failure: string | undefined;
+  /** Fails only the stretches that begin after this many s, with `failure`. */
+  failingFrom: number | undefined;
   stopHalfway = false;
   readonly requested: VideoInterpolation[] = [];
   private release: (() => void) | undefined;
@@ -26,7 +28,9 @@ export class TestInterpolator {
   readonly interpolator: VideoInterpolator = {
     interpolate: async (request, progress, signal) => {
       this.requested.push(request);
-      if (this.failure) throw new Error(this.failure);
+      if (this.failure && (this.failingFrom === undefined || request.from > this.failingFrom)) {
+        throw new Error(this.failure);
+      }
       if (this.stopHalfway) {
         progress(0.5);
         await new Promise<void>((done, fail) => {

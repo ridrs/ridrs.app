@@ -53,6 +53,14 @@ Given('the test interpolator stops halfway', function (this: RidrsWorld) {
   interpolator(this).stopHalfway = true;
 });
 
+Given(
+  'the test interpolator fails with {string} for the stretches after {int} s',
+  function (this: RidrsWorld, reason: string, after: number) {
+    interpolator(this).failure = reason;
+    interpolator(this).failingFrom = after;
+  },
+);
+
 Given('the test interpolator fails with {string}', function (this: RidrsWorld, reason: string) {
   interpolator(this).failure = reason;
 });
@@ -140,6 +148,13 @@ const refinementFile = (key: string) =>
   parseRefinement(readFileSync(join(folderOf(key), ...REFINE_FILE.split('/')), 'utf8'));
 
 Then(
+  /^the route "([^"]*)" has (\d+) refined stretch(?:es)?$/,
+  function (this: RidrsWorld, key: string, count: string) {
+    assert.equal(refinementFile(key).segments.length, Number(count));
+  },
+);
+
+Then(
   'the route {string} has the refined stretch from {int} s to {int} s with {int} frames per frame',
   function (this: RidrsWorld, key: string, from: number, to: number, factor: number) {
     const { video, segments } = refinementFile(key);
@@ -207,6 +222,13 @@ When('the host has started again', async function (this: RidrsWorld) {
   await this.ensureHost().start();
   await this.settle();
 });
+
+Then(
+  'the test interpolator was asked for {int} stretches',
+  function (this: RidrsWorld, count: number) {
+    assert.equal(interpolator(this).requested.length, count);
+  },
+);
 
 Then('the test interpolator was asked for no stretch since', function (this: RidrsWorld) {
   assert.equal(interpolator(this).requested.length, askedBefore.get(this));
