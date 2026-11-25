@@ -42,6 +42,8 @@ export class FramePlayer<F extends DecodedFrame> {
   private samples: SampleReader | undefined;
   /** The first time the decoder can give since it started again. */
   private from = 0;
+  /** The latest frame time (s) closed as left behind since the last start: before it, nothing is left. */
+  private behind = Number.NEGATIVE_INFINITY;
   /** The latest keyframe fed since the last start, and the latest presentation time fed. */
   private fedKeyframe = Number.NEGATIVE_INFINITY;
   private fedUntil = Number.NEGATIVE_INFINITY;
@@ -77,6 +79,10 @@ export class FramePlayer<F extends DecodedFrame> {
     }
     if (this.samples === undefined || time < this.from - FRAME_PLAYER.tolerance || time > this.fedUntil) {
       this.locate(time);
+    } else if (time < this.behind - FRAME_PLAYER.tolerance) {
+      // Back within the keyframe's run, behind the frames already closed: from the keyframe again.
+      this.samples = undefined;
+      this.locate(time);
     }
     // Drop every frame before the one shown: they are behind the rider.
     let shown = -1;
@@ -84,6 +90,7 @@ export class FramePlayer<F extends DecodedFrame> {
       shown += 1;
     }
     for (const frame of this.buffer.splice(0, Math.max(0, shown))) {
+      this.behind = Math.max(this.behind, frame.timestamp / 1e6);
       frame.close();
     }
     this.pump();
@@ -140,6 +147,7 @@ export class FramePlayer<F extends DecodedFrame> {
     this.decoder.configure();
     this.samples = this.video.samplesFrom(keyframe);
     this.from = keyframe;
+    this.behind = Number.NEGATIVE_INFINITY;
     this.fedKeyframe = keyframe;
     this.fedUntil = Number.NEGATIVE_INFINITY;
     this.fetching = false;

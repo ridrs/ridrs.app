@@ -5,7 +5,7 @@
  * and the GPX track it names (ADR 0094).
  */
 
-import { besideControl, entryNamed, findControl } from '@ridrs/ride';
+import { besideControl, entryNamed, findControl, parseRefinement, REFINE_FILE, REFINE_FOLDER } from '@ridrs/ride';
 
 /** A video route. */
 export interface VideoRoute {
@@ -18,6 +18,18 @@ export interface VideoRoute {
   readonly framerate: number;
   /** The video frame of the track's first point, from 1. */
   readonly startFrame: number;
+  /** The stretches of the video refined with in-between frames (ADR 0109), in the order of their time. */
+  readonly refined: readonly RefinedPart[];
+  /** Why the route's refinement was left out, where it has one that was. */
+  readonly refinementProblem?: string;
+}
+
+/** A refined stretch of a route's video: from `from` s to `to` s of the video, its file's URL. */
+export interface RefinedPart {
+  readonly from: number;
+  readonly to: number;
+  readonly factor: number;
+  readonly url: string;
 }
 
 /** A point of the GPX track: degrees, m above sea level and s since the track's first point. */
@@ -88,6 +100,11 @@ export async function loadDownloadedRoute(id: string, files: Readonly<Record<str
   }
   const { control } = found;
   const url = (relative: string) => files[entryNamed(paths, besideControl(found.path, relative)) ?? ''] ?? '';
+  const refinement = entryNamed(paths, REFINE_FILE);
+  const { refined, problem } =
+    refinement === undefined
+      ? { refined: [], problem: undefined }
+      : refinedParts(new TextDecoder().decode(await read(refinement)), control.video, files);
   return {
     id,
     title: control.title ?? control.name ?? id,
@@ -95,5 +112,39 @@ export async function loadDownloadedRoute(id: string, files: Readonly<Record<str
     gpxUrl: url(control.gpx),
     framerate: control.framerate,
     startFrame: control.startFrame,
+    refined,
+    ...(problem ? { refinementProblem: problem } : {}),
   };
+}
+
+/**
+ * The refined stretches of a route from its `refine/refine.json` (ADR 0109): none, with the reason,
+ * where it does not parse, names another video than `video` (the control file's) or a file the
+ * route's `files` lack. A refinement is all or nothing: one that is wrong in part is left out whole.
+ */
+export function refinedParts(
+  text: string,
+  video: string,
+  files: Readonly<Record<string, string>>,
+): { readonly refined: readonly RefinedPart[]; readonly problem?: string } {
+  const paths = Object.keys(files);
+  try {
+    const refinement = parseRefinement(text);
+    const same = (path: string) => path.replace(/^\.\//, '').toLowerCase();
+    if (same(refinement.video) !== same(video)) {
+      return { refined: [], problem: `${REFINE_FILE} names the video "${refinement.video}", not "${video}"` };
+    }
+    const refined: RefinedPart[] = [];
+    for (const segment of refinement.segments) {
+      const path = `${REFINE_FOLDER}/${segment.file}`;
+      const entry = entryNamed(paths, path);
+      if (entry === undefined) {
+        return { refined: [], problem: `${path} is not in the route` };
+      }
+      refined.push({ from: segment.from, to: segment.to, factor: segment.factor, url: files[entry] ?? '' });
+    }
+    return { refined };
+  } catch (error) {
+    return { refined: [], problem: error instanceof Error ? error.message : String(error) };
+  }
 }

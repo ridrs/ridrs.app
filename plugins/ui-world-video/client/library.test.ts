@@ -64,6 +64,7 @@ describe('loadDownloadedRoute', () => {
         gpxUrl: files['FR_Col_de_Pennes.gpx'],
         framerate: 30,
         startFrame: 31,
+        refined: [],
       });
       expect(fetched).toEqual([files['FR_Col_de_Pennes.xml']]);
     } finally {

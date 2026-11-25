@@ -11,6 +11,7 @@ export * from './climbs.ts';
 export * from './control.ts';
 export * from './folder.ts';
 export * from './package.ts';
+export * from './refined-video.ts';
 export * from './refinement.ts';
 export * from './track.ts';
 export * from './video-time.ts';

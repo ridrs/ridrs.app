@@ -19,6 +19,7 @@ import { messages } from './i18n/index.ts';
 import { loadDownloadedRoute, parseGpx, type VideoRoute } from './library.ts';
 import { buildVideoTime, VideoClock, type VideoTime } from './playback.ts';
 import { plausibleTrack, type Repair } from './plausible-track.ts';
+import { RefinedFramePlayer, shiftedSource } from './refined-player.ts';
 import type { Track } from './track.ts';
 import { httpRangeReader } from './video-index.ts';
 import { openVideo, type VideoSource } from './video-source.ts';
@@ -145,6 +146,9 @@ function useRoute(ctx: UiContext): { readonly id: string | undefined; readonly l
         if (repairs.length > 0) {
           ctx.logger.info(`Video route "${id}": ${repairs.length} implausible GPS points repaired`, repairs);
         }
+        if (route.route.refinementProblem) {
+          ctx.logger.warn(`Video route "${id}" plays without its refined stretches: ${route.route.refinementProblem}`);
+        }
         if (current) {
           setLoaded({ status: 'ready', ...route });
         }
@@ -185,7 +189,25 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
         ctx.events.publish(uiTerrainObservedEvent, { ...window, samples: [...samples] }),
       position: (position) => ctx.events.publish(uiPositionObservedEvent, position),
     });
-    const player = new FramePlayer(video, webCodecsDecoder(video));
+    // The refined stretches (ADR 0109) are SDR: an HDR video plays without them.
+    const refined = isPqBt2020(video.colour) ? [] : route.refined;
+    const player = new RefinedFramePlayer(
+      new FramePlayer(video, webCodecsDecoder(video)),
+      refined.map((part) => ({
+        from: part.from,
+        to: part.to,
+        open: async () => {
+          const read = httpRangeReader(part.url);
+          const stretch = await openVideo(read, read.size);
+          if (!(await VideoDecoder.isConfigSupported(decoderConfig(stretch))).supported) {
+            throw new Error(`This system cannot decode ${stretch.codec} video`);
+          }
+          return new FramePlayer(shiftedSource(stretch, part.from), webCodecsDecoder(stretch));
+        },
+      })),
+    );
+    /** How many different frames were drawn: the rider's frames per second over time (plan phase 2). */
+    let framesShown = 0;
     const clock = new VideoClock(videoTime, (route.startFrame - 1) / route.framerate);
     skip.current = () => {
       clock.skip();
@@ -258,13 +280,22 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
             element.getContext('2d')?.drawImage(picture, 0, 0, element.width, element.height);
           }
           drawn = picture;
+          framesShown += 1;
           element.dataset.frameTime = (picture.timestamp / 1e6).toFixed(3);
+          element.dataset.framesShown = String(framesShown);
         }
       }
       if (element) {
         element.dataset.distance = (routeDistance ?? 0).toFixed(2);
         element.dataset.time = time.toFixed(3);
         element.dataset.restarts = String(player.restarts);
+      }
+      for (const { index, reason } of player.takeFailures()) {
+        const part = refined[index];
+        ctx.logger.warn(
+          `The refined stretch ${part?.from}–${part?.to} s of "${route.id}" is left out; the video plays there`,
+          reason,
+        );
       }
       if (player.error !== undefined && element?.dataset.failed === undefined && element) {
         element.dataset.failed = String(player.error);

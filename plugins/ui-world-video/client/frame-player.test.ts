@@ -135,6 +135,19 @@ describe('FramePlayer', () => {
     expect(seconds(player.frameAt(1.2))).toBeCloseTo(1.2, 5);
   });
 
+  it('starts again at the keyframe when the time jumps back within it, behind the frames it closed', async () => {
+    // One keyframe for the whole video, as a refined stretch has (ADR 0109).
+    const { player, settle } = setup(video(60, 60));
+    for (let t = 0; t <= 1.5; t += 0.1) {
+      player.frameAt(t);
+      await settle();
+    }
+    expect(seconds(player.frameAt(1.5))).toBeCloseTo(45 / 30, 5);
+    player.frameAt(0.85);
+    await settle();
+    expect(seconds(player.frameAt(0.85))).toBeCloseTo(25 / 30, 5);
+  });
+
   it('skips to the keyframe ahead when the time passes one the decoder has not reached', async () => {
     const { player, settle, decoded } = setup();
     player.frameAt(0);
