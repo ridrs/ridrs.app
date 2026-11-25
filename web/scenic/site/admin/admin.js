@@ -149,7 +149,7 @@ async function loadMap() {
   }
   $('#view').classList.add('mapmode');
   body.innerHTML = `<div id="lmap"></div><p class="lmap-legend meta"><span id="lmap-count">${num(vids.length)} Videos · ${num(nPub)} öffentlich</span>
-    <span><i class="dot pub"></i>veröffentlicht</span><span><i class="dot draft"></i>nicht veröffentlicht</span><span>Routen ab Zoom 5</span></p>`;
+    <span><i class="dot pub"></i>veröffentlicht</span><span><i class="dot draft"></i>nicht veröffentlicht</span><span>Routen ab Zoom 5</span><span><i class="bar"></i><a href="#tracks">Routen (GPX)</a></span></p>`;
   const cam = listState.camera ?? { center: [10, 45], zoom: 3.2 };
   const map = listMap = new MapGL({ container: 'lmap', style: STYLE, center: cam.center, zoom: cam.zoom, attributionControl: false });
   map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -169,6 +169,15 @@ async function loadMap() {
     // Invisible, wider twin for hover and click: thin lines are hard to hit.
     map.addLayer({ id: 'lines-hit', type: 'line', source: 'lines', minzoom: 5, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 12 } });
     setListLines();
+    // Routes uploaded as GPX (tab „Routen“, src/tracks.js) in their colour above the video lines; not published: paler.
+    map.addSource('tracks', { type: 'geojson', data: fc([]) });
+    map.addLayer({ id: 'tracks-casing', type: 'line', source: 'tracks', layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.5, 10, 6, 14, 8], 'line-opacity': ['case', ['==', ['get', 'pub'], 1], 0.85, 0.45] } });
+    map.addLayer({ id: 'tracks', type: 'line', source: 'tracks', layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 3, 2, 10, 3.5, 14, 5], 'line-opacity': ['case', ['==', ['get', 'pub'], 1], 1, 0.5] } });
+    map.addLayer({ id: 'tracks-hit', type: 'line', source: 'tracks', paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 12 } });
+    api('GET', 'tracks').then((list) => { if (listMap === map) map.getSource('tracks')?.setData(fc(list.map(trackGeo))); })
+      .catch((e) => toast(`GPX-Routen: ${e.message}`, true));
     map.addSource('vids', { type: 'geojson', data, cluster: true, clusterMaxZoom: 11, clusterRadius: 40, clusterProperties: { pub: ['+', ['get', 'pub']] } });
     map.addLayer({ id: 'cl', type: 'circle', source: 'vids', filter: ['has', 'point_count'],
       paint: { 'circle-color': css('--surface-raised'), 'circle-opacity': 0.92, 'circle-stroke-color': ['case', ['>', ['get', 'pub'], 0], css('--l2'), css('--cyan')], 'circle-stroke-width': 1.5,
@@ -211,7 +220,14 @@ async function loadMap() {
     tip.setLngLat(e.lngLat).setHTML(`${esc(f.properties.title)}${f.properties.pub ? '' : ' · <em>nicht veröffentlicht</em>'}`).addTo(map);
   });
   map.on('mouseleave', 'lines-hit', () => { setHover(null); tip.remove(); });
-  for (const l of ['cl', 'pt', 'lines-hit']) {
+  map.on('click', 'tracks-hit', (e) => { if (!onPoint(e)) location.hash = 'tracks'; });
+  map.on('mousemove', 'tracks-hit', (e) => {
+    if (onPoint(e)) return;
+    const f = e.features[0].properties;
+    tip.setLngLat(e.lngLat).setHTML(`Route (GPX): ${esc(f.name)}${f.pub ? '' : ' · <em>nicht veröffentlicht</em>'}`).addTo(map);
+  });
+  map.on('mouseleave', 'tracks-hit', () => tip.remove());
+  for (const l of ['cl', 'pt', 'lines-hit', 'tracks-hit']) {
     map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; });
   }

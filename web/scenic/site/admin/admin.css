@@ -116,6 +116,8 @@ input[type=color] { width: 2.4rem; height: 2.1rem; padding: .15rem; border: 1px 
 .lmap-legend { position: absolute; left: 10px; bottom: 10px; z-index: 1; display: flex; gap: .9rem; align-items: center; margin: 0; padding: .3rem .7rem;
   border-radius: 12px; background: color-mix(in srgb, var(--surface) 92%, transparent); box-shadow: var(--chip-shadow); }
 .lmap-legend .dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; vertical-align: -1px; margin-right: .3rem; }
+.lmap-legend .bar { display: inline-block; width: 1rem; height: .25rem; border-radius: 2px; background: #d6336c; vertical-align: 2px; margin-right: .3rem; }
+.lmap-legend a { color: inherit; }
 .lmap-legend .dot.pub { background: var(--l2); border: 1px solid #fff; } .lmap-legend .dot.draft { background: #fff; border: 2px solid var(--l4); }
 .lmap-pick { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; font-size: .82rem; }
 .lmap-pick a { color: #0d121c; text-decoration: none; } .lmap-pick a:hover { text-decoration: underline; }
