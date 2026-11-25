@@ -25,8 +25,8 @@ const AGREEMENT_SAMPLES = 600;
 const KM_PER_DEG_LAT = 111.32;
 const r6 = (x) => Math.round(x * 1e6) / 1e6;
 const r1 = (x) => Math.round(x * 10) / 10;
-const fail = (status, message) => { const e = new Error(message); e.status = status; throw e; };
-const bad = (message) => fail(400, message);
+const fail = (status, message, extra) => { const e = new Error(message); e.status = status; if (extra) e.extra = extra; throw e; };
+const bad = (message, extra) => fail(400, message, extra);
 const parse = (s) => { try { return s == null ? null : JSON.parse(s); } catch { return null; } };
 
 /** {south, west, north, east} of a line [[lon, lat], …]. */
@@ -43,6 +43,11 @@ export function growBbox(b, km) {
 }
 const around = ([lon, lat], km) => growBbox({ south: lat, west: lon, north: lat, east: lon }, km);
 export const inBbox = (b, [lon, lat]) => lat >= b.south && lat <= b.north && lon >= b.west && lon <= b.east;
+/** Distance in km from a point to the nearest edge of a bbox (0 inside). */
+export const kmOutside = (b, [lon, lat]) => {
+  const k = Math.cos((lat * Math.PI) / 180), clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+  return Math.hypot((lon - clamp(lon, b.west, b.east)) * k, lat - clamp(lat, b.south, b.north)) * KM_PER_DEG_LAT;
+};
 
 /** Route level of the hint: 4 (confirmed; also for levels 1-3, which need a confirmed route) or 5 (approximate). */
 export function routeLevelOf(loc) {
@@ -97,9 +102,11 @@ const VERDICTS = ['confident', 'uncertain'];
 /**
  * Validates an uploaded result against the video's job (plan section 5): id, t strictly increasing, plausible speeds (a jump only at a
  * scene cut), every point inside the job's bbox, size limits, a complete checklist. Throws {status, message} (German) on the first problem.
- * @returns {{track: {v: 1, t: number[], c: number[][], e?: number[]}, t_start: number, t_end: number}}
+ * Points outside the job's bbox are the one overridable problem: the error carries extra {code: 'outside_bbox', outside}, and with
+ * allowOutsideBbox (the editor confirmed the video is placed correctly) they pass and `outside` reports them.
+ * @returns {{track: {v: 1, t: number[], c: number[][], e?: number[]}, t_start: number, t_end: number, outside: object|null}}
  */
-export function validateResult(p, job, { durationS = null } = {}) {
+export function validateResult(p, job, { durationS = null, allowOutsideBbox = false } = {}) {
   if (!p || typeof p !== 'object' || Array.isArray(p)) bad('Kein video2gpx-Ergebnis (JSON-Objekt erwartet)');
   if (p.video_id !== job.video_id) bad(`Die Datei gehört zu Video ${String(p.video_id).slice(0, 20)}, nicht zu ${job.video_id}`);
   if (typeof p.pipeline_hash !== 'string' || !/^[\w.-]{1,64}$/.test(p.pipeline_hash)) bad('pipeline_hash fehlt');
@@ -110,16 +117,25 @@ export function validateResult(p, job, { durationS = null } = {}) {
   if (t.length > MAX_POINTS) fail(413, `Höchstens ${MAX_POINTS} Punkte (4 Stunden)`);
   if (e != null && (!Array.isArray(e) || e.length !== t.length || !e.every(num))) bad('e muss so lang wie t sein und nur Zahlen enthalten');
   const cuts = Array.isArray(p.cuts) ? p.cuts.filter(num) : [];
+  let outside = null;
   for (let i = 0; i < t.length; i++) {
     const ti = t[i], ci = c[i];
     if (!num(ti) || ti < 0) bad(`t[${i}] ist keine Videozeit`);
     if (i && !(ti > t[i - 1])) bad(`t muss streng steigen (bei ${ti} s)`);
     if (!Array.isArray(ci) || ci.length !== 2 || !num(ci[0]) || !num(ci[1]) || Math.abs(ci[0]) > 180 || Math.abs(ci[1]) > 90) bad(`c[${i}] ist kein [lon, lat]`);
-    if (job.bbox && !inBbox(job.bbox, ci)) bad(`Punkt bei ${ti} s liegt außerhalb des Suchrahmens der Job-Datei`);
+    if (job.bbox && !inBbox(job.bbox, ci)) {
+      const km = kmOutside(job.bbox, ci);
+      if (!outside) outside = { points: 0, first_s: ti, last_s: ti, max_km: 0 };
+      outside.points++; outside.last_s = ti; outside.max_km = Math.max(outside.max_km, km);
+    }
     if (i) {
       const dt = ti - t[i - 1], v = dist(c[i - 1], ci) / dt;
       if (v > MAX_SPEED_MS && !cuts.some((x) => x >= t[i - 1] - 1 && x <= ti + 1)) bad(`Unplausible Geschwindigkeit ${Math.round(v * 3.6)} km/h bei ${ti} s`);
     }
+  }
+  if (outside) {
+    outside = { ...outside, max_km: r1(outside.max_km) };
+    if (!allowOutsideBbox) bad(`${outside.points === 1 ? `Punkt bei ${outside.first_s} s liegt` : `${outside.points} Punkte (${outside.first_s}–${outside.last_s} s) liegen`} außerhalb des Suchrahmens der Job-Datei (bis ${outside.max_km} km)`, { code: 'outside_bbox', outside });
   }
   if (durationS && t.at(-1) > durationS + 2) bad(`t endet bei ${t.at(-1)} s, das Video ist nur ${durationS} s lang`);
   if (!num(p.t_start) || !num(p.t_end) || !(p.t_start < p.t_end)) bad('t_start und t_end fehlen');
@@ -130,7 +146,7 @@ export function validateResult(p, job, { durationS = null } = {}) {
   if (open.length) bad(`Prüfliste nicht vollständig: ${open.map((x) => x?.id ?? '?').join(', ')}`);
   const track = { v: 1, t: t.map((x) => Math.round(x * 1000) / 1000), c: c.map(([lo, la]) => [r6(lo), r6(la)]) };
   if (e) track.e = e.map(r1);
-  return { track, t_start: p.t_start, t_end: p.t_end };
+  return { track, t_start: p.t_start, t_end: p.t_end, outside };
 }
 
 /** What of the payload ridrs Scenic keeps beside the track (localization.gates.video2gpx); checked_by is the uploader's identity. */

@@ -392,7 +392,7 @@ export default {
       if ((m = /^\/vg\/([a-z0-9-]+)\/./.exec(p))) return await videoAsset(env, request, `vg-${m[1]}`);
       if (p.startsWith('/vg/')) return new Response('Not found', { status: 404 });
     } catch (err) {
-      if (err instanceof HttpError) return ajson({ error: err.message }, err.status);
+      if (err instanceof HttpError) return ajson({ ...err.extra, error: err.message }, err.status);
       console.error(err);
       return json({ error: 'internal error' }, { status: 500, maxAge: 0 });
     }

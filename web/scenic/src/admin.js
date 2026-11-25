@@ -15,7 +15,7 @@ import { routeLines } from './route-lines.js';
 import { tracksAdmin } from './tracks.js';
 import { buildJob, validateResult, resultMeta, routeAgreement, uploadLevel, MAX_RESULT_BYTES, ROUTE_OFFER_M } from './video2gpx.js';
 
-export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
+export class HttpError extends Error { constructor(status, message, extra) { super(message); this.status = status; if (extra) this.extra = extra; } }
 const bad = (msg) => { throw new HttpError(400, msg); };
 const ID = VIDEO_ID;
 const now = () => new Date().toISOString();
@@ -360,12 +360,15 @@ async function uploadResult(env, who, id, request, origin) {
   const j = await loadJob(env, id, origin);
   if (!j) throw new HttpError(404, 'Video nicht gefunden');
   let res;
-  try { res = validateResult(p, j.job, { durationS: j.video.duration_s }); } catch (e) { if (e.status) throw new HttpError(e.status, e.message); throw e; }
+  // ?outside_bbox=1: the editor confirmed that points outside the job's search frame are right (the video is placed correctly).
+  const allowOutsideBbox = new URL(request.url).searchParams.get('outside_bbox') === '1';
+  try { res = validateResult(p, j.job, { durationS: j.video.duration_s, allowOutsideBbox }); } catch (e) { if (e.status) throw new HttpError(e.status, e.message, e.extra); throw e; }
   const cur = await H.sync.get(env, id), loc0 = cur.localization;
   const json = JSON.stringify(res.track), hash = await hashText(json), at = now();
   const agree = routeAgreement(j.line, res.track.c);
   const level = uploadLevel(loc0, hash), routeLevel = j.job.route_level;
   const meta = resultMeta(p, who);
+  if (res.outside) meta.bbox_override = { ...res.outside, by: who, bbox: j.job.bbox };
   const next = {
     manual: true, manual_localization: true,
     sync: { video_id: id, method: 'video2gpx', t_start_s: Math.round(res.t_start), t_end_s: Math.round(res.t_end), path: `api/sync/${id}.json`, hash, built_at: at },

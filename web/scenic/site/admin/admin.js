@@ -34,7 +34,7 @@ async function api(method, path, body) {
   else if (body !== undefined) { opts.body = JSON.stringify(body); opts.headers['content-type'] = 'application/json'; }
   const res = await fetch(`../api/admin/${path}`, opts);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `${res.status}`), { data });
   return data;
 }
 let toastTimer = 0;
@@ -624,7 +624,13 @@ function bindSections() {
     if (file.size > 1.5 * 1024 * 1024) throw new Error('Höchstens 1,5 MB');
     let body;
     try { body = JSON.parse(await file.text()); } catch { throw new Error('Die Datei ist kein JSON'); }
-    const r = await api('POST', `videos/${ed.id}/video2gpx`, body);
+    let r;
+    try { r = await api('POST', `videos/${ed.id}/video2gpx`, body); } catch (err) {
+      // Points outside the job's search frame: the editor may confirm the placement and upload anyway (noted in the result).
+      if (err.data?.code !== 'outside_bbox') throw err;
+      if (!confirm(`${err.message}.\n\nDas Video ist trotzdem richtig lokalisiert? Dann hochladen und den Suchrahmen überschreiben (wird beim Ergebnis vermerkt).`)) return;
+      r = await api('POST', `videos/${ed.id}/video2gpx?outside_bbox=1`, body);
+    }
     toast(!r.changed ? 'Dieses Ergebnis ist schon gespeichert' : `video2gpx-Track gespeichert: ${r.points} Punkte, Stufe ${r.level}${r.route_agreement ? ` · Abstand zur Scenic-Route Median ${r.route_agreement.median_m} m` : ''}${r.route_offer ? ' · Route prüfen' : ''}`);
     await refresh({ track: true });
   });

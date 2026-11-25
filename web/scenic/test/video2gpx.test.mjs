@@ -36,7 +36,7 @@ function setup(videos = [vid(ID)]) {
   const call = async (method, path, body) => {
     const res = await handleAdmin(new Request(`${BASE}/api/admin/${path}`, { method, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
       headers: body === undefined ? {} : { 'content-type': 'application/json' } }), env, WHO, null).catch((err) => {
-      if (err instanceof HttpError) return new Response(JSON.stringify({ error: err.message, status: err.status }), { status: err.status, headers: { 'content-type': 'application/json' } });
+      if (err instanceof HttpError) return new Response(JSON.stringify({ ...err.extra, error: err.message, status: err.status }), { status: err.status, headers: { 'content-type': 'application/json' } });
       throw err;
     });
     return res.json();
@@ -147,6 +147,21 @@ test('result: Prüfmodus lifts it to level 1; a changed upload drops it to 2, th
   const loc = q('SELECT * FROM localization WHERE video_id = ?', ID);
   assert.deepEqual([loc.loc_level, loc.verified_hash], [2, null]);
   assert.ok(q("SELECT 1 x FROM localization_log WHERE video_id = ? AND from_level = 1 AND to_level = 2 AND reason = 'track_changed'", ID));
+});
+
+test('result: points outside the search frame are rejected with a code and pass when the editor overrides', async () => {
+  const { call, q } = setup();
+  const p = clone(RESULT); p.c = p.c.map(([lo, la]) => [lo, la + 0.2]);
+  const r = await upload(call, p);
+  assert.equal(r.status, 400);
+  assert.equal(r.code, 'outside_bbox');
+  assert.equal(r.outside.points, p.t.length);
+  assert.ok(r.outside.max_km > 10);
+  const ok = await call('POST', `videos/${ID}/video2gpx?outside_bbox=1`, p);
+  assert.equal(ok.changed, true, JSON.stringify(ok));
+  const g = JSON.parse(q('SELECT gates FROM localization WHERE video_id = ?', ID).gates);
+  assert.equal(g.video2gpx.bbox_override.points, p.t.length);
+  assert.equal(g.video2gpx.bbox_override.by, WHO.email);
 });
 
 test('result: rejected cases (id, order, speed, bbox, size, checklist, verdict, json)', async () => {
