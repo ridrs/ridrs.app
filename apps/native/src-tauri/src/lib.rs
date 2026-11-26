@@ -132,10 +132,17 @@ pub fn run() {
             media_drop::media_drop_read,
             media_drop::media_drop_remove,
             process_run::process_run,
+            process_run::process_attach,
             process_run::process_cancel,
             video_interpolate::video_interpolate,
             video_interpolate::video_interpolate_cancel,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        // Programs do not outlive the app.
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                app.state::<process_run::Processes>().end_all();
+            }
+        });
 }

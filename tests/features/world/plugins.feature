@@ -86,3 +86,29 @@ Feature: Plugins the rider switches off, installs and removes
     Given the host has started
     When a plugin runs the program "node" through process.run
     Then the program was refused: "No installed plugin was granted the program \"node\""
+
+  Scenario: A program under a key outlives its caller and is found again, never started twice
+    Given the host has started
+    And the rider drags the plugin "test-youtube-downloader" onto the window
+    And the dragged files are read
+    And the UI bridge calls "file.drop.import" with '{}'
+    And ridrs restarted
+    When the run "before the reload" starts the program "node" under the key "test:job", which writes "done" and ends with 7 after 1 s
+    And the run "after the reload" starts the program "node" under the key "test:job", which ends with 0 at once
+    And the run "of the new page" attaches to the key "test:job"
+    Then the run "before the reload" heard "done" and ended with 7
+    And the run "after the reload" heard "done" and ended with 7
+    And the run "of the new page" heard "done" and ended with 7
+    And nothing runs under the key "test:job"
+
+  Scenario: The rider who cancels a program found again ends it
+    Given the host has started
+    And the rider drags the plugin "test-youtube-downloader" onto the window
+    And the dragged files are read
+    And the UI bridge calls "file.drop.import" with '{}'
+    And ridrs restarted
+    When the run "before the reload" starts the program "node" under the key "test:job", which writes "done" and ends with 7 after 30 s
+    And the run "of the new page" attaches to the key "test:job"
+    And the run "of the new page" is cancelled
+    Then the run "before the reload" ended with -1
+    And nothing runs under the key "test:job"

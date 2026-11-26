@@ -125,13 +125,19 @@ export const pluginsRemoveService = defineService('plugins.remove', {
 export interface ProcessRequest {
   readonly program: string;
   readonly args: readonly string[];
+  /**
+   * The work's name, chosen by the caller and prefixed with its plugin id (ADR 0112): one program
+   * runs under a key, and a caller after a reload finds it again with `attach`.
+   */
+  readonly key?: string;
 }
 
 /**
  * Programs of the device (ADR 0106): starts one that the rider granted to an installed plugin,
  * found where the platform finds programs, without a shell. `onLine` hears every line it writes;
  * aborting `signal` ends it. Resolves with its exit code; rejects for a program not granted or not
- * found.
+ * found. A program under a key outlives its caller (ADR 0112): `run` with a key under which a
+ * program runs attaches to it instead of starting another.
  */
 export interface ProcessRun {
   run(
@@ -139,6 +145,15 @@ export interface ProcessRun {
     onLine?: (line: string, stream: 'out' | 'err') => void,
     signal?: AbortSignal,
   ): Promise<{ readonly code: number }>;
+  /**
+   * Joins the program that runs under `key`: `onLine` hears its lines from now on, aborting
+   * `signal` ends it. Resolves with its exit code, or with `undefined` at once where none runs.
+   */
+  attach(
+    key: string,
+    onLine?: (line: string, stream: 'out' | 'err') => void,
+    signal?: AbortSignal,
+  ): Promise<{ readonly code: number } | undefined>;
 }
 
 export const processRunCapability = defineCapability<ProcessRun, 'single', 'process.run'>(

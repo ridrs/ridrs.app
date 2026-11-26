@@ -182,6 +182,109 @@ Then('the program was refused: {string}', function (this: RidrsWorld, reason: st
   assert.deepEqual(programs.get(this), { error: reason });
 });
 
+/** Runs of a program under a key, by the step's name for each caller. */
+interface KeyedRun {
+  readonly lines: string[];
+  readonly abort: AbortController;
+  readonly done: Promise<number | undefined>;
+}
+const keyedRuns = new WeakMap<RidrsWorld, Map<string, KeyedRun>>();
+
+function keyedRunsOf(world: RidrsWorld): Map<string, KeyedRun> {
+  const runs = keyedRuns.get(world) ?? new Map<string, KeyedRun>();
+  keyedRuns.set(world, runs);
+  return runs;
+}
+
+function processRunOf(world: RidrsWorld) {
+  const run = world.ensureHost().getProvider(processRunCapability);
+  assert.ok(run, 'No plugin provides process.run');
+  return run;
+}
+
+function startKeyed(
+  world: RidrsWorld,
+  name: string,
+  start: (onLine: (line: string) => void, signal: AbortSignal) => Promise<number | undefined>,
+) {
+  const lines: string[] = [];
+  const abort = new AbortController();
+  const done = start((line) => lines.push(line), abort.signal);
+  keyedRunsOf(world).set(name, { lines, abort, done });
+}
+
+When(
+  'the run {string} starts the program {string} under the key {string}, which writes {string} and ends with {int} after {int} s',
+  async function (
+    this: RidrsWorld,
+    name: string,
+    program: string,
+    key: string,
+    line: string,
+    code: number,
+    seconds: number,
+  ) {
+    const script = `setTimeout(() => { console.log(${JSON.stringify(line)}); process.exit(${code}); }, ${seconds * 1000});`;
+    const run = processRunOf(this);
+    startKeyed(this, name, (onLine, signal) =>
+      run.run({ program, args: ['-e', script], key }, onLine, signal).then(({ code }) => code),
+    );
+    // The program is running before the next caller comes.
+    await sleep(200);
+  },
+);
+
+When(
+  'the run {string} starts the program {string} under the key {string}, which ends with {int} at once',
+  function (this: RidrsWorld, name: string, program: string, key: string, code: number) {
+    const run = processRunOf(this);
+    startKeyed(this, name, (onLine, signal) =>
+      run
+        .run({ program, args: ['-e', `process.exit(${code})`], key }, onLine, signal)
+        .then(({ code }) => code),
+    );
+  },
+);
+
+When(
+  'the run {string} attaches to the key {string}',
+  function (this: RidrsWorld, name: string, key: string) {
+    const run = processRunOf(this);
+    startKeyed(this, name, (onLine, signal) =>
+      run.attach(key, onLine, signal).then((result) => result?.code),
+    );
+  },
+);
+
+When('the run {string} is cancelled', function (this: RidrsWorld, name: string) {
+  const run = keyedRunsOf(this).get(name);
+  assert.ok(run, `There is no run "${name}"`);
+  run.abort.abort();
+});
+
+Then(
+  'the run {string} heard {string} and ended with {int}',
+  async function (this: RidrsWorld, name: string, line: string, code: number) {
+    const run = keyedRunsOf(this).get(name);
+    assert.ok(run, `There is no run "${name}"`);
+    assert.equal(await run.done, code);
+    assert.deepEqual(run.lines, [line]);
+  },
+);
+
+Then(
+  'the run {string} ended with {int}',
+  async function (this: RidrsWorld, name: string, code: number) {
+    const run = keyedRunsOf(this).get(name);
+    assert.ok(run, `There is no run "${name}"`);
+    assert.equal(await run.done, code);
+  },
+);
+
+Then('nothing runs under the key {string}', async function (this: RidrsWorld, key: string) {
+  assert.equal(await processRunOf(this).attach(key), undefined);
+});
+
 Then('the plugins page reads {string}', async function (this: RidrsWorld, text: string) {
   const view = this.uiViews[0];
   assert.ok(view, 'Expected the ridrs UI to be shown');
