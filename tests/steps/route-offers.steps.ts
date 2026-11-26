@@ -280,3 +280,25 @@ Then("the route's profile colours each stretch by its gradient", async function 
     assert.ok(grades.size >= 3, `Grades: ${[...grades]}`);
   });
 });
+
+/** The in-between frames among the global actions (`ui-area-ride/refinement`), if they show. */
+const refinementAction = (world: RidrsWorld) =>
+  within(ui(world)).getByTestId('slot-main-action').querySelector<HTMLElement>('[data-refinement]');
+
+Then('the global actions read {string}', async function (this: RidrsWorld, text: string) {
+  await waitFor(() => assert.equal(refinementAction(this)?.textContent, text));
+});
+
+Then(
+  'the in-between frames in the global actions are labelled {string}',
+  async function (this: RidrsWorld, name: string) {
+    await waitFor(() =>
+      assert.equal(refinementAction(this)?.closest('button')?.getAttribute('aria-label'), name),
+    );
+  },
+);
+
+Then('the global actions show no in-between frames', async function (this: RidrsWorld) {
+  // The text, not the element: a failing assert would print the whole DOM (util.inspect).
+  await waitFor(() => assert.equal(refinementAction(this)?.textContent, undefined));
+});

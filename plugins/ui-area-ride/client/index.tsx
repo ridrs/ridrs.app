@@ -34,10 +34,11 @@ import {
   userDocument,
 } from '@ridrs/ui-preview';
 import type { UiCapabilityHandle, UiContext } from '@ridrs/ui-sdk';
-import { useMessages } from '@ridrs/ui-sdk/react';
+import { useLanguage, useMessages, useStateEntries } from '@ridrs/ui-sdk/react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { openBriefing } from './briefing.ts';
+import { estimateEnd, type RefinementSample } from './refinement-status.ts';
 import { type Messages, messages } from './i18n/index.ts';
 import {
   climbCategory,
@@ -921,6 +922,131 @@ function RideAgainView({ ctx }: { readonly ctx: UiContext }) {
   );
 }
 
+/** Shared look of the two halves of the refinement's action: plain buttons in its pill. */
+const PILL_BUTTON: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  height: '100%',
+  padding: 0,
+  border: 0,
+  background: 'none',
+  color: 'inherit',
+  font: 'inherit',
+  cursor: 'pointer',
+};
+
+/** A ring that fills with the share done, or a quiet dot while there is no share to show. */
+function RefinementRing({ share }: { readonly share: number | undefined }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: '50%',
+        background:
+          share === undefined
+            ? 'var(--ridrs-text-muted)'
+            : `conic-gradient(var(--ridrs-info) ${share * 360}deg, var(--ridrs-line) 0)`,
+        mask: 'radial-gradient(circle, transparent 5px, #000 5.5px)',
+        WebkitMask: 'radial-gradient(circle, transparent 5px, #000 5.5px)',
+      }}
+    />
+  );
+}
+
+/**
+ * The refinement of the downloaded routes among the global actions (`main/action`, ADR 0110): while
+ * a route gets its in-between frames, how far it is and when it is likely done, and while the rider
+ * paused them, that they are paused; nothing otherwise. It opens the routes, and pauses or resumes
+ * every route's refinement: pausing cancels it until it is started again (`video.refine`), keeping
+ * the stretches done. The end goes on at the pace since the refinement was last seen starting.
+ */
+function RefinementActionView({ ctx }: { readonly ctx: UiContext }) {
+  const text = useMessages(ctx, messages);
+  const language = useLanguage(ctx);
+  const refinements = useStateEntries(ctx, videoRefinementState);
+  const offers = useStateEntries(ctx, routeOfferState);
+  const firstSeen = useRef(new Map<string, RefinementSample>());
+  const [shown, setShown] = useState<string>();
+  useEffect(() => ctx.onNavigated(setShown), [ctx]);
+
+  for (const [id, refinement] of refinements) {
+    if (refinement.status !== 'refining') firstSeen.current.delete(id);
+    else if (!firstSeen.current.has(id)) firstSeen.current.set(id, { at: Date.now(), progress: refinement.progress });
+  }
+  const all = [...refinements];
+  const busy = all.filter(([, r]) => r.status === 'refining' || r.status === 'waiting');
+  const paused = all.filter(([, r]) => r.status === 'skipped' && r.reason === CANCELLED);
+  const listed = busy.length > 0 ? busy : paused;
+  const [id, refinement] =
+    listed.find(([, r]) => r.status === 'refining') ?? listed[0] ?? ([undefined, undefined] as const);
+  if (id === undefined || refinement === undefined) return null;
+  const title = offers.get(id)?.title ?? id;
+  const more = listed.length > 1 ? ` ${text.refinementMore(listed.length - 1)}` : '';
+  let label: string;
+  let short: string;
+  let ring: number | undefined;
+  if (refinement.status === 'refining') {
+    const percent = Math.floor(refinement.progress * 100);
+    const first = firstSeen.current.get(id);
+    const end = first && estimateEnd(first, { at: Date.now(), progress: refinement.progress });
+    const time =
+      end === undefined
+        ? undefined
+        : new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(end);
+    label = text.refinementAction(title, percent, time) + more;
+    short = text.refinementShort(percent) + (time ? ` · ${text.refinementEndsAt(time)}` : '');
+    ring = refinement.progress;
+  } else if (refinement.status === 'waiting') {
+    label = text.refinementActionWaiting(title) + more;
+    short = text.refinementShortWaiting;
+  } else {
+    label = text.refinementActionPaused(title) + more;
+    short = text.refinementShortPaused;
+  }
+  const pausing = busy.length > 0;
+  const toggle = () => {
+    for (const [key] of listed) {
+      ctx.call(videoRefineService, { key, action: pausing ? 'cancel' : 'start' }).catch(() => undefined);
+    }
+  };
+  return (
+    <div
+      data-action
+      aria-current={shown === 'ride' ? 'page' : undefined}
+      style={{ width: 'auto', display: 'flex', alignItems: 'center', gap: 12, padding: '0 6px 0 12px', borderRadius: 22 }}
+    >
+      <button type="button" aria-label={label} title={label} onClick={() => ctx.navigate('ride')} style={PILL_BUTTON}>
+        <RefinementRing share={ring} />
+        <span data-refinement style={{ fontSize: 14, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+          {short}
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label={pausing ? text.pauseRefinement : text.resumeRefinement}
+        title={pausing ? text.pauseRefinement : text.resumeRefinement}
+        onClick={toggle}
+        style={{
+          ...PILL_BUTTON,
+          justifyContent: 'center',
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          background: 'var(--ridrs-surface-raised)',
+        }}
+      >
+        <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>
+          {pausing ? '❚❚' : '▶'}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+export const RefinementAction = reactComponent((ctx) => <RefinementActionView ctx={ctx} />);
 export const RideArea = reactComponent((ctx) => <RideAreaView ctx={ctx} />);
 export const RideAgainTile = reactComponent((ctx) => <RideAgainView ctx={ctx} />);
 function RideMenuEntryView({ ctx }: { readonly ctx: UiContext }) {

@@ -35,3 +35,25 @@ Feature: The route details say how far a route's in-between frames are
     When the test interpolator works again at once
     And I press "Compute in-between frames"
     Then the route details read "With in-between frames for slow riding"
+
+  Scenario: The global actions show while in-between frames are computed, until they are done
+    When I press "Ride"
+    And I press "Col de Pennes - Climb it twice!"
+    And I press "Download"
+    Then the global actions read "In-between frames 50 %"
+    And the in-between frames in the global actions are labelled "In-between frames for Col de Pennes - Climb it twice!: 50 %, the end is being estimated"
+    When the test interpolator goes on
+    Then the global actions show no in-between frames
+
+  Scenario: The rider pauses the in-between frames in the global actions and resumes them
+    When I press "Ride"
+    And I press "Col de Pennes - Climb it twice!"
+    And I press "Download"
+    Then the global actions read "In-between frames 50 %"
+    When I press "Pause in-between frames"
+    Then the global actions read "In-between frames paused"
+    And the route details read "In-between frames for slow riding: cancelled"
+    When the test interpolator works again at once
+    And I press "Resume in-between frames"
+    Then the route details read "With in-between frames for slow riding"
+    And the global actions show no in-between frames

@@ -2,7 +2,7 @@
   "version": 1,
   "menu": "ui-main-menu/menu",
   "topBar": "ui-main-top-bar/top-bar",
-  "actions": ["ui-search/search", "ui-devices/status", "ui-settings/settings", "ui-garage/garage", "ui-area-me/profile"],
+  "actions": ["ui-area-ride/refinement", "ui-search/search", "ui-devices/status", "ui-settings/settings", "ui-garage/garage", "ui-area-me/profile"],
   "tiles": [
     { "contribution": "ui-ride-recovery/interrupted-ride", "columns": { "wide": 12 } },
     { "contribution": "ui-tile-ride-start/ride-start", "columns": { "wide": 8, "medium": 12 } },
