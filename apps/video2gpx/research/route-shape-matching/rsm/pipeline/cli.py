@@ -179,7 +179,7 @@ class Run:
                              *([["hz_fixed1"], ["hz_spread1", C.HZ_SPREAD_IQR]] if P.get("horizon", "running") != "running" else [])],
                      rotation=[C.FAR, C.F_FAR, C.F_REF, "rotation2", C.ROT_BAND_OFF_VMS,
                                *([["rot_extract1", VI_ALT.params()]] if (C.MOTION_FROM_EXTRACT and C.ROT_FROM_EXTRACT) else []),
-                               *([["a25", C.X0_MIN_S, C.X0_MAX_RMS, C.X0_MIN_PAIRS]] if C.ROT_X0_ROAD else []), ["gate_rms_rel1", GP_DEFAULT.max_rms_px, GP_DEFAULT.max_rms_rel],
+                               *([["a25", C.X0_MIN_S, C.X0_MAX_RMS, C.X0_MIN_PAIRS]] if C.ROT_X0_ROAD else []), ["gate_rms_rel1", GP_DEFAULT.max_rms_px, GP_DEFAULT.max_rms_rel], ["gate_rms_yaw1", GP_DEFAULT.max_rms_yaw, GP_DEFAULT.rms_yaw_ref],
                                *([["same1", C.CUT_SAME_SHARE, C.CUT_SAME_WIN_S, C.CUT_SAME_H]] if (C.CUT_ON and C.CUT_SAME_ON) else []),
                                *([["intro_user1", P["intro_end"]]] if P.get("intro_end") is not None else []),
                                *([["strong2", C.CUT_STRONG_IMPULSE, C.CUT_STRONG_FACTOR, C.CUT_STRONG_MIN_DIFF, C.CUT_STRONG_AROUND, C.CUT_STRONG_NB_SHARE]] if C.CUT_ON else []),

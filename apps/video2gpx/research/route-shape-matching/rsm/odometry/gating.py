@@ -13,6 +13,12 @@ frame pairs, not seconds):
               absolute limit rejected half of all pairs and split the tracks for minutes, so the limit follows the video's own level (1.5 x the
               median; videos with a median up to 0.53 px keep the 0.8 px). On PCI25WijGrE pairs up to 1.5 x the median read the speed like the
               clean pairs (median ratio 1.00-1.05), pairs at 1.5-2.5 x read it 11-17 % fast and 25-52 % of them >20 % off.
+              On such a video (relative limit) the limit also rises in curves: x (1 + `max_rms_yaw` (0.5) x min(w / `rms_yaw_ref` (80 px/s), 1)),
+              w = 1 s mean of |yaw flow| (2026-11-26). Filmed from a leaning motorcycle the fit gets worse with the turn rate: share above the
+              limit 8 % on straights, 28-40 % at w >= 80 px/s (Griesalp gIGsrHCyZZA, Furka 0eEylPLoqMA, Stelvio my42mzltbPo, 480p25). In slow
+              hairpins that split the motion into pieces too short for an HMM step (< 2 x D0) and 80 s of a correct route became a gap
+              (Griesalp 30:38-31:58). The pairs it admits read the speed >20 % off in 7-17 % (clean pairs 2-6 %, the still rejected 30 %), far
+              better than a gap; a clean video (Monaco, UWSxwOHNApI: absolute limit) is not touched, its few admitted pairs were 25-32 % off.
   cut         frame difference above `cut_factor` (4) x its 61-pair running median (>= 1) and above `cut_min_diff` (25),
               dilated by +-7 pairs (a scene cut, or a bump / flash big enough to look like one)
   spike       speed more than 0.35 |median| + 2e-4 from the 31-pair running median of the usable speeds
@@ -46,7 +52,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 import numpy as np
-from scipy.ndimage import maximum_filter1d, median_filter, percentile_filter
+from scipy.ndimage import maximum_filter1d, median_filter, percentile_filter, uniform_filter1d
 
 from .vms_csv import Pairs
 
@@ -60,6 +66,8 @@ class GateParams:
     min_inliers: int = 10
     max_rms_px: float = 0.8
     max_rms_rel: float = 1.5
+    max_rms_yaw: float = 0.5
+    rms_yaw_ref: float = 80.0
     traffic_bridge_s: float = 4.0
     traffic_share: float = 0.3
     traffic_side_s: float = 1.0
@@ -142,11 +150,22 @@ def _false_stop(p: Pairs, v: np.ndarray, diff: np.ndarray, gp: GateParams) -> np
     return maximum_filter1d(hit.astype(np.int8), size=2 * w + 1, mode="constant") > 0
 
 
+def pair_rms_limit(p: Pairs, fitted: np.ndarray, gp: GateParams = GateParams()) -> np.ndarray | float:
+    """the high_rms limit per pair (px): `rms_limit`, and on a video whose limit is relative (its plain level is above max_rms_px / max_rms_rel) raised
+    in curves by max_rms_yaw x min(w / rms_yaw_ref, 1), w = the 1 s mean of |yaw flow| in px/s (see the module doc, high_rms)."""
+    lim = rms_limit(np.where(fitted, p.rms_px, np.nan), p.inliers, gp)
+    if gp.max_rms_yaw <= 0 or lim <= gp.max_rms_px or len(p.yaw) == 0:
+        return lim
+    dt = float(p.dt) if np.isfinite(p.dt) and p.dt > 0 else 1.0
+    w = uniform_filter1d(np.abs(np.nan_to_num(np.asarray(p.yaw, float))) / dt, max(1, int(round(1.0 / dt))), mode="nearest")
+    return lim * (1.0 + gp.max_rms_yaw * np.minimum(w / gp.rms_yaw_ref, 1.0))
+
+
 def pair_flags(p: Pairs, gp: GateParams = GateParams()) -> np.ndarray:
     """Per pair a bit mask of the reasons it is unusable (0 = usable)."""
     v = p.rel_speed
     fitted = ~np.isnan(v) & ~np.isnan(p.yaw) & (p.inliers >= gp.min_inliers)
-    rms_bad = fitted & (p.rms_px > rms_limit(np.where(fitted, p.rms_px, np.nan), p.inliers, gp))
+    rms_bad = fitted & (p.rms_px > pair_rms_limit(p, fitted, gp))
     diff = np.nan_to_num(p.diff)
     base = median_filter(diff, size=gp.cut_median_window, mode="nearest")
     cut = (diff > gp.cut_factor * np.maximum(base, 1.0)) & (diff > gp.cut_min_diff)

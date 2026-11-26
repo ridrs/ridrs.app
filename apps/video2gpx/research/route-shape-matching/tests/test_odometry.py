@@ -358,3 +358,29 @@ def test_false_stop_needs_cruising_speed(tmp_path):
             r["rel_speed"] *= 0.04
     p = load_pairs(write_csv(tmp_path / "a.csv", n, mutate=crawl))
     assert not (pair_flags(p, GateParams()) & FALSE_STOP).any()
+
+
+def test_rms_limit_rises_in_curves_on_a_noisy_video(tmp_path):
+    """a video whose plain level makes the limit relative (median 0.7 px -> 1.05 px) admits pairs up to 1.5 x that limit at w >= 80 px/s (a
+    leaning motorcycle in a hairpin, Griesalp gIGsrHCyZZA 30:38); on straights and on a clean video the limit is unchanged"""
+    from rsm.odometry.gating import HIGH_RMS
+    n = int(60 / DT)
+    a, b = int(30 / DT), int(36 / DT)
+
+    def noisy(rows, yaw_px):
+        for r in rows:
+            r["rms_px"] = 0.7
+        for r in rows[a:b]:
+            r["rms_px"] = 1.4      # above 1.05, below 1.05 x 1.5
+            r["yaw"] = yaw_px      # px per pair; x 25 = px/s
+    p = load_pairs(write_csv(tmp_path / "curve.csv", n, mutate=lambda rr: noisy(rr, 4.0)))      # 100 px/s
+    assert not (pair_flags(p, GateParams())[a + 15:b - 15] & HIGH_RMS).any()
+    p = load_pairs(write_csv(tmp_path / "straight.csv", n, mutate=lambda rr: noisy(rr, 0.0)))
+    assert (pair_flags(p, GateParams())[a:b] & HIGH_RMS).all()
+
+    def clean(rows):           # median 0.2 px: absolute limit 0.8 px, no curve allowance
+        for r in rows[a:b]:
+            r["rms_px"] = 1.0
+            r["yaw"] = 4.0
+    p = load_pairs(write_csv(tmp_path / "clean.csv", n, mutate=clean))
+    assert (pair_flags(p, GateParams())[a:b] & HIGH_RMS).all()
