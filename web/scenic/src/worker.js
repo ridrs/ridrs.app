@@ -151,13 +151,19 @@ export async function refresh(env, { limit = 1500 } = {}) {
     ORDER BY api_fetched_at LIMIT ?1`).bind(limit).all();
   const ids = results.map((r) => r.video_id);
   let updated = 0, removed = 0;
+  // The full-text index holds title and channel name only, so only videos whose title changed and the videos of a renamed
+  // channel are re-indexed. D1 counts every row written: a rebuild of video_fts would write all rows twice, every day.
+  const retitled = [], renamed = [];
   for (let i = 0; i < ids.length; i += 50) {
     const batch = ids.slice(i, i + 50);
     const data = await youtube(env, 'videos', { part: 'snippet,contentDetails,statistics,status', id: batch.join(','), maxResults: '50' });
     const got = new Map((data.items || []).map((it) => [it.id, it]));
+    const old = await env.DB.prepare(`SELECT video_id, title, channel_id FROM video WHERE video_id IN (${batch.map((_, j) => `?${j + 1}`).join(', ')})`).bind(...batch).all();
+    const before = new Map(old.results.map((r) => [r.video_id, r]));
     const stmts = [];
     for (const id of batch) {
-      const it = got.get(id);
+      const it = got.get(id), was = before.get(id);
+      if ((it?.snippet.title ?? null) !== (was?.title ?? null) || (it && it.snippet.channelId !== was?.channel_id)) retitled.push(id);
       if (!it) {
         // Gone or private: drop the API data, keep only the id (allowed indefinitely).
         stmts.push(env.DB.prepare(`UPDATE video SET status = 'removed', title = NULL, view_count = NULL, like_count = NULL, api_fetched_at = ?2 WHERE video_id = ?1`).bind(id, today));
@@ -176,18 +182,35 @@ export async function refresh(env, { limit = 1500 } = {}) {
   }
   const ch = await env.DB.prepare(`SELECT channel_id FROM channel WHERE api_fetched_at IS NULL OR api_fetched_at <= date('now', '-29 days') LIMIT 500`).all();
   const cids = ch.results.map((r) => r.channel_id);
+  const channelName = new Map((await env.DB.prepare('SELECT channel_id, name FROM channel').all()).results.map((r) => [r.channel_id, r.name]));
   for (let i = 0; i < cids.length; i += 50) {
     const data = await youtube(env, 'channels', { part: 'snippet', id: cids.slice(i, i + 50).join(','), maxResults: '50' });
+    for (const it of data.items || []) if (it.snippet.title !== channelName.get(it.id)) renamed.push(it.id);
     await env.DB.batch((data.items || []).map((it) => env.DB.prepare('UPDATE channel SET name = ?2, country = ?3, api_fetched_at = ?4 WHERE channel_id = ?1')
       .bind(it.id, it.snippet.title, it.snippet.country ?? null, today)));
   }
-  if (updated || removed) {
+  const reindexed = await reindex(env, retitled, renamed);
+  return { videos: ids.length, updated, removed, channels: cids.length, reindexed };
+}
+
+/** Rewrites the video_fts rows of the given videos and of every video of the given channels; returns how many rows. */
+async function reindex(env, videoIds, channelIds) {
+  const params = (xs) => xs.map((_, j) => `?${j + 1}`).join(', ');
+  const ids = new Set(videoIds);
+  for (let i = 0; i < channelIds.length; i += 50) {
+    const part = channelIds.slice(i, i + 50);
+    const { results } = await env.DB.prepare(`SELECT video_id FROM video WHERE channel_id IN (${params(part)})`).bind(...part).all();
+    for (const r of results) ids.add(r.video_id);
+  }
+  const all = [...ids];
+  for (let i = 0; i < all.length; i += 50) { // D1 binds at most 100 parameters per statement
+    const part = all.slice(i, i + 50);
     await env.DB.batch([
-      env.DB.prepare('DELETE FROM video_fts'),
-      env.DB.prepare(FTS_INSERT),
+      env.DB.prepare(`DELETE FROM video_fts WHERE video_id IN (${params(part)})`).bind(...part),
+      env.DB.prepare(`${FTS_INSERT} WHERE v.video_id IN (${params(part)})`).bind(...part),
     ]);
   }
-  return { videos: ids.length, updated, removed, channels: cids.length };
+  return all.length;
 }
 
 /** Is the video publicly visible? (for the static per-video assets) */
