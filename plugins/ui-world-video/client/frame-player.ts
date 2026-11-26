@@ -23,6 +23,8 @@ export const FRAME_PLAYER = Object.freeze({
   bufferAhead: 30,
   /** s a frame may lie after the shown time and still count as at it: rounding of µs timestamps. */
   tolerance: 1e-4,
+  /** Decoder errors in a row without a frame in between after which the video stops for the ride. */
+  maxDecodeFailures: 3,
 });
 
 /**
@@ -34,10 +36,26 @@ export const FRAME_PLAYER = Object.freeze({
  *
  * Where the keyframes are, the video source says (ADR 0101): an MP4's index at once, a Matroska
  * file's cues after a read. It is asked only when the time leaves what was fed.
+ *
+ * A sample the decoder cannot decode (a damaged stretch of a download) closes a WebCodecs decoder.
+ * The player then leaves out the samples from that sample's keyframe to the next one for the rest
+ * of the ride and goes on with a new decoder: the last picture holds only over the broken stretch
+ * (broken-video.feature). A decoder that fails `maxDecodeFailures` times in a row without a frame in
+ * between stops the player, as a failed read does.
  */
 export class FramePlayer<F extends DecodedFrame> {
-  private readonly decoder: FrameDecoder;
+  private decoder: FrameDecoder;
   private buffer: F[] = [];
+  /** Fed samples not decoded yet: their time (µs) and their keyframe's (s), in decode order. */
+  private pending: { timestamp: number; keyframe: number }[] = [];
+  /** The keyframe (s) of the run the last fed sample belongs to. */
+  private feeding = Number.NEGATIVE_INFINITY;
+  /** Keyframes (s) whose run the decoder could not decode: left out for the ride. */
+  private readonly broken = new Set<number>();
+  private readonly newlyBroken: number[] = [];
+  /** The error of the current decoder, until a new one replaces it. */
+  private decodeError: unknown;
+  private decodeFailures = 0;
   /** The samples to feed from the keyframe of the last start; undefined before the first start. */
   private samples: SampleReader | undefined;
   /** The first time the decoder can give since it started again. */
@@ -57,15 +75,29 @@ export class FramePlayer<F extends DecodedFrame> {
 
   constructor(
     private readonly video: VideoSource,
-    createDecoder: (output: (frame: F) => void, error: (error: unknown) => void) => FrameDecoder,
+    private readonly createDecoder: (output: (frame: F) => void, error: (error: unknown) => void) => FrameDecoder,
   ) {
-    this.decoder = createDecoder(
+    this.decoder = this.newDecoder();
+  }
+
+  /** A configured decoder whose errors count only while it is the player's. */
+  private newDecoder(): FrameDecoder {
+    let decoder: FrameDecoder | undefined;
+    decoder = this.createDecoder(
       (frame) => this.receive(frame, this.generation),
       (error) => {
-        this.failure = error;
+        if (decoder === undefined || decoder === this.decoder) {
+          this.decodeError ??= error;
+        }
       },
     );
-    this.decoder.configure();
+    decoder.configure();
+    return decoder;
+  }
+
+  /** The keyframes (s) whose runs were left out since the last call, as the decoder could not decode them. */
+  takeSkipped(): number[] {
+    return this.newlyBroken.splice(0);
   }
 
   /** Why the player stopped, if it did. */
@@ -74,6 +106,9 @@ export class FramePlayer<F extends DecodedFrame> {
   }
 
   frameAt(time: number): F | undefined {
+    if (this.decodeError !== undefined && this.failure === undefined) {
+      this.recover();
+    }
     if (this.failure !== undefined) {
       return undefined;
     }
@@ -103,6 +138,34 @@ export class FramePlayer<F extends DecodedFrame> {
       frame.close();
     }
     this.decoder.close();
+  }
+
+  /**
+   * After a decoder error: leaves out the run of the sample that was not decoded and goes on with a
+   * new decoder from the keyframe of the next shown time; stops after too many errors in a row.
+   */
+  private recover(): void {
+    const error = this.decodeError;
+    this.decodeError = undefined;
+    this.decodeFailures += 1;
+    if (this.decodeFailures >= FRAME_PLAYER.maxDecodeFailures) {
+      this.failure = error;
+      return;
+    }
+    const keyframe = this.pending[0]?.keyframe ?? this.feeding;
+    if (Number.isFinite(keyframe) && !this.broken.has(keyframe)) {
+      this.broken.add(keyframe);
+      this.newlyBroken.push(keyframe);
+    }
+    this.generation += 1;
+    for (const frame of this.buffer.splice(0)) {
+      frame.close();
+    }
+    this.pending = [];
+    this.decoder.close();
+    this.decoder = this.newDecoder();
+    // `locate` starts again at the keyframe of the time; the broken run is left out as it is fed.
+    this.samples = undefined;
   }
 
   /** Finds the keyframe of `time` and starts again there if the decoder cannot reach it in time. */
@@ -145,6 +208,7 @@ export class FramePlayer<F extends DecodedFrame> {
     }
     this.decoder.reset();
     this.decoder.configure();
+    this.pending = [];
     this.samples = this.video.samplesFrom(keyframe);
     this.from = keyframe;
     this.behind = Number.NEGATIVE_INFINITY;
@@ -159,6 +223,10 @@ export class FramePlayer<F extends DecodedFrame> {
       frame.close();
       return;
     }
+    this.decodeFailures = 0;
+    while ((this.pending[0]?.timestamp ?? Number.POSITIVE_INFINITY) <= frame.timestamp) {
+      this.pending.shift();
+    }
     // Frames come out in presentation order; inserting sorted keeps it so whatever the decoder does.
     let at = this.buffer.length;
     while (at > 0 && (this.buffer[at - 1]?.timestamp ?? 0) > frame.timestamp) {
@@ -170,7 +238,7 @@ export class FramePlayer<F extends DecodedFrame> {
   /** Reads and feeds the next samples while the buffer has room; one batch at a time. */
   private pump(): void {
     const { samples } = this;
-    if (this.fetching || this.flushed || samples === undefined) {
+    if (this.fetching || this.flushed || samples === undefined || this.decodeError !== undefined) {
       return;
     }
     if (this.buffer.length + this.decoder.decodeQueueSize >= FRAME_PLAYER.bufferAhead) {
@@ -191,11 +259,18 @@ export class FramePlayer<F extends DecodedFrame> {
           return;
         }
         for (const sample of batch) {
-          this.decoder.decode({ data: sample.data, timestamp: Math.round(sample.time * 1e6), key: sample.key });
           if (sample.key) {
+            this.feeding = sample.time;
             this.fedKeyframe = Math.max(this.fedKeyframe, sample.time);
           }
           this.fedUntil = Math.max(this.fedUntil, sample.time);
+          // A run the decoder could not decode is passed over up to the next keyframe.
+          if (this.broken.has(this.feeding) || this.decodeError !== undefined) {
+            continue;
+          }
+          const timestamp = Math.round(sample.time * 1e6);
+          this.pending.push({ timestamp, keyframe: this.feeding });
+          this.decoder.decode({ data: sample.data, timestamp, key: sample.key });
         }
         this.pump();
       },

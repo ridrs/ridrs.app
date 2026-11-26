@@ -70,6 +70,11 @@ export class RefinedFramePlayer<F extends DecodedFrame> {
     return this.video.restarts;
   }
 
+  /** The video's keyframes (s) whose runs were left out since the last call (broken-video.feature). */
+  takeSkipped(): number[] {
+    return this.video.takeSkipped();
+  }
+
   frameAt(time: number): F | undefined {
     const current = this.stretches.findIndex(
       (stretch, i) => time >= stretch.from && time < stretch.to && this.states[i]?.status !== 'failed',

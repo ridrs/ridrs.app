@@ -290,6 +290,11 @@ function useVideoWorld(ctx: UiContext, route: VideoRoute, track: Track, videoTim
         element.dataset.time = time.toFixed(3);
         element.dataset.restarts = String(player.restarts);
       }
+      for (const keyframe of player.takeSkipped()) {
+        ctx.logger.warn(
+          `The video of "${route.id}" cannot be decoded from ${keyframe.toFixed(3)} s to its next keyframe; it plays on from there`,
+        );
+      }
       for (const { index, reason } of player.takeFailures()) {
         const part = refined[index];
         ctx.logger.warn(
