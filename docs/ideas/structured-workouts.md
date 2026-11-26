@@ -377,6 +377,7 @@ The player starts **simple and robust**; refinement comes later.
 - **Durations:** time as given; distance by the virtual distance; open and `until` until "Next step" on the controller, `until` also once its condition is met.
 - **Controls (ride path):** "Next step" skips. Pause and finish as today.
 - **Precedence:** during a step with a power target only the player sets the target, and `control-erg` ignores its plus and minus buttons (a note in the HUD says so). Changing the intensity with plus and minus is a later refinement.
+- **Leaving ERG:** the rider may leave ERG during a step with a power target (the ERG toggle, or Back on the target). Then the workout sets no target, through every step, and the trainer rides on the gradient and the gears at a load of the rider's own, until the rider enters ERG again and the workout takes the target back at once. Both are rider input (`trainer.erg-requested`), recorded, so a replay and a continued ride do the same.
 - **Bus and replay:** the player publishes `workout.step-changed { stepId, index, startedAt }` as a derived event. A replay gives the same targets at the same times. A skip is rider input and is recorded (rule 13).
 - **End:** ERG off, then a free ride (section 11).
 

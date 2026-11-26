@@ -637,6 +637,18 @@ Then(
   },
 );
 
+Then(
+  "the recording holds the rider's {string} as inputs at {string}",
+  async function (this: RidrsWorld, type: string, list: string) {
+    const times = list.split(',').map((text) => sinceStart(this, text));
+    const recorded = (await lastRecording(this)).events.filter((e) => e.envelope.type === type);
+    assert.deepEqual(
+      recorded.map((e) => ({ input: e.envelope.input, at: e.envelope.timestamp })),
+      times.map((at) => ({ input: true, at })),
+    );
+  },
+);
+
 async function savedRide(world: RidrsWorld): Promise<CompletedWorkout> {
   const sessionId = rides(world).at(-1);
   assert.ok(sessionId, 'Expected a ride');

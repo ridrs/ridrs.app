@@ -32,7 +32,9 @@ const ERG_DEFAULTS = Object.freeze({
  * (structured-workouts.md, section 11a): then plus and minus and the power-up buttons change the
  * workout's intensity instead, by 1 % between 50 % and 150 %, as the input
  * `workout.intensity-changed`, which the player scales the workout's targets by; entering and
- * leaving ERG are ignored. The step comes from `workout.step-changed`, its target from the
+ * leaving ERG are the workout player's: leaving releases the workout's hold on the target, and
+ * until the rider enters ERG again, plus, minus and the power-up buttons change nothing here (the
+ * gears take plus and minus). The step comes from `workout.step-changed`, its target from the
  * workout of the activity state, so the HUD can tell the same from the same two events. A new
  * ride starts at 100 %.
  */
@@ -54,6 +56,8 @@ export default definePlugin({
     let workoutSession: string | undefined;
     let workoutKey: string | undefined;
     let held = false;
+    /** Whether the rider left the workout's ERG during a step with a power target. */
+    let released = false;
     /** % of the workout's targets, as this driver set it last or heard it on the bus. */
     let intensity: number = WORKOUT_INTENSITY.default;
 
@@ -92,10 +96,17 @@ export default definePlugin({
 
     ctx.events.subscribe(trainerErgRequestedEvent, ({ payload }) => {
       if (held) {
-        if (payload.change === 'up' || payload.change === 'down') {
+        if (payload.change === 'leave') {
+          released = true;
+        } else if (payload.change === 'enter') {
+          released = false;
+        } else if (!released) {
           changeIntensity(payload.change);
         }
         return;
+      }
+      if (payload.change === 'enter') {
+        released = false;
       }
       switch (payload.change) {
         case 'enter':
@@ -124,6 +135,9 @@ export default definePlugin({
         if (before.includes(button)) {
           continue;
         }
+        if (held && released) {
+          continue;
+        }
         if (button === 'power-up-right') {
           held ? changeIntensity('up') : raise();
         } else if (button === 'power-up-left') {
@@ -138,6 +152,7 @@ export default definePlugin({
     });
     ctx.events.subscribe(workoutFinishedEvent, () => {
       held = false;
+      released = false;
     });
 
     ctx.events.subscribe(activityStateChangedEvent, ({ payload }) => {
@@ -146,6 +161,7 @@ export default definePlugin({
         workoutSession = undefined;
         workoutKey = undefined;
         held = false;
+        released = false;
         intensity = WORKOUT_INTENSITY.default;
       } else {
         const nextKey = payload.workout ? JSON.stringify(payload.workout.workout) : undefined;

@@ -5,7 +5,7 @@ Feature: The workout player on a ride with the physics, a route and the recorder
   as a free ride on the gradient of the route; when the route ends first, the picture stands still
   and the gradient is 0 % beyond its end (the world says so, as the video world does), the
   workout goes on to its end and then a free ride follows at 0 %. Continuing an interrupted ride
-  goes on at the same step, "Next step" and the workout's intensity are recorded rider input, and a replay gives the same
+  goes on at the same step, "Next step", the workout's intensity and leaving ERG are recorded rider input, and a replay gives the same
   targets and steps at the same times. The workout starts with the ride's time, at the rider's
   first pedal stroke: while the ride waits at its start (the video's lead-in), it holds.
 
@@ -114,6 +114,26 @@ Feature: The workout player on a ride with the physics, a route and the recorder
     And the workout's target power was:
       | at    | target |
       | +5 s  | 202 W  |
+    When the recording is replayed
+    Then the replay is identical
+    And the replay compared every "trainer.target-power" event of the ride, and there was at least one
+
+  Scenario: Leaving the workout's ERG is recorded, and a replay gives the same targets
+    Given the host has started
+    When the rider starts a ride with the workout "Short"
+    And "test-device" delivers only power 200 W every 0.25 s for 5 seconds
+    And the rider asks ERG for "leave"
+    And "test-device" delivers only power 200 W every 0.25 s for 20 more seconds
+    And the rider asks ERG for "enter"
+    And "test-device" delivers only power 200 W every 0.25 s for 10 more seconds
+    And "test-ui" publishes "activity.finish-requested" through the UI bridge
+    Then the recording holds the rider's "trainer.erg-requested" as inputs at "+5 s, +25 s"
+    And the workout's target power was:
+      | at    | target |
+      | +4 s  | 200 W  |
+      | +5 s  | off    |
+      | +24 s | off    |
+      | +26 s | 210 W  |
     When the recording is replayed
     Then the replay is identical
     And the replay compared every "trainer.target-power" event of the ride, and there was at least one

@@ -59,7 +59,9 @@ export type DrivetrainShiftRequestedPayload = z.infer<typeof drivetrainShiftRequ
 /**
  * The rider asks for a change of the ERG target in the activity screen: `enter` starts ERG at the
  * default target, `up` and `down` change it by a step, `leave` ends ERG. The ERG driver turns it
- * into `trainer.target-power`.
+ * into `trainer.target-power`. While a workout step holds the target, `leave` releases the
+ * workout's hold (the trainer rides on the gradient and the gears) until `enter` takes it back:
+ * the workout player follows both.
  */
 export const trainerErgRequestedEvent = defineEvent(
   'trainer.erg-requested',

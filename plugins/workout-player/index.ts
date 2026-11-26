@@ -11,6 +11,7 @@ import {
   physicsStateEvent,
   type TaskId,
   type TemporalSeriesReader,
+  trainerErgRequestedEvent,
   trainerTargetPowerEvent,
   WORKOUT_INTENSITY,
   workoutFinishedEvent,
@@ -31,6 +32,11 @@ interface Ride {
   readonly run: WorkoutRun;
   /** % of the workout's power targets, as the rider set it last. */
   intensity: number;
+  /**
+   * Whether the rider left the workout's ERG: then the workout sets no target, through every
+   * step, until the rider enters ERG again.
+   */
+  released: boolean;
   /** ms ridden up to `since`, or up to the pause. */
   ridden: number;
   /** When the ride ran on last; undefined while it is paused. */
@@ -59,6 +65,11 @@ interface Waiting {
  * target from then on), so a replay computes it again and compares it. A step without an ERG target leaves
  * ERG, and the trainer rides on the gradient of the route; so does the end of the workout
  * (`workout.finished`). It says where it is in `workout.step-changed`.
+ *
+ * The rider may leave the workout's ERG (`trainer.erg-requested` `leave`, rider input, recorded)
+ * during a step with a power target: then the workout sets no target any more, and the trainer
+ * rides on the gradient and the gears at a load of the rider's own, through every step, until the
+ * rider enters ERG again (`enter`) and the workout takes the target back at once.
  *
  * The workout starts with the ride's time: with a motion that waits at the ride's start for its
  * world and the rider's first pedal stroke (`rolling: false`, the video's lead-in), the workout
@@ -161,6 +172,9 @@ export default definePlugin({
       }
       // A step without an ERG target leaves ERG once, when it begins: then the rider may ride it
       // with ERG of their own. A step with one holds its target against every other source.
+      if (current.released) {
+        return;
+      }
       const erg = run.target(progress, current.intensity);
       if (erg !== null || began.length > 0) {
         setTarget(erg);
@@ -196,6 +210,7 @@ export default definePlugin({
         sessionId: currentSessionId,
         run,
         intensity,
+        released: false,
         ridden: 0,
         ...(paused ? {} : { since: from }),
         distance: sessionDistance,
@@ -302,10 +317,35 @@ export default definePlugin({
         return;
       }
       current.intensity = payload.percent;
+      if (current.released) {
+        return;
+      }
       // A step with a power target takes the new intensity at once; one without stays as it is.
       const erg = current.run.target(progressOf(current), current.intensity);
       if (erg !== null) {
         setTarget(erg);
+      }
+    });
+
+    // Leaving ERG during a step with a power target releases the workout's hold on the target;
+    // entering ERG again takes it back. In a step without one, ERG is the rider's own
+    // (`control-erg`), and only entering it ends a release.
+    ctx.events.subscribe(trainerErgRequestedEvent, ({ payload }) => {
+      const current = ride;
+      if (!current) {
+        return;
+      }
+      if (payload.change === 'leave' && !current.released) {
+        if (current.run.target(progressOf(current), current.intensity) !== null) {
+          current.released = true;
+          setTarget(null);
+        }
+      } else if (payload.change === 'enter' && current.released) {
+        current.released = false;
+        const erg = current.run.target(progressOf(current), current.intensity);
+        if (erg !== null) {
+          setTarget(erg);
+        }
       }
     });
 
