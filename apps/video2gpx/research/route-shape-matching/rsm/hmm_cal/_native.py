@@ -55,6 +55,18 @@ def _bind(p: Path):
     lib = ctypes.CDLL(str(p))
     lib.viterbi_scan_batches.argtypes = [ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_Batch4Job)]
     lib.viterbi_scan_batches.restype = None
+    lib.viterbi_range.argtypes = [
+        ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBase),
+        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_float, ctypes.c_int32,
+        ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_int32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_int32), ctypes.c_void_p,
+        ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.c_int32, ctypes.c_void_p,
+    ]
+    lib.viterbi_range.restype = ctypes.c_float
     lib.viterbi_single.argtypes = [
         ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_GroupBase),
         ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
@@ -94,7 +106,7 @@ def _load():
             continue
         try:
             return _bind(p)
-        except OSError:
+        except (OSError, AttributeError):
             continue
     return None
 
@@ -268,10 +280,11 @@ def viterbi_scan(grid, base_par, st, a_angs, start_ok=None, end_ok=None, step_ok
     return out
 
 
-def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step_ok=None, s_lp=None, e_lp=None) -> dict:
+def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step_ok=None, s_lp=None, e_lp=None, block: int | None = None) -> dict:
+    from rsm.hmm.grid import ckpt_block
+    from . import dp as _dp
     grid, par = pre.grid, pre.par
     N, T, n_g = grid.N, st.T, len(grid.groups)
-    from . import dp as _dp
     ut_on = par.ut_extra > 0
     gbases, grefs = _pack_groups(grid, pre.loc if backptr else None, ut=ut_on)
     utes = np.ascontiguousarray(_dp.ut_cost(par, st), np.float32) if ut_on else None
@@ -283,23 +296,43 @@ def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step
     dths = np.ascontiguousarray(np.nan_to_num(st.dth * par.a_ang, nan=0.0), np.float32)
     a0, end_arr = _init_end_arrays(N, start_ok, end_ok, step_ok, s_lp, e_lp)
     n_so, so_steps, so_ptrs, so_refs = _pack_step_ok(step_ok, N)
+    so_ptr_arg = so_ptrs if so_ptrs is not None else ctypes.POINTER(ctypes.c_void_p)()
     is_jump = np.ascontiguousarray(st.jump, np.uint8) if getattr(st, "jump", None) is not None else None
     jump_src = np.full(T, -1, np.int32) if (backptr and is_jump is not None) else None
-    bps = np.empty((max(0, T - 1), N), np.uint16) if backptr else None
+    B = ckpt_block(T) if block is None else max(1, int(block))
+    use_ckpt = backptr and T > 2 and B < T - 1
     final_cell = ctypes.c_int32(-1)
-    best = float(LIB.viterbi_single(
-        N, T, n_g, gbases, ls_ptrs, is2_ptrs,
-        mus.ctypes.data, sds.ctypes.data, has_dth.ctypes.data, dths.ctypes.data,
-        float(pre.c1), int(par.slot_bits),
-        a0.ctypes.data, end_arr.ctypes.data if end_arr is not None else 0,
-        n_so, so_steps.ctypes.data if so_steps is not None else 0,
-        so_ptrs if so_ptrs is not None else ctypes.POINTER(ctypes.c_void_p)(),
-        bps.ctypes.data if bps is not None else 0,
-        ctypes.byref(final_cell),
-        utes.ctypes.data if utes is not None else 0,
-        is_jump.ctypes.data if is_jump is not None else 0,
-        jump_src.ctypes.data if jump_src is not None else 0,
-    ))
+    if use_ckpt:
+        M = (T - 2) // B + 1
+        ckpts = np.empty((M, N), np.float32)
+        best = float(LIB.viterbi_range(
+            N, 1, T, n_g, gbases, ls_ptrs, is2_ptrs,
+            mus.ctypes.data, sds.ctypes.data, has_dth.ctypes.data, dths.ctypes.data,
+            float(pre.c1), int(par.slot_bits),
+            a0.ctypes.data, end_arr.ctypes.data if end_arr is not None else 0,
+            n_so, so_steps.ctypes.data if so_steps is not None else 0, so_ptr_arg,
+            0, ctypes.byref(final_cell),
+            utes.ctypes.data if utes is not None else 0,
+            is_jump.ctypes.data if is_jump is not None else 0,
+            jump_src.ctypes.data if jump_src is not None else 0,
+            B, ckpts.ctypes.data,
+        ))
+        bps = None
+    else:
+        ckpts = None
+        bps = np.empty((max(0, T - 1), N), np.uint16) if backptr else None
+        best = float(LIB.viterbi_single(
+            N, T, n_g, gbases, ls_ptrs, is2_ptrs,
+            mus.ctypes.data, sds.ctypes.data, has_dth.ctypes.data, dths.ctypes.data,
+            float(pre.c1), int(par.slot_bits),
+            a0.ctypes.data, end_arr.ctypes.data if end_arr is not None else 0,
+            n_so, so_steps.ctypes.data if so_steps is not None else 0, so_ptr_arg,
+            bps.ctypes.data if bps is not None else 0,
+            ctypes.byref(final_cell),
+            utes.ctypes.data if utes is not None else 0,
+            is_jump.ctypes.data if is_jump is not None else 0,
+            jump_src.ctypes.data if jump_src is not None else 0,
+        ))
     c = int(final_cell.value)
     if c < 0 or not np.isfinite(best):
         return dict(score=float("-inf"), final_cell=-1, cell_path=None)
@@ -309,18 +342,52 @@ def viterbi_one(pre, st, backptr: bool = False, start_ok=None, end_ok=None, step
         path = np.empty(T, np.int64)
         path[-1] = c
         mask = (1 << par.slot_bits) - 1
-        for j in range(T - 1, 0, -1):
-            if jump_src is not None and jump_src[j] >= 0:
-                c = int(jump_src[j])
+        if use_ckpt:
+            block_bps = np.empty((B, N), np.uint16)
+            null_fc = ctypes.POINTER(ctypes.c_int32)()
+            broken = False
+            for b in range(M - 1, -1, -1):
+                t0 = b * B
+                t1 = min(t0 + B, T - 1)
+                LIB.viterbi_range(
+                    N, t0 + 1, t1 + 1, n_g, gbases, ls_ptrs, is2_ptrs,
+                    mus.ctypes.data, sds.ctypes.data, has_dth.ctypes.data, dths.ctypes.data,
+                    float(pre.c1), int(par.slot_bits),
+                    ckpts[b].ctypes.data, 0,
+                    n_so, so_steps.ctypes.data if so_steps is not None else 0, so_ptr_arg,
+                    block_bps.ctypes.data, null_fc,
+                    utes.ctypes.data if utes is not None else 0,
+                    is_jump.ctypes.data if is_jump is not None else 0,
+                    0, 0, 0,
+                )
+                for j in range(t1, t0, -1):
+                    if jump_src is not None and jump_src[j] >= 0:
+                        c = int(jump_src[j])
+                        path[j - 1] = c
+                        continue
+                    cd = int(block_bps[j - t0 - 1, c])
+                    if cd == 65535:
+                        path[:j] = -1
+                        broken = True
+                        break
+                    gr = grid.groups[cd >> par.slot_bits]
+                    c = int(gr.src[gr.starts[gr.first[c]] + (cd & mask)])
+                    path[j - 1] = c
+                if broken:
+                    break
+        else:
+            for j in range(T - 1, 0, -1):
+                if jump_src is not None and jump_src[j] >= 0:
+                    c = int(jump_src[j])
+                    path[j - 1] = c
+                    continue
+                cd = int(bps[j - 1, c])
+                if cd == 65535:
+                    path[:j] = -1
+                    break
+                gr = grid.groups[cd >> par.slot_bits]
+                c = int(gr.src[gr.starts[gr.first[c]] + (cd & mask)])
                 path[j - 1] = c
-                continue
-            cd = int(bps[j - 1, c])
-            if cd == 65535:
-                path[:j] = -1
-                break
-            gr = grid.groups[cd >> par.slot_bits]
-            c = int(gr.src[gr.starts[gr.first[c]] + (cd & mask)])
-            path[j - 1] = c
         out["cell_path"] = path
     return out
 
@@ -329,6 +396,9 @@ class FBContext:
     """pre-packed C views for fast forward-backward steps on a Prepared HMM"""
 
     def __init__(self, pre):
+        if not hasattr(pre, "_border"):
+            from . import dp as _dp
+            _dp._prep_border(pre)
         grid = pre.grid
         n_g = len(grid.groups)
         self.N = grid.N

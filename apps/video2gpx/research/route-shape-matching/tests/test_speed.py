@@ -145,6 +145,87 @@ def test_native_hmm_charges_the_no_video_uturn_cost_like_numpy():
     assert np.all(sc_nat <= sc_off + 1e-4)          # the cost only ever lowers a score
 
 
+@pytest.mark.parametrize("use_native", [False, True])
+def test_checkpointed_viterbi_and_fb_are_bit_identical_to_direct(use_native):
+    if use_native and not N.available():
+        pytest.skip("native HMM library not compiled for this platform")
+    g = _toy_graph()
+    G = grid.build(g, h=30.0, sm=10.0, **C.UTURN)
+    # Backward view is built lazily: absent after grid.build() and dp.prepare()
+    assert all("b_dst" not in gr.__dict__ for gr in G.groups)
+    par = dp.Par(kappa=1.0, a_ang=C.F_REF / C.F_GRID[2], ut_extra=20.0, ut_video_deg=135.0, ut_win_m=60.0)
+    pre = dp.prepare(G, par)
+    assert all("b_dst" not in gr.__dict__ for gr in G.groups)
+
+    # Test boundary lengths including T=1, T=2, exact multiples of block=5, and cuts/masks on block boundaries
+    start_ok = np.zeros(G.N, bool); start_ok[: max(2, G.N // 3)] = True
+    end_ok = np.zeros(G.N, bool); end_ok[G.N // 2 :] = True
+    s_lp = -0.05 * np.arange(G.N, dtype=np.float32)
+    e_lp = -0.02 * np.arange(G.N, dtype=np.float32)[::-1].copy()
+
+    saved_lib = N.LIB
+    old_hook = dp.FRAME_PRIOR_HOOK
+    if not use_native:
+        N.LIB = None
+    dp.FRAME_PRIOR_HOOK = lambda _g: (s_lp, e_lp)
+    try:
+        for n_steps in (1, 2, 5, 6, 10, 11, 24):
+            st = _toy_steps(n_steps) if n_steps >= 6 else seq.Steps(
+                t=np.arange(n_steps, dtype=float) * 3.0,
+                dth=np.r_[np.nan, np.zeros(max(0, n_steps - 1))],
+                mu=np.r_[0.0, np.full(max(0, n_steps - 1), 30.0)],
+                rel=np.full(n_steps, 0.2), v=np.full(n_steps, 10.0),
+                gap=np.zeros(n_steps, bool), seg=np.zeros(n_steps, int), d0=30.0,
+            )
+            if n_steps >= 11:
+                jump = np.zeros(n_steps, bool)
+                jump[5] = True       # jump right on block boundary (B=5)
+                jump[8] = True       # jump inside a block
+                jump[n_steps - 1] = (n_steps == 11)   # jump at final step
+                st = st.copy(jump=jump)
+            step_ok = {}
+            if n_steps > 5:
+                step_ok[5] = (np.arange(G.N) % 2 == 0)
+            if n_steps > 7:
+                step_ok[7] = (np.arange(G.N) % 3 != 0)
+            if n_steps > 1:
+                step_ok[0] = (np.arange(G.N) % 2 == 0) | start_ok
+
+            vit_dir = dp.viterbi(pre, st, backptr=True, start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, block=n_steps + 1)
+            vit_ck = dp.viterbi(pre, st, backptr=True, start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, block=5)
+            assert vit_ck["score"] == vit_dir["score"]
+            assert vit_ck["final_cell"] == vit_dir["final_cell"]
+            assert np.array_equal(vit_ck["cell_path"], vit_dir["cell_path"])
+
+            if n_steps == 1:
+                continue
+            # Backward view is still lazy until forward_backward runs
+            if n_steps == 2:
+                assert all("b_dst" not in gr.__dict__ for gr in G.groups)
+            fb_dir = dp.forward_backward(pre, st, vit_dir["cell_path"], start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, block=n_steps + 1)
+            fb_ck = dp.forward_backward(pre, st, vit_ck["cell_path"], start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, block=5)
+            assert all("b_dst" in gr.__dict__ for gr in G.groups)
+            assert fb_ck["logev"] == fb_dir["logev"]
+            assert np.array_equal(fb_ck["p_vit"], fb_dir["p_vit"], equal_nan=True)
+            assert np.array_equal(fb_ck["p_max"], fb_dir["p_max"])
+            assert np.array_equal(fb_ck["e_max"], fb_dir["e_max"])
+            assert np.array_equal(fb_ck["ent"], fb_dir["ent"])
+
+        # Also verify steps_c.forward_backward_cb matches direct bit-for-bit with monotonic progress
+        st24 = _toy_steps(24)
+        jump24 = np.zeros(24, bool); jump24[10] = True
+        st24 = st24.copy(jump=jump24)
+        prog = []
+        cb = lambda j, p: (float(p.max()), int(np.argmax(p)))
+        out_dir = SC.forward_backward_cb(pre, st24, cb, lambda _p: None, start_ok=start_ok, end_ok=end_ok, block=100)
+        out_ck = SC.forward_backward_cb(pre, st24, cb, prog.append, start_ok=start_ok, end_ok=end_ok, block=5)
+        assert out_ck == out_dir
+        assert prog == sorted(prog) and all(0.0 <= x <= 100.0 for x in prog)
+    finally:
+        N.LIB = saved_lib
+        dp.FRAME_PRIOR_HOOK = old_hook
+
+
 # ------------------------------------------------------------------ parallel interpret parity
 def test_parallel_interpret_is_byte_identical_to_single_worker(tmp_path):
     from tests.test_insight import _encode, _world

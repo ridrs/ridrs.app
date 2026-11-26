@@ -120,7 +120,7 @@ def local_pass(d: Path, P: dict, W: Worker, g, E, tracks, route: dict, vehicle: 
     h = C.LOCAL_D0 * k
     cost = minor_cost(gl, Ec, vehicle)
     G = grid.build(gl, Ec, h=h, sm=10.0 * k, edge_cost=cost, **C.UTURN)
-    grid.check_budget(G.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True)
+    grid.check_budget(G.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True, checkpointed=True)
     par = dataclasses.replace(dp.Par(**C.UTURN_PAR), a_ang=float(route["a_ang"]), kappa=k)
     pre = dp.prepare(G, par)
     sm, em = frame_masks(gl, G, route.get("cons"))

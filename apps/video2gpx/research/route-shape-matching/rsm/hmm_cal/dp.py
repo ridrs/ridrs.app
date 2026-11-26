@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from rsm.hmm.grid import Grid, check_budget
+from rsm.hmm.grid import Grid, check_budget, ckpt_block
 from rsm.hmm.seq import Steps
 from . import _native as _N
 
@@ -159,60 +159,76 @@ def viterbi_scan(grid: Grid, base_par: Par, st: Steps, a_angs, start_ok=None, en
     return _N.viterbi_scan(grid, base_par, st, a_angs, start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, s_lp=s_lp, e_lp=e_lp, threads=threads)
 
 
-def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0, start_ok=None, end_ok=None, step_ok: dict | None = None):
+def _viterbi_step(pre: Prepared, grid: Grid, st: Steps, a: np.ndarray, j: int, is_jump, step_ok, need_code: bool):
+    N = grid.N
+    if is_jump is not None and is_jump[j]:
+        best_prev = int(np.argmax(a))
+        m_prev = a[best_prev]
+        new = np.full(N, m_prev if np.isfinite(m_prev) else NEG, np.float32)
+        if step_ok and j in step_ok:
+            new = np.where(step_ok[j], new, NEG).astype(np.float32)
+        return new, None, best_prev
+    mu, sd, dth = _step_terms(pre, st, j)
+    new = np.full(N, NEG, np.float32)
+    code = np.full(N, 65535, np.uint16) if need_code else None
+    for gi, gr in enumerate(grid.groups):
+        if _skip(gr, mu, sd):
+            continue
+        cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
+        m = np.maximum.reduceat(cand, gr.starts)
+        if need_code:
+            eq = cand == m[gr.blk]
+            slot = np.minimum.reduceat(np.where(eq, pre.loc[gi], np.uint16(65535)), gr.starts)
+            better = m > new[gr.ud]
+            bu = gr.ud[better]
+            code[bu] = (np.uint16(gi) << np.uint16(pre.par.slot_bits)) | slot[better]
+            new[bu] = m[better]
+        else:
+            new[gr.ud] = np.maximum(new[gr.ud], m)
+    if step_ok and j in step_ok:
+        new = np.where(step_ok[j], new, NEG).astype(np.float32)
+    return new, code, -1
+
+
+def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0, start_ok=None, end_ok=None, step_ok: dict | None = None, block: int | None = None):
     """-> dict(score = best total log score, cell_path (T,) or None). Score has no initial prior constant.
     start_ok / end_ok (optional bool arrays over the cells): the path must start in / end in these cells (area hints). If no path satisfies them, score = -inf and cell_path None.
-    step_ok (optional {step j: bool array over the cells}): the path must be in these cells at step j (anchors inside the video; j = 0 acts like start_ok)."""
+    step_ok (optional {step j: bool array over the cells}): the path must be in these cells at step j (anchors inside the video; j = 0 acts like start_ok).
+    backptr=True uses sqrt(T) block checkpointing (O(N sqrt(T)) memory, bit-identical to full backpointer storage)."""
     grid = pre.grid
     if STEP_OK_HOOK is not None:
         step_ok = STEP_OK_HOOK(grid, st, step_ok)
-    N = grid.N
+    N, T = grid.N, st.T
     if backptr:
-        check_budget(N, st.T, bp_bytes=2, forward_backward=False)
+        check_budget(N, T, bp_bytes=2, forward_backward=False, checkpointed=True)
     s_lp, e_lp = FRAME_PRIOR_HOOK(grid) if FRAME_PRIOR_HOOK is not None else (None, None)
     if _N.available():
-        return _N.viterbi_one(pre, st, backptr=backptr, start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, s_lp=s_lp, e_lp=e_lp)
+        return _N.viterbi_one(pre, st, backptr=backptr, start_ok=start_ok, end_ok=end_ok, step_ok=step_ok, s_lp=s_lp, e_lp=e_lp, block=block)
     a = np.zeros(N, np.float32) if start_ok is None else np.where(start_ok, np.float32(0), NEG).astype(np.float32)
     if step_ok and 0 in step_ok:
         a = np.where(step_ok[0], a, NEG).astype(np.float32)
     if s_lp is not None:
         a = (a + s_lp).astype(np.float32)
-    bps = [] if backptr else None
+    B = ckpt_block(T) if block is None else max(1, int(block))
+    use_ckpt = backptr and T > 2 and B < T - 1
     is_jump = st.jump
-    jump_src = np.full(st.T, -1, np.int32) if backptr else None
-    for j in range(1, st.T):
-        if is_jump is not None and is_jump[j]:
-            best_prev = int(np.argmax(a))
-            m_prev = a[best_prev]
-            new = np.full(N, m_prev if np.isfinite(m_prev) else NEG, np.float32)
-            if step_ok and j in step_ok:
-                new = np.where(step_ok[j], new, NEG).astype(np.float32)
-            a = new
-            if backptr:
-                jump_src[j] = best_prev
-                bps.append(None)
-            continue
-        mu, sd, dth = _step_terms(pre, st, j)
-        new = np.full(N, NEG, np.float32)
-        code = np.full(N, 65535, np.uint16) if backptr else None
-        for gi, gr in enumerate(grid.groups):
-            if _skip(gr, mu, sd):
-                continue
-            cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
-            m = np.maximum.reduceat(cand, gr.starts)
-            if backptr:
-                eq = cand == m[gr.blk]
-                slot = np.minimum.reduceat(np.where(eq, pre.loc[gi], np.uint16(65535)), gr.starts)
-                better = m > new[gr.ud]
-                bu = gr.ud[better]
-                code[bu] = (np.uint16(gi) << np.uint16(pre.par.slot_bits)) | slot[better]
-                new[bu] = m[better]
-            else:
-                new[gr.ud] = np.maximum(new[gr.ud], m)
-        if step_ok and j in step_ok:
-            new = np.where(step_ok[j], new, NEG).astype(np.float32)
-        a = new
-        if backptr:
+    jump_src = np.full(T, -1, np.int32) if backptr else None
+    if use_ckpt:
+        M = (T - 2) // B + 1
+        ckpts = np.empty((M, N), np.float32)
+        ckpts[0] = a
+        bps = None
+    else:
+        ckpts = None
+        bps = [] if backptr else None
+    for j in range(1, T):
+        a, code, jprev = _viterbi_step(pre, grid, st, a, j, is_jump, step_ok, need_code=bool(backptr and not use_ckpt))
+        if backptr and jprev >= 0:
+            jump_src[j] = jprev
+        if use_ckpt:
+            if j < T - 1 and j % B == 0:
+                ckpts[j // B] = a
+        elif backptr:
             bps.append(code)
     if end_ok is not None:
         a = np.where(end_ok, a, NEG).astype(np.float32)
@@ -225,21 +241,47 @@ def viterbi(pre: Prepared, st: Steps, backptr: bool = False, log_every: int = 0,
     jac = float(np.count_nonzero(~np.isnan(st.dth[1:])) * np.log(pre.par.a_ang))
     out = dict(score=float(a[c]) + jac, final_cell=c, cell_path=None)
     if backptr:
-        path = np.empty(st.T, np.int64)
+        path = np.empty(T, np.int64)
         path[-1] = c
         mask = (1 << pre.par.slot_bits) - 1
-        for j in range(st.T - 1, 0, -1):
-            if jump_src[j] >= 0:
-                c = int(jump_src[j])
+        if use_ckpt:
+            broken = False
+            for b in range(M - 1, -1, -1):
+                t0 = b * B
+                t1 = min(t0 + B, T - 1)
+                a_blk = ckpts[b]
+                blk_bps = []
+                for j in range(t0 + 1, t1 + 1):
+                    a_blk, code, _ = _viterbi_step(pre, grid, st, a_blk, j, is_jump, step_ok, need_code=True)
+                    blk_bps.append(code)
+                for j in range(t1, t0, -1):
+                    if jump_src[j] >= 0:
+                        c = int(jump_src[j])
+                        path[j - 1] = c
+                        continue
+                    cd = int(blk_bps[j - t0 - 1][c])
+                    if cd == 65535:
+                        path[:j] = -1
+                        broken = True
+                        break
+                    gr = grid.groups[cd >> pre.par.slot_bits]
+                    c = int(gr.src[gr.starts[gr.first[c]] + (cd & mask)])
+                    path[j - 1] = c
+                if broken:
+                    break
+        else:
+            for j in range(T - 1, 0, -1):
+                if jump_src[j] >= 0:
+                    c = int(jump_src[j])
+                    path[j - 1] = c
+                    continue
+                cd = int(bps[j - 1][c])
+                if cd == 65535:
+                    path[:j] = -1
+                    break
+                gr = grid.groups[cd >> pre.par.slot_bits]
+                c = int(gr.src[gr.starts[gr.first[c]] + (cd & mask)])
                 path[j - 1] = c
-                continue
-            cd = int(bps[j - 1][c])
-            if cd == 65535:
-                path[:j] = -1
-                break
-            gr = grid.groups[cd >> pre.par.slot_bits]
-            c = int(gr.src[gr.starts[gr.first[c]] + (cd & mask)])
-            path[j - 1] = c
         out["cell_path"] = path
     return out
 
@@ -251,63 +293,103 @@ def _lse_reduce(cand, starts, blk):
     return ms + np.log(np.maximum(s, np.float32(1e-38))), np.isfinite(m)
 
 
-def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: float = 4.0, start_ok=None, end_ok=None, step_ok: dict | None = None):
-    """posterior per step. Returns dict(logev = log evidence (no prior constant), p_vit (mass of the Viterbi cell's directed edge), p_max (largest edge mass),
+def _fb_fwd_step(pre: Prepared, fb_c, grid: Grid, st: Steps, a: np.ndarray, j: int, is_jump, step_ok):
+    N = grid.N
+    if is_jump is not None and is_jump[j]:
+        mx_a = a.max()
+        new = np.full(N, np.float32(-np.log(N)) if np.isfinite(mx_a) else NEG, np.float32)
+    else:
+        mu, sd, dth = _step_terms(pre, st, j)
+        if fb_c is not None:
+            new = fb_c.forward_step(a, mu, sd, dth)
+        else:
+            new = np.full(N, NEG, np.float32)
+            for gi, gr in enumerate(grid.groups):
+                if _skip(gr, mu, sd):
+                    continue
+                cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
+                lse, ok = _lse_reduce(cand, gr.starts, gr.blk)
+                lse = np.where(ok, lse, NEG)
+                tmp = np.full(N, NEG, np.float32)
+                tmp[gr.ud] = lse
+                new = np.logaddexp(new, tmp)
+    if step_ok and j in step_ok:
+        new = np.where(step_ok[j], new, NEG).astype(np.float32)
+    mx = new.max()
+    c = mx + np.log(np.exp(new - mx).sum())
+    return new - c, float(c)
+
+
+def _fb_bwd_step(pre: Prepared, fb_c, grid: Grid, st: Steps, beta: np.ndarray, j: int, is_jump):
+    N = grid.N
+    if is_jump is not None and is_jump[j]:
+        return np.zeros(N, np.float32) if np.isfinite(beta.max()) else np.full(N, NEG, np.float32)
+    mu, sd, dth = _step_terms(pre, st, j)
+    if fb_c is not None:
+        nb = fb_c.backward_step(beta, mu, sd, dth)
+    else:
+        nb = np.full(N, NEG, np.float32)
+        for gi, gr in enumerate(grid.groups):
+            if _skip(gr, mu, sd):
+                continue
+            cand = beta[gr.b_dst] + _cand(pre, gi, mu, sd, dth, None, view="b")
+            lse, ok = _lse_reduce(cand, gr.b_starts, gr.b_blk)
+            lse = np.where(ok, lse, NEG)
+            tmp = np.full(N, NEG, np.float32)
+            tmp[gr.b_us] = lse
+            nb = np.logaddexp(nb, tmp)
+    return nb - nb.max()
+
+
+def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: float = 4.0, start_ok=None, end_ok=None, step_ok: dict | None = None, block: int | None = None):
+    """posterior per step (sqrt(T) block-checkpointed, O(N sqrt(T)) memory, bit-identical to full alpha storage).
+    Returns dict(logev = log evidence (no prior constant), p_vit (mass of the Viterbi cell's directed edge), p_max (largest edge mass),
     e_max (edge with the largest mass, graph edge id), p_twin (mass on the Viterbi edge or its direction-reversed edges is NOT computed here), ent (edge entropy, nats))."""
     grid = pre.grid
     if STEP_OK_HOOK is not None:
         step_ok = STEP_OK_HOOK(grid, st, step_ok)
     N, T = grid.N, st.T
-    check_budget(N, T, bp_bytes=0, alpha_bytes=2, cap_gb=cap_gb)
+    check_budget(N, T, bp_bytes=0, alpha_bytes=2, cap_gb=cap_gb, checkpointed=True)
     if not hasattr(pre, "_border"):
         _prep_border(pre)
-    al = np.empty((T, N), np.float16)
     a = np.full(N, -np.log(N), np.float32) if start_ok is None else _log_uniform(start_ok)
     if step_ok and 0 in step_ok:
         a = _log_uniform(step_ok[0] if start_ok is None else (step_ok[0] & start_ok))
     a = start_prior(grid, a)
-    al[0] = a
+    B = ckpt_block(T) if block is None else max(1, int(block))
+    use_ckpt = T > 1 and B < T
     logev = 0.0
     fb_c = _N.FBContext(pre) if _N.available() else None
     is_jump = st.jump
-    for j in range(1, T):
-        if is_jump is not None and is_jump[j]:
-            mx_a = a.max()
-            new = np.full(N, np.float32(-np.log(N)) if np.isfinite(mx_a) else NEG, np.float32)
-        else:
-            mu, sd, dth = _step_terms(pre, st, j)
-            if fb_c is not None:
-                new = fb_c.forward_step(a, mu, sd, dth)
-            else:
-                new = np.full(N, NEG, np.float32)
-                for gi, gr in enumerate(grid.groups):
-                    if _skip(gr, mu, sd):
-                        continue
-                    cand = a[gr.src] + _cand(pre, gi, mu, sd, dth, a)
-                    lse, ok = _lse_reduce(cand, gr.starts, gr.blk)
-                    lse = np.where(ok, lse, NEG)
-                    tmp = np.full(N, NEG, np.float32)
-                    tmp[gr.ud] = lse
-                    new = np.logaddexp(new, tmp)
-        if step_ok and j in step_ok:
-            new = np.where(step_ok[j], new, NEG).astype(np.float32)
-        mx = new.max()
-        c = mx + np.log(np.exp(new - mx).sum())
-        logev += float(c)
-        a = new - c
-        al[j] = np.maximum(a, -60000).astype(np.float16)
+    if use_ckpt:
+        M = (T + B - 1) // B
+        ckpts = np.empty((M, N), np.float32)
+        ckpts[0] = a
+        for j in range(1, T):
+            a, c = _fb_fwd_step(pre, fb_c, grid, st, a, j, is_jump, step_ok)
+            logev += c
+            if j % B == 0:
+                ckpts[j // B] = a
+        al = None
+    else:
+        al = np.empty((T, N), np.float16)
+        al[0] = a
+        for j in range(1, T):
+            a, c = _fb_fwd_step(pre, fb_c, grid, st, a, j, is_jump, step_ok)
+            logev += c
+            al[j] = np.maximum(a, -60000).astype(np.float16)
     logev += float(np.count_nonzero(~np.isnan(st.dth[1:])) * np.log(pre.par.a_ang))
-    ne = len(grid.edges)
     es = grid.estart[:-1]
     p_vit = np.full(T, np.nan); p_max = np.zeros(T); e_max = np.zeros(T, np.int64); ent = np.zeros(T)
     beta = np.zeros(N, np.float32) if end_ok is None else np.where(end_ok, np.float32(0), NEG).astype(np.float32)
     e_lp = end_prior(grid)
     if e_lp is not None:
         beta = (beta + e_lp).astype(np.float32)
-    for j in range(T - 1, -1, -1):
+
+    def _emit_post(j: int, al_row: np.ndarray, b_vec: np.ndarray) -> np.ndarray:
         if step_ok and j in step_ok:
-            beta = np.where(step_ok[j], beta, NEG).astype(np.float32)
-        g_ = al[j].astype(np.float32) + beta
+            b_vec = np.where(step_ok[j], b_vec, NEG).astype(np.float32)
+        g_ = al_row.astype(np.float32) + b_vec
         mx = g_.max()
         p = np.exp(g_ - mx)
         p /= p.sum()
@@ -317,27 +399,29 @@ def forward_backward(pre: Prepared, st: Steps, cell_path: np.ndarray, cap_gb: fl
         ent[j] = float(-(nz * np.log(nz)).sum())
         if cell_path is not None and cell_path[j] >= 0:
             p_vit[j] = float(em[grid.cell_ei[cell_path[j]]])
-        if j == 0:
-            break
-        if is_jump is not None and is_jump[j]:
-            beta = np.zeros(N, np.float32) if np.isfinite(beta.max()) else np.full(N, NEG, np.float32)
-            continue
-        mu, sd, dth = _step_terms(pre, st, j)
-        if fb_c is not None:
-            nb = fb_c.backward_step(beta, mu, sd, dth)
-        else:
-            nb = np.full(N, NEG, np.float32)
-            for gi, gr in enumerate(grid.groups):
-                if _skip(gr, mu, sd):
-                    continue
-                cand = beta[gr.b_dst] + _cand(pre, gi, mu, sd, dth, None, view="b")
-                lse, ok = _lse_reduce(cand, gr.b_starts, gr.b_blk)
-                lse = np.where(ok, lse, NEG)
-                tmp = np.full(N, NEG, np.float32)
-                tmp[gr.b_us] = lse
-                nb = np.logaddexp(nb, tmp)
-        mx = nb.max()
-        beta = nb - mx
+        return b_vec
+
+    if use_ckpt:
+        block_al = np.empty((B, N), np.float16)
+        for b in range(M - 1, -1, -1):
+            t0 = b * B
+            t1 = min(t0 + B, T)
+            a_blk = ckpts[b]
+            block_al[0] = a_blk if t0 == 0 else np.maximum(a_blk, -60000).astype(np.float16)
+            for j in range(t0 + 1, t1):
+                a_blk, _ = _fb_fwd_step(pre, fb_c, grid, st, a_blk, j, is_jump, step_ok)
+                block_al[j - t0] = np.maximum(a_blk, -60000).astype(np.float16)
+            for j in range(t1 - 1, t0 - 1, -1):
+                beta = _emit_post(j, block_al[j - t0], beta)
+                if j == 0:
+                    break
+                beta = _fb_bwd_step(pre, fb_c, grid, st, beta, j, is_jump)
+    else:
+        for j in range(T - 1, -1, -1):
+            beta = _emit_post(j, al[j], beta)
+            if j == 0:
+                break
+            beta = _fb_bwd_step(pre, fb_c, grid, st, beta, j, is_jump)
     return dict(logev=logev, p_vit=p_vit, p_max=p_max, e_max=e_max, ent=ent)
 
 
@@ -364,6 +448,4 @@ def _log_uniform(ok) -> np.ndarray:
 
 
 def prepare(grid: Grid, par: Par) -> Prepared:
-    pre = Prepared(grid, par)
-    _prep_border(pre)
-    return pre
+    return Prepared(grid, par)

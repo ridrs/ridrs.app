@@ -188,7 +188,7 @@ def refine_islands(d: Path, P: dict, W, g, E, route: dict, vehicle: str, st, tra
             continue
         Gp = grid.build(gx, Ex, h=h, sm=10.0 * k, edge_cost=cost_of(Ex), **C.UTURN)
         try:
-            grid.check_budget(Gp.N, b - a + 1, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=False)
+            grid.check_budget(Gp.N, b - a + 1, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=False, checkpointed=True)
         except MemoryError:
             info["parts"].append(dict(kind=kind, t0=float(st.t[a]), t1=float(st.t[b]), skipped="too large"))
             continue
@@ -288,7 +288,7 @@ def refine_islands(d: Path, P: dict, W, g, E, route: dict, vehicle: str, st, tra
     Ef = np.union1d(HI.corridor_edges(gx, allE[np.isin(hw_all, list(loc_cls))], [sxy, loc_xy], C.LOCAL_BUF_M), np.unique(np.concatenate(part_edges)))
     cost = cost_of(Ef)
     Gf = grid.build(gx, Ef, h=h, sm=10.0 * k, edge_cost=cost, **C.UTURN)
-    grid.check_budget(Gf.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True)
+    grid.check_budget(Gf.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True, checkpointed=True)
     pref = dp.prepare(Gf, par)
     nbf = lambda xy: np.hypot(Gf.xy[:, 0] - xy[0], Gf.xy[:, 1] - xy[1]) <= R
     step_ok = {j: nbf(loc_xy[j]) for j in range(1, st.T, 2) if isl[j] and cp[j] >= 0}

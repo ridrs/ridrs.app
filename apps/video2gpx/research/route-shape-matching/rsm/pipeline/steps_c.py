@@ -43,81 +43,79 @@ class PathMoments(post.PathMean):
         return float(mu), float(m), float(np.sqrt((w * (arcs - mu) ** 2).sum() / m))
 
 
-def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None):
-    """rsm.refine.post.forward_backward_cb with progress (forward pass 0-50 %, backward 50-100 %)"""
+def forward_backward_cb(pre, st, cb, progress, start_ok=None, end_ok=None, block: int | None = None):
+    """rsm.refine.post.forward_backward_cb with progress (sqrt(T) block-checkpointed, O(N sqrt(T)) memory, bit-identical to full alpha storage)."""
     G = pre.grid
     N, T_ = G.N, st.T
-    grid.check_budget(N, T_, bp_bytes=0, alpha_bytes=2, cap_gb=C.HMM_CAP_GB)
+    grid.check_budget(N, T_, bp_bytes=0, alpha_bytes=2, cap_gb=C.HMM_CAP_GB, checkpointed=True)
     NEG = dp.NEG
     if not hasattr(pre, "_border"):
         dp._prep_border(pre)
-    al = np.empty((T_, N), np.float16)
     a = dp.start_prior(G, np.full(N, -np.log(N), np.float32) if start_ok is None else dp._log_uniform(start_ok))   # + the start frame cost (A30)
     so = dp.STEP_OK_HOOK(G, st, None) if dp.STEP_OK_HOOK else None      # user anchors (anchors.py)
-    al[0] = a
     fb_c = dp._N.FBContext(pre) if dp._N.available() else None
     is_jump = getattr(st, "jump", None)
-    for j in range(1, T_):
-        if is_jump is not None and is_jump[j]:
-            new = np.full(N, np.float32(-np.log(N)) if np.isfinite(a.max()) else NEG, np.float32)
-        else:
-            mu, sd, dth = dp._step_terms(pre, st, j)
-            if fb_c is not None:
-                new = fb_c.forward_step(a, mu, sd, dth)
-            else:
-                new = np.full(N, NEG, np.float32)
-                for gi, gr in enumerate(G.groups):
-                    if dp._skip(gr, mu, sd):
-                        continue
-                    cand = a[gr.src] + dp._cand(pre, gi, mu, sd, dth, a)
-                    lse, ok = dp._lse_reduce(cand, gr.starts, gr.blk)
-                    lse = np.where(ok, lse, NEG)
-                    tmp = np.full(N, NEG, np.float32)
-                    tmp[gr.ud] = lse
-                    new = np.logaddexp(new, tmp)
-        if so and j in so:
-            new = np.where(so[j], new, NEG).astype(np.float32)
-        mx = new.max()
-        a = new - (mx + np.log(np.exp(new - mx).sum()))
-        al[j] = np.maximum(a, -60000).astype(np.float16)
-        if j % 20 == 0:
-            progress(50.0 * j / T_)
+    B = grid.ckpt_block(T_) if block is None else max(1, int(block))
+    use_ckpt = T_ > 1 and B < T_
+    if use_ckpt:
+        M = (T_ + B - 1) // B
+        ckpts = np.empty((M, N), np.float32)
+        ckpts[0] = a
+        for j in range(1, T_):
+            a, _ = dp._fb_fwd_step(pre, fb_c, G, st, a, j, is_jump, so)
+            if j % B == 0:
+                ckpts[j // B] = a
+            if j % 20 == 0:
+                progress(35.0 * j / T_)
+        al = None
+    else:
+        al = np.empty((T_, N), np.float16)
+        al[0] = a
+        for j in range(1, T_):
+            a, _ = dp._fb_fwd_step(pre, fb_c, G, st, a, j, is_jump, so)
+            al[j] = np.maximum(a, -60000).astype(np.float16)
+            if j % 20 == 0:
+                progress(50.0 * j / T_)
     out = [None] * T_
     beta = np.zeros(N, np.float32) if end_ok is None else np.where(end_ok, np.float32(0), NEG).astype(np.float32)
     e_lp = dp.end_prior(G)                       # the end frame cost (A30)
     if e_lp is not None:
         beta = (beta + e_lp).astype(np.float32)
-    for j in range(T_ - 1, -1, -1):
-        if so and j in so:
-            beta = np.where(so[j], beta, NEG).astype(np.float32)
-        g_ = al[j].astype(np.float32) + beta
-        p = np.exp(g_ - g_.max())
-        p /= p.sum()
-        out[j] = cb(j, p)
-        if j == 0:
-            break
-        if is_jump is not None and is_jump[j]:
-            beta = np.zeros(N, np.float32) if np.isfinite(beta.max()) else np.full(N, NEG, np.float32)
+    if use_ckpt:
+        block_al = np.empty((B, N), np.float16)
+        for b in range(M - 1, -1, -1):
+            t0 = b * B
+            t1 = min(t0 + B, T_)
+            a_blk = ckpts[b]
+            block_al[0] = a_blk if t0 == 0 else np.maximum(a_blk, -60000).astype(np.float16)
+            for j in range(t0 + 1, t1):
+                a_blk, _ = dp._fb_fwd_step(pre, fb_c, G, st, a_blk, j, is_jump, so)
+                block_al[j - t0] = np.maximum(a_blk, -60000).astype(np.float16)
+            for j in range(t1 - 1, t0 - 1, -1):
+                if so and j in so:
+                    beta = np.where(so[j], beta, NEG).astype(np.float32)
+                g_ = block_al[j - t0].astype(np.float32) + beta
+                p = np.exp(g_ - g_.max())
+                p /= p.sum()
+                out[j] = cb(j, p)
+                if j == 0:
+                    break
+                beta = dp._fb_bwd_step(pre, fb_c, G, st, beta, j, is_jump)
+                if j % 20 == 0:
+                    progress(35.0 + 65.0 * (T_ - j) / T_)
+    else:
+        for j in range(T_ - 1, -1, -1):
+            if so and j in so:
+                beta = np.where(so[j], beta, NEG).astype(np.float32)
+            g_ = al[j].astype(np.float32) + beta
+            p = np.exp(g_ - g_.max())
+            p /= p.sum()
+            out[j] = cb(j, p)
+            if j == 0:
+                break
+            beta = dp._fb_bwd_step(pre, fb_c, G, st, beta, j, is_jump)
             if j % 20 == 0:
                 progress(50.0 + 50.0 * (T_ - j) / T_)
-            continue
-        mu, sd, dth = dp._step_terms(pre, st, j)
-        if fb_c is not None:
-            nb = fb_c.backward_step(beta, mu, sd, dth)
-        else:
-            nb = np.full(N, NEG, np.float32)
-            for gi, gr in enumerate(G.groups):
-                if dp._skip(gr, mu, sd):
-                    continue
-                cand = beta[gr.b_dst] + dp._cand(pre, gi, mu, sd, dth, None, view="b")
-                lse, ok = dp._lse_reduce(cand, gr.b_starts, gr.b_blk)
-                lse = np.where(ok, lse, NEG)
-                tmp = np.full(N, NEG, np.float32)
-                tmp[gr.b_us] = lse
-                nb = np.logaddexp(nb, tmp)
-        beta = nb - nb.max()
-        if j % 20 == 0:
-            progress(50.0 + 50.0 * (T_ - j) / T_)
     return out
 
 

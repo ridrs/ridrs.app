@@ -573,11 +573,13 @@ def n_cells(g: NetGraph, edges, h: float) -> int:
 
 
 def memory_plan(g: NetGraph, edges, T: int, cap_gb: float = C.HMM_CAP_GB) -> dict:
-    """worst case over the scan (kappa_min, cell h = 30 kappa_min): backpointers 2 B + stored forward scores 2 B per state and step. Raises MemoryError above the cap."""
+    """worst case over the scan (kappa_min, cell h = 30 kappa_min): sqrt(T)-checkpointed HMM arrays plus O(N) Grid/scan working set. Raises MemoryError above the cap."""
+    from rsm.hmm.grid import memory_estimate
     h = C.H * C.K_GRID[0]
     N = n_cells(g, edges, h)
-    gb = N * T * 4 / 1e9
-    p = dict(N=N, T=T, h=h, gb=gb, cap_gb=cap_gb)
+    est = memory_estimate(N, T, bp_bytes=2, alpha_bytes=2, forward_backward=True, checkpointed=True)
+    gb = est["total_gb"]
+    p = dict(N=N, T=T, h=h, gb=gb, cap_gb=cap_gb, block=est["block"], dp_gb=est["dp"] / 1e9, grid_gb=est["grid"] / 1e9)
     if gb > cap_gb:
         raise MemoryError(f"HMM arrays would need {gb:.2f} GB ({N} states x {T} steps) > {cap_gb} GB: use a smaller area")
     return p

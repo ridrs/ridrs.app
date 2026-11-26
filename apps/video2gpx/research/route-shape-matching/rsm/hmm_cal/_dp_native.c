@@ -419,10 +419,10 @@ void viterbi_scan_batches(int32_t n_batches, int32_t n_threads, Batch4Job *jobs)
     }
 }
 
-/* ---------------- Single-f_eff Viterbi (optional backpointers) ---------------- */
+/* ---------------- Single-f_eff Viterbi (optional backpointers / checkpointing) ---------------- */
 
-float viterbi_single(
-    int32_t N, int32_t T, int32_t n_groups,
+float viterbi_range(
+    int32_t N, int32_t j_start, int32_t j_end, int32_t n_groups,
     const GroupBase *groups,
     const float *const *ls_ptrs,
     const float *const *is2_ptrs,
@@ -430,28 +430,33 @@ float viterbi_single(
     const int32_t *has_dth, const float *dths,
     float c1,
     int32_t slot_bits,
-    const float *start_init,
-    const float *end_lp,
+    const float *a_init,        /* [N] scores at step j_start - 1 */
+    const float *end_lp,        /* [N] or NULL; applied only when out_final_cell != NULL */
     int32_t n_step_ok,
     const int32_t *step_ok_steps,
     const uint8_t *const *step_ok_masks,
-    uint16_t *out_bps,          /* NULL if backptr=False, else (T-1)*N */
-    int32_t *out_final_cell,
+    uint16_t *out_bps,          /* NULL if backptr=False, else (j_end - j_start) * N */
+    int32_t *out_final_cell,    /* NULL to skip final argmax (block replay pass) */
     const float *utes,          /* [T] or NULL: extra U-turn cost (nats) per step, charged on entries with utf = 1 */
     const uint8_t *is_jump,     /* [T] or NULL: 1 on a 1-step free cut-jump transition */
-    int32_t *out_jump_src       /* [T] or NULL: argmax(a) before each jump step (init -1) */
+    int32_t *out_jump_src,      /* [T] or NULL: argmax(a) before each jump step (init -1), indexed by j */
+    int32_t ckpt_stride,        /* 0 = off; >0 = save `a` at j=0 and every multiple of ckpt_stride < j_end - 1 */
+    float *out_ckpts            /* NULL or M * N */
 ) {
     const float NEG = -INFINITY;
     float *a = (float *)malloc((size_t)N * sizeof(float));
     float *tmp = (float *)malloc((size_t)N * sizeof(float));
     if (!a || !tmp) {
         free(a); free(tmp);
-        *out_final_cell = -1;
+        if (out_final_cell) *out_final_cell = -1;
         return NEG;
     }
-    memcpy(a, start_init, (size_t)N * sizeof(float));
+    memcpy(a, a_init, (size_t)N * sizeof(float));
+    if (ckpt_stride > 0 && out_ckpts && j_start == 1) {
+        memcpy(out_ckpts, a, (size_t)N * sizeof(float));
+    }
 
-    for (int32_t j = 1; j < T; j++) {
+    for (int32_t j = j_start; j < j_end; j++) {
         if (is_jump && is_jump[j]) {
             float m = NEG;
             int32_t best_prev = -1;
@@ -467,13 +472,16 @@ float viterbi_single(
                 }
             }
             float *sw = a; a = tmp; tmp = sw;
+            if (ckpt_stride > 0 && out_ckpts && j < j_end - 1 && (j % ckpt_stride) == 0) {
+                memcpy(out_ckpts + (size_t)(j / ckpt_stride) * (size_t)N, a, (size_t)N * sizeof(float));
+            }
             continue;
         }
         float mu = mus[j], sd = sds[j], dth = dths[j];
         int hd = has_dth[j];
         const float ute = utes ? utes[j] : 0.0f;
         for (int32_t i = 0; i < N; i++) tmp[i] = NEG;
-        uint16_t *code = out_bps ? (out_bps + (size_t)(j - 1) * (size_t)N) : NULL;
+        uint16_t *code = out_bps ? (out_bps + (size_t)(j - j_start) * (size_t)N) : NULL;
         if (code) memset(code, 0xFF, (size_t)N * sizeof(uint16_t));
 
         const float inv_sd = 1.0f / sd;
@@ -552,20 +560,54 @@ float viterbi_single(
             }
         }
         float *sw = a; a = tmp; tmp = sw;
-    }
-
-    float best = NEG;
-    int32_t best_c = -1;
-    for (int32_t i = 0; i < N; i++) {
-        float v = end_lp ? (a[i] + end_lp[i]) : a[i];
-        if (v > best) {
-            best = v;
-            best_c = i;
+        if (ckpt_stride > 0 && out_ckpts && j < j_end - 1 && (j % ckpt_stride) == 0) {
+            memcpy(out_ckpts + (size_t)(j / ckpt_stride) * (size_t)N, a, (size_t)N * sizeof(float));
         }
     }
-    *out_final_cell = best_c;
+
+    float best = 0.0f;
+    if (out_final_cell) {
+        best = NEG;
+        int32_t best_c = -1;
+        for (int32_t i = 0; i < N; i++) {
+            float v = end_lp ? (a[i] + end_lp[i]) : a[i];
+            if (v > best) {
+                best = v;
+                best_c = i;
+            }
+        }
+        *out_final_cell = best_c;
+    }
     free(a); free(tmp);
     return best;
+}
+
+float viterbi_single(
+    int32_t N, int32_t T, int32_t n_groups,
+    const GroupBase *groups,
+    const float *const *ls_ptrs,
+    const float *const *is2_ptrs,
+    const float *mus, const float *sds,
+    const int32_t *has_dth, const float *dths,
+    float c1,
+    int32_t slot_bits,
+    const float *start_init,
+    const float *end_lp,
+    int32_t n_step_ok,
+    const int32_t *step_ok_steps,
+    const uint8_t *const *step_ok_masks,
+    uint16_t *out_bps,          /* NULL if backptr=False, else (T-1)*N */
+    int32_t *out_final_cell,
+    const float *utes,          /* [T] or NULL: extra U-turn cost (nats) per step, charged on entries with utf = 1 */
+    const uint8_t *is_jump,     /* [T] or NULL: 1 on a 1-step free cut-jump transition */
+    int32_t *out_jump_src       /* [T] or NULL: argmax(a) before each jump step (init -1) */
+) {
+    return viterbi_range(
+        N, 1, T, n_groups, groups, ls_ptrs, is2_ptrs,
+        mus, sds, has_dth, dths, c1, slot_bits,
+        start_init, end_lp, n_step_ok, step_ok_steps, step_ok_masks,
+        out_bps, out_final_cell, utes, is_jump, out_jump_src, 0, NULL
+    );
 }
 
 /* ---------------- Forward-Backward single-step kernels ---------------- */

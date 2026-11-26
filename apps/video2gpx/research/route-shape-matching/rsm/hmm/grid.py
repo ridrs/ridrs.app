@@ -31,9 +31,20 @@ def wrap(a):
     return (a + np.pi) % (2 * np.pi) - np.pi
 
 
+_BACK_ATTRS = frozenset(("b_src", "b_dst", "b_D", "b_dphi", "b_w", "b_starts", "b_us", "b_blk", "border", "b_ut"))
+
+
+def _blk_of(n: int, starts: np.ndarray) -> np.ndarray:
+    if not n:
+        return np.zeros(0, np.int32)
+    m = np.zeros(n, np.int32)
+    m[starts] = 1
+    return np.cumsum(m, dtype=np.int32) - 1
+
+
 @dataclass
 class Group:
-    """entries with the same advance k, sorted by dst (forward) and by src (backward)"""
+    """entries with the same advance k, sorted by dst (forward) and lazily by src (backward)"""
     k: int
     src: np.ndarray      # int32, sorted by dst
     dst: np.ndarray      # int32
@@ -43,19 +54,8 @@ class Group:
     starts: np.ndarray   # int64 start of every dst block
     ud: np.ndarray       # int32 unique dst, one per block
     blk: np.ndarray      # int32 block index of every entry
-    # backward view, sorted by src
-    b_src: np.ndarray = None
-    b_dst: np.ndarray = None
-    b_D: np.ndarray = None
-    b_dphi: np.ndarray = None
-    b_w: np.ndarray = None
-    b_starts: np.ndarray = None
-    b_us: np.ndarray = None
-    b_blk: np.ndarray = None
-    border: np.ndarray = None  # permutation dst-sorted -> src-sorted
     first: np.ndarray = None  # (n_cells,) index of the dst block of every cell in `starts` or -1
-    ut: np.ndarray = None      # bool, the entry's path contains a U-turn (dst-sorted)
-    b_ut: np.ndarray = None    # the same, src-sorted
+    ut: np.ndarray = None     # bool, the entry's path contains a U-turn (dst-sorted)
     d_min: float = 0.0
     d_max: float = 0.0
 
@@ -63,6 +63,31 @@ class Group:
         if len(self.D):
             self.d_min = float(self.D.min())
             self.d_max = float(self.D.max())
+
+    def _ensure_back(self):
+        """build the src-sorted backward view on first access (skipped during forward-only scan/Viterbi)"""
+        n = len(self.src)
+        o2 = np.lexsort((self.dst, self.src)) if n else np.zeros(0, np.intp)
+        bs = self.src[o2].astype(np.int32)
+        bd = self.dst[o2].astype(np.int32)
+        bD = self.D[o2].astype(np.float32)
+        bdp = self.dphi[o2].astype(np.float32)
+        bw = self.w[o2].astype(np.float32)
+        ch2 = np.flatnonzero(np.diff(bs) != 0) + 1
+        st2 = np.concatenate([[0], ch2]).astype(np.int64) if n else np.zeros(0, np.int64)
+        blk2 = _blk_of(n, st2)
+        b_us = bs[st2].astype(np.int32) if n else np.zeros(0, np.int32)
+        b_ut = self.ut[o2].astype(bool) if self.ut is not None else None
+        self.__dict__.update(
+            b_src=bs, b_dst=bd, b_D=bD, b_dphi=bdp, b_w=bw,
+            b_starts=st2, b_us=b_us, b_blk=blk2, border=o2, b_ut=b_ut,
+        )
+
+    def __getattr__(self, name: str):
+        if name in _BACK_ATTRS:
+            self._ensure_back()
+            return self.__dict__[name]
+        raise AttributeError(name)
 
     @property
     def n(self) -> int:
@@ -126,18 +151,12 @@ def _group(k, src, dst, D, dp, w, ut, n_cells) -> Group:
     src, dst, D, dp, w, ut = src[o], dst[o], D[o], dp[o], w[o], ut[o]
     ch = np.flatnonzero(np.diff(dst) != 0) + 1
     starts = np.concatenate([[0], ch]).astype(np.int64) if len(dst) else np.zeros(0, np.int64)
-    blk = (np.cumsum(np.isin(np.arange(len(dst)), starts)) - 1).astype(np.int32) if len(dst) else np.zeros(0, np.int32)
+    blk = _blk_of(len(dst), starts)
     ud = dst[starts].astype(np.int32) if len(dst) else np.zeros(0, np.int32)
     first = np.full(n_cells, -1, np.int32)
     first[ud] = np.arange(len(ud), dtype=np.int32)
-    o2 = np.lexsort((dst, src))
-    bs, bd, bD, bdp, bw = src[o2], dst[o2], D[o2], dp[o2], w[o2]
-    ch2 = np.flatnonzero(np.diff(bs) != 0) + 1
-    st2 = np.concatenate([[0], ch2]).astype(np.int64) if len(bs) else np.zeros(0, np.int64)
-    blk2 = (np.cumsum(np.isin(np.arange(len(bs)), st2)) - 1).astype(np.int32) if len(bs) else np.zeros(0, np.int32)
-    return Group(k, src.astype(np.int32), dst.astype(np.int32), D.astype(np.float32), dp.astype(np.float32), w.astype(np.float32), starts, ud, blk,
-                 bs.astype(np.int32), bd.astype(np.int32), bD.astype(np.float32), bdp.astype(np.float32), bw.astype(np.float32), st2,
-                 bs[st2].astype(np.int32) if len(bs) else np.zeros(0, np.int32), blk2, o2, first, ut.astype(bool), ut[o2].astype(bool))
+    return Group(k, src.astype(np.int32), dst.astype(np.int32), D.astype(np.float32), dp.astype(np.float32), w.astype(np.float32),
+                 starts, ud, blk, first, ut.astype(bool))
 
 
 def end_bearings(g: NetGraph, edges: np.ndarray, span: float):
@@ -237,8 +256,34 @@ def twin_edges(g: NetGraph) -> np.ndarray:
     return np.array([key.get((int(g.edge_v[e]), int(g.edge_u[e]), int(g.edge_way[e])), -1) for e in range(g.n_edges)])
 
 
-def memory_estimate(N: int, T: int, bp_bytes: int = 1, alpha_bytes: int = 2, forward_backward: bool = True) -> dict:
-    """bytes of the big arrays of a full run (backpointers N x T, stored forward scores N x T for the posterior)"""
+GRID_BYTES_PER_CELL = 1500  # conservative O(N) allowance for Grid + Prepared + 4-wide viterbi_scan tables (~6-8 entries/cell)
+
+
+def ckpt_block(T: int) -> int:
+    """optimal block length B for sqrt(T) checkpointing (4 B float32 checkpoints + 2 B uint16/float16 block rows); returns T when direct storage is smaller"""
+    if T <= 8:
+        return max(1, int(T))
+    return min(int(np.ceil(np.sqrt(2.0 * T))), int(T))
+
+
+def memory_estimate(N: int, T: int, bp_bytes: int = 1, alpha_bytes: int = 2, forward_backward: bool = True, checkpointed: bool = False) -> dict:
+    """bytes of the big arrays of a full run.
+    checkpointed=False (legacy rsm.hmm.dp): full N x T backpointers + alphas.
+    checkpointed=True (rsm.hmm_cal.dp): sqrt(T) block checkpointing (backpointers and alphas never live simultaneously) plus the O(N) Grid/scan working set."""
+    if checkpointed:
+        B = ckpt_block(T)
+        row_b = max(bp_bytes, alpha_bytes if forward_backward else 0, 2)
+        if T <= 1:
+            dp_b = 0
+        elif B >= T:
+            dp_b = N * T * row_b
+        else:
+            M = (T + B - 1) // B
+            dp_b = N * (M * 4 + B * row_b)
+        grid_b = N * GRID_BYTES_PER_CELL
+        total = dp_b + grid_b
+        return dict(N=N, T=T, block=B, dp=dp_b, grid=grid_b, backpointers=dp_b if bp_bytes else 0,
+                    alphas=dp_b if forward_backward else 0, total=total, total_gb=total / 1e9)
     bp = N * T * bp_bytes
     al = N * T * alpha_bytes if forward_backward else 0
     return dict(N=N, T=T, backpointers=bp, alphas=al, total=bp + al, total_gb=(bp + al) / 1e9)

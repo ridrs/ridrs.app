@@ -199,9 +199,12 @@ def test_foreign_boxes_rule():
 
 def test_memory_plan_aborts_above_4gb():
     class G:
-        edge_len = np.full(1000, 30.0 * 0.8)
+        edge_len = np.full(3_000_000, 30.0 * 0.8)
     with pytest.raises(MemoryError, match="4.0 GB"):
-        osm.memory_plan(G, np.arange(1000), T=2_000_000)
+        osm.memory_plan(G, np.arange(3_000_000), T=5_000)
+    # 213,887 states x 5,967 steps (was 5.11 GB uncheckpointed) now fits well under 1 GB with sqrt(T) checkpointing
+    plan_large = osm.memory_plan(G, np.arange(213_887), T=5_967)
+    assert plan_large["gb"] < 1.0 and plan_large["dp_gb"] < 0.15
     assert osm.memory_plan(G, np.arange(1000), T=600)["gb"] < 0.01
 
 

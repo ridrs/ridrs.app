@@ -492,7 +492,7 @@ def _scan(g, E, st, cons, tick, cell_ok=None, kg0=None):
     S[fi, ki] = best-path score (with the ln kappa term). The speed work may reorder or parallelise this freely as long as S stays bit-identical."""
 
     def kappa_ok(k):
-        return osm.n_cells(g, E, C.H * k) * st.T * 4 / 1e9 <= C.HMM_CAP_GB       # same memory rule as the map step, for kappa below the scan
+        return grid.memory_estimate(osm.n_cells(g, E, C.H * k), st.T, bp_bytes=2, alpha_bytes=2, forward_backward=True, checkpointed=True)["total_gb"] <= C.HMM_CAP_GB       # same memory rule as the map step, for kappa below the scan
 
     kg = [k for k in (C.K_GRID if kg0 is None else kg0) if k >= C.K_GRID[0] or kappa_ok(k)]
     tick.total += len(C.F_GRID) * (len(kg) - len(C.K_GRID))
@@ -532,7 +532,7 @@ def _decode_at(P: dict, W: Worker, g, E, st, cons, f_eff: float, kappa: float):
     par = dataclasses.replace(dp.Par(**C.UTURN_PAR), a_ang=C.F_REF / f_eff, kappa=kappa)
     pre = dp.prepare(G, par)
     sm, em = frame_masks(g, G, cons)
-    grid.check_budget(G.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True)
+    grid.check_budget(G.N, st.T, cap_gb=C.HMM_CAP_GB, bp_bytes=2, forward_backward=True, checkpointed=True)
     r = dp.viterbi(pre, st, backptr=True, start_ok=sm, end_ok=em)
     if r["cell_path"] is None or not np.isfinite(r["score"]):
         return None
