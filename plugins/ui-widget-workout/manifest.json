@@ -24,7 +24,8 @@
         "activity.athlete",
         "workout.step-changed",
         "workout.finished",
-        "workout.intensity-changed"
+        "workout.intensity-changed",
+        "workout.halt-changed"
       ],
       "publish": []
     },

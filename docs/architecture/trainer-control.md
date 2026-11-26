@@ -39,6 +39,7 @@ The virtual gradient and speed drive the trainer's resistance, the Zwift Ride sh
 - The gear source and the trainer load are optional (`optionalRequires`, [ADR 0053](../decisions/0053-optional-capabilities.md)): without a gear source the load with the gear equals the load without it; without a trainer load the engine rides as before.
 - Only `device-ftms-trainer` writes to the trainer, through the peripheral link; dependency-cruiser enforces it.
 - Every decision is made in a turn, from inputs and derived events, on the logical clock: a replay without a trainer publishes the same commands.
+- While the rider cannot hold a workout step's power target, the workout player halts the workout and sets no target: the trainer rides the route until a countdown brings the target back ([ADR 0113](../decisions/0113-the-workout-halts-while-the-rider-cannot-hold-its-target.md)).
 
 ## Defaults
 

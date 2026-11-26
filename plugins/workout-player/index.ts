@@ -14,11 +14,14 @@ import {
   trainerErgRequestedEvent,
   trainerTargetPowerEvent,
   WORKOUT_INTENSITY,
+  type WorkoutHaltChangedPayload,
   workoutFinishedEvent,
+  workoutHaltChangedEvent,
   workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
+import { HALT_DEFAULTS, type HaltView, WorkoutHalt } from './halt.ts';
 import { type ConditionUnit, type Progress, type StepBegan, WorkoutRun } from './player.ts';
 
 /** ms of one physics step: the ride's time is `STEP_MS · (step - timeFromStep)`. */
@@ -47,6 +50,16 @@ interface Ride {
   /** J of work up to `workAt` (ridden ms). */
   work: number;
   workAt: number;
+  /** Whether the workout halted itself, and how it runs again (ADR 0113). */
+  readonly halt: WorkoutHalt;
+  /** The looks at the halt, every 250 ms of the ride's clock while the ride runs. */
+  monitor?: TaskId;
+  /** m the ride went while the workout was halted: a distance step does not count them. */
+  haltedMeters: number;
+  /** m of the ride when the workout halted; undefined while it runs. */
+  haltedAtMeters?: number;
+  /** The halt as published last. */
+  published?: string;
 }
 
 /** A ride whose workout waits for the ride to roll. */
@@ -112,6 +125,10 @@ export default definePlugin({
       }
     });
 
+    /** m the workout counts: without the metres ridden while it was halted. */
+    const stepDistance = (current: Ride): number =>
+      (current.haltedAtMeters ?? current.distance) - current.haltedMeters;
+
     const riddenNow = (current: Ride): number =>
       current.ridden + (current.since === undefined ? 0 : ctx.clock.now() - current.since);
 
@@ -133,7 +150,7 @@ export default definePlugin({
           values[unit] = value;
         }
       }
-      return { ridden, distance: current.distance, work: current.work, values };
+      return { ridden, distance: stepDistance(current), work: current.work, values };
     };
 
     const setTarget = (watts: number | null): void => {
@@ -149,6 +166,118 @@ export default definePlugin({
       }
     };
 
+    /** The step's target at the ride's intensity, before the halt's ceiling; null without one. */
+    const stepTarget = (current: Ride, progress: Progress): number | null =>
+      current.released ? null : current.run.target(progress, current.intensity);
+
+    /** The target the trainer gets while the workout runs: the step's, under the halt's ceiling. */
+    const runningTarget = (current: Ride, progress: Progress): number | null => {
+      const erg = stepTarget(current, progress);
+      const ceiling = current.halt.peek().ceiling;
+      return erg === null || ceiling === 100 ? erg : Math.round((erg * ceiling) / 100);
+    };
+
+    const publishHalt = (current: Ride, view: HaltView): void => {
+      const payload: WorkoutHaltChangedPayload = {
+        state: view.state,
+        ...(view.secondsLeft === undefined ? {} : { secondsLeft: view.secondsLeft }),
+        ...(view.waiting ? { waiting: true } : {}),
+        ...(view.ceiling < 100 ? { ceiling: view.ceiling } : {}),
+      };
+      const key = JSON.stringify(payload);
+      // Nothing to say while the workout runs as it always did.
+      if (key === current.published || (current.published === undefined && key === '{"state":"running"}')) {
+        return;
+      }
+      current.published = key;
+      ctx.events.publish(workoutHaltChangedEvent, payload);
+    };
+
+    /** The workout halts: its time stands, the trainer rides the route. */
+    const freeze = (current: Ride): void => {
+      if (current.since !== undefined) {
+        progressOf(current);
+        current.ridden += ctx.clock.now() - current.since;
+        current.since = undefined;
+      }
+      stop(current);
+      current.haltedAtMeters ??= current.distance;
+      setTarget(null);
+    };
+
+    /** The workout runs again where it stood. */
+    const thaw = (current: Ride): void => {
+      if (current.haltedAtMeters !== undefined) {
+        current.haltedMeters += current.distance - current.haltedAtMeters;
+        current.haltedAtMeters = undefined;
+      }
+      if (current.since === undefined) {
+        current.since = ctx.clock.now();
+        current.workAt = current.ridden;
+        schedule(current);
+      }
+      const erg = runningTarget(current, progressOf(current));
+      if (erg !== null) {
+        setTarget(erg);
+      }
+    };
+
+    /** The latest reported value, not one estimated past it; undefined where not available. */
+    const reported = (reader: TemporalSeriesReader): number | undefined => {
+      const read = reader.valueAt(ctx.clock.now());
+      if (read.status !== 'available') {
+        return undefined;
+      }
+      const last = reader.valueAt(read.sourceMeasuredAt);
+      return Math.max(0, last.status === 'available' ? last.value : read.value);
+    };
+
+    /** One look at the halt, and what follows from it. */
+    const look = (current: Ride): void => {
+      const before = current.halt.current;
+      const progress = progressOf(current);
+      const view = current.halt.look(
+        {
+          at: ctx.clock.now(),
+          watts: reported(readers.watts),
+          rpm: reported(readers.rpm),
+        },
+        stepTarget(current, progress),
+      );
+      if (before === 'running' && view.state !== 'running') {
+        freeze(current);
+      } else if (before !== 'running' && view.state === 'running') {
+        thaw(current);
+      } else if (view.state === 'countdown') {
+        setTarget(view.rampWatts ?? null);
+      } else if (before === 'countdown' && view.state === 'halted') {
+        setTarget(null);
+      }
+      publishHalt(current, view);
+    };
+
+    const stopMonitor = (current: Ride): void => {
+      if (current.monitor !== undefined) {
+        ctx.clock.cancel(current.monitor);
+        current.monitor = undefined;
+      }
+    };
+
+    /** Looks at the halt every 250 ms of the ride's clock, while the ride runs. */
+    const monitor = (current: Ride): void => {
+      stopMonitor(current);
+      current.monitor = ctx.clock.scheduleAt(ctx.clock.now() + HALT_DEFAULTS.tickMs, () => {
+        current.monitor = undefined;
+        if (ride !== current) {
+          return;
+        }
+        look(current);
+        if (ride === current) {
+          monitor(current);
+        }
+      });
+    };
+
     /**
      * Publishes what a look at the workout found: the steps that began, then the target. `at` is
      * when they began; the first step began when the ride's time began.
@@ -162,20 +291,25 @@ export default definePlugin({
       for (const step of began) {
         ctx.events.publish(workoutStepChangedEvent, { ...step, startedAt: at });
       }
+      if (began.length > 0) {
+        current.halt.stepBegan();
+        publishHalt(current, current.halt.peek());
+      }
       const run = current.run;
       if (run.finished) {
         setTarget(null);
         stop(current);
+        stopMonitor(current);
         ctx.events.publish(workoutFinishedEvent, { at: ctx.clock.now() });
         ride = undefined;
         return;
       }
       // A step without an ERG target leaves ERG once, when it begins: then the rider may ride it
       // with ERG of their own. A step with one holds its target against every other source.
-      if (current.released) {
+      if (current.released || current.halt.current !== 'running') {
         return;
       }
-      const erg = run.target(progress, current.intensity);
+      const erg = runningTarget(current, progress);
       if (erg !== null || began.length > 0) {
         setTarget(erg);
       }
@@ -211,6 +345,8 @@ export default definePlugin({
         run,
         intensity,
         released: false,
+        halt: new WorkoutHalt(),
+        haltedMeters: 0,
         ridden: 0,
         ...(paused ? {} : { since: from }),
         distance: sessionDistance,
@@ -222,6 +358,7 @@ export default definePlugin({
       apply(current, run.begin(progress), progress, from);
       if (ride === current && !paused) {
         schedule(current);
+        monitor(current);
       }
     };
 
@@ -241,6 +378,7 @@ export default definePlugin({
       if (payload.state === 'idle') {
         if (ride) {
           stop(ride);
+          stopMonitor(ride);
           ride = undefined;
         }
         waiting = undefined;
@@ -257,6 +395,7 @@ export default definePlugin({
         }
         if (ride?.sessionId === payload.sessionId) {
           stop(ride);
+          stopMonitor(ride);
           ride = undefined;
         }
         if (sessionId === payload.sessionId) {
@@ -272,6 +411,7 @@ export default definePlugin({
       if (newSession || nextKey !== workoutKey) {
         if (ride) {
           stop(ride);
+          stopMonitor(ride);
           ride = undefined;
         }
         waiting = undefined;
@@ -299,14 +439,28 @@ export default definePlugin({
       if (!current || payload.sessionId !== current.sessionId) {
         return;
       }
-      if (payload.state === 'paused' && current.since !== undefined) {
-        progressOf(current);
-        current.ridden += ctx.clock.now() - current.since;
-        current.since = undefined;
-        stop(current);
-      } else if (payload.state === 'running' && current.since === undefined) {
-        current.since = ctx.clock.now();
-        schedule(current);
+      if (payload.state === 'paused') {
+        stopMonitor(current);
+        if (current.since !== undefined) {
+          progressOf(current);
+          current.ridden += ctx.clock.now() - current.since;
+          current.since = undefined;
+          stop(current);
+        }
+      } else if (payload.state === 'running' && current.monitor === undefined) {
+        // Back from the rider's pause, the rider stands: with power and cadence to tell when they
+        // pedal again, the workout waits for that, as after a stop (ADR 0113).
+        const known =
+          valueOf(readers.watts) !== undefined && valueOf(readers.rpm) !== undefined;
+        if (known && stepTarget(current, progressOf(current)) !== null) {
+          current.halt.resumed(ctx.clock.now());
+          freeze(current);
+          publishHalt(current, current.halt.peek());
+        } else if (current.halt.current === 'running' && current.since === undefined) {
+          current.since = ctx.clock.now();
+          schedule(current);
+        }
+        monitor(current);
       }
     });
 
@@ -317,11 +471,11 @@ export default definePlugin({
         return;
       }
       current.intensity = payload.percent;
-      if (current.released) {
+      if (current.released || current.halt.current !== 'running') {
         return;
       }
       // A step with a power target takes the new intensity at once; one without stays as it is.
-      const erg = current.run.target(progressOf(current), current.intensity);
+      const erg = runningTarget(current, progressOf(current));
       if (erg !== null) {
         setTarget(erg);
       }
@@ -339,10 +493,16 @@ export default definePlugin({
         if (current.run.target(progressOf(current), current.intensity) !== null) {
           current.released = true;
           setTarget(null);
+          // A halted workout runs on at the rider's own load.
+          if (current.halt.current !== 'running') {
+            current.halt.reset();
+            thaw(current);
+            publishHalt(current, current.halt.peek());
+          }
         }
       } else if (payload.change === 'enter' && current.released) {
         current.released = false;
-        const erg = current.run.target(progressOf(current), current.intensity);
+        const erg = runningTarget(current, progressOf(current));
         if (erg !== null) {
           setTarget(erg);
         }
@@ -351,7 +511,7 @@ export default definePlugin({
 
     ctx.events.subscribe(workoutNextStepRequestedEvent, () => {
       const current = ride;
-      if (!current || current.since === undefined) {
+      if (!current || (current.since === undefined && current.halt.current === 'running')) {
         ctx.logger.debug({}, 'workout-player: no workout runs, "Next step" changes nothing');
         return;
       }

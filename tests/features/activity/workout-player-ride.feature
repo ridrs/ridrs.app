@@ -152,3 +152,16 @@ Feature: The workout player on a ride with the physics, a route and the recorder
     And "test-device" delivers only power 200 W every 0.25 s for 5 seconds
     Then the workout's intensity is 101 %
     And the latest target power is 202 W
+
+  Scenario: The workout's halt is derived, and a replay gives the same halt and targets
+    Given the host has started
+    When the rider starts a ride with the workout "Short"
+    And "test-device" delivers power 200 W and cadence 90 rpm every 0.5 s for 8 seconds
+    And "test-device" delivers power 0 W and cadence 0 rpm every 0.5 s for 6 more seconds
+    And "test-device" delivers power 200 W and cadence 90 rpm every 0.5 s for 30 more seconds
+    And "test-ui" publishes "activity.finish-requested" through the UI bridge
+    Then the workout halted and ran again
+    When the recording is replayed
+    Then the replay is identical
+    And the replay compared every "workout.halt-changed" event of the ride, and there was at least one
+    And the replay compared every "trainer.target-power" event of the ride, and there was at least one

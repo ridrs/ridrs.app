@@ -9,6 +9,11 @@ export const en = {
   target: 'Target',
   watts: (watts: number) => `${watts} W`,
   keys: '↑ ↓ target',
+  /** The workout halted itself (ADR 0113): the trainer rides the route. */
+  halted: 'Halted',
+  goingOn: (seconds: number) => `Going on in ${seconds}`,
+  /** The target after a repeated halt, as a share of the step's. */
+  ceiling: (percent: number) => `Target ${percent} %`,
 };
 
 export type Messages = typeof en;

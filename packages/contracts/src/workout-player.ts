@@ -43,6 +43,35 @@ export const workoutNextStepRequestedEvent = defineEvent(
   z.object({}).strict(),
 );
 
+/**
+ * The workout halts itself while the rider cannot hold a step's power target (ADR 0113): the
+ * rider stopped pedalling, or the cadence fell so low that ERG would hold them down. The ride goes
+ * on, the trainer rides on the gradient of the route, and the step's time stands.
+ *
+ * - `running`: the workout runs, ERG holds the step's target.
+ * - `halted`: the step's time stands; pedalling at 30 rpm or more starts the countdown.
+ * - `countdown`: `secondsLeft` (5 … 1) until the workout runs again, while the target rises from
+ *   the power the rider pedals to the step's; `waiting` while the cadence is below 55 rpm, when
+ *   it does not count and the load does not change.
+ *
+ * Derived, by the player, from the measured power and cadence on the ride's clock, so a replay
+ * computes it again. Published when one of its fields changes.
+ */
+export const workoutHaltChangedEvent = defineEvent(
+  'workout.halt-changed',
+  z
+    .object({
+      state: z.enum(['running', 'halted', 'countdown']),
+      secondsLeft: z.number().int().min(1).max(5).optional(),
+      waiting: z.boolean().optional(),
+      /** % of the step's target the workout holds after a repeated halt; absent at 100 %. */
+      ceiling: z.number().int().min(50).max(99).optional(),
+    })
+    .strict(),
+);
+
+export type WorkoutHaltChangedPayload = z.infer<typeof workoutHaltChangedEvent.schema>;
+
 /** The workout's intensity: 100 % rides the workout as planned. */
 export const WORKOUT_INTENSITY = Object.freeze({ min: 50, max: 150, default: 100, step: 1 });
 

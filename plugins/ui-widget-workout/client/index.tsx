@@ -8,7 +8,9 @@ import {
   dataSourceState,
   WORKOUT_INTENSITY,
   type Workout,
+  type WorkoutHaltChangedPayload,
   workoutFinishedEvent,
+  workoutHaltChangedEvent,
   workoutIntensityChangedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
@@ -56,6 +58,8 @@ interface Track {
   stepStartedAt?: number;
   pausedAt?: number;
   pausedMs: number;
+  /** Whether `pausedAt` is the start of a halt of the workout (ADR 0113), not of a pause. */
+  halting?: boolean;
 }
 
 const NBSP = ' ';
@@ -71,6 +75,7 @@ function useWorkoutRide(ctx: UiContext) {
   const [finishedAt, setFinishedAt] = useState<number>();
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [halt, setHalt] = useState<WorkoutHaltChangedPayload>();
   const [intensity, setIntensity] = useState<{ at: number; percent: number }>();
   const track = useRef<Track>({ pausedMs: 0 });
 
@@ -93,13 +98,14 @@ function useWorkoutRide(ctx: UiContext) {
         setStep(undefined);
         setFinishedAt(undefined);
         setIntensity(undefined);
+        setHalt(undefined);
         setElapsed(0);
       }
       setPaused(payload.state === 'paused');
       const now = track.current;
       if (payload.state === 'paused') {
         now.pausedAt ??= payload.pausedAt;
-      } else if (now.pausedAt !== undefined && payload.resumedAt !== undefined) {
+      } else if (now.pausedAt !== undefined && payload.resumedAt !== undefined && !now.halting) {
         // The step held while the ride stood: its clock does not count that time.
         now.pausedMs += Math.max(0, payload.resumedAt - now.pausedAt);
         now.pausedAt = undefined;
@@ -126,12 +132,30 @@ function useWorkoutRide(ctx: UiContext) {
     const stopStep = ctx.events.subscribe(workoutStepChangedEvent, ({ payload }) => {
       track.current.stepStartedAt = payload.startedAt;
       track.current.pausedMs = 0;
+      if (track.current.pausedAt !== undefined) {
+        track.current.pausedAt = Math.max(track.current.pausedAt, payload.startedAt);
+      }
       setStep({ index: payload.index, startedAt: payload.startedAt });
       setElapsed(0);
     });
     const stopFinished = ctx.events.subscribe(workoutFinishedEvent, ({ payload }) =>
       setFinishedAt(payload.at),
     );
+    // While the workout halts, the step's time stands, as in a pause.
+    const stopHalt = ctx.events.subscribe(workoutHaltChangedEvent, ({ payload, timestamp }) => {
+      const now = track.current;
+      if (payload.state !== 'running') {
+        now.pausedAt ??= timestamp;
+        now.halting = true;
+      } else if (now.halting) {
+        if (now.pausedAt !== undefined) {
+          now.pausedMs += Math.max(0, timestamp - now.pausedAt);
+          now.pausedAt = undefined;
+        }
+        now.halting = false;
+      }
+      setHalt(payload);
+    });
     const stopIntensity = ctx.events.subscribe(workoutIntensityChangedEvent, ({ payload, timestamp }) =>
       setIntensity({ at: timestamp, percent: payload.percent }),
     );
@@ -146,6 +170,7 @@ function useWorkoutRide(ctx: UiContext) {
       stopAthlete();
       stopStep();
       stopFinished();
+      stopHalt();
       stopIntensity();
       stopFrames();
     };
@@ -162,7 +187,24 @@ function useWorkoutRide(ctx: UiContext) {
   // Every loaded workout starts at 100 %; an intensity of an earlier workout is ignored.
   const percent =
     ride && intensity && intensity.at >= ride.loadedAt ? intensity.percent : WORKOUT_INTENSITY.default;
-  return { ride, ftp, step: thisStep, finished: finished === true, elapsed, paused, intensity: percent };
+  return {
+    ride,
+    ftp,
+    step: thisStep,
+    finished: finished === true,
+    elapsed,
+    paused,
+    halt: ride ? halt : undefined,
+    intensity: percent,
+  };
+}
+
+/** What a halted workout asks of the rider (ADR 0113). */
+function haltText(halt: WorkoutHaltChangedPayload, text: Messages): string {
+  if (halt.state === 'halted') {
+    return text.halted;
+  }
+  return halt.waiting ? text.haltWaiting : text.haltCountdown(halt.secondsLeft ?? 5);
 }
 
 /** "288 W", "125 → 188 W", "Free ride", "150 bpm": what a segment asks, watts only. */
@@ -419,7 +461,7 @@ const CLOCK_ICON = (
 
 function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
-  const { ride, ftp, step, finished, elapsed, paused, intensity } = useWorkoutRide(ctx);
+  const { ride, ftp, step, finished, elapsed, paused, halt, intensity } = useWorkoutRide(ctx);
   const powerZones = usePowerZones(ctx);
   const timeline = useMemo(() => {
     if (!ride) return undefined;
@@ -459,8 +501,14 @@ function WorkoutView({ ctx }: { readonly ctx: UiContext }) {
         countdown: countdownAt(remaining, current.index + 1 < segments.length),
       }
     : undefined;
-  // A cue shows for its time in the middle of the screen; a pause has that place to itself.
-  const note = current && !paused ? cueAt(current.cues, elapsed)?.text : undefined;
+  // A cue shows for its time in the middle of the screen; a pause has that place to itself, and
+  // a halt of the workout says there how to go on.
+  const note =
+    !current || paused
+      ? undefined
+      : halt && halt.state !== 'running'
+        ? haltText(halt, text)
+        : cueAt(current.cues, elapsed)?.text;
   const progress = finished ? timeline.durationSeconds : (current?.startSeconds ?? 0) + inStep;
   const totalLeft = Math.max(0, timeline.durationSeconds - progress);
 

@@ -7,6 +7,7 @@ import {
   activityStateChangedEvent,
   type Workout,
   workoutFinishedEvent,
+  workoutHaltChangedEvent,
   workoutIntensityChangedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
@@ -186,6 +187,20 @@ When(
   'the workout player reports step {int} of the workout',
   async function (this: RidrsWorld, number: number) {
     publishStep(this, number, this.fixedTime);
+    await this.settle();
+  },
+);
+
+/** "halted", "countdown 3", "countdown 5 waiting", "running": the player's halt (ADR 0113). */
+When(
+  'the workout player reports the workout {string}',
+  async function (this: RidrsWorld, text: string) {
+    const [state, seconds, waiting] = text.split(' ');
+    this.ensureHost().publishEvent('ui-bridge', workoutHaltChangedEvent, {
+      state: state as 'running' | 'halted' | 'countdown',
+      ...(seconds ? { secondsLeft: Number(seconds) } : {}),
+      ...(waiting === 'waiting' ? { waiting: true } : {}),
+    });
     await this.settle();
   },
 );

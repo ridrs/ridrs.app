@@ -31,4 +31,10 @@ export const de: Messages = {
   totalLeft: 'Restzeit im Workout',
   /** The footer: the workout's intensity, changed with plus and minus. */
   intensity: 'Intensität',
+  /** The workout halted itself: the rider stopped or could not hold the target (ADR 0113). */
+  halted: 'Workout angehalten · antreten zum Fortsetzen',
+  /** The countdown before the halted workout runs again. */
+  haltCountdown: (seconds: number) => `Weiter in ${seconds}`,
+  /** The countdown waits for the cadence. */
+  haltWaiting: 'Schneller treten · ab 55 rpm',
 };

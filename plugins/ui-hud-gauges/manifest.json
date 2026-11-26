@@ -53,7 +53,8 @@
         "trainer.target-power",
         "workout.step-changed",
         "workout.finished",
-        "workout.intensity-changed"
+        "workout.intensity-changed",
+        "workout.halt-changed"
       ],
       "publish": [
         "drivetrain.shift-requested",

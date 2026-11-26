@@ -26,9 +26,11 @@ import {
   type Workout,
   type WorkoutDuration,
   type WorkoutEffort,
+  type WorkoutHaltChangedPayload,
   type WorkoutIntensityChangedPayload,
   type WorkoutStepChangedPayload,
   workoutFinishedEvent,
+  workoutHaltChangedEvent,
   workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,
@@ -67,6 +69,7 @@ function registerPlayerEvents(world: RidrsWorld): void {
   for (const event of [
     workoutStepChangedEvent,
     workoutFinishedEvent,
+    workoutHaltChangedEvent,
     workoutNextStepRequestedEvent,
     workoutIntensityChangedEvent,
   ]) {
@@ -154,6 +157,14 @@ Given(
   'the workout player runs with the ridrs plugins {string}',
   async function (this: RidrsWorld, pluginsCsv: string) {
     await usePlayerPlugins(this, pluginsCsv);
+  },
+);
+
+Given(
+  'the workout player runs with the ridrs plugins {string} and a test device',
+  async function (this: RidrsWorld, pluginsCsv: string) {
+    await usePlayerPlugins(this, pluginsCsv);
+    await addProbe(this, 'test-device', { types: ['device'] });
   },
 );
 
@@ -681,3 +692,53 @@ Then(
     assert.equal(ride.planned, undefined);
   },
 );
+
+// ---- Halting -------------------------------------------------------------------------------
+
+/** "halted", "countdown 4", "countdown 5 waiting", "running at 95 %": a halt as the HUD reads it. */
+function haltText(payload: WorkoutHaltChangedPayload | undefined): string {
+  if (!payload) {
+    return 'running';
+  }
+  const parts: string[] = [payload.state];
+  if (payload.secondsLeft !== undefined) {
+    parts.push(String(payload.secondsLeft));
+  }
+  if (payload.waiting) {
+    parts.push('waiting');
+  }
+  if (payload.ceiling !== undefined) {
+    parts.push(`at ${payload.ceiling} %`);
+  }
+  return parts.join(' ');
+}
+
+Then("the workout's halt was:", function (this: RidrsWorld, table: DataTable) {
+  const halts = tappedOfType(this, workoutHaltChangedEvent.id);
+  for (const row of table.hashes()) {
+    const at = sinceStart(this, row.at ?? '');
+    const latest = halts.filter((e) => e.timestamp <= at).at(-1);
+    assert.equal(
+      haltText(latest?.payload as WorkoutHaltChangedPayload | undefined),
+      row.halt,
+      `The halt at ${row.at}; all: ${halts.map((e) => `${label(this, e.timestamp)} ${haltText(e.payload as WorkoutHaltChangedPayload)}`).join(', ')}`,
+    );
+  }
+});
+
+Then('the workout did not halt', function (this: RidrsWorld) {
+  assert.deepEqual(
+    tappedOfType(this, workoutHaltChangedEvent.id).map(
+      (e) => `${label(this, e.timestamp)} ${haltText(e.payload as WorkoutHaltChangedPayload)}`,
+    ),
+    [],
+  );
+});
+
+Then('the workout halted and ran again', function (this: RidrsWorld) {
+  const states = tappedOfType(this, workoutHaltChangedEvent.id).map(
+    (e) => (e.payload as WorkoutHaltChangedPayload).state,
+  );
+  assert.ok(states.includes('halted'), `Halts: ${states.join(', ')}`);
+  assert.equal(states.at(-1), 'running', `Halts: ${states.join(', ')}`);
+});

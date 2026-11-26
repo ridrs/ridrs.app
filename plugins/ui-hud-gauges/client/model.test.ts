@@ -269,6 +269,40 @@ describe('workout targets on the gauges', () => {
     expect(interpolateTarget(from, undefined, 100)).toBeUndefined();
   });
 
+  it("stands the step's time still while the workout halts itself (ADR 0113)", () => {
+    const tracker = new WorkoutTargetTracker();
+    tracker.activity({
+      state: 'running',
+      sessionId: 'ride-1',
+      startedAt: 0,
+      workout: {
+        workout: {
+          format: 'ridrs-workout',
+          version: 1,
+          id: 'w1',
+          name: 'Test',
+          sport: 'virtual-ride',
+          source: { kind: 'builtin' },
+          steps: [
+            {
+              kind: 'interval',
+              id: 's1',
+              duration: { kind: 'time', seconds: 120 },
+              effort: { kind: 'target', primary: { unit: 'watts', start: { low: 300, high: 300 } } },
+            },
+          ],
+        },
+      },
+    });
+    tracker.stepChanged({ stepId: 's1', index: 0, startedAt: 0 });
+    tracker.haltChanged({ state: 'halted' }, 30_000);
+    expect(tracker.stepAt(50_000)?.elapsedSeconds).toBe(30);
+    tracker.haltChanged({ state: 'countdown', secondsLeft: 5 }, 55_000);
+    expect(tracker.stepAt(58_000)?.elapsedSeconds).toBe(30);
+    tracker.haltChanged({ state: 'running' }, 60_000);
+    expect(tracker.stepAt(70_000)?.elapsedSeconds).toBe(40);
+  });
+
   it('tracks a workout ride across steps, glides between targets, and clears when finished', () => {
     const tracker = new WorkoutTargetTracker();
     tracker.setFtp(250);

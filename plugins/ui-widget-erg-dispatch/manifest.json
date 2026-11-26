@@ -24,7 +24,8 @@
     ],
     "events": {
       "subscribe": [
-        "trainer.target-power"
+        "trainer.target-power",
+        "workout.halt-changed"
       ],
       "publish": []
     },

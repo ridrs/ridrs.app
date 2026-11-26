@@ -30,6 +30,12 @@ export const en = {
   totalLeft: 'Time left in the workout',
   /** The footer: the workout's intensity, changed with plus and minus. */
   intensity: 'Intensity',
+  /** The workout halted itself: the rider stopped or could not hold the target (ADR 0113). */
+  halted: 'Workout halted · pedal to go on',
+  /** The countdown before the halted workout runs again. */
+  haltCountdown: (seconds: number) => `Going on in ${seconds}`,
+  /** The countdown waits for the cadence. */
+  haltWaiting: 'Pedal faster · from 55 rpm',
 };
 
 export type Messages = typeof en;

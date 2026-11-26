@@ -7,6 +7,7 @@ import {
   WORKOUT_INTENSITY,
   type WorkoutFinishedPayload,
   type WorkoutIntensityChangedPayload,
+  type WorkoutHaltChangedPayload,
   type WorkoutStepChangedPayload,
   type WorkoutTarget,
 } from '@ridrs/contracts';
@@ -507,6 +508,8 @@ export class WorkoutTargetTracker {
   private step: ActiveStep | undefined;
   private pausedAt: number | undefined;
   private pausedMs = 0;
+  /** Whether `pausedAt` is the start of a halt of the workout (ADR 0113), not of a pause. */
+  private halting = false;
   private finishedAt: number | undefined;
   private intensity: { readonly at: number; readonly percent: number } | undefined;
   private ftp: number | undefined;
@@ -523,6 +526,7 @@ export class WorkoutTargetTracker {
       this.step = undefined;
       this.pausedAt = undefined;
       this.pausedMs = 0;
+      this.halting = false;
       this.finishedAt = undefined;
       return;
     }
@@ -535,6 +539,7 @@ export class WorkoutTargetTracker {
       this.step = undefined;
       this.pausedAt = undefined;
       this.pausedMs = 0;
+      this.halting = false;
       this.finishedAt = undefined;
       this.intensity = undefined;
     } else if (nextKey !== this.workoutKey) {
@@ -547,9 +552,25 @@ export class WorkoutTargetTracker {
     }
     if (state.state === 'paused') {
       this.pausedAt ??= state.pausedAt;
-    } else if (this.pausedAt !== undefined && state.resumedAt !== undefined) {
+    } else if (this.pausedAt !== undefined && state.resumedAt !== undefined && !this.halting) {
       this.pausedMs += Math.max(0, state.resumedAt - this.pausedAt);
       this.pausedAt = undefined;
+    }
+  }
+
+  /** The workout halted itself or runs again: while it halts, the step's time stands. */
+  haltChanged(payload: WorkoutHaltChangedPayload, at: number): void {
+    if (payload.state !== 'running') {
+      if (this.pausedAt === undefined) {
+        this.pausedAt = at;
+      }
+      this.halting = true;
+    } else if (this.halting) {
+      if (this.pausedAt !== undefined) {
+        this.pausedMs += Math.max(0, at - this.pausedAt);
+        this.pausedAt = undefined;
+      }
+      this.halting = false;
     }
   }
 
@@ -562,6 +583,9 @@ export class WorkoutTargetTracker {
       fromCadence: previous.cadence,
     };
     this.pausedMs = 0;
+    if (this.pausedAt !== undefined) {
+      this.pausedAt = Math.max(this.pausedAt, payload.startedAt);
+    }
   }
 
   finished(payload: WorkoutFinishedPayload): void {

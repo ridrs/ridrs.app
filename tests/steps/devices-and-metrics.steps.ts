@@ -731,28 +731,32 @@ When(
   },
 );
 
-When(
-  '{string} delivers power {float} W and cadence {float} rpm every {float} s for {float} second(s)',
-  async function (
-    this: RidrsWorld,
-    plugin: string,
-    power: number,
-    cadence: number,
-    every: number,
-    seconds: number,
-  ) {
-    await deliver(
-      this,
-      plugin,
-      [
-        { kind: 'power', device: 'trainer-1', value: power, everyMs: every * 1000 },
-        { kind: 'cadence', device: 'trainer-1', value: cadence, everyMs: every * 1000 },
-      ],
-      seconds,
-      false,
+for (const verb of ['delivers', 'delivered']) {
+  for (const more of [false, true]) {
+    When(
+      `{string} ${verb} power {float} W and cadence {float} rpm every {float} s for {float} ${more ? 'more ' : ''}second(s)`,
+      async function (
+        this: RidrsWorld,
+        plugin: string,
+        power: number,
+        cadence: number,
+        every: number,
+        seconds: number,
+      ) {
+        await deliver(
+          this,
+          plugin,
+          [
+            { kind: 'power', device: 'trainer-1', value: power, everyMs: every * 1000 },
+            { kind: 'cadence', device: 'trainer-1', value: cadence, everyMs: every * 1000 },
+          ],
+          seconds,
+          more,
+        );
+      },
     );
-  },
-);
+  }
+}
 
 When(
   '{string} delivers only power {float} W every {float} s for {float} more second(s)',

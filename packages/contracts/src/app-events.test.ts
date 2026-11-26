@@ -25,6 +25,7 @@ const SIMULATION = [
   'equipment.bicycle-changed',
   'trainer.control-changed',
   'trainer.erg-requested',
+  'workout.halt-changed',
   'workout.intensity-changed',
   'workout.next-step-requested',
   'workout.step-changed',

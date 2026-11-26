@@ -11,7 +11,7 @@ Feature: The workout in the HUD
   place of the time left before a segment changes. Below the last segment shown, a footer shows
   the workout's intensity ("Intensity 100 %"), which the rider changes with plus and minus; the
   targets of the segments are shown at that intensity, as the trainer holds them. The widget only reads: `activity.state-changed`,
-  `activity.athlete`, `workout.step-changed`, `workout.finished`, `workout.intensity-changed` and the clock of the frames; it takes no focus. Without a workout it does not
+  `activity.athlete`, `workout.step-changed`, `workout.finished`, `workout.intensity-changed`, `workout.halt-changed` and the clock of the frames; it takes no focus. Without a workout it does not
   show.
 
   Here the scenarios publish those events directly, as the workout player does; the workout is
@@ -180,3 +180,21 @@ Feature: The workout in the HUD
     And the workout HUD reads the time left as "noch 1:47"
     When the workout player reports the workout finished
     Then the workout HUD says "Workout geschafft"
+
+  Scenario: While the workout halts, the step's time stands and the middle of the screen says how to go on
+    Given the workout HUD is shown
+    And a ride with the workout "VO2max 5×4" starts for an athlete with an FTP of 250 W
+    When the workout player reports step 5 of the workout
+    And 30 seconds go by
+    And the workout player reports the workout "halted"
+    And 20 seconds go by
+    Then the workout HUD shows the time left "3:30"
+    And the workout HUD shows the note "Workout halted · pedal to go on"
+    When the workout player reports the workout "countdown 5 waiting"
+    Then the workout HUD shows the note "Pedal faster · from 55 rpm"
+    When the workout player reports the workout "countdown 3"
+    Then the workout HUD shows the note "Going on in 3"
+    When the workout player reports the workout "running"
+    And 10 seconds go by
+    Then the workout HUD shows the time left "3:20"
+    And the workout HUD shows the note "Stay seated, spin it out"

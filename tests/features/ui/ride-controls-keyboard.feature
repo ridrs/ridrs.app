@@ -37,6 +37,21 @@ Feature: ERG and virtual gears with the keyboard alone
     Then the ERG button is off
     And the focus is on "ERG"
 
+  Scenario: While the workout halts itself, the target keeps the gear's place and says how it goes on
+    Given I move the focus to "ERG"
+    And I press Enter
+    And eventually the target power widget shows "150 W"
+    When the workout player reports the workout "halted"
+    And "test-device" publishes "trainer.target-power" with the payload "{\"watts\":null}"
+    Then eventually the target power widget shows "150 W" as "Halted"
+    And the virtual gear widget is not shown
+    And the ERG button is on
+    When the workout player reports the workout "countdown 3"
+    Then eventually the target power widget shows "150 W" as "Going on in 3"
+    When the workout player reports the workout "running"
+    And "test-device" publishes "trainer.target-power" with the payload "{\"watts\":150}"
+    Then eventually the target power widget shows "150 W" as "Target"
+
   Scenario: In ERG the target power takes the place of the gear, and the gear comes back after it
     Given I move the focus to "ERG"
     When I press Enter

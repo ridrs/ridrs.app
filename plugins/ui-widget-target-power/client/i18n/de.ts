@@ -11,4 +11,9 @@ export const de: Messages = {
   target: 'Ziel',
   watts: (watts: number) => `${watts} W`,
   keys: '↑ ↓ Ziel',
+  /** The workout halted itself (ADR 0113): the trainer rides the route. */
+  halted: 'Angehalten',
+  goingOn: (seconds: number) => `Weiter in ${seconds}`,
+  /** The target after a repeated halt, as a share of the step's. */
+  ceiling: (percent: number) => `Ziel ${percent} %`,
 };

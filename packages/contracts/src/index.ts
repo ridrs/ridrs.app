@@ -709,9 +709,11 @@ export {
 export {
   WORKOUT_INTENSITY,
   type WorkoutFinishedPayload,
+  type WorkoutHaltChangedPayload,
   type WorkoutIntensityChangedPayload,
   type WorkoutStepChangedPayload,
   workoutFinishedEvent,
+  workoutHaltChangedEvent,
   workoutIntensityChangedEvent,
   workoutNextStepRequestedEvent,
   workoutStepChangedEvent,

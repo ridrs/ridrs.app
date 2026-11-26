@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { trainerErgRequestedEvent, trainerTargetPowerEvent } from '@ridrs/contracts';
+import {
+  trainerErgRequestedEvent,
+  trainerTargetPowerEvent,
+  type WorkoutHaltChangedPayload,
+  workoutHaltChangedEvent,
+} from '@ridrs/contracts';
 import type { UiComponent, UiContext } from '@ridrs/ui-sdk';
 import { useMessages } from '@ridrs/ui-sdk/react';
-import { type KeyboardEvent, useEffect, useState } from 'react';
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { messages } from './i18n/index.ts';
 
@@ -30,6 +35,42 @@ function useTarget(ctx: UiContext): number | null {
 }
 
 /**
+ * The workout's halt (ADR 0113), while it is not running, and the target the rider goes back to:
+ * the last one before the halt.
+ */
+function useHalt(ctx: UiContext): {
+  halt?: WorkoutHaltChangedPayload;
+  resumeWatts?: number;
+  ceiling?: number;
+} {
+  const [halt, setHalt] = useState<WorkoutHaltChangedPayload>();
+  const [ceiling, setCeiling] = useState<number>();
+  const [resumeWatts, setResumeWatts] = useState<number>();
+  const halting = useRef(false);
+  useEffect(() => {
+    const stopTarget = ctx.events.subscribe(trainerTargetPowerEvent, ({ payload }) => {
+      if (!halting.current && payload.watts !== null) {
+        setResumeWatts(payload.watts);
+      }
+    });
+    const stopHalt = ctx.events.subscribe(workoutHaltChangedEvent, ({ payload }) => {
+      halting.current = payload.state !== 'running';
+      setHalt(halting.current ? payload : undefined);
+      setCeiling(payload.ceiling);
+    });
+    return () => {
+      stopTarget();
+      stopHalt();
+    };
+  }, [ctx]);
+  return {
+    ...(halt ? { halt } : {}),
+    ...(resumeWatts === undefined ? {} : { resumeWatts }),
+    ...(ceiling === undefined ? {} : { ceiling }),
+  };
+}
+
+/**
  * The ERG toggle, a round control of the activity screen between Pause and Finish ride
  * (`activity/control`), drawn like them: a round glass with a light edge. Enter turns ERG on at
  * the default target and off again; it says "On" or "Off", nothing more, and shows the state in
@@ -38,7 +79,9 @@ function useTarget(ctx: UiContext): number | null {
  */
 function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
-  const erg = useTarget(ctx) !== null;
+  const target = useTarget(ctx);
+  const { halt } = useHalt(ctx);
+  const erg = target !== null || halt !== undefined;
   return (
     <button
       type="button"
@@ -81,9 +124,13 @@ function ErgToggleView({ ctx }: { readonly ctx: UiContext }) {
  */
 function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
   const text = useMessages(ctx, messages);
-  const watts = useTarget(ctx);
+  const target = useTarget(ctx);
+  const { halt, resumeWatts, ceiling } = useHalt(ctx);
   const [focused, setFocused] = useState(false);
-  const erg = watts !== null;
+  // While the workout halts, the trainer rides the route: the widget shows the target the rider
+  // goes back to, and how.
+  const watts = halt ? (target ?? resumeWatts ?? null) : target;
+  const erg = watts !== null || halt !== undefined;
 
   useEffect(
     () =>
@@ -136,7 +183,8 @@ function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
       role="spinbutton"
       tabIndex={0}
       aria-label={text.targetPower}
-      aria-valuenow={watts}
+      aria-valuenow={watts ?? undefined}
+      {...(halt ? { 'data-halt': halt.state } : {})}
       onKeyDown={onKeyDown}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
@@ -151,10 +199,21 @@ function TargetPowerView({ ctx }: { readonly ctx: UiContext }) {
         fontFamily: 'var(--ridrs-font-text)',
       }}
     >
-      <div style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>{text.target}</div>
-      <div data-testid="value" style={{ fontSize: 44, fontWeight: 500, lineHeight: 1.1 }}>
-        {text.watts(watts)}
+      <div data-testid="label" style={{ fontFamily: 'var(--ridrs-font-mono)', fontSize: 'var(--ridrs-size-label)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ridrs-info)' }}>
+        {halt?.state === 'halted'
+          ? text.halted
+          : halt?.state === 'countdown'
+            ? text.goingOn(halt.secondsLeft ?? 5)
+            : text.target}
       </div>
+      <div data-testid="value" style={{ fontSize: 44, fontWeight: 500, lineHeight: 1.1, opacity: halt?.state === 'halted' ? 0.6 : 1 }}>
+        {watts === null ? '–' : text.watts(watts)}
+      </div>
+      {ceiling !== undefined && (
+        <div data-testid="ceiling" style={{ fontSize: 13, opacity: 0.8 }}>
+          {text.ceiling(ceiling)}
+        </div>
+      )}
       {focused && (
         <div data-testid="keys" style={{ fontSize: 13, opacity: 0.8 }}>
           {text.keys}

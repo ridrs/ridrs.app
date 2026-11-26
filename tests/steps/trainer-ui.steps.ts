@@ -195,6 +195,18 @@ Then(
   },
 );
 
+Then(
+  'eventually the target power widget shows {string} as {string}',
+  EVENTUALLY_STEP,
+  async function (this: RidrsWorld, target: string, label: string) {
+    const element = await widget('target-power');
+    await waitFor(() => {
+      assert.equal(within(element).getByTestId('value').textContent, target);
+      assert.equal(within(element).getByTestId('label').textContent, label);
+    }, EVENTUALLY);
+  },
+);
+
 Then('the target power widget is not shown', async function (this: RidrsWorld) {
   await this.settle();
   assert.equal(document.querySelector('[data-testid="widget-target-power"]'), null);

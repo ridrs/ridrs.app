@@ -24,6 +24,7 @@ import {
   worldPositionEvent,
   worldTerrainPreviewEvent,
   workoutFinishedEvent,
+  workoutHaltChangedEvent,
   workoutIntensityChangedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
@@ -206,6 +207,10 @@ function useWorkoutTargets(
       tracker.current.finished(payload);
       sync(payload.at);
     });
+    const stopHalt = ctx.events.subscribe(workoutHaltChangedEvent, ({ payload, timestamp }) => {
+      tracker.current.haltChanged(payload, timestamp);
+      sync(timestamp);
+    });
     const stopIntensity = ctx.events.subscribe(
       workoutIntensityChangedEvent,
       ({ payload, timestamp }) => {
@@ -217,6 +222,7 @@ function useWorkoutTargets(
       stopState();
       stopStep();
       stopFinished();
+      stopHalt();
       stopIntensity();
     };
   }, [ctx]);

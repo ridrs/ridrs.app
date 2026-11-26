@@ -371,7 +371,7 @@ The player starts **simple and robust**; refinement comes later.
 
 **Plugin `workout-player`** (host, type `control`):
 - Takes the workout from the activity state (`activity.start-requested { world, workout }`). Its targets were **resolved at the start**: % FTP and zones became watts with the FTP and the zones of the profile; watt targets stay watts.
-- **Time:** ridden time by `ctx.clock` (rule 7). A pause holds the workout; continuing an interrupted ride goes on at the same step.
+- **Time:** ridden time by `ctx.clock` (rule 7). A pause holds the workout; continuing an interrupted ride goes on at the same step. While the rider cannot hold a step's power target (stopped, or a spiral of the cadence), the workout halts itself and the ride goes on; pedalling again counts down 5 s into the step ([ADR 0113](../decisions/0113-the-workout-halts-while-the-rider-cannot-hold-its-target.md)).
 - **Target:** `trainer.target-power` as input, as `control-erg` does; ramps follow every second.
 - **Steps without an ERG target** (free ride, max effort, heart rate target, a range without power): ERG off; resistance by the gradient of the route; without a route, or after its end, 0 %.
 - **Durations:** time as given; distance by the virtual distance; open and `until` until "Next step" on the controller, `until` also once its condition is met.

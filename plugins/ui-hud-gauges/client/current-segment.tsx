@@ -8,6 +8,7 @@ import {
   type TerrainPreview,
   type WorldPosition,
   workoutFinishedEvent,
+  workoutHaltChangedEvent,
   workoutIntensityChangedEvent,
   workoutStepChangedEvent,
 } from '@ridrs/contracts';
@@ -120,6 +121,10 @@ export function useWorkoutSegment(
       tracker.current.finished(payload);
       sync(payload.at);
     });
+    const stopHalt = ctx.events.subscribe(workoutHaltChangedEvent, ({ payload, timestamp }) => {
+      tracker.current.haltChanged(payload, timestamp);
+      sync(timestamp);
+    });
     const stopIntensity = ctx.events.subscribe(
       workoutIntensityChangedEvent,
       ({ payload, timestamp }) => {
@@ -131,6 +136,7 @@ export function useWorkoutSegment(
       stopState();
       stopStep();
       stopFinished();
+      stopHalt();
       stopIntensity();
     };
   }, [ctx, commit]);
