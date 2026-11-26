@@ -15,7 +15,7 @@ Feature: Every ride is recorded
     Given "test-ui" published "activity.start-requested" through the UI bridge
     And "test-device" delivered power 200 W every 0.25 s and heart rate 150 bpm every 1 s for 10 seconds
     When "test-ui" publishes "activity.finish-requested" through the UI bridge
-    Then the memory storage contains "recordings/ride-20261101T100000Z-<session>.ridrs"
+    Then the memory storage contains "recordings/ride-<local start>~<session>~10s~-~Ride.ridrs"
     And it contains no ".ridrs.jsonl" file
     And the latest "recording.ride" state names that file with a distance of 41.94 m and a duration of 10000 ms
 
@@ -54,7 +54,7 @@ Feature: Every ride is recorded
   Scenario: An interrupted recording is recovered at the next start
     Given the memory storage contains an interrupted recording "recordings/ride-20261101T090000Z-0badc0de.ridrs.jsonl" whose last line is torn
     When the host restarts
-    Then the memory storage contains "recordings/ride-20261101T090000Z-0badc0de.ridrs"
+    Then the memory storage contains "recordings/ride-20261101T090000.000+0000~0badc0de-0000-4000-8000-000000000000~1s~-~Ride.ridrs"
     And its footer has the status "recovered"
     And a "recording-recovered" diagnostic was reported
     And a "recording.ride" state names that file

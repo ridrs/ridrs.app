@@ -34,13 +34,14 @@ import {
   lastRecordTime,
   OPEN_RECORDING_EXTENSION,
   openRecordingPath,
-  RECORDING_EXTENSION,
   RECORDINGS_DIRECTORY,
   type Recording,
   RecordingWriter,
   readRecording,
+  parseRideName,
   recordingName,
-  recordingPath,
+  ridePath,
+  summaryOfText,
   recoverRecording,
   type SerializedEnvelope,
   serializeEnvelope,
@@ -65,7 +66,6 @@ interface Ride {
   readonly sessionId: string;
   readonly startedAt: number;
   readonly openPath: string;
-  readonly path: string;
   readonly writer: RecordingWriter;
   /** Lines not yet handed to storage. */
   pending: string[];
@@ -242,7 +242,6 @@ function startRide(
     sessionId,
     startedAt,
     openPath: openRecordingPath(name),
-    path: recordingPath(name),
     writer,
     pending: [
       writer.header({
@@ -304,15 +303,15 @@ function distanceOf(recording: Recording): number | undefined {
 }
 
 /**
- * Compresses an open recording to `.ridrs`, reads it back, checks it and only then removes the
- * open file. Returns the verified recording and its size.
+ * Compresses an open recording to `.ridrs`, named after its summary (ADR 0111), reads it back,
+ * checks it and only then removes the open file. Returns the verified recording, its path and size.
  */
 async function seal(
   storage: AppFiles,
   openPath: string,
-  path: string,
   text: string,
-): Promise<{ recording: Recording; bytes: number }> {
+): Promise<{ recording: Recording; path: string; bytes: number }> {
+  const path = ridePath(summaryOfText(text));
   const expectedLines = text.split('\n').length - 1;
   const compressed = await gzip(new TextEncoder().encode(text));
   await storage.write(path, compressed);
@@ -321,7 +320,7 @@ async function seal(
     throw new Error(`"${path}" read back ${recording.lines} of ${expectedLines} lines`);
   }
   await storage.remove(openPath);
-  return { recording, bytes: compressed.length };
+  return { recording, path, bytes: compressed.length };
 }
 
 async function closeRide(ctx: PluginContext, recorder: Recorder, ride: Ride): Promise<void> {
@@ -336,11 +335,11 @@ async function closeRide(ctx: PluginContext, recorder: Recorder, ride: Ride): Pr
   }
   try {
     const open = new TextDecoder().decode(await recorder.storage.read(ride.openPath));
-    const { bytes } = await seal(recorder.storage, ride.openPath, ride.path, open);
+    const { path, bytes } = await seal(recorder.storage, ride.openPath, open);
     setRide(ctx, {
       sessionId: ride.sessionId,
       state: 'saved',
-      file: ride.path,
+      file: path,
       bytes,
       events: ride.writer.eventCount(),
       ...(ride.distance !== undefined ? { distance: ride.distance } : {}),
@@ -358,12 +357,11 @@ async function sealOrphan(
   openPath: string,
   why?: string,
 ): Promise<void> {
-  const path = openPath.slice(0, -'.jsonl'.length);
   try {
     const { text } = recoverRecording(
       new TextDecoder().decode(await recorder.storage.read(openPath)),
     );
-    const { recording, bytes } = await seal(recorder.storage, openPath, path, text);
+    const { recording, path, bytes } = await seal(recorder.storage, openPath, text);
     ctx.reportDiagnostic('recording-recovered', `Recovered the interrupted recording "${path}"`, {
       file: path,
       status: recording.footer?.status,
@@ -478,7 +476,7 @@ async function deleteRecording(ctx: PluginContext, recorder: Recorder, sessionId
     ride?.state === 'saved' &&
     file !== undefined &&
     file.startsWith(`${RECORDINGS_DIRECTORY}/`) &&
-    fileNameOf(file).endsWith(`-${sessionId.slice(0, 8)}${RECORDING_EXTENSION}`);
+    parseRideName(file)?.sessionId === sessionId;
   if (!completed) {
     throw new Error(`Ride ${sessionId} has no saved recording to delete`);
   }
@@ -534,7 +532,6 @@ async function attach(ctx: PluginContext, recorder: Recorder, file: string): Pro
     sessionId: header.sessionId,
     startedAt: header.startedAt,
     openPath: file,
-    path: file.slice(0, -'.jsonl'.length),
     writer: RecordingWriter.continuing(journal.recording),
     pending: [],
     lines: journal.recording.lines,

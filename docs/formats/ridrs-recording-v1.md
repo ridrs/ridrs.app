@@ -12,11 +12,15 @@ A ridrs recording is the complete, ordered history of one ride: every event-bus 
 
 | File | Content |
 |---|---|
-| `recordings/<name>.ridrs.jsonl` | While a ride runs: UTF-8 JSON Lines, uncompressed, append-only, flushed about every 1 s. |
+| `recordings/<open name>.ridrs.jsonl` | While a ride runs: UTF-8 JSON Lines, uncompressed, append-only, flushed about every 1 s. |
 | `recordings/<name>.ridrs` | After finish: the same lines, gzip-compressed. The `.jsonl` is removed only after this file was written and read back. |
 | `recordings/<name>.fit` | The FIT export. |
 
-`<name>` = `ride-<startedAt as UTC yyyyMMdd'T'HHmmss'Z'>-<first 8 characters of the session id>`, e.g. `ride-20261101T100000Z-3f2a9c1d`.
+`<open name>` = `ride-<startedAt as UTC yyyyMMdd'T'HHmmss'Z'>-<first 8 characters of the session id>`, e.g. `ride-20261101T100000Z-3f2a9c1d`.
+
+`<name>` sums up the sealed ride ([ADR 0111](../decisions/0111-a-rides-summary-in-its-file-name.md)), so the folder listing is the index of the rides on the device:
+`ride-<local start yyyyMMdd'T'HHmmss.SSS±hhmm>~<session id, ':' as '_'>~<whole seconds>s~<provider>=<planned id> or -~<workout name or "Ride">`, e.g. `ride-20261101T110000.000+0100~3f2a9c1d_activity-session_1793530800000_0~3600s~intervals.icu=146155281~Sweet Spot 3×12`.
+In the session, the planned id and the name, `% / \ : * ? " < > | ~` and control characters are written as `%XX`, and a `_` of the session as `%5F`; the name is cut to 100 bytes at a grapheme, ending with `…`. A `.ridrs` named before is renamed once by `history-ridrs`.
 
 Debugging: `gunzip -c ride-….ridrs | jq -c 'select(.kind=="event") | .envelope.type' | sort | uniq -c`.
 

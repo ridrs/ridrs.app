@@ -15,6 +15,7 @@ import {
 import {
   OPEN_RECORDING_EXTENSION,
   parseRecording,
+  parseRideName,
   type Recording,
   readRecording,
 } from '@ridrs/recording';
@@ -193,10 +194,15 @@ Then('no physics step ran since the interruption', function (this: RidrsWorld) {
  */
 async function sealedRideOf(world: RidrsWorld): Promise<Recording> {
   const journal = world.interruptedFile;
-  const file = journal?.replace(/\.jsonl$/, '');
-  assert.ok(journal && file && world.memoryFiles, 'Expected an interrupted ride');
+  assert.ok(journal && world.memoryFiles, 'Expected an interrupted ride');
   const files = world.memoryFiles.files;
-  await world.waitForIo(() => files.has(file) && !files.has(journal), 'the sealed ride');
+  // Sealed, the ride is named after its summary (ADR 0111); the journal's name has its session's start.
+  const session = /-([^-.]+)\.ridrs\.jsonl$/.exec(journal)?.[1] ?? '';
+  const sealed = () =>
+    [...files.keys()].find((path) => parseRideName(path)?.sessionId.startsWith(session));
+  await world.waitForIo(() => sealed() !== undefined && !files.has(journal), 'the sealed ride');
+  const file = sealed();
+  assert.ok(file);
   world.lastRecordingFile = file;
   return readRecording(memoryFile(world, file));
 }

@@ -7,6 +7,8 @@ export class MemoryAppFiles implements AppFiles {
   readonly files = new Map<string, Uint8Array>();
   /** How often each file was written whole (`write`, `replace`). */
   readonly writes = new Map<string, number>();
+  /** How often each file was read. */
+  readonly reads = new Map<string, number>();
   /** While set, every append and write rejects. */
   failWrites = false;
   /** How many bytes of each file are on the "disk": appended bytes count once synced. */
@@ -83,6 +85,7 @@ export class MemoryAppFiles implements AppFiles {
   }
 
   async read(path: string): Promise<Uint8Array> {
+    this.reads.set(path, (this.reads.get(path) ?? 0) + 1);
     const bytes = this.files.get(assertAppFilePath(path));
     if (!bytes) {
       throw new Error(`No such file "${path}"`);

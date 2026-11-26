@@ -1,43 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
-  activityStateChangedEvent,
-  activityStateSchema,
+  type AppFiles,
   type CompletedWorkout,
   DEFAULT_PROVIDER,
   definePlugin,
   linkIdOf,
   type PluginContext,
-  type RideWorkout,
   recordingRideState,
   storageAppFilesCapability,
   trainingHistoryRemoveService,
   trainingHistoryState,
 } from '@ridrs/contracts';
 import {
+  fitPathFor,
+  gunzip,
+  isGzip,
+  parseRideName,
   RECORDING_EXTENSION,
   RECORDINGS_DIRECTORY,
-  type Recording,
-  readRecording,
+  type RideSummary,
+  ridePath,
+  summaryOfText,
 } from '@ridrs/recording';
-
-/**
- * The workout a recorded ride rode: it is part of the ride's activity states (rule 13), so the
- * recording keeps it, with the planned entry it came from.
- */
-export function workoutOf(recording: Pick<Recording, 'events'>): RideWorkout | undefined {
-  let latest: RideWorkout | undefined;
-  for (const { envelope } of recording.events) {
-    if (envelope.type !== activityStateChangedEvent.id) {
-      continue;
-    }
-    const state = activityStateSchema.safeParse(envelope.payload);
-    if (state.success && state.data.state !== 'idle' && state.data.workout) {
-      latest = state.data.workout;
-    }
-  }
-  return latest;
-}
 
 /**
  * The rider's local date of a start, from the offset of the host the ride was recorded on: days
@@ -58,50 +43,77 @@ function localDateOf(startedAt: number, offsetMinutes: number): string {
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+/** The history's entry of a ride, from the summary in its file name (ADR 0111). */
+export function rideOf(summary: RideSummary): CompletedWorkout {
+  return {
+    id: summary.sessionId,
+    date: localDateOf(summary.startedAt, summary.timeZoneOffsetMinutes),
+    startedAt: summary.startedAt,
+    name: summary.name,
+    sport: 'virtual-ride',
+    ...(summary.durationSeconds !== undefined ? { durationSeconds: summary.durationSeconds } : {}),
+    externalId: linkIdOf(summary.sessionId),
+    ...(summary.planned ? { planned: summary.planned } : {}),
+  };
+}
+
+/**
+ * Renames a recording named before ADR 0111 after its summary, with its FIT file: written whole
+ * under the new name, then the old one removed. Reads the recording's header, footer and workout.
+ */
+async function rename(storage: AppFiles, file: string, present: ReadonlySet<string>): Promise<string> {
+  const bytes = await storage.read(file);
+  const text = new TextDecoder().decode(isGzip(bytes) ? await gunzip(bytes) : bytes);
+  const path = ridePath(summaryOfText(text));
+  if (path !== file) {
+    await storage.write(path, bytes);
+    await storage.remove(file);
+  }
+  const fit = fitPathFor(file);
+  if (present.has(fit) && fitPathFor(path) !== fit) {
+    await storage.write(fitPathFor(path), await storage.read(fit));
+    await storage.remove(fit);
+  }
+  return path;
+}
+
 /**
  * The rides saved on this device as `training.history` of the provider `ridrs` (ADR 0076): one
- * entry per sealed recording, read from its header and footer. Rides are indoor rides, named
- * after their workout, else "Ride"; a ride of a planned workout names its planned entry, so the
- * calendar can match it with its plan. It reconciles like the FIT export (ADR 0069): at start every recording in the app
- * files is read once, and a ride saved or deleted later changes the list at once. A ride removed
- * (`training.history.remove`) is deleted with its recording.
+ * entry per sealed recording, from its file name (ADR 0111), so the start reads no recording.
+ * Rides are indoor rides, named after their workout, else "Ride"; a ride of a planned workout
+ * names its planned entry, so the calendar can match it with its plan. A ride saved later joins
+ * the list at once, and one deleted leaves it. A ride removed (`training.history.remove`) is
+ * deleted with its recording. Recordings named before ADR 0111 are renamed once, after the start:
+ * the history is `loading` until they are.
  */
 export default definePlugin({
   async start(ctx) {
     const storage = ctx.capabilities.get(storageAppFilesCapability);
     const rides = new Map<string, CompletedWorkout>();
-    // The recording each ride was read from, by its session.
+    // The recording each ride is in, by its session.
     const files = new Map<string, string>();
+    let renaming = true;
 
     const publish = () =>
       ctx.state.set(trainingHistoryState, DEFAULT_PROVIDER, {
         provider: DEFAULT_PROVIDER,
         label: 'ridrs (this device)',
-        status: 'ready',
+        status: renaming ? 'loading' : 'ready',
         writable: true,
         fetchedAt: ctx.clock.now(),
         data: { workouts: [...rides.values()].sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0)) },
       });
 
-    const read = async (file: string): Promise<void> => {
-      const recording = await readRecording(await storage.read(file));
-      const { header, footer } = recording;
-      const workout = workoutOf(recording);
-      files.set(header.sessionId, file);
-      rides.set(header.sessionId, {
-        id: header.sessionId,
-        date: localDateOf(header.startedAt, header.timeZoneOffsetMinutes),
-        startedAt: header.startedAt,
-        name: workout?.workout.name ?? 'Ride',
-        sport: 'virtual-ride',
-        ...(footer ? { durationSeconds: Math.max(0, (footer.endedAt - header.startedAt) / 1000) } : {}),
-        externalId: linkIdOf(header.sessionId),
-        ...(workout?.planned ? { planned: workout.planned } : {}),
-      });
+    /** Adds the ride a sealed recording's name sums up; false for a name of no summary. */
+    const add = (file: string): boolean => {
+      const summary = parseRideName(file);
+      if (!summary) {
+        return false;
+      }
+      files.set(summary.sessionId, file);
+      rides.set(summary.sessionId, rideOf(summary));
+      return true;
     };
-
-    const warn = (file: string, error: unknown) =>
-      ctx.logger.warn({ error, file }, 'history-ridrs: a recording could not be read');
 
     ctx.services.provide(trainingHistoryRemoveService, async ({ id }) => {
       const file = files.get(id);
@@ -114,25 +126,43 @@ export default definePlugin({
       publish();
       return { ok: true };
     });
+
+    const entries = await storage.list(RECORDINGS_DIRECTORY);
+    const present = new Set(entries.map((entry) => entry.path));
+    const unnamed = entries
+      .map((entry) => entry.path)
+      .filter((path) => path.endsWith(RECORDING_EXTENSION) && !add(path));
+    renaming = unnamed.length > 0;
     publish();
-    for (const { path } of await storage.list(RECORDINGS_DIRECTORY)) {
-      if (ctx.signal.aborted) {
-        return;
+    watchRides(ctx, rides, add, publish);
+
+    // In the background: the start does not wait for the old recordings, one at a time.
+    void (async () => {
+      for (const file of unnamed) {
+        if (ctx.signal.aborted) {
+          return;
+        }
+        try {
+          add(await rename(storage, file, present));
+        } catch (error) {
+          ctx.logger.warn({ error, file }, 'history-ridrs: a recording could not be read');
+        }
+        if (!ctx.signal.aborted) {
+          publish();
+        }
       }
-      if (path.endsWith(RECORDING_EXTENSION)) {
-        await read(path).catch((error: unknown) => warn(path, error));
+      renaming = false;
+      if (!ctx.signal.aborted) {
+        publish();
       }
-    }
-    publish();
-    watchRides(ctx, rides, read, warn, publish);
+    })();
   },
 });
 
 function watchRides(
   ctx: PluginContext,
   rides: Map<string, CompletedWorkout>,
-  read: (file: string) => Promise<void>,
-  warn: (file: string, error: unknown) => void,
+  add: (file: string) => boolean,
   publish: () => void,
 ): void {
   ctx.state.watch(recordingRideState, ({ entries, changed }) => {
@@ -143,10 +173,11 @@ function watchRides(
           publish();
         }
       } else if (ride?.state === 'saved' && ride.file && !rides.has(key)) {
-        const file = ride.file;
-        read(file)
-          .then(publish)
-          .catch((error: unknown) => warn(file, error));
+        if (add(ride.file)) {
+          publish();
+        } else {
+          ctx.logger.warn({ file: ride.file }, 'history-ridrs: a saved ride has no summary in its name');
+        }
       }
     }
   });

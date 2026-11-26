@@ -9,12 +9,12 @@ Feature: FIT export of a recorded ride
     And a ride from "+0 ms" to "+10 s" with power 200 W every 0.25 s and heart rate 150 bpm every 1 s was recorded
 
   Scenario: The FIT file is written and valid
-    Then the memory storage contains "recordings/ride-20261101T100000Z-<session>.fit"
+    Then the memory storage contains "recordings/ride-<local start>~<session>~10s~-~Ride.fit"
     And the latest "export.fit" state names that file with 11 records
     And the FIT file is valid according to the official FIT SDK
 
   Scenario: A restarted FIT export writes no file again
-    Given the memory storage contains "recordings/ride-20261101T100000Z-<session>.fit"
+    Given the memory storage contains "recordings/ride-<local start>~<session>~10s~-~Ride.fit"
     When the plugin "export-fit" is stopped
     And the plugin "export-fit" is started
     Then the FIT file of the first ride was written only once

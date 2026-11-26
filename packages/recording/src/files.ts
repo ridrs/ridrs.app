@@ -20,17 +20,16 @@ function utcStamp(startedAt: number): string {
   );
 }
 
-/** `ride-<startedAt as UTC yyyyMMdd'T'HHmmss'Z'>-<first 8 chars of the session id>`. */
+/**
+ * `ride-<startedAt as UTC yyyyMMdd'T'HHmmss'Z'>-<first 8 chars of the session id>`: the name of a
+ * running ride's open recording. Sealed, it is named after its summary (`ridePath`, ADR 0111).
+ */
 export function recordingName(startedAt: number, sessionId: string): string {
   return `ride-${utcStamp(startedAt)}-${sessionId.slice(0, 8)}`;
 }
 
 export function openRecordingPath(name: string): string {
   return `${RECORDINGS_DIRECTORY}/${name}${OPEN_RECORDING_EXTENSION}`;
-}
-
-export function recordingPath(name: string): string {
-  return `${RECORDINGS_DIRECTORY}/${name}${RECORDING_EXTENSION}`;
 }
 
 /** `recordings/x.ridrs` or `recordings/x.ridrs.jsonl` -> `recordings/x.fit`. */

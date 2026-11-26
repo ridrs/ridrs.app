@@ -12,7 +12,6 @@ export {
   RECORDING_EXTENSION,
   RECORDINGS_DIRECTORY,
   recordingName,
-  recordingPath,
   SCREENSHOT_EXTENSION,
   screenshotPath,
 } from './files.ts';
@@ -25,5 +24,6 @@ export {
   readRecording,
 } from './reader.ts';
 export { type RecoveredRecording, recoverRecording } from './recovery.ts';
+export { parseRideName, type RideSummary, rideName, ridePath, summaryOfText } from './ride-name.ts';
 export { buildConfigSnapshot } from './snapshot.ts';
 export { RecordingWriter, type SerializedEnvelope, serializeEnvelope } from './writer.ts';

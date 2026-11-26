@@ -45,11 +45,42 @@ export function tappedOf(world: RidrsWorld, type: string): EventEnvelope[] {
   return world.tapped.filter((e) => e.type === type);
 }
 
-/** `<session>` in a file name stands for the first 8 characters of the ride's session id. */
+/**
+ * In a file name, `<session>` stands for the ride's session id with `:` as `_`, and `<local start>`
+ * for the ride's start in this host's local time with its offset (ADR 0111).
+ */
 export function withSession(world: RidrsWorld, path: string): string {
-  return path.includes('<session>')
-    ? path.replace('<session>', currentSessionId(world).slice(0, 8))
-    : path;
+  let named = path;
+  if (named.includes('<session>')) {
+    named = named.replace('<session>', currentSessionId(world).replaceAll(':', '_'));
+  }
+  if (named.includes('<local start>')) {
+    named = named.replace('<local start>', localStart(currentStartedAt(world)));
+  }
+  return named;
+}
+
+/** `yyyyMMdd'T'HHmmss.SSS±hhmm` in this host's time zone. */
+function localStart(at: number): string {
+  const date = new Date(at);
+  const two = (n: number) => String(n).padStart(2, '0');
+  const offset = -date.getTimezoneOffset();
+  return (
+    `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}` +
+    `T${two(date.getHours())}${two(date.getMinutes())}${two(date.getSeconds())}` +
+    `.${String(date.getMilliseconds()).padStart(3, '0')}` +
+    `${offset < 0 ? '-' : '+'}${two(Math.floor(Math.abs(offset) / 60))}${two(Math.abs(offset) % 60)}`
+  );
+}
+
+function currentStartedAt(world: RidrsWorld): number {
+  const sessionId = currentSessionId(world);
+  const started = world.hostObserved
+    .filter((e) => e.type === activityStateChangedEvent.id)
+    .map((e) => e.payload as ActivityState)
+    .find((state) => state.state !== 'idle' && state.sessionId === sessionId);
+  assert.ok(started && 'startedAt' in started, `Expected the start of ${sessionId}`);
+  return started.startedAt;
 }
 
 function memory(world: RidrsWorld) {
